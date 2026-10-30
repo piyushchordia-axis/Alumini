@@ -19,6 +19,7 @@ coverage/
 apps/api/uploads/
 apps/api/test/.uploads/
 *.log
+dump.rdb
 
 # expo / react native
 .expo/
@@ -33,6 +34,10 @@ apps/mobile/android/
 *.orig.*
 web-build/
 expo-env.d.ts
+
+# e2e artefacts
+e2e/screenshots/
+e2e/.expo-web/
 
 # editors / os
 .DS_Store

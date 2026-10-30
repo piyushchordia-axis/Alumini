@@ -17,10 +17,14 @@
     "db:reset": "pnpm --filter @illuminize/api db:reset",
     "api": "pnpm --filter @illuminize/api dev",
     "web": "pnpm --filter @illuminize/web dev",
-    "mobile": "pnpm --filter @illuminize/mobile start"
+    "mobile": "pnpm --filter @illuminize/mobile start",
+    "e2e:web": "node e2e/web-member.mjs",
+    "e2e:admin": "node e2e/web-admin.mjs",
+    "e2e:mobile-web": "node e2e/mobile-web.mjs"
   },
   "devDependencies": {
     "turbo": "^2.11.10",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "playwright": "^1.64.1"
   }
 }
