@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { AppError } from "../../src/lib/errors";
+import type { AppError } from "../../src/lib/errors";
 import { keys } from "../../src/redis/keys";
 import { OTP_MAX_ATTEMPTS, OTP_MAX_PER_HOUR, requestOtp, verifyOtp } from "../../src/services/otp.service";
 import { createUnitContext } from "../helpers/unitContext";

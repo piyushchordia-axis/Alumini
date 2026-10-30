@@ -5,6 +5,7 @@ import { createDb } from "./db/client";
 import { createJwtSigner } from "./lib/jwt";
 import { createLogger } from "./lib/logger";
 import { createRedis } from "./redis/client";
+import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
 import { createOtpSender } from "./services/otp";
 
 async function main(): Promise<void> {
@@ -22,6 +23,7 @@ async function main(): Promise<void> {
     logger,
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: createOtpSender(config, logger),
+    push: new ExpoPushChannel(db, logger, config.EXPO_ACCESS_TOKEN),
   };
   const app = createApp(ctx);
 

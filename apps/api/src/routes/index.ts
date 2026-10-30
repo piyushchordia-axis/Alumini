@@ -4,6 +4,7 @@ import { authRoutes } from "./auth.routes";
 import { healthRoutes } from "./health.routes";
 import { meRoutes } from "./me.routes";
 import { publicRoutes } from "./public.routes";
+import { tenantRouter } from "./tenant";
 
 export function apiRouter(ctx: AppContext): Router {
   const router = Router();
@@ -11,5 +12,6 @@ export function apiRouter(ctx: AppContext): Router {
   router.use(publicRoutes(ctx));
   router.use(authRoutes(ctx));
   router.use(meRoutes(ctx));
+  router.use("/t/:tenantSlug", tenantRouter(ctx));
   return router;
 }

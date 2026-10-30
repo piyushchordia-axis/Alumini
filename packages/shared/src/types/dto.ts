@@ -1,7 +1,10 @@
 import type {
   ApprovalMode,
+  MaritalStatus,
   MembershipRole,
   MembershipStatus,
+  NotificationType,
+  ProfessionType,
   TenantFeatures,
   TenantStatus,
   TenantType,
@@ -106,4 +109,99 @@ export interface AuthSessionDto extends MeDto {
 export interface TokenPairDto {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface MembershipDto {
+  id: string;
+  tenantId: string;
+  role: MembershipRole;
+  status: MembershipStatus;
+  statusReason: string | null;
+  statusChangedAt: string | null;
+  fullName: string;
+  batchYear: number;
+  dateOfBirth: string | null;
+  professionType: ProfessionType;
+  companyName: string | null;
+  designation: string | null;
+  city: string | null;
+  country: string | null;
+  maritalStatus: MaritalStatus | null;
+  kidsCount: number | null;
+  bio: string | null;
+  linkedinUrl: string | null;
+  interests: string[];
+  avatarUrl: string | null;
+  isPhoneVisible: boolean;
+  extra: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Compact member representation used in lists, authors and attendees. */
+export interface MemberCardDto {
+  id: string;
+  fullName: string;
+  batchYear: number;
+  professionType: ProfessionType;
+  companyName: string | null;
+  designation: string | null;
+  city: string | null;
+  country: string | null;
+  avatarUrl: string | null;
+  role: MembershipRole;
+  isOpenToWork: boolean;
+}
+
+export interface MemberProfileDto extends MemberCardDto {
+  bio: string | null;
+  linkedinUrl: string | null;
+  interests: string[];
+  extra: Record<string, unknown>;
+  /** Present only when the member chose to share it. */
+  phone: string | null;
+  memberSince: string;
+}
+
+export interface AdminMemberDto extends MembershipDto {
+  userId: string;
+  phone: string;
+  lastActiveAt: string | null;
+  lastLoginAt: string | null;
+}
+
+export interface NotificationDto {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditDto {
+  id: string;
+  tenantId: string | null;
+  actorUserId: string | null;
+  actorMembershipId: string | null;
+  actorName: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface DashboardDto {
+  pendingMembers: number;
+  approvedMembers: number;
+  rejectedMembers: number;
+  suspendedMembers: number;
+  newMembersLast30d: number;
+  activeMembersLast30d: number;
+  pendingContent: number;
+  openReports: number;
+  upcomingEvents: number;
+  postsLast7d: number;
 }

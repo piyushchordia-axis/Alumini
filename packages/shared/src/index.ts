@@ -3,4 +3,7 @@ export * from "./errorCodes";
 export * from "./schemas/common";
 export * from "./schemas/auth";
 export * from "./schemas/tenant";
+export * from "./schemas/membership";
+export * from "./schemas/notifications";
+export * from "./schemas/admin";
 export * from "./types/dto";

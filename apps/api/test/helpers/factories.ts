@@ -66,3 +66,56 @@ export async function loginAs(ctx: TestContext, phone: string) {
 }
 
 export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+import { memberships } from "../../src/db/schema";
+import type { MembershipRow } from "../../src/types/request";
+
+export interface MembershipFactoryOptions {
+  status?: MembershipRow["status"];
+  role?: MembershipRow["role"];
+  fullName?: string;
+  batchYear?: number;
+  city?: string;
+  country?: string;
+  companyName?: string;
+  professionType?: MembershipRow["professionType"];
+}
+
+export async function createMembership(ctx: TestContext, tenantId: string, userId: string, opts: MembershipFactoryOptions = {}) {
+  const n = nextId();
+  const [row] = await ctx.db
+    .insert(memberships)
+    .values({
+      tenantId,
+      userId,
+      status: opts.status ?? "APPROVED",
+      role: opts.role ?? "MEMBER",
+      fullName: opts.fullName ?? `Member ${n}`,
+      batchYear: opts.batchYear ?? 2010,
+      professionType: opts.professionType ?? "EMPLOYED",
+      companyName: opts.companyName ?? null,
+      city: opts.city ?? "Mumbai",
+      country: opts.country ?? "IN",
+      statusChangedAt: new Date(),
+    })
+    .returning();
+  return row!;
+}
+
+/** Creates a user + membership in the tenant and logs them in. */
+export async function memberSession(ctx: TestContext, tenantId: string, opts: MembershipFactoryOptions & { phone?: string } = {}) {
+  const user = await createUser(ctx, { phone: opts.phone });
+  const membership = await createMembership(ctx, tenantId, user.id, opts);
+  const session = await loginAs(ctx, user.phoneE164);
+  return { user, membership, token: session.accessToken, headers: auth(session.accessToken) };
+}
+
+export const PROFILE = {
+  fullName: "Test Member",
+  batchYear: 2012,
+  professionType: "EMPLOYED",
+  companyName: "Acme",
+  designation: "Engineer",
+  city: "Mumbai",
+  country: "IN",
+} as const;

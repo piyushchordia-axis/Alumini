@@ -3,6 +3,7 @@ import type { Db } from "./db/client";
 import type { JwtSigner } from "./lib/jwt";
 import type { Logger } from "./lib/logger";
 import type { RedisClient } from "./redis/client";
+import type { NotificationChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
 
 export interface AppContext {
@@ -12,4 +13,6 @@ export interface AppContext {
   logger: Logger;
   jwt: JwtSigner;
   otpSender: OtpSender;
+  /** Optional secondary notification channel (Expo push). */
+  push?: NotificationChannel;
 }
