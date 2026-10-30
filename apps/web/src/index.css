@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --c-primary: 29 78 216;
+  --c-secondary: 15 23 42;
+}
+
+@theme inline {
+  --color-primary: rgb(var(--c-primary));
+  --color-secondary: rgb(var(--c-secondary));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}

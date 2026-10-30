@@ -1,0 +1,26 @@
+{
+  "name": "illuminize",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter @illuminize/api db:migrate",
+    "db:seed": "pnpm --filter @illuminize/api db:seed",
+    "db:reset": "pnpm --filter @illuminize/api db:reset",
+    "api": "pnpm --filter @illuminize/api dev",
+    "web": "pnpm --filter @illuminize/web dev",
+    "mobile": "pnpm --filter @illuminize/mobile start"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10",
+    "typescript": "~5.9.3"
+  }
+}
