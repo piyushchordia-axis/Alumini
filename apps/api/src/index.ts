@@ -7,6 +7,7 @@ import { createLogger } from "./lib/logger";
 import { createRedis } from "./redis/client";
 import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
 import { createOtpSender } from "./services/otp";
+import { createStorage } from "./services/storage";
 
 async function main(): Promise<void> {
   loadDotenvFiles();
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
     logger,
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: createOtpSender(config, logger),
+    storage: createStorage(config),
     push: new ExpoPushChannel(db, logger, config.EXPO_ACCESS_TOKEN),
   };
   const app = createApp(ctx);

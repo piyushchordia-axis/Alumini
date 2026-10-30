@@ -10,6 +10,7 @@ import { createJwtSigner } from "../../src/lib/jwt";
 import { createLogger } from "../../src/lib/logger";
 import type { RedisClient } from "../../src/redis/client";
 import type { OtpSender, OtpSendResult } from "../../src/services/otp";
+import { createStorage } from "../../src/services/storage";
 
 /** Records every OTP so tests can read the code that was "sent". */
 export class CapturingOtpSender implements OtpSender {
@@ -73,6 +74,7 @@ export async function createTestContext(overrides: Record<string, string | undef
     logger,
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
+    storage: createStorage(config),
   };
   const app = createApp(base);
 

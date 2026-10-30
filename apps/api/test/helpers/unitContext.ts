@@ -2,6 +2,7 @@ import { loadConfig } from "../../src/config/env";
 import type { AppContext } from "../../src/context";
 import { createJwtSigner } from "../../src/lib/jwt";
 import { createLogger } from "../../src/lib/logger";
+import { createStorage } from "../../src/services/storage";
 import { CapturingOtpSender, newRedisMock } from "./testContext";
 
 /** Context for pure/Redis-only unit tests: no database handle. */
@@ -15,6 +16,7 @@ export function createUnitContext(overrides: Record<string, string | undefined> 
     logger: createLogger("silent", false),
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
+    storage: createStorage(config),
     otpCapture,
   };
   return ctx;

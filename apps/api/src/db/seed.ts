@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createDb, type Db } from "./client";
-import { memberships, tenantSettings, tenants, users } from "./schema";
+import { sql } from "drizzle-orm";
+import { contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -199,10 +200,159 @@ export async function seedMembers(db: Db, tenantIds: Record<string, string>): Pr
   return membershipIds;
 }
 
-export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number }> {
+const DAY = 24 * 60 * 60 * 1000;
+const inDays = (d: number, hour = 18) => {
+  const t = new Date(Date.now() + d * DAY);
+  t.setUTCHours(hour, 30, 0, 0);
+  return t;
+};
+
+/** Seeds demo content once per tenant (skipped when the tenant already has posts). */
+export async function seedContent(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<number> {
+  let created = 0;
+  const mid = (slug: string, phone: string) => {
+    const id = m[`${slug}:${phone}`];
+    if (!id) throw new Error(`missing seeded membership ${slug}:${phone}`);
+    return id;
+  };
+  const hasContent = async (tenantId: string) => {
+    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(posts).where(sql`${posts.tenantId} = ${tenantId}`);
+    return (row?.count ?? 0) > 0;
+  };
+  const approved = { moderationStatus: "APPROVED" as const, moderatedAt: new Date() };
+
+  // ---------- demo-university (AUTO / AUTO) ----------
+  const uni = tenantIds["demo-university"]!;
+  if (!(await hasContent(uni))) {
+    const admin = mid("demo-university", "+919000000001");
+    const rahul = mid("demo-university", "+919100000001");
+    const priya = mid("demo-university", "+919100000002");
+    const arjun = mid("demo-university", "+919100000003");
+    const meera = mid("demo-university", "+919100000004");
+    const vikram = mid("demo-university", "+919100000005");
+    const sneha = mid("demo-university", "+919100000006");
+
+    const [welcome, p1, p2, p3] = await db
+      .insert(posts)
+      .values([
+        { tenantId: uni, authorMembershipId: admin, body: "Welcome to the official Demo University alumni network! Introduce yourself in the comments: batch, city and what you're up to.", isPinned: true, ...approved },
+        { tenantId: uni, authorMembershipId: rahul, body: "Zylo Labs just closed our seed round 🎉 Huge thanks to the DemoU alumni who made intros. If you're building in fintech, let's talk.", ...approved },
+        { tenantId: uni, authorMembershipId: priya, body: "Any DemoU folks in London? Thinking of a small meetup near King's Cross next month.", ...approved },
+        { tenantId: uni, authorMembershipId: sneha, body: "Mentoring slots open for final-year students interested in distributed systems. DM me on LinkedIn.", ...approved },
+      ])
+      .returning();
+    await db.insert(postComments).values([
+      { tenantId: uni, postId: welcome!.id, authorMembershipId: rahul, body: "Rahul, batch of 2012, Mumbai. Running Zylo Labs.", ...approved },
+      { tenantId: uni, postId: welcome!.id, authorMembershipId: meera, body: "Meera, 2018, Dubai. Consulting at Deloitte — happy to help with Gulf job leads.", ...approved },
+      { tenantId: uni, postId: p1!.id, authorMembershipId: arjun, body: "Congratulations! Proud moment for the batch.", ...approved },
+      { tenantId: uni, postId: p2!.id, authorMembershipId: sneha, body: "Not London, but count me in for a virtual one!", ...approved },
+    ]);
+    await db.insert(postReactions).values([
+      { tenantId: uni, postId: p1!.id, membershipId: priya, type: "CELEBRATE" },
+      { tenantId: uni, postId: p1!.id, membershipId: arjun, type: "LIKE" },
+      { tenantId: uni, postId: p1!.id, membershipId: admin, type: "CELEBRATE" },
+      { tenantId: uni, postId: welcome!.id, membershipId: vikram, type: "LIKE" },
+      { tenantId: uni, postId: p3!.id, membershipId: vikram, type: "INSIGHTFUL" },
+    ]);
+    await db.execute(sql`update posts set comment_count = (select count(*) from post_comments c where c.post_id = posts.id and c.moderation_status = 'APPROVED'), reaction_count = (select count(*) from post_reactions r where r.post_id = posts.id) where tenant_id = ${uni}`);
+
+    await db.insert(jobs).values([
+      { tenantId: uni, authorMembershipId: rahul, title: "Backend Engineer (Node.js)", companyName: "Zylo Labs", location: "Mumbai", isRemote: true, jobType: "FULL_TIME", description: "Own our payments ledger service. 3+ years with Node/TypeScript and Postgres. Remote-friendly within India.", applyUrl: "https://example.com/zylo/backend", salaryRange: "₹25–40 LPA", ...approved },
+      { tenantId: uni, authorMembershipId: priya, title: "Associate Product Manager", companyName: "Google", location: "London", isRemote: false, jobType: "FULL_TIME", description: "Referral available for DemoU alumni. Consumer product, 1–3 years experience.", contactEmail: "priya@example.com", ...approved },
+      { tenantId: uni, authorMembershipId: meera, title: "Summer Intern – Strategy", companyName: "Deloitte", location: "Dubai", isRemote: false, jobType: "INTERNSHIP", description: "8-week internship for 2024/2025 batches. Visa sponsorship supported.", ...approved },
+      { tenantId: uni, authorMembershipId: arjun, title: "Export Operations Lead", companyName: "Singh Textiles", location: "Surat", isRemote: false, jobType: "FULL_TIME", description: "Closed — position filled.", isClosed: true, ...approved },
+    ]);
+    await db.insert(jobSeekers).values({ tenantId: uni, membershipId: vikram, note: "Graduating from IIM-A in 2026, looking for product/strategy roles in Bengaluru or Mumbai.", preferredRoles: "Product Manager, Strategy Associate", preferredLocations: "Bengaluru, Mumbai", isActive: true });
+
+    await db.insert(fundingListings).values([
+      { tenantId: uni, authorMembershipId: rahul, kind: "SEEKING", title: "Zylo Labs", stage: "SEED", amountMinMinor: 50_000_000, amountMaxMinor: 150_000_000, currency: "INR", pitch: "Embedded credit for SME marketplaces. ₹2.4Cr ARR, 40% QoQ growth. Raising a bridge before Series A.", sectors: ["fintech", "SME"], websiteUrl: "https://example.com/zylo", ...approved },
+      { tenantId: uni, authorMembershipId: sneha, kind: "OFFERING", title: "Angel cheques for DemoU founders", stage: "PRE_SEED", amountMinMinor: 2_500_000, amountMaxMinor: 10_000_000, currency: "INR", pitch: "Writing ₹25L–₹1Cr angel cheques into developer tools and infra startups founded by alumni. Happy to lead or follow.", sectors: ["devtools", "infra", "SaaS"], ...approved },
+    ]);
+
+    const [meetup, conf, past] = await db
+      .insert(events)
+      .values([
+        { tenantId: uni, authorMembershipId: rahul, title: "Mumbai alumni coffee meetup", description: "Casual Saturday coffee in Bandra. Come say hi, bring a friend from your batch.", kind: "CASUAL_MEETUP", city: "Mumbai", venueName: "Blue Tokai, Bandra West", startAt: inDays(9, 11), endAt: inDays(9, 13), timezone: "Asia/Kolkata", ...approved },
+        { tenantId: uni, authorMembershipId: admin, title: "DemoU Alumni Day 2026", description: "Annual gathering on campus with faculty talks, batch reunions and dinner. Registration required.", kind: "ORGANISED_EVENT", city: "Mumbai", venueName: "Main Auditorium, Demo University", address: "Demo University Campus, Powai, Mumbai 400076", startAt: inDays(45, 10), endAt: inDays(45, 16), timezone: "Asia/Kolkata", maxAttendees: 300, ...approved },
+        { tenantId: uni, authorMembershipId: priya, title: "London pub night", description: "First London get-together. Thanks to everyone who came!", kind: "CASUAL_MEETUP", city: "London", venueName: "The Lamb, Bloomsbury", startAt: inDays(-20, 18), endAt: inDays(-20, 21), timezone: "Europe/London", ...approved },
+      ])
+      .returning();
+    await db.insert(eventRsvps).values([
+      { tenantId: uni, eventId: meetup!.id, membershipId: arjun, status: "YES" },
+      { tenantId: uni, eventId: meetup!.id, membershipId: vikram, status: "YES" },
+      { tenantId: uni, eventId: meetup!.id, membershipId: admin, status: "MAYBE" },
+      { tenantId: uni, eventId: conf!.id, membershipId: rahul, status: "YES" },
+      { tenantId: uni, eventId: conf!.id, membershipId: priya, status: "YES" },
+      { tenantId: uni, eventId: conf!.id, membershipId: meera, status: "MAYBE" },
+      { tenantId: uni, eventId: past!.id, membershipId: sneha, status: "NO" },
+    ]);
+    created++;
+  }
+
+  // ---------- demo-college (ADMIN / ADMIN) ----------
+  const col = tenantIds["demo-college"]!;
+  if (!(await hasContent(col))) {
+    const admin = mid("demo-college", "+919000000002");
+    const kiran = mid("demo-college", "+919100000011");
+    const neha = mid("demo-college", "+919100000012");
+    const rohan = mid("demo-college", "+919100000013");
+
+    const [notice, spam] = await db
+      .insert(posts)
+      .values([
+        { tenantId: col, authorMembershipId: admin, body: "Alumni office notice: convocation photos from 1998–2010 are now digitised. Reply with your batch to get the link.", isPinned: true, ...approved },
+        { tenantId: col, authorMembershipId: rohan, body: "Earn $5000/week from home!!! Click here >>> http://totally-legit.example", ...approved },
+        { tenantId: col, authorMembershipId: kiran, body: "Joshi Robotics is hiring interns from DCE — details in the jobs section once approved.", moderationStatus: "PENDING" },
+        { tenantId: col, authorMembershipId: neha, body: "Does anyone have Prof. Deshmukh's contact? Wanted to invite him to our batch reunion.", moderationStatus: "PENDING" },
+        { tenantId: col, authorMembershipId: rohan, body: "Selling my old laptop, DM for price.", moderationStatus: "REJECTED", moderatedAt: new Date(), moderationNote: "Please use the community for alumni matters, not classifieds." },
+      ])
+      .returning();
+    await db.insert(postComments).values({ tenantId: col, postId: notice!.id, authorMembershipId: neha, body: "Batch of 2010 please!", ...approved });
+    await db.execute(sql`update posts set comment_count = (select count(*) from post_comments c where c.post_id = posts.id and c.moderation_status = 'APPROVED') where tenant_id = ${col}`);
+    await db.insert(contentReports).values({ tenantId: col, reporterMembershipId: neha, contentType: "POST", contentId: spam!.id, reason: "SPAM", details: "Looks like a scam link." });
+
+    await db.insert(jobs).values([
+      { tenantId: col, authorMembershipId: neha, title: "Solutions Architect", companyName: "TCS", location: "Hyderabad", isRemote: false, jobType: "FULL_TIME", description: "Architect role in the BFSI unit. 8+ years experience. DCE alumni referrals welcome.", ...approved },
+      { tenantId: col, authorMembershipId: kiran, title: "Robotics Intern", companyName: "Joshi Robotics", location: "Pune", isRemote: false, jobType: "INTERNSHIP", description: "6-month internship on autonomous warehouse robots. ROS2 and C++ preferred.", moderationStatus: "PENDING" },
+    ]);
+    await db.insert(fundingListings).values({ tenantId: col, authorMembershipId: kiran, kind: "SEEKING", title: "Joshi Robotics", stage: "PRE_SEED", amountMinMinor: 20_000_000, amountMaxMinor: 50_000_000, currency: "INR", pitch: "Warehouse automation for Indian 3PLs. Two pilots live in Pune. Raising ₹2–5Cr pre-seed.", sectors: ["robotics", "logistics"], moderationStatus: "PENDING" });
+    await db.insert(events).values([
+      { tenantId: col, authorMembershipId: admin, title: "Batch of 2010 reunion", description: "15-year reunion on campus followed by dinner at the faculty club.", kind: "ORGANISED_EVENT", city: "Pune", venueName: "DCE Campus", startAt: inDays(30, 11), endAt: inDays(30, 20), timezone: "Asia/Kolkata", maxAttendees: 120, ...approved },
+      { tenantId: col, authorMembershipId: rohan, title: "Toronto alumni dinner", description: "Anyone in the GTA? Let's do dinner downtown.", kind: "CASUAL_MEETUP", city: "Toronto", startAt: inDays(14, 23), timezone: "America/Toronto", moderationStatus: "PENDING" },
+    ]);
+    created++;
+  }
+
+  // ---------- demo-school (ADMIN / AUTO) ----------
+  const sch = tenantIds["demo-school"]!;
+  if (!(await hasContent(sch))) {
+    const admin = mid("demo-school", "+919000000003");
+    const aditya = mid("demo-school", "+919100000021");
+    const shreya = mid("demo-school", "+919100000022");
+    const nikhil = mid("demo-school", "+919100000023");
+    await db.insert(posts).values([
+      { tenantId: sch, authorMembershipId: admin, body: "Founders' Day is on 14 November. Alumni are invited to the morning assembly — RSVP in the events section.", isPinned: true, ...approved },
+      { tenantId: sch, authorMembershipId: shreya, body: "Designed the new alumni logo — would love feedback from the 2009 batch especially!", ...approved },
+      { tenantId: sch, authorMembershipId: nikhil, body: "Singapore DIS alumni: there are at least six of us here now. Dinner soon?", ...approved },
+    ]);
+    await db.insert(jobs).values({ tenantId: sch, authorMembershipId: aditya, title: "Product Analyst", companyName: "Flipkart", location: "Bengaluru", isRemote: false, jobType: "FULL_TIME", description: "Referral for DIS alumni with 1–3 years of analytics experience.", ...approved });
+    await db.insert(fundingListings).values({ tenantId: sch, authorMembershipId: nikhil, kind: "OFFERING", title: "Seed cheques for DIS founders", stage: "SEED", currency: "USD", amountMinMinor: 5_000_000, amountMaxMinor: 25_000_000, pitch: "Investing personally in alumni-founded companies, USD 50k–250k, sector agnostic.", sectors: [], ...approved });
+    await db.insert(events).values([
+      { tenantId: sch, authorMembershipId: admin, title: "Founders' Day assembly", description: "Join the morning assembly and the alumni tea afterwards.", kind: "ORGANISED_EVENT", city: "Bengaluru", venueName: "Demo International School", startAt: inDays(21, 3), endAt: inDays(21, 6), timezone: "Asia/Kolkata", ...approved },
+      { tenantId: sch, authorMembershipId: nikhil, title: "Singapore alumni dinner", description: "Hawker centre crawl, then drinks.", kind: "CASUAL_MEETUP", city: "Singapore", startAt: inDays(12, 11), timezone: "Asia/Singapore", ...approved },
+    ]);
+    created++;
+  }
+
+  await db.execute(sql`update events set yes_count = (select count(*) from event_rsvps r where r.event_id = events.id and r.status = 'YES'), maybe_count = (select count(*) from event_rsvps r where r.event_id = events.id and r.status = 'MAYBE')`);
+  return created;
+}
+
+export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number }> {
   const core = await seedCore(db, platformAdminPhones);
   const membershipIds = await seedMembers(db, core.tenantIds);
-  return { ...core, memberships: Object.keys(membershipIds).length };
+  const tenantsWithContent = await seedContent(db, core.tenantIds, membershipIds);
+  return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent };
 }
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);

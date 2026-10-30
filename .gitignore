@@ -17,6 +17,7 @@ coverage/
 
 # api runtime
 apps/api/uploads/
+apps/api/test/.uploads/
 *.log
 
 # expo / react native

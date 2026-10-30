@@ -5,6 +5,7 @@ import type { Logger } from "./lib/logger";
 import type { RedisClient } from "./redis/client";
 import type { NotificationChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
+import type { StorageProvider } from "./services/storage";
 
 export interface AppContext {
   config: Config;
@@ -13,6 +14,7 @@ export interface AppContext {
   logger: Logger;
   jwt: JwtSigner;
   otpSender: OtpSender;
+  storage: StorageProvider;
   /** Optional secondary notification channel (Expo push). */
   push?: NotificationChannel;
 }

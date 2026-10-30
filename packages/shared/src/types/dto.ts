@@ -1,10 +1,20 @@
 import type {
   ApprovalMode,
+  ContentType,
+  EventKind,
+  FundingKind,
+  FundingStage,
+  JobType,
   MaritalStatus,
   MembershipRole,
   MembershipStatus,
+  ModerationStatus,
   NotificationType,
   ProfessionType,
+  ReactionType,
+  ReportReason,
+  ReportStatus,
+  RsvpStatus,
   TenantFeatures,
   TenantStatus,
   TenantType,
@@ -205,3 +215,176 @@ export interface DashboardDto {
   upcomingEvents: number;
   postsLast7d: number;
 }
+
+export interface ModerationFields {
+  moderationStatus: ModerationStatus;
+  moderationNote: string | null;
+  moderatedAt: string | null;
+}
+
+export interface JobDto extends ModerationFields {
+  id: string;
+  title: string;
+  companyName: string;
+  location: string | null;
+  isRemote: boolean;
+  jobType: JobType;
+  description: string;
+  applyUrl: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  salaryRange: string | null;
+  isClosed: boolean;
+  expiresAt: string | null;
+  author: MemberCardDto;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobSeekerDto {
+  member: MemberCardDto;
+  note: string;
+  preferredRoles: string | null;
+  preferredLocations: string | null;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface FundingDto extends ModerationFields {
+  id: string;
+  kind: FundingKind;
+  title: string;
+  stage: FundingStage | null;
+  amountMinMinor: number | null;
+  amountMaxMinor: number | null;
+  currency: string;
+  pitch: string;
+  sectors: string[];
+  websiteUrl: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  isClosed: boolean;
+  author: MemberCardDto;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostDto extends ModerationFields {
+  id: string;
+  body: string;
+  imageUrls: string[];
+  commentCount: number;
+  reactionCount: number;
+  myReaction: ReactionType | null;
+  isPinned: boolean;
+  author: MemberCardDto;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommentDto {
+  id: string;
+  postId: string;
+  body: string;
+  author: MemberCardDto;
+  isMine: boolean;
+  moderationStatus: ModerationStatus;
+  createdAt: string;
+}
+
+export interface ReactionSummaryDto {
+  reactionCount: number;
+  myReaction: ReactionType | null;
+}
+
+export interface ReactionEntryDto {
+  member: MemberCardDto;
+  type: ReactionType;
+  createdAt: string;
+}
+
+export interface EventDto extends ModerationFields {
+  id: string;
+  title: string;
+  description: string;
+  kind: EventKind;
+  city: string;
+  venueName: string | null;
+  address: string | null;
+  startAt: string;
+  endAt: string | null;
+  timezone: string;
+  maxAttendees: number | null;
+  coverImageUrl: string | null;
+  isCancelled: boolean;
+  yesCount: number;
+  maybeCount: number;
+  myRsvp: RsvpStatus | null;
+  author: MemberCardDto;
+  isMine: boolean;
+  attendeePreview?: MemberCardDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RsvpSummaryDto {
+  myRsvp: RsvpStatus | null;
+  yesCount: number;
+  maybeCount: number;
+}
+
+export interface ReportDto {
+  id: string;
+  contentType: ContentType;
+  contentId: string;
+  reason: ReportReason;
+  details: string | null;
+  status: ReportStatus;
+  resolutionNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface ContentPreviewDto {
+  title: string | null;
+  excerpt: string | null;
+  moderationStatus: ModerationStatus;
+  authorMembershipId: string;
+}
+
+export interface AdminReportDto extends ReportDto {
+  reporter: MemberCardDto;
+  content: ContentPreviewDto | null;
+}
+
+export interface ModerationItemDto {
+  contentType: ContentType;
+  id: string;
+  title: string | null;
+  excerpt: string | null;
+  author: MemberCardDto;
+  moderationStatus: ModerationStatus;
+  moderatedAt: string | null;
+  createdAt: string;
+  reportCount: number;
+}
+
+export interface DirectoryFiltersDto {
+  batchYears: number[];
+  cities: string[];
+  countries: string[];
+  companies: string[];
+}
+
+export interface UploadResultDto {
+  url: string;
+}
+
+export interface PostPageDto extends CursorPage<PostDto> {
+  pinned?: PostDto[];
+}
+
+export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto;
