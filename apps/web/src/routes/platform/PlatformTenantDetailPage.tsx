@@ -1,0 +1,362 @@
+import { BILLING_CYCLES, BILLING_MODELS, BILLING_MODEL_LABELS, type BillingModel, type BillingPlanCreateInput, type TenantStatus } from "@illuminize/shared";
+import { errorMessage } from "@illuminize/shared/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { BrandingForm } from "@/components/admin/BrandingForm";
+import { SettingsForm } from "@/components/admin/SettingsForm";
+import { Avatar, Badge, Button, Card, ErrorBox, FormField, Input, Loading, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { api } from "@/lib/api";
+import { formatDate, formatMoneyMinor } from "@/lib/format";
+import { qk } from "@/lib/queryKeys";
+import { toast } from "@/stores/uiStore";
+
+type Tab = "overview" | "settings" | "branding" | "admins" | "billing";
+
+export function PlatformTenantDetailPage() {
+  const { tenantId = "" } = useParams();
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>("overview");
+  const q = useQuery({ queryKey: qk.platform.tenant(tenantId), queryFn: () => api.platform.tenants.get(tenantId) });
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["platform"] });
+    void qc.invalidateQueries({ queryKey: ["tenants"] });
+  };
+  const setStatus = useMutation({
+    mutationFn: (status: TenantStatus) => api.platform.tenants.update(tenantId, { status }),
+    onSuccess: () => {
+      refresh();
+      toast.success("Status updated");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  if (q.isLoading) return <Loading />;
+  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Not found"} />;
+  const { tenant, settings, counts, currentPlan, admins } = q.data;
+  return (
+    <div className="space-y-4">
+      <Link to="/platform/tenants" className="text-sm text-slate-500 hover:text-slate-800">
+        ← Institutions
+      </Link>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} />
+            {tenant.name}
+            <Badge tone={tenant.status === "ACTIVE" ? "success" : tenant.status === "SUSPENDED" ? "warning" : "neutral"}>{tenant.status}</Badge>
+          </span>
+        }
+        subtitle={
+          <>
+            <a href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer" className="text-primary underline">
+              /t/{tenant.slug} ↗
+            </a>{" "}
+            · onboarded {formatDate(tenant.createdAt)}
+          </>
+        }
+        actions={
+          <Select value={tenant.status} onChange={(e) => setStatus.mutate(e.target.value as TenantStatus)} className="w-40">
+            <option value="ACTIVE">Active</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="ARCHIVED">Archived</option>
+          </Select>
+        }
+      />
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: "overview", label: "Overview" },
+          { value: "settings", label: "Settings" },
+          { value: "branding", label: "Branding" },
+          { value: "admins", label: "Admins", count: admins.length },
+          { value: "billing", label: "Billing" },
+        ]}
+        className="w-fit"
+      />
+      {tab === "overview" && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Stat label="Approved members" value={counts.approvedMembers} />
+          <Stat label="Pending members" value={counts.pendingMembers} />
+          <Stat label="Suspended" value={counts.suspendedMembers} />
+          <Stat label="Active (30d)" value={counts.activeMembers30d} hint="Used for per-active-user billing" />
+          <Stat label="New (30d)" value={counts.newMembers30d} />
+          <Stat label="Billing plan" value={currentPlan ? BILLING_MODEL_LABELS[currentPlan.billingModel] : "None"} hint={currentPlan ? `since ${formatDate(currentPlan.effectiveFrom)}` : "Add one under Billing"} />
+        </div>
+      )}
+      {tab === "settings" && (
+        <Card className="p-5">
+          <SettingsForm
+            key={settings.updatedAt}
+            initial={settings}
+            onSubmit={async (input) => {
+              await api.platform.tenants.updateSettings(tenantId, input);
+              refresh();
+            }}
+          />
+        </Card>
+      )}
+      {tab === "branding" && (
+        <Card className="p-5">
+          <BrandingForm
+            key={tenant.updatedAt}
+            initial={tenant}
+            onSubmit={async (input) => {
+              await api.platform.tenants.update(tenantId, input);
+              refresh();
+            }}
+          />
+        </Card>
+      )}
+      {tab === "admins" && <AdminsTab tenantId={tenantId} admins={admins} onChange={refresh} />}
+      {tab === "billing" && <BillingTab tenantId={tenantId} />}
+    </div>
+  );
+}
+
+function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: Awaited<ReturnType<typeof api.platform.tenants.get>>["admins"]; onChange: () => void }) {
+  const [phone, setPhone] = useState("+91");
+  const [fullName, setFullName] = useState("");
+  const add = useMutation({
+    mutationFn: () => api.platform.tenants.admins.add(tenantId, { phone, fullName }),
+    onSuccess: () => {
+      onChange();
+      setFullName("");
+      setPhone("+91");
+      toast.success("Admin added — they can sign in with their mobile number");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const remove = useMutation({
+    mutationFn: (membershipId: string) => api.platform.tenants.admins.remove(tenantId, membershipId),
+    onSuccess: () => {
+      onChange();
+      toast.success("Admin role removed");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h3 className="mb-3 font-semibold text-slate-900">Add an institution admin</h3>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            add.mutate();
+          }}
+        >
+          <FormField label="Mobile number">
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </FormField>
+          <FormField label="Full name">
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </FormField>
+          <Button type="submit" loading={add.isPending} disabled={fullName.length < 2}>
+            Add admin
+          </Button>
+        </form>
+        <p className="mt-2 text-xs text-slate-500">Existing members are promoted and approved; new numbers get an approved admin membership they can log into immediately.</p>
+      </Card>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        {admins.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No admins yet.</li>}
+        {admins.map((a) => (
+          <li key={a.id} className="flex items-center gap-3 px-4 py-3">
+            <Avatar name={a.fullName} src={a.avatarUrl} size="sm" />
+            <span className="flex-1 text-sm">
+              <span className="font-medium text-slate-900">{a.fullName}</span>
+              <span className="text-slate-500"> · {a.phone} · batch of {a.batchYear}</span>
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => confirm(`Remove admin role from ${a.fullName}?`) && remove.mutate(a.id)}>
+              Remove
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BillingTab({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+  const billing = useQuery({ queryKey: qk.platform.billing(tenantId), queryFn: () => api.platform.billing.get(tenantId) });
+  const today = new Date();
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  const [from, setFrom] = useState(monthStart);
+  const [to, setTo] = useState(monthEnd);
+  const usage = useQuery({ queryKey: qk.platform.usage(tenantId, { from, to }), queryFn: () => api.platform.billing.usage(tenantId, { from, to }), enabled: !!from && !!to && from <= to });
+  const [model, setModel] = useState<BillingModel>("PER_ACTIVE_USER");
+  const [cycle, setCycle] = useState<(typeof BILLING_CYCLES)[number]>("MONTHLY");
+  const [currency, setCurrency] = useState("INR");
+  const [price, setPrice] = useState("");
+  const [flat, setFlat] = useState("");
+  const [effectiveFrom, setEffectiveFrom] = useState(monthStart);
+  const [notes, setNotes] = useState("");
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["platform"] });
+  };
+  const createPlan = useMutation({
+    mutationFn: () => {
+      const input: BillingPlanCreateInput = {
+        billingModel: model,
+        billingCycle: cycle,
+        currency,
+        pricePerActiveUserMinor: model === "PER_ACTIVE_USER" ? Math.round(Number(price) * 100) : null,
+        flatFeeMinor: model === "FLAT_FEE" ? Math.round(Number(flat) * 100) : null,
+        effectiveFrom,
+        notes: notes || null,
+      };
+      return api.platform.billing.createPlan(tenantId, input);
+    },
+    onSuccess: () => {
+      refresh();
+      toast.success("Billing plan recorded");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const snapshot = useMutation({
+    mutationFn: () => api.platform.billing.createSnapshot(tenantId, { periodStart: from, periodEnd: to, notes: null }),
+    onSuccess: () => {
+      refresh();
+      toast.success("Snapshot saved for invoicing");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  if (billing.isLoading) return <Loading />;
+  if (billing.error || !billing.data) return <ErrorBox error={billing.error ?? "Failed"} />;
+  const b = billing.data;
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h3 className="font-semibold text-slate-900">Current plan</h3>
+        {b.currentPlan ? (
+          <p className="mt-1 text-sm text-slate-700">
+            {BILLING_MODEL_LABELS[b.currentPlan.billingModel]}
+            {b.currentPlan.billingModel === "PER_ACTIVE_USER" && ` · ${formatMoneyMinor(b.currentPlan.pricePerActiveUserMinor, b.currentPlan.currency)} per active member`}
+            {b.currentPlan.billingModel === "FLAT_FEE" && ` · ${formatMoneyMinor(b.currentPlan.flatFeeMinor, b.currentPlan.currency)}`} · {b.currentPlan.billingCycle.toLowerCase()} · since {formatDate(b.currentPlan.effectiveFrom)}
+            {b.currentPlan.notes && <span className="block text-xs text-slate-500">{b.currentPlan.notes}</span>}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-amber-700">No plan recorded. Add one below so usage can be priced.</p>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="font-semibold text-slate-900">Usage &amp; chargeback estimate</h3>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <FormField label="From">
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </FormField>
+          <FormField label="To">
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </FormField>
+          <Button variant="outline" onClick={() => snapshot.mutate()} loading={snapshot.isPending} disabled={!usage.data}>
+            Freeze snapshot for invoice
+          </Button>
+        </div>
+        {usage.data && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-4">
+            <Stat label="Approved members" value={usage.data.approvedMembers} />
+            <Stat label="Active in period" value={usage.data.activeMembers} />
+            <Stat label="New in period" value={usage.data.newMembers} />
+            <Stat label="Estimated amount" value={formatMoneyMinor(usage.data.estimatedAmountMinor, usage.data.currency)} hint={usage.data.plan ? BILLING_MODEL_LABELS[usage.data.plan.billingModel] : "no plan"} />
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="font-semibold text-slate-900">Record a new plan</h3>
+        <p className="text-xs text-slate-500">Billing is handled offline; this records what was agreed. A new plan closes the previous one the day before it starts.</p>
+        <form
+          className="mt-3 grid gap-3 sm:grid-cols-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createPlan.mutate();
+          }}
+        >
+          <FormField label="Model">
+            <Select value={model} onChange={(e) => setModel(e.target.value as BillingModel)}>
+              {BILLING_MODELS.map((m) => (
+                <option key={m} value={m}>
+                  {BILLING_MODEL_LABELS[m]}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Cycle">
+            <Select value={cycle} onChange={(e) => setCycle(e.target.value as (typeof BILLING_CYCLES)[number])}>
+              {BILLING_CYCLES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Currency">
+            <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              {["INR", "USD", "EUR", "GBP", "AED", "SGD"].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </FormField>
+          {model === "PER_ACTIVE_USER" && (
+            <FormField label="Price per active member" required>
+              <Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </FormField>
+          )}
+          {model === "FLAT_FEE" && (
+            <FormField label="Flat fee per cycle" required>
+              <Input type="number" min={0} step="0.01" value={flat} onChange={(e) => setFlat(e.target.value)} />
+            </FormField>
+          )}
+          <FormField label="Effective from" required>
+            <Input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+          </FormField>
+          <div className="sm:col-span-3">
+            <FormField label="Notes">
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Who agreed, invoice terms, PO numbers…" />
+            </FormField>
+          </div>
+          <div className="sm:col-span-3">
+            <Button type="submit" loading={createPlan.isPending} disabled={(model === "PER_ACTIVE_USER" && !price) || (model === "FLAT_FEE" && !flat)}>
+              Record plan
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="mb-2 font-semibold text-slate-900">Plan history</h3>
+        <ul className="divide-y divide-slate-100 text-sm">
+          {b.plans.map((p) => (
+            <li key={p.id} className="flex flex-wrap justify-between gap-2 py-2">
+              <span>
+                {BILLING_MODEL_LABELS[p.billingModel]}
+                {p.pricePerActiveUserMinor != null && ` · ${formatMoneyMinor(p.pricePerActiveUserMinor, p.currency)}/active member`}
+                {p.flatFeeMinor != null && ` · ${formatMoneyMinor(p.flatFeeMinor, p.currency)}`}
+              </span>
+              <span className="text-slate-500">
+                {formatDate(p.effectiveFrom)} → {p.effectiveTo ? formatDate(p.effectiveTo) : "open"}
+              </span>
+            </li>
+          ))}
+          {b.plans.length === 0 && <li className="py-2 text-slate-400">No plans yet.</li>}
+        </ul>
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="mb-2 font-semibold text-slate-900">Invoice snapshots</h3>
+        <ul className="divide-y divide-slate-100 text-sm">
+          {b.snapshots.map((s) => (
+            <li key={s.id} className="flex flex-wrap justify-between gap-2 py-2">
+              <span>
+                {formatDate(s.periodStart)} – {formatDate(s.periodEnd)} · {s.activeMemberCount} active · {s.approvedMemberCount} approved
+              </span>
+              <span className="font-medium text-slate-900">{formatMoneyMinor(s.amountMinor, s.currency)}</span>
+            </li>
+          ))}
+          {b.snapshots.length === 0 && <li className="py-2 text-slate-400">No snapshots yet.</li>}
+        </ul>
+      </Card>
+    </div>
+  );
+}
