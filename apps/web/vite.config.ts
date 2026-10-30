@@ -11,6 +11,16 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          data: ["@tanstack/react-query", "zustand", "zod", "react-hook-form", "@hookform/resolvers"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
