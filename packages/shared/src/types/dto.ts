@@ -1,5 +1,7 @@
 import type {
   ApprovalMode,
+  BillingCycle,
+  BillingModel,
   ContentType,
   EventKind,
   FundingKind,
@@ -388,3 +390,80 @@ export interface PostPageDto extends CursorPage<PostDto> {
 }
 
 export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto;
+
+export interface TenantCountsDto {
+  approvedMembers: number;
+  pendingMembers: number;
+  suspendedMembers: number;
+  activeMembers30d: number;
+  newMembers30d: number;
+}
+
+export interface PlatformTenantRowDto extends TenantSummaryDto {
+  status: TenantStatus;
+  createdAt: string;
+  counts: TenantCountsDto;
+  billingModel: BillingModel | null;
+}
+
+export interface BillingPlanDto {
+  id: string;
+  tenantId: string;
+  billingModel: BillingModel;
+  billingCycle: BillingCycle;
+  currency: string;
+  pricePerActiveUserMinor: number | null;
+  flatFeeMinor: number | null;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface BillingSnapshotDto {
+  id: string;
+  tenantId: string;
+  billingPlanId: string | null;
+  periodStart: string;
+  periodEnd: string;
+  approvedMemberCount: number;
+  activeMemberCount: number;
+  newMemberCount: number;
+  amountMinor: number;
+  currency: string;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface BillingUsageDto {
+  periodStart: string;
+  periodEnd: string;
+  approvedMembers: number;
+  activeMembers: number;
+  newMembers: number;
+  plan: BillingPlanDto | null;
+  estimatedAmountMinor: number;
+  currency: string;
+}
+
+export interface PlatformTenantDto {
+  tenant: TenantPublicDto & { createdAt: string; updatedAt: string };
+  settings: TenantSettingsDto;
+  counts: TenantCountsDto;
+  currentPlan: BillingPlanDto | null;
+  admins: AdminMemberDto[];
+}
+
+export interface PlatformUserDto extends UserDto {
+  lastLoginAt: string | null;
+  memberships: MembershipSummaryDto[];
+}
+
+export interface PlatformStatsDto {
+  tenants: { total: number; byStatus: Record<TenantStatus, number> };
+  users: number;
+  memberships: Record<MembershipStatus, number>;
+  content: { posts: number; jobs: number; funding: number; events: number };
+  activeMembers30d: number;
+  perTenant: PlatformTenantRowDto[];
+}

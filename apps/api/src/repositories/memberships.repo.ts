@@ -164,3 +164,36 @@ export async function openToWorkSet(db: DbClient, tenantId: string, membershipId
     .where(and(eq(jobSeekers.tenantId, tenantId), eq(jobSeekers.isActive, true), inArray(jobSeekers.membershipId, membershipIds)));
   return new Set(rows.map((r) => r.membershipId));
 }
+
+export async function countAllMembershipsByStatus(db: DbClient): Promise<Record<MembershipRow["status"], number>> {
+  const rows = await db.select({ status: memberships.status, count: sql<number>`count(*)::int` }).from(memberships).groupBy(memberships.status);
+  const out: Record<MembershipRow["status"], number> = { PENDING: 0, APPROVED: 0, REJECTED: 0, SUSPENDED: 0 };
+  for (const r of rows) out[r.status] = r.count;
+  return out;
+}
+
+export async function countActiveMembersGlobal(db: DbClient, since: Date): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(memberships)
+    .where(and(eq(memberships.status, "APPROVED"), gte(memberships.lastActiveAt, since)));
+  return row?.count ?? 0;
+}
+
+/** Counts used for billing a period: approved now, active within the period, newly created within the period. */
+export async function billingCountsForPeriod(
+  db: DbClient,
+  tenantId: string,
+  from: Date,
+  toExclusive: Date,
+): Promise<{ approved: number; active: number; created: number }> {
+  const [row] = await db
+    .select({
+      approved: sql<number>`count(*) filter (where ${memberships.status} = 'APPROVED')::int`,
+      active: sql<number>`count(*) filter (where ${memberships.status} = 'APPROVED' and ${memberships.lastActiveAt} >= ${from} and ${memberships.lastActiveAt} < ${toExclusive})::int`,
+      created: sql<number>`count(*) filter (where ${memberships.createdAt} >= ${from} and ${memberships.createdAt} < ${toExclusive})::int`,
+    })
+    .from(memberships)
+    .where(eq(memberships.tenantId, tenantId));
+  return row ?? { approved: 0, active: 0, created: 0 };
+}

@@ -12,4 +12,5 @@ export * from "./schemas/funding";
 export * from "./schemas/posts";
 export * from "./schemas/events";
 export * from "./schemas/reports";
+export * from "./schemas/platform";
 export * from "./types/dto";
