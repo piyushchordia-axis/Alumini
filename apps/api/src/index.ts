@@ -2,8 +2,10 @@ import { createApp } from "./app";
 import { loadConfig, loadDotenvFiles } from "./config/env";
 import type { AppContext } from "./context";
 import { createDb } from "./db/client";
+import { createJwtSigner } from "./lib/jwt";
 import { createLogger } from "./lib/logger";
 import { createRedis } from "./redis/client";
+import { createOtpSender } from "./services/otp";
 
 async function main(): Promise<void> {
   loadDotenvFiles();
@@ -13,7 +15,14 @@ async function main(): Promise<void> {
   const redis = createRedis(config.REDIS_URL);
   redis.on("error", (err) => logger.error({ err }, "Redis error"));
 
-  const ctx: AppContext = { config, db, redis, logger };
+  const ctx: AppContext = {
+    config,
+    db,
+    redis,
+    logger,
+    jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
+    otpSender: createOtpSender(config, logger),
+  };
   const app = createApp(ctx);
 
   const server = app.listen(config.PORT, () => {

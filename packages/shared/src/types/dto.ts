@@ -1,4 +1,11 @@
-import type { ApprovalMode, TenantFeatures, TenantStatus, TenantType } from "../constants";
+import type {
+  ApprovalMode,
+  MembershipRole,
+  MembershipStatus,
+  TenantFeatures,
+  TenantStatus,
+  TenantType,
+} from "../constants";
 import type { ErrorCode } from "../errorCodes";
 
 export interface ApiErrorBody {
@@ -55,4 +62,48 @@ export interface TenantSettingsDto {
   maxBatchYear: number;
   features: TenantFeatures;
   updatedAt: string;
+}
+
+export type OtpChannel = "whatsapp" | "sms" | "console";
+
+export interface OtpRequestResultDto {
+  expiresInSec: number;
+  resendAfterSec: number;
+  channel: OtpChannel;
+  /** Only present when the API runs in development mode. */
+  devCode?: string;
+}
+
+export interface UserDto {
+  id: string;
+  phone: string;
+  displayName: string | null;
+  isPlatformAdmin: boolean;
+  createdAt: string;
+}
+
+export interface MembershipSummaryDto {
+  id: string;
+  tenant: TenantSummaryDto;
+  role: MembershipRole;
+  status: MembershipStatus;
+  statusReason: string | null;
+  fullName: string;
+  batchYear: number;
+  avatarUrl: string | null;
+}
+
+export interface MeDto {
+  user: UserDto;
+  memberships: MembershipSummaryDto[];
+}
+
+export interface AuthSessionDto extends MeDto {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface TokenPairDto {
+  accessToken: string;
+  refreshToken: string;
 }

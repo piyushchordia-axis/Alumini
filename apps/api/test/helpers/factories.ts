@@ -52,3 +52,17 @@ export async function createUser(ctx: TestContext, opts: { phone?: string; isPla
     .returning();
   return user!;
 }
+
+/** Logs a user in through the real OTP flow and returns tokens. */
+export async function loginAs(ctx: TestContext, phone: string) {
+  const { default: request } = await import("supertest");
+  const req = await request(ctx.app).post("/api/v1/auth/otp/request").send({ phone });
+  if (req.status !== 200) throw new Error(`OTP request failed: ${JSON.stringify(req.body)}`);
+  const code = ctx.otpCapture.codes.get(phone);
+  if (!code) throw new Error(`No OTP captured for ${phone}`);
+  const verify = await request(ctx.app).post("/api/v1/auth/otp/verify").send({ phone, code });
+  if (verify.status !== 200) throw new Error(`OTP verify failed: ${JSON.stringify(verify.body)}`);
+  return verify.body.data as { accessToken: string; refreshToken: string; user: { id: string; isPlatformAdmin: boolean } };
+}
+
+export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

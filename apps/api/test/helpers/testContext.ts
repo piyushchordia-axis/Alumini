@@ -6,17 +6,41 @@ import { loadConfig, type Config } from "../../src/config/env";
 import type { AppContext } from "../../src/context";
 import { createDb, type Db } from "../../src/db/client";
 import { runMigrations } from "../../src/db/migrate";
+import { createJwtSigner } from "../../src/lib/jwt";
 import { createLogger } from "../../src/lib/logger";
 import type { RedisClient } from "../../src/redis/client";
+import type { OtpSender, OtpSendResult } from "../../src/services/otp";
+
+/** Records every OTP so tests can read the code that was "sent". */
+export class CapturingOtpSender implements OtpSender {
+  readonly name = "capture";
+  readonly codes = new Map<string, string>();
+  failNext = false;
+  async send(phone: string, code: string): Promise<OtpSendResult> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error("simulated delivery failure");
+    }
+    this.codes.set(phone, code);
+    return { channel: "console" };
+  }
+}
 
 export interface TestContext extends AppContext {
   app: ReturnType<typeof createApp>;
+  otpCapture: CapturingOtpSender;
   pool: pg.Pool;
   truncateAll: () => Promise<void>;
   dispose: () => Promise<void>;
 }
 
 let migrated = false;
+let redisDbCounter = 1;
+
+/** ioredis-mock shares one store per host:port/db, so each instance gets its own db index. */
+export function newRedisMock(): RedisClient {
+  return new RedisMock({ db: redisDbCounter++ }) as unknown as RedisClient;
+}
 
 export async function isDatabaseAvailable(): Promise<boolean> {
   const url = process.env.DATABASE_URL;
@@ -39,9 +63,17 @@ export async function createTestContext(overrides: Record<string, string | undef
     migrated = true;
   }
   const { pool, db } = createDb(config.DATABASE_URL);
-  const redis = new RedisMock() as unknown as RedisClient;
+  const redis = newRedisMock();
   const logger = createLogger("silent", false);
-  const base: AppContext = { config, db, redis, logger };
+  const otpCapture = new CapturingOtpSender();
+  const base: AppContext = {
+    config,
+    db,
+    redis,
+    logger,
+    jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
+    otpSender: otpCapture,
+  };
   const app = createApp(base);
 
   const truncateAll = async () => {
@@ -52,6 +84,7 @@ export async function createTestContext(overrides: Record<string, string | undef
   return {
     ...base,
     app,
+    otpCapture,
     pool,
     truncateAll,
     dispose: async () => {
