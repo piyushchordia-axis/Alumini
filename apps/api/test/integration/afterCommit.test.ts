@@ -52,7 +52,6 @@ describe.skipIf(!dbAvailable)("work queued after commit", () => {
 
   it("refuses transactions not started with runInTransaction()", async () => {
     const { tenant, m } = await member();
-    // eslint-disable-next-line no-restricted-syntax -- the point of the test
     const raw = ctx.db.transaction(async (tx) => notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.id], type: "SYSTEM", title: "x" }, tx));
     await expect(raw).rejects.toThrow(/runInTransaction/);
   });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BILLING_CYCLES, BILLING_MODELS, MIN_BATCH_YEAR, TENANT_STATUSES, TENANT_TYPES } from "../constants";
+import { BILLING_CYCLES, BILLING_MODELS, MESSAGE_CHANNELS, MIN_BATCH_YEAR, TENANT_STATUSES, TENANT_TYPES } from "../constants";
 import { phoneInputSchema } from "./auth";
 import { dateOnlySchema, hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, pageQuerySchema, tenantSlugSchema, trimmedString, uuidSchema } from "./common";
 import { tenantBrandingUpdateSchema, tenantSettingsUpdateSchema } from "./tenant";
@@ -102,3 +102,13 @@ export type PlatformUsersQuery = z.infer<typeof platformUsersQuerySchema>;
 
 export const platformAdminToggleSchema = z.object({ enabled: z.boolean() });
 export type PlatformAdminToggleInput = z.infer<typeof platformAdminToggleSchema>;
+
+/** Staff check that a channel is configured: sends the PLATFORM_TEST message to a phone and/or email. */
+export const platformTestMessageSchema = z
+  .object({
+    phone: phoneInputSchema.optional(),
+    email: z.email().optional(),
+    channels: z.array(z.enum(MESSAGE_CHANNELS)).min(1).max(3).optional(),
+  })
+  .refine((v) => v.phone || v.email, { message: "Give a phone number or an email address", path: ["phone"] });
+export type PlatformTestMessageInput = z.infer<typeof platformTestMessageSchema>;

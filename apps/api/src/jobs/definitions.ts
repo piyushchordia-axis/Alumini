@@ -11,6 +11,10 @@ export interface JobPayloads {
   "push.send": { messages: PushMessage[] };
   /** Read Expo delivery receipts and drop tokens of uninstalled apps. */
   "push.checkReceipts": Record<string, never>;
+  /** Send one outbound WhatsApp/SMS/email message (outbound_messages row). */
+  "messages.send": { messageId: string };
+  /** Re-queue outbound messages a crash left behind. */
+  "messages.sweep": Record<string, never>;
 }
 
 export type JobName = keyof JobPayloads;
@@ -30,4 +34,7 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "notifications.dispatch": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "push.send": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
   "push.checkReceipts": { queue: "jobs", attempts: 1 },
+  // Retries at roughly 30s, 1m, 2m and 4m before the message is marked FAILED.
+  "messages.send": { queue: "messages", attempts: 5, backoff: { type: "exponential", delayMs: 30_000 } },
+  "messages.sweep": { queue: "jobs", attempts: 1 },
 };

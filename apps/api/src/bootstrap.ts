@@ -6,6 +6,7 @@ import { createBullConnection } from "./jobs/connection";
 import { createJwtSigner } from "./lib/jwt";
 import type { Logger } from "./lib/logger";
 import { createRedis } from "./redis/client";
+import { createMessageSenders } from "./services/messages";
 import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
 import { createOtpSender } from "./services/otp";
 import { createStorage } from "./services/storage";
@@ -35,6 +36,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
     storage: createStorage(config),
     jobs,
     push: new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN),
+    messageSenders: createMessageSenders(config, logger),
   };
 
   return {

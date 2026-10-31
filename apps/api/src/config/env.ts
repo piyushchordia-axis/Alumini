@@ -64,6 +64,13 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().default("loopback"),
 
   EXPO_ACCESS_TOKEN: z.string().optional(),
+  /** Outbound email over SMTP, e.g. smtps://user:pass@smtp.zoho.in:465 or smtp://…:587 (STARTTLS). */
+  SMTP_URL: z.string().optional(),
+  /** Sender, e.g. "Illuminize <no-reply@illuminize.app>"; the domain needs SPF/DKIM for the SMTP provider. */
+  EMAIL_FROM: z.string().optional(),
+  EMAIL_REPLY_TO: z.string().optional(),
+  /** MSG91 flow (DLT) template id per message type: "PLATFORM_TEST=65ab…,INVITE=65cd…". */
+  MSG91_FLOW_TEMPLATE_IDS: z.string().default(""),
 });
 
 export type Config = z.infer<typeof envSchema> & {
@@ -73,6 +80,8 @@ export type Config = z.infer<typeof envSchema> & {
   platformAdminPhones: string[];
   corsOrigins: string[] | "*";
   uploadDirAbsolute: string;
+  /** Parsed MSG91_FLOW_TEMPLATE_IDS. */
+  msg91FlowTemplateIds: Record<string, string>;
   /** Resolved WORKER_MODE: inline outside production unless set. */
   workerMode: "inline" | "separate";
 };
@@ -105,11 +114,19 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     isDevelopment: c.NODE_ENV === "development",
     isTest: c.NODE_ENV === "test",
     workerMode: c.WORKER_MODE ?? (c.NODE_ENV === "production" ? "separate" : "inline"),
+    msg91FlowTemplateIds: Object.fromEntries(
+      c.MSG91_FLOW_TEMPLATE_IDS.split(",")
+        .map((pair) => pair.split("=").map((x) => x.trim()) as [string, string | undefined])
+        .filter((pair): pair is [string, string] => !!pair[0] && !!pair[1]),
+    ),
     platformAdminPhones,
     corsOrigins,
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),
   };
 
+  if (config.SMTP_URL && !config.EMAIL_FROM) {
+    throw new Error("SMTP_URL is set but EMAIL_FROM is not; set the sender address, e.g. EMAIL_FROM=\"Illuminize <no-reply@example.com>\"");
+  }
   if (config.isProduction && config.OTP_PROVIDER === "console" && !config.OTP_ALLOW_CONSOLE_IN_PRODUCTION) {
     // The console sender only logs codes, so anyone with log access could sign in as anyone.
     throw new Error("OTP_PROVIDER=console is not allowed in production. Use whatsapp or sms (or set OTP_ALLOW_CONSOLE_IN_PRODUCTION=true for a throwaway demo).");

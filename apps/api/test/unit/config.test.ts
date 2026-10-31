@@ -28,4 +28,11 @@ describe("config", () => {
     expect(loadConfig({ ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t" }).workerMode).toBe("separate");
     expect(loadConfig({ ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t", WORKER_MODE: "inline" }).workerMode).toBe("inline");
   });
+
+  it("needs a sender address for SMTP and parses MSG91 flow template ids", () => {
+    const dev = { NODE_ENV: "development", DATABASE_URL: "postgres://x", JWT_SECRET: "x".repeat(40), OTP_PEPPER: "p".repeat(20) };
+    expect(() => loadConfig({ ...dev, SMTP_URL: "smtp://localhost:2525" })).toThrow(/EMAIL_FROM/);
+    const c = loadConfig({ ...dev, MSG91_FLOW_TEMPLATE_IDS: " PLATFORM_TEST=65ab , INVITE=65cd,broken" });
+    expect(c.msg91FlowTemplateIds).toEqual({ PLATFORM_TEST: "65ab", INVITE: "65cd" });
+  });
 });

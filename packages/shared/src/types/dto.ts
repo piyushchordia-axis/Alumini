@@ -9,9 +9,11 @@ import type {
   JobType,
   MaritalStatus,
   MembershipRole,
+  MessageChannel,
   MembershipStatus,
   ModerationStatus,
   NotificationType,
+  OutboundMessageStatus,
   ProfessionType,
   ReactionType,
   ReportReason,
@@ -475,4 +477,23 @@ export interface PlatformStatsDto {
   content: { posts: number; jobs: number; funding: number; events: number };
   activeMembers30d: number;
   perTenant: PlatformTenantRowDto[];
+}
+
+/** An outbound WhatsApp/SMS/email message and its delivery state (platform console, Wave 1 invite status). */
+export interface OutboundMessageDto {
+  id: string;
+  tenantId: string | null;
+  type: string;
+  status: OutboundMessageStatus;
+  /** Requested channels in preference order, and the one that delivered (or was last tried). */
+  channels: MessageChannel[];
+  channel: MessageChannel | null;
+  provider: string | null;
+  toPhone: string | null;
+  toEmail: string | null;
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
 }

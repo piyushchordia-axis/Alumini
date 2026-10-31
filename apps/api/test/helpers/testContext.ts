@@ -11,6 +11,8 @@ import { createJwtSigner } from "../../src/lib/jwt";
 import { createLogger } from "../../src/lib/logger";
 import type { RedisClient } from "../../src/redis/client";
 import type { OtpSender, OtpSendResult } from "../../src/services/otp";
+import type { MessageSenders } from "../../src/services/messages/types";
+import { ConsoleChannelSender } from "../../src/services/messages/providers/ConsoleChannelSender";
 import { createStorage } from "../../src/services/storage";
 
 /** Records every OTP so tests can read the code that was "sent". */
@@ -60,7 +62,12 @@ export async function isDatabaseAvailable(): Promise<boolean> {
 }
 
 /** Providers a test can swap in (fakes with injectable fetch, capturing senders, …). */
-export type TestProviders = Partial<Pick<AppContext, "push" | "storage">>;
+export type TestProviders = Partial<Pick<AppContext, "push" | "storage" | "messageSenders">>;
+
+/** Console senders for every channel, so message flows run in tests without providers. */
+export function consoleMessageSenders(logger: AppContext["logger"]): MessageSenders {
+  return { WHATSAPP: new ConsoleChannelSender("WHATSAPP", logger), SMS: new ConsoleChannelSender("SMS", logger), EMAIL: new ConsoleChannelSender("EMAIL", logger) };
+}
 
 export async function createTestContext(overrides: Record<string, string | undefined> = {}, providers: TestProviders = {}): Promise<TestContext> {
   const config: Config = loadConfig({ NODE_ENV: "test", ...overrides });
@@ -82,6 +89,7 @@ export async function createTestContext(overrides: Record<string, string | undef
     otpSender: otpCapture,
     storage: providers.storage ?? createStorage(config),
     push: providers.push,
+    messageSenders: providers.messageSenders ?? consoleMessageSenders(logger),
     otpCapture,
     pool,
   } as unknown as TestContext;

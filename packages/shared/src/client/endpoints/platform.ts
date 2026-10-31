@@ -7,11 +7,12 @@ import type {
   PlatformTenantCreateInput,
   PlatformTenantUpdateInput,
   PlatformTenantsQuery,
+  PlatformTestMessageInput,
   PlatformUsersQuery,
   SnapshotCreateInput,
   TenantSettingsUpdate,
 } from "../..";
-import type { AdminMemberDto, AuditDto, BillingPlanDto, BillingSnapshotDto, BillingUsageDto, Page, PlatformStatsDto, PlatformTenantDto, PlatformTenantRowDto, PlatformUserDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AuditDto, BillingPlanDto, BillingSnapshotDto, BillingUsageDto, OutboundMessageDto, Page, PlatformStatsDto, PlatformTenantDto, PlatformTenantRowDto, PlatformUserDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -45,6 +46,11 @@ export function platformEndpoints(core: ApiCore) {
     },
     audit: {
       list: (query?: Partial<AuditQuery>) => core.request<Page<AuditDto>>({ path: path("/audit"), query: q(query) }),
+    },
+    messages: {
+      /** Sends the platform test message (checks WhatsApp/SMS/email configuration). */
+      test: (input: PlatformTestMessageInput) => core.data<OutboundMessageDto>({ method: "POST", path: path("/messages/test"), body: input }),
+      get: (id: string) => core.data<OutboundMessageDto>({ path: path(`/messages/${id}`) }),
     },
   };
 }

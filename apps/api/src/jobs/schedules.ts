@@ -15,4 +15,7 @@ export interface ScheduledJob<N extends JobName = JobName> {
   enabled?: (config: Config) => boolean;
 }
 
-export const scheduledJobs: ScheduledJob[] = [{ id: "push-receipts", job: "push.checkReceipts", data: {}, repeat: { every: 5 * 60_000 } }];
+export const scheduledJobs: ScheduledJob[] = [
+  { id: "push-receipts", job: "push.checkReceipts", data: {}, repeat: { every: 5 * 60_000 } },
+  { id: "messages-sweep", job: "messages.sweep", data: {}, repeat: { every: 5 * 60_000 } },
+];

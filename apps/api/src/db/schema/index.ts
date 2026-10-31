@@ -10,3 +10,4 @@ export * from "./reports";
 export * from "./notifications";
 export * from "./audit";
 export * from "./views";
+export * from "./messages";

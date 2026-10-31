@@ -80,6 +80,14 @@ export type BillingCycle = (typeof BILLING_CYCLES)[number];
 export const PUSH_PLATFORMS = ["IOS", "ANDROID", "WEB"] as const;
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 
+/** Outbound message channels, in no particular order (each message type sets its own preference). */
+export const MESSAGE_CHANNELS = ["WHATSAPP", "SMS", "EMAIL"] as const;
+export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+
+/** DELIVERED and READ are reported by provider webhooks (WhatsApp/MSG91 status callbacks). */
+export const OUTBOUND_MESSAGE_STATUSES = ["QUEUED", "SENDING", "SENT", "DELIVERED", "READ", "FAILED"] as const;
+export type OutboundMessageStatus = (typeof OUTBOUND_MESSAGE_STATUSES)[number];
+
 export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;

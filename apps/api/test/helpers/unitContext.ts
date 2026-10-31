@@ -18,6 +18,7 @@ export function createUnitContext(overrides: Record<string, string | undefined> 
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
     storage: createStorage(config),
+    messageSenders: {},
     otpCapture,
   } as unknown as AppContext & { otpCapture: CapturingOtpSender; jobs: MemoryJobQueue };
   ctx.jobs = new MemoryJobQueue(() => ctx);

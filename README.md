@@ -112,6 +112,23 @@ runs on a BullMQ queue in Redis. Code inside a request queues a job; it never ca
   Redis and are skipped without one (CI sets `REQUIRE_REAL_REDIS=1`).
 - **Redis** must keep jobs: use `maxmemory-policy noeviction` and AOF persistence in production.
 
+### Outbound messages (WhatsApp, SMS, email)
+
+Invites, digests, reminders and receipts go out through `queueMessage()` (`apps/api/src/services/messages`). Each
+message is stored in `outbound_messages` and sent by a background job, which tries the message type's channels in
+order (for example WhatsApp, then SMS, then email), retries temporary provider errors with backoff, and records every
+attempt. A sweeper re-queues messages a crash left behind.
+
+| Channel | Provider | Settings |
+| --- | --- | --- |
+| WhatsApp | Meta WhatsApp Cloud API | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`; each message type uses an approved template |
+| SMS | MSG91 Flow API | `MSG91_AUTH_KEY` and `MSG91_FLOW_TEMPLATE_IDS="TYPE=flowId,…"` (DLT-registered text in India) |
+| Email | Any SMTP server (SES, Zoho, Google Workspace, Resend, SendGrid) | `SMTP_URL`, `EMAIL_FROM`, optional `EMAIL_REPLY_TO`; set SPF and DKIM for the sending domain |
+
+Outside production, channels without settings log the message instead of sending it. To check a deployment, staff can
+call `POST /api/v1/platform/messages/test` with a phone and/or email and follow `GET /api/v1/platform/messages/:id`.
+Message types and their per-channel templates live in `templates.ts`.
+
 ### Multi-tenancy
 
 One Postgres database; every tenant-scoped table carries `tenant_id` and every repository function takes the tenant

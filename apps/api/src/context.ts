@@ -4,6 +4,7 @@ import type { JwtSigner } from "./lib/jwt";
 import type { Logger } from "./lib/logger";
 import type { RedisClient } from "./redis/client";
 import type { JobQueue } from "./jobs/JobQueue";
+import type { MessageSenders } from "./services/messages/types";
 import type { PushChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
 import type { StorageProvider } from "./services/storage";
@@ -20,4 +21,6 @@ export interface AppContext {
   jobs: JobQueue;
   /** Push delivery to devices (Expo); absent when not configured, e.g. in tests. */
   push?: PushChannel;
+  /** WhatsApp/SMS/email senders per channel; channels without one are skipped. */
+  messageSenders: MessageSenders;
 }

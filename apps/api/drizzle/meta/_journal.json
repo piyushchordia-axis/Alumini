@@ -43,6 +43,13 @@
       "when": 1793472252552,
       "tag": "0005_billing_activity_days",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793489953243,
+      "tag": "0006_outbound_messages",
+      "breakpoints": true
     }
   ]
 }
