@@ -21,6 +21,7 @@ import { toBillingPlanDto } from "../dto/platform.dto";
 import { toPlatformTenantRowDto, toPlatformUserDto, toTenantCountsDto } from "../dto/platform.dto";
 import { toTenantPublicDto, toTenantSettingsDto } from "../dto/tenant.dto";
 import { AppError } from "../lib/errors";
+import { runInTransaction } from "../lib/transaction";
 import { buildPage, type Page } from "../lib/pagination";
 import { normalizePhone } from "../lib/phone";
 import { findPlanEffectiveOn } from "../repositories/billing.repo";
@@ -136,7 +137,7 @@ async function ensureAdminMembership(
 
 export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor, input: PlatformTenantCreateInput): Promise<PlatformTenantDto> {
   if (await findTenantBySlug(ctx.db, input.slug)) throw AppError.conflict("An institution with this slug already exists");
-  const tenantId = await ctx.db.transaction(async (tx) => {
+  const tenantId = await runInTransaction(ctx, async (tx) => {
     const tenant = await insertTenant(tx, {
       slug: input.slug,
       name: input.name,

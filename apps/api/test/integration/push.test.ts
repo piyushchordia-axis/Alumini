@@ -96,4 +96,11 @@ describe.skipIf(!dbAvailable)("Expo push channel", () => {
     expect(await channel.checkReceipts(later)).toEqual({ checked: 0, removedTokens: 0 });
     expect(expo.receiptRequests).toHaveLength(1);
   });
+
+  it("runs the receipt check as a scheduled job", async () => {
+    const expo = fakeExpo({ ticket: () => ({ status: "ok", id: "t" }) });
+    ctx.push = new ExpoPushChannel(ctx.db, ctx.redis, ctx.logger, undefined, expo.impl);
+    await expect(ctx.jobs.runScheduled("push-receipts")).resolves.toBeUndefined();
+    ctx.push = undefined;
+  });
 });

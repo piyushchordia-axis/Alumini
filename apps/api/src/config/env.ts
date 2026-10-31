@@ -22,6 +22,11 @@ const envSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   OTP_GLOBAL_DAILY_CAP: z.coerce.number().int().positive().default(5000),
+  /** inline: background workers run inside the API process (default outside production); separate: `pnpm worker`. */
+  WORKER_MODE: z.enum(["inline", "separate"]).optional(),
+  WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
+  /** The separate worker answers GET /health here. */
+  WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(4001),
   /** Time zone for billing periods and member activity days (IANA name). */
   BILLING_TIMEZONE: z
     .string()
@@ -68,6 +73,8 @@ export type Config = z.infer<typeof envSchema> & {
   platformAdminPhones: string[];
   corsOrigins: string[] | "*";
   uploadDirAbsolute: string;
+  /** Resolved WORKER_MODE: inline outside production unless set. */
+  workerMode: "inline" | "separate";
 };
 
 const emptyToUndefined = (v: string | undefined) => (v === "" ? undefined : v);
@@ -97,6 +104,7 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     isProduction: c.NODE_ENV === "production",
     isDevelopment: c.NODE_ENV === "development",
     isTest: c.NODE_ENV === "test",
+    workerMode: c.WORKER_MODE ?? (c.NODE_ENV === "production" ? "separate" : "inline"),
     platformAdminPhones,
     corsOrigins,
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),

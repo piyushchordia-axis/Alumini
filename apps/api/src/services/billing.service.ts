@@ -2,6 +2,7 @@ import type { BillingPlanCreateInput, BillingPlanDto, BillingPlanUpdateInput, Bi
 import type { AppContext } from "../context";
 import { toBillingPlanDto, toBillingSnapshotDto } from "../dto/platform.dto";
 import { AppError } from "../lib/errors";
+import { runInTransaction } from "../lib/transaction";
 import { closeOpenPlansBefore, findPlanById, findPlanEffectiveOn, insertPlan, insertSnapshot, listPlans, listSnapshots, updatePlan } from "../repositories/billing.repo";
 import { billingCountsForPeriod } from "../repositories/memberships.repo";
 import { findTenantById } from "../repositories/tenants.repo";
@@ -29,7 +30,7 @@ export async function getTenantBilling(ctx: AppContext, tenantId: string): Promi
 
 export async function createBillingPlan(ctx: AppContext, actor: PlatformActor, tenantId: string, input: BillingPlanCreateInput): Promise<BillingPlanDto> {
   await assertTenant(ctx, tenantId);
-  const row = await ctx.db.transaction(async (tx) => {
+  const row = await runInTransaction(ctx, async (tx) => {
     const closed = await closeOpenPlansBefore(tx, tenantId, input.effectiveFrom);
     const plan = await insertPlan(tx, {
       tenantId,

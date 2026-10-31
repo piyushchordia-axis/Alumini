@@ -6,6 +6,7 @@ import { loadConfig, type Config } from "../../src/config/env";
 import type { AppContext } from "../../src/context";
 import { createDb, type Db } from "../../src/db/client";
 import { runMigrations } from "../../src/db/migrate";
+import { MemoryJobQueue } from "../../src/jobs/MemoryJobQueue";
 import { createJwtSigner } from "../../src/lib/jwt";
 import { createLogger } from "../../src/lib/logger";
 import type { RedisClient } from "../../src/redis/client";
@@ -28,6 +29,7 @@ export class CapturingOtpSender implements OtpSender {
 }
 
 export interface TestContext extends AppContext {
+  jobs: MemoryJobQueue;
   app: ReturnType<typeof createApp>;
   otpCapture: CapturingOtpSender;
   pool: pg.Pool;
@@ -57,7 +59,10 @@ export async function isDatabaseAvailable(): Promise<boolean> {
   }
 }
 
-export async function createTestContext(overrides: Record<string, string | undefined> = {}): Promise<TestContext> {
+/** Providers a test can swap in (fakes with injectable fetch, capturing senders, …). */
+export type TestProviders = Partial<Pick<AppContext, "push" | "storage">>;
+
+export async function createTestContext(overrides: Record<string, string | undefined> = {}, providers: TestProviders = {}): Promise<TestContext> {
   const config: Config = loadConfig({ NODE_ENV: "test", ...overrides });
   if (!migrated) {
     await runMigrations(config.DATABASE_URL);
@@ -67,32 +72,30 @@ export async function createTestContext(overrides: Record<string, string | undef
   const redis = newRedisMock();
   const logger = createLogger("silent", false);
   const otpCapture = new CapturingOtpSender();
-  const base: AppContext = {
+  // One object is handed to createApp and returned, so fields a test sets later are seen by the routes too.
+  const ctx = {
     config,
     db,
     redis,
     logger,
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
-    storage: createStorage(config),
-  };
-  const app = createApp(base);
-
-  const truncateAll = async () => {
-    await truncateAllTables(db);
-    await redis.flushall();
-  };
-
-  return {
-    ...base,
-    app,
+    storage: providers.storage ?? createStorage(config),
+    push: providers.push,
     otpCapture,
     pool,
-    truncateAll,
-    dispose: async () => {
-      await pool.end();
-    },
+  } as unknown as TestContext;
+  ctx.jobs = new MemoryJobQueue(() => ctx);
+  ctx.app = createApp(ctx);
+  ctx.truncateAll = async () => {
+    await truncateAllTables(db);
+    await redis.flushall();
+    ctx.jobs.clear();
   };
+  ctx.dispose = async () => {
+    await pool.end();
+  };
+  return ctx;
 }
 
 export async function truncateAllTables(db: Db): Promise<void> {

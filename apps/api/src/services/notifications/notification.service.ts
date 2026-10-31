@@ -1,9 +1,9 @@
 import type { NotificationType } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient } from "../../db/client";
-import { findMembershipsByIds, listTenantAdmins } from "../../repositories/memberships.repo";
+import { afterCommit } from "../../lib/transaction";
+import { listTenantAdmins } from "../../repositories/memberships.repo";
 import { insertNotifications } from "../../repositories/notifications.repo";
-import { findTenantById } from "../../repositories/tenants.repo";
 
 export interface NotifyInput {
   tenantId: string;
@@ -14,7 +14,14 @@ export interface NotifyInput {
   data?: Record<string, unknown>;
 }
 
-/** Stores in-app notifications and forwards them to the optional push channel. */
+/** Max notification ids per dispatch job (keeps job payloads small). */
+const DISPATCH_CHUNK = 500;
+
+/**
+ * Stores in-app notifications, then queues their delivery to devices once the data is committed. Works with the root
+ * handle or a runInTransaction() transaction (delivery is dropped if it rolls back). The stored rows are the source of
+ * truth: if queueing fails, members still see them in the app.
+ */
 export async function notify(ctx: AppContext, input: NotifyInput, db: DbClient = ctx.db): Promise<void> {
   const ids = [...new Set(input.recipientMembershipIds)];
   if (ids.length === 0) return;
@@ -29,17 +36,10 @@ export async function notify(ctx: AppContext, input: NotifyInput, db: DbClient =
       data: input.data ?? {},
     })),
   );
-  if (ctx.push) {
-    const push = ctx.push;
-    const [recipients, tenant] = await Promise.all([findMembershipsByIds(db, input.tenantId, ids), findTenantById(db, input.tenantId)]);
-    if (!tenant) return;
-    void push
-      .deliver(
-        rows,
-        recipients.map((m) => ({ membershipId: m.id, userId: m.userId })),
-        { tenantSlug: tenant.slug },
-      )
-      .catch((err) => ctx.logger.warn({ err }, "push delivery failed"));
+  const notificationIds = rows.map((r) => r.id);
+  for (let i = 0; i < notificationIds.length; i += DISPATCH_CHUNK) {
+    const chunk = notificationIds.slice(i, i + DISPATCH_CHUNK);
+    await afterCommit(ctx, db, () => ctx.jobs.enqueue("notifications.dispatch", { tenantId: input.tenantId, notificationIds: chunk }));
   }
 }
 

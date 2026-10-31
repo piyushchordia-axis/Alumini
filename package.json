@@ -16,6 +16,7 @@
     "db:seed": "pnpm --filter @illuminize/api db:seed",
     "db:reset": "pnpm --filter @illuminize/api db:reset",
     "api": "pnpm --filter @illuminize/api dev",
+    "worker": "pnpm --filter @illuminize/api worker",
     "web": "pnpm --filter @illuminize/web dev",
     "mobile": "pnpm --filter @illuminize/mobile start",
     "mobile:tunnel": "pnpm --filter @illuminize/mobile tunnel",

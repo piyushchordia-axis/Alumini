@@ -15,10 +15,13 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts && tsx src/db/migrate.ts && tsx src/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "worker": "tsx watch --clear-screen=false src/worker.ts",
+    "start:worker": "node dist/worker.js"
   },
   "dependencies": {
     "@illuminize/shared": "workspace:*",
+    "bullmq": "^5.81.5",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "drizzle-orm": "^0.45.0",

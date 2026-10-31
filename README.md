@@ -96,6 +96,22 @@ OTP delivery is pluggable (`OTP_PROVIDER`):
 | `whatsapp` | Meta WhatsApp Business Cloud API: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, an approved *authentication* template (`WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_LANG`). Falls back to SMS when configured (required in production). |
 | `sms` | MSG91 OTP API: `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID` (swap the request shape in `SmsOtpSender.ts` for another vendor) |
 
+### Background jobs
+
+Work that can wait (delivering push notifications, checking Expo receipts, and later invites, digests and reminders)
+runs on a BullMQ queue in Redis. Code inside a request queues a job; it never calls slow providers itself.
+
+- **Where workers run.** `WORKER_MODE=inline` (the default outside production, so `pnpm demo` needs nothing extra)
+  runs them inside the API process. In production the default is `separate`: run `pnpm worker` locally, or
+  `node dist/worker.js` from the API image, as its own process (health check on `WORKER_HEALTH_PORT`, default 4001).
+- **After commit.** Jobs queued inside a transaction must use `runInTransaction()` (`apps/api/src/lib/transaction.ts`);
+  they are queued only once it commits and dropped if it rolls back. ESLint rejects raw `db.transaction(...)`.
+- **Adding a job.** Declare its payload in `src/jobs/definitions.ts` (with attempts and backoff), add a handler to
+  `src/jobs/handlers.ts`, and for recurring work an entry in `src/jobs/schedules.ts` (synced when workers start).
+- **Tests** use an in-memory queue that runs only when a test calls `ctx.jobs.drain()`. The BullMQ tests need a real
+  Redis and are skipped without one (CI sets `REQUIRE_REAL_REDIS=1`).
+- **Redis** must keep jobs: use `maxmemory-policy noeviction` and AOF persistence in production.
+
 ### Multi-tenancy
 
 One Postgres database; every tenant-scoped table carries `tenant_id` and every repository function takes the tenant
@@ -189,8 +205,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 
 ## Known gaps / next steps
 
-- Email/digest notifications, event reminders and chat are not included yet; they are planned with the background
-  worker. Push receipt checks currently run on a timer inside the API process.
+- Email/digest notifications, event reminders and chat are not included yet; they build on the background jobs
+  described above.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be
   tested; the console sender covers development.
 - Postgres enum additions need hand-written `ALTER TYPE` migrations. Migration 0005 adds a trigger that stamps

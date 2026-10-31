@@ -10,8 +10,38 @@ export interface DeliveryContext {
   tenantSlug: string;
 }
 
-/** Secondary delivery channel (push, email…) invoked after the in-app row is stored. */
-export interface NotificationChannel {
+/** One push message for one device token (Expo format). Plain JSON so it can travel in a job payload. */
+export interface PushMessage {
+  to: string;
+  title: string;
+  body?: string;
+  data?: Record<string, unknown>;
+  sound?: "default";
+  channelId?: string;
+}
+
+/**
+ * Push delivery, split so the job queue can retry each provider request on its own:
+ * prepare() resolves device tokens into messages, sendBatch() sends one request.
+ */
+export interface PushChannel {
   readonly name: string;
+  prepare(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<PushMessage[]>;
+  sendBatch(batch: PushMessage[]): Promise<void>;
+  /** prepare + sendBatch in one go, logging failures. */
   deliver(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<void>;
+  checkReceipts(now?: number): Promise<{ checked: number; removedTokens: number }>;
+}
+
+/** A push provider error; retryable errors make the job retry with backoff. */
+export class PushSendError extends Error {
+  constructor(
+    readonly provider: string,
+    message: string,
+    readonly retryable: boolean,
+    cause?: unknown,
+  ) {
+    super(message, { cause });
+    this.name = "PushSendError";
+  }
 }

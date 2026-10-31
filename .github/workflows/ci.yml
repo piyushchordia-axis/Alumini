@@ -64,6 +64,8 @@ jobs:
           NODE_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/illuminize_test
           REDIS_URL: redis://localhost:6379/1
+          # The BullMQ and Socket.IO adapter tests need this real Redis; fail instead of skipping if it is missing.
+          REQUIRE_REAL_REDIS: "1"
         run: pnpm test
 
       - name: Build API and web

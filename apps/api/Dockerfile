@@ -29,6 +29,9 @@ COPY --from=build /repo/node_modules ./node_modules
 RUN mkdir -p /app/uploads && chown -R app:app /app
 USER app
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:4000/api/v1/health || exit 1
-# Run pending migrations, then start the API
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]
+# One image, two roles: the API answers on 4000, the worker (`node dist/worker.js`) on 4001.
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:4000/api/v1/health || wget -qO- http://localhost:4001/health || exit 1
+# API: run pending migrations, then start the server. `exec` makes node PID 1's child receive SIGTERM directly so it
+# shuts down gracefully. Run the background worker from the same image with:
+#   docker run … <image> node dist/worker.js        (never run migrations from the worker)
+CMD ["sh", "-c", "node dist/db/migrate.js && exec node dist/index.js"]

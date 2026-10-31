@@ -3,6 +3,7 @@ import type { AppContext } from "../context";
 import { toEventDto } from "../dto/content.dto";
 import { toMemberCardDto } from "../dto/membership.dto";
 import { AppError } from "../lib/errors";
+import { runInTransaction } from "../lib/transaction";
 import {
   deleteEvent,
   deleteRsvp,
@@ -151,7 +152,7 @@ export async function cancelEvent(ctx: AppContext, tenantCtx: TenantContext, act
 
 export async function setRsvp(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, status: RsvpStatus): Promise<RsvpSummaryDto> {
   const tenantId = tenantCtx.tenant.id;
-  const result = await ctx.db.transaction(async (tx) => {
+  const result = await runInTransaction(ctx, async (tx) => {
     const event = await findEventById(tx, tenantId, id, true);
     if (!event) throw AppError.notFound("Event not found");
     assertCanView(actor, event.moderationStatus, event.authorMembershipId, "Event");

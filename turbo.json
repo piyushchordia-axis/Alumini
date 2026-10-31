@@ -18,7 +18,8 @@
         "CODESPACES",
         "CODESPACE_NAME",
         "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN",
-        "VITE_API_PROXY_TARGET"
+        "VITE_API_PROXY_TARGET",
+        "WORKER_MODE"
       ]
     },
     "start": {

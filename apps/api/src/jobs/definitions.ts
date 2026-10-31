@@ -1,0 +1,33 @@
+import type { PushMessage } from "../services/notifications/NotificationChannel";
+
+/**
+ * Every background job and its payload. Payloads are plain JSON (they are stored in Redis), so pass ids and small
+ * values, never rows or class instances. Add new jobs here, give them a policy below and a handler in handlers.ts.
+ */
+export interface JobPayloads {
+  /** Deliver freshly stored notifications to devices (push now; realtime from B3). */
+  "notifications.dispatch": { tenantId: string; notificationIds: string[] };
+  /** One Expo push request (at most 100 messages). */
+  "push.send": { messages: PushMessage[] };
+  /** Read Expo delivery receipts and drop tokens of uninstalled apps. */
+  "push.checkReceipts": Record<string, never>;
+}
+
+export type JobName = keyof JobPayloads;
+
+/** Queues are split by workload so slow provider calls (messages) never hold up internal jobs. */
+export const QUEUE_NAMES = ["jobs", "messages"] as const;
+export type QueueName = (typeof QUEUE_NAMES)[number];
+
+export interface JobPolicy {
+  queue: QueueName;
+  /** Total tries, including the first. */
+  attempts: number;
+  backoff?: { type: "exponential" | "fixed"; delayMs: number };
+}
+
+export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
+  "notifications.dispatch": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
+  "push.send": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
+  "push.checkReceipts": { queue: "jobs", attempts: 1 },
+};

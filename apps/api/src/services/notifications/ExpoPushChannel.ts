@@ -4,22 +4,16 @@ import type { RedisClient } from "../../redis/client";
 import { keys } from "../../redis/keys";
 import type { NotificationRow } from "../../repositories/notifications.repo";
 import { deletePushTokensByValue, listPushTokensForUsers } from "../../repositories/users.repo";
-import type { DeliveryContext, NotificationChannel, NotificationRecipient } from "./NotificationChannel";
+import { PushSendError, type DeliveryContext, type NotificationRecipient, type PushChannel, type PushMessage } from "./NotificationChannel";
 
 const SEND_URL = "https://exp.host/--/api/v2/push/send";
 const RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 /** Expo publishes receipts within ~15 minutes and keeps them for a day. */
+/** Expo accepts at most 100 messages per request. */
+export const PUSH_BATCH_SIZE = 100;
 export const RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const RECEIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-interface ExpoPushMessage {
-  to: string;
-  title: string;
-  body?: string;
-  data?: Record<string, unknown>;
-  sound?: "default";
-  channelId?: string;
-}
 
 /** A ticket (send response) or receipt: https://docs.expo.dev/push-notifications/sending-notifications/#push-tickets */
 interface ExpoStatus {
@@ -36,7 +30,7 @@ const isExpoToken = (t: string) => t.startsWith("ExponentPushToken[") || t.start
  * uninstalled, permission revoked) are deleted straight away from the send tickets, and again later from the
  * delivery receipts, which `checkReceipts` reads.
  */
-export class ExpoPushChannel implements NotificationChannel {
+export class ExpoPushChannel implements PushChannel {
   readonly name = "expo-push";
 
   constructor(
@@ -55,17 +49,18 @@ export class ExpoPushChannel implements NotificationChannel {
     };
   }
 
-  async deliver(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<void> {
-    if (rows.length === 0) return;
+  /** Builds one Expo message per recipient device. Recipients without push tokens get none. */
+  async prepare(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<PushMessage[]> {
+    if (rows.length === 0) return [];
     const userByMembership = new Map(recipients.map((r) => [r.membershipId, r.userId]));
     const tokens = await listPushTokensForUsers(this.db, [...new Set(recipients.map((r) => r.userId))]);
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) return [];
     const tokensByUser = new Map<string, string[]>();
     for (const t of tokens) {
       if (!isExpoToken(t.token)) continue;
       tokensByUser.set(t.userId, [...(tokensByUser.get(t.userId) ?? []), t.token]);
     }
-    const messages: ExpoPushMessage[] = [];
+    const messages: PushMessage[] = [];
     for (const row of rows) {
       const userId = userByMembership.get(row.recipientMembershipId);
       if (!userId) continue;
@@ -80,22 +75,36 @@ export class ExpoPushChannel implements NotificationChannel {
         });
       }
     }
-    for (let i = 0; i < messages.length; i += 100) await this.sendBatch(messages.slice(i, i + 100));
+    return messages;
   }
 
-  private async sendBatch(batch: ExpoPushMessage[]): Promise<void> {
+  /** Prepares and sends in batches of 100, logging failures (used outside the job queue, e.g. scripts and tests). */
+  async deliver(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<void> {
+    const messages = await this.prepare(rows, recipients, context);
+    for (let i = 0; i < messages.length; i += PUSH_BATCH_SIZE) {
+      await this.sendBatch(messages.slice(i, i + PUSH_BATCH_SIZE)).catch((err) => this.logger.warn({ err }, "Expo push send failed"));
+    }
+  }
+
+  /**
+   * Sends up to 100 messages. Network errors, 429 and 5xx throw a retryable PushSendError so the job is retried;
+   * other HTTP errors are logged (retrying would not help).
+   */
+  async sendBatch(batch: PushMessage[]): Promise<void> {
+    if (batch.length === 0) return;
     let tickets: ExpoStatus[] = [];
+    let res: Response;
     try {
-      const res = await this.fetchImpl(SEND_URL, { method: "POST", headers: this.headers(), body: JSON.stringify(batch), signal: AbortSignal.timeout(10_000) });
-      if (!res.ok) {
-        this.logger.warn({ status: res.status }, "Expo push send failed");
-        return;
-      }
-      tickets = ((await res.json()) as { data?: ExpoStatus[] }).data ?? [];
+      res = await this.fetchImpl(SEND_URL, { method: "POST", headers: this.headers(), body: JSON.stringify(batch), signal: AbortSignal.timeout(10_000) });
     } catch (err) {
-      this.logger.warn({ err }, "Expo push send errored");
+      throw new PushSendError(this.name, "Expo push request failed", true, err);
+    }
+    if (res.status === 429 || res.status >= 500) throw new PushSendError(this.name, `Expo push returned ${res.status}`, true);
+    if (!res.ok) {
+      this.logger.warn({ status: res.status }, "Expo push send rejected");
       return;
     }
+    tickets = ((await res.json()) as { data?: ExpoStatus[] }).data ?? [];
     // Tickets come back in the same order as the messages.
     const dead: string[] = [];
     const now = Date.now();

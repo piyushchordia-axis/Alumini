@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { notifications } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
@@ -52,4 +52,13 @@ export async function markAllRead(db: DbClient, recipientMembershipId: string): 
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.recipientMembershipId, recipientMembershipId), isNull(notifications.readAt)));
+}
+
+/** Rows by id within one tenant (background delivery reloads what the request stored). */
+export async function findNotificationsByIds(db: DbClient, tenantId: string, ids: string[]): Promise<NotificationRow[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.tenantId, tenantId), inArray(notifications.id, ids)));
 }

@@ -22,4 +22,10 @@ describe("config", () => {
     const c = loadConfig({ ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t", OTP_DEV_FIXED_CODE: "123456" });
     expect(c.OTP_DEV_FIXED_CODE).toBeUndefined();
   });
+
+  it("runs background workers in the API process except in production", () => {
+    expect(loadConfig({ NODE_ENV: "development", DATABASE_URL: "postgres://x", JWT_SECRET: "x".repeat(40), OTP_PEPPER: "p".repeat(20) }).workerMode).toBe("inline");
+    expect(loadConfig({ ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t" }).workerMode).toBe("separate");
+    expect(loadConfig({ ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t", WORKER_MODE: "inline" }).workerMode).toBe("inline");
+  });
 });

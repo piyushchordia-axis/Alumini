@@ -1,60 +1,41 @@
 import { createApp } from "./app";
+import { createRuntime } from "./bootstrap";
 import { loadConfig, loadDotenvFiles } from "./config/env";
-import type { AppContext } from "./context";
-import { createDb } from "./db/client";
-import { createJwtSigner } from "./lib/jwt";
+import { startWorkers, type RunningWorkers } from "./jobs/runWorkers";
 import { createLogger } from "./lib/logger";
-import { createRedis } from "./redis/client";
-import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
-import { createOtpSender } from "./services/otp";
-import { createStorage } from "./services/storage";
 
 async function main(): Promise<void> {
   loadDotenvFiles();
   const config = loadConfig();
   const logger = createLogger(config.LOG_LEVEL, config.isDevelopment);
-  const { pool, db } = createDb(config.DATABASE_URL);
-  const redis = createRedis(config.REDIS_URL);
-  redis.on("error", (err) => logger.error({ err }, "Redis error"));
-
-  const push = new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN);
-  const ctx: AppContext = {
-    config,
-    db,
-    redis,
-    logger,
-    jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
-    otpSender: createOtpSender(config, logger),
-    storage: createStorage(config),
-    push,
-  };
+  const runtime = await createRuntime({ role: "api", config, logger });
+  const { ctx } = runtime;
   const app = createApp(ctx);
 
-  // Expo delivery receipts: drop tokens of uninstalled apps. (Moves to the background worker once it exists.)
-  const receipts = setInterval(() => {
-    push.checkReceipts().catch((err) => logger.warn({ err }, "push receipt check failed"));
-  }, 5 * 60 * 1000);
-  receipts.unref();
-
   const server = app.listen(config.PORT, () => {
-    logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER }, "Illuminize API listening");
+    logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER, workerMode: config.workerMode }, "Illuminize API listening");
   });
 
-  const shutdown = async (signal: string) => {
+  // Development and the Codespaces demo run the background workers in this process; production runs `pnpm worker`.
+  let workers: RunningWorkers | null = null;
+  if (config.workerMode === "inline") {
+    workers = await startWorkers(ctx, { redisUrl: config.REDIS_URL, concurrency: config.WORKER_CONCURRENCY });
+  }
+
+  const shutdown = (signal: string) => {
     logger.info({ signal }, "Shutting down");
-    clearInterval(receipts);
     server.close(async () => {
       try {
-        await redis.quit();
-        await pool.end();
+        await workers?.close();
+        await runtime.close();
       } finally {
         process.exit(0);
       }
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 main().catch((err) => {
