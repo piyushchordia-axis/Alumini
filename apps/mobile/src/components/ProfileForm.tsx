@@ -2,6 +2,7 @@ import { MARITAL_STATUSES, MARITAL_STATUS_LABELS, PROFESSION_TYPES, PROFESSION_T
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
+import { DateTimeField } from "@/components/DateTimeField";
 import { Avatar, Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 import { colors, useTheme } from "@/theme";
@@ -128,7 +129,16 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
       <Input label="Designation / role" value={f.designation} onChangeText={(v) => set("designation", v)} error={errors.designation} />
       <Input label="Current city" value={f.city} onChangeText={(v) => set("city", v)} error={errors.city} />
       <ChipSelect label="Country" options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))} value={f.country} onChange={(v) => set("country", v)} allowEmpty />
-      <Input label="Date of birth" value={f.dateOfBirth} onChangeText={(v) => set("dateOfBirth", v)} placeholder="YYYY-MM-DD" error={errors.dateOfBirth} />
+      <DateTimeField
+        label="Date of birth"
+        mode="date"
+        value={f.dateOfBirth || null}
+        onChange={(v) => set("dateOfBirth", v ?? "")}
+        maximumDate={new Date(new Date().getFullYear() - 10, 11, 31)}
+        minimumDate={new Date(1900, 0, 1)}
+        error={errors.dateOfBirth}
+        clearable
+      />
       <Pressable onPress={() => setMore((m) => !m)}>
         <Text style={{ color: theme.primary, fontWeight: "600" }}>{more ? "Hide optional details" : "More about you (optional)"}</Text>
       </Pressable>

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_type" ADD VALUE 'EVENT_UPDATED' BEFORE 'NEW_MEMBER_PENDING';

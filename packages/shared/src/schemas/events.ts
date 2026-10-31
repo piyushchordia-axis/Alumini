@@ -34,13 +34,16 @@ const eventFields = {
   coverImageUrl: httpUrlSchema.nullable().optional(),
 };
 
+/** One hour of grace so an event that is just starting can still be created or moved. */
+export const EVENT_START_GRACE_MS = 60 * 60 * 1000;
+
 const endAfterStart = (v: { startAt?: string; endAt?: string | null }) =>
   !v.startAt || !v.endAt || new Date(v.endAt).getTime() > new Date(v.startAt).getTime();
 
 export const eventCreateSchema = z
   .object(eventFields)
   .refine(endAfterStart, { message: "End time must be after the start time", path: ["endAt"] })
-  .refine((v) => new Date(v.startAt).getTime() > Date.now() - 60 * 60 * 1000, { message: "Start time must be in the future", path: ["startAt"] });
+  .refine((v) => new Date(v.startAt).getTime() > Date.now() - EVENT_START_GRACE_MS, { message: "Start time must be in the future", path: ["startAt"] });
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
 
 export const eventUpdateSchema = z
@@ -48,6 +51,21 @@ export const eventUpdateSchema = z
   .partial()
   .refine(endAfterStart, { message: "End time must be after the start time", path: ["endAt"] });
 export type EventUpdateInput = z.infer<typeof eventUpdateSchema>;
+
+/**
+ * Full-form schema for editing an existing event: the start may stay in the past
+ * (the event already happened) but cannot be moved to a different past time.
+ */
+export function eventEditSchema(originalStartAt: string) {
+  const original = new Date(originalStartAt).getTime();
+  return z
+    .object(eventFields)
+    .refine(endAfterStart, { message: "End time must be after the start time", path: ["endAt"] })
+    .refine((v) => new Date(v.startAt).getTime() === original || new Date(v.startAt).getTime() > Date.now() - EVENT_START_GRACE_MS, {
+      message: "Start time must be in the future",
+      path: ["startAt"],
+    });
+}
 
 export const eventListQuerySchema = cursorQuerySchema.extend({
   scope: z.enum(["upcoming", "past"]).default("upcoming"),

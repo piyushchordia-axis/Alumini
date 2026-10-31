@@ -6,6 +6,7 @@ export default function EventsStack() {
       <Stack.Screen name="index" />
       <Stack.Screen name="[id]" options={{ headerShown: true, title: "Event", headerTitleStyle: { fontWeight: "700" } }} />
       <Stack.Screen name="new" options={{ headerShown: true, title: "Plan a gathering", presentation: "modal" }} />
+      <Stack.Screen name="edit/[id]" options={{ headerShown: true, title: "Edit event", presentation: "modal" }} />
     </Stack>
   );
 }

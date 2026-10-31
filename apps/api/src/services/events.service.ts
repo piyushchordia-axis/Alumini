@@ -1,4 +1,4 @@
-import type { AttendeesQuery, CursorPage, EventCreateInput, EventDto, EventListQuery, EventUpdateInput, MemberCardDto, RsvpStatus, RsvpSummaryDto } from "@illuminize/shared";
+import { EVENT_START_GRACE_MS, type AttendeesQuery, type CursorPage, type EventCreateInput, type EventDto, type EventListQuery, type EventUpdateInput, type MemberCardDto, type RsvpStatus, type RsvpSummaryDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toEventDto } from "../dto/content.dto";
 import { toMemberCardDto } from "../dto/membership.dto";
@@ -78,6 +78,13 @@ export async function updateEventListing(ctx: AppContext, tenantCtx: TenantConte
   const nextStart = input.startAt ? new Date(input.startAt) : found.event.startAt;
   const nextEnd = input.endAt === undefined ? found.event.endAt : input.endAt ? new Date(input.endAt) : null;
   if (nextEnd && nextEnd <= nextStart) throw AppError.badRequest("End time must be after the start time", [{ path: "endAt", message: "Must be after startAt" }]);
+  const startMoved = nextStart.getTime() !== found.event.startAt.getTime();
+  if (startMoved && nextStart.getTime() < Date.now() - EVENT_START_GRACE_MS) {
+    throw AppError.badRequest("Start time must be in the future", [{ path: "startAt", message: "Start time must be in the future" }]);
+  }
+  if (input.maxAttendees != null && input.maxAttendees < found.event.yesCount) {
+    throw AppError.badRequest(`${found.event.yesCount} people are already going`, [{ path: "maxAttendees", message: `Must be at least ${found.event.yesCount} (already going)` }]);
+  }
   const status = statusAfterEdit(tenantCtx, actor, found.event.moderationStatus);
   const row = (await updateEvent(ctx.db, tenantCtx.tenant.id, id, {
     ...eventColumns(input),
@@ -85,14 +92,41 @@ export async function updateEventListing(ctx: AppContext, tenantCtx: TenantConte
     moderationNote: status === found.event.moderationStatus ? found.event.moderationNote : null,
   }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "EVENT", id, title: row.title, status, action: "update" });
+
+  // Tell people who are coming when the when/where changes.
+  const changed: string[] = [];
+  if (startMoved || (nextEnd?.getTime() ?? null) !== (found.event.endAt?.getTime() ?? null) || row.timezone !== found.event.timezone) changed.push("time");
+  if (row.city !== found.event.city || row.venueName !== found.event.venueName || row.address !== found.event.address) changed.push("place");
+  if (changed.length > 0 && row.moderationStatus === "APPROVED") {
+    const attendees = await listRsvpMembershipIds(ctx.db, id, ["YES", "MAYBE"]);
+    await notify(ctx, {
+      tenantId: tenantCtx.tenant.id,
+      recipientMembershipIds: attendees.filter((m) => m !== actor.membership.id),
+      type: "EVENT_UPDATED",
+      title: `Updated: ${row.title}`,
+      body: `The organiser changed the ${changed.join(" and ")}. Check the details before you go.`,
+      data: { eventId: id, contentType: "EVENT", contentId: id },
+    });
+  }
   return toEventDto({ event: row, author: found.author, myRsvp: found.myRsvp }, actor.membership.id);
 }
 
 export async function removeEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<void> {
   const found = await loadEvent(ctx, tenantCtx, actor, id);
   assertAuthor(actor, found.event.authorMembershipId);
+  // Collect attendees before the cascade removes their RSVPs.
+  const upcoming = !found.event.isCancelled && found.event.startAt.getTime() > Date.now();
+  const attendees = upcoming && found.event.moderationStatus === "APPROVED" ? await listRsvpMembershipIds(ctx.db, id, ["YES", "MAYBE"]) : [];
   await deleteEvent(ctx.db, tenantCtx.tenant.id, id);
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "EVENT", id, title: found.event.title, status: found.event.moderationStatus, action: "delete" });
+  await notify(ctx, {
+    tenantId: tenantCtx.tenant.id,
+    recipientMembershipIds: attendees.filter((m) => m !== actor.membership.id),
+    type: "EVENT_CANCELLED",
+    title: `Cancelled: ${found.event.title}`,
+    body: "The organiser removed this gathering.",
+    data: {},
+  });
 }
 
 export async function cancelEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, reason?: string | null): Promise<EventDto> {
@@ -123,6 +157,8 @@ export async function setRsvp(ctx: AppContext, tenantCtx: TenantContext, actor: 
     assertCanView(actor, event.moderationStatus, event.authorMembershipId, "Event");
     if (event.moderationStatus !== "APPROVED") throw AppError.forbidden("This event is not published yet");
     if (event.isCancelled) throw AppError.conflict("This event has been cancelled");
+    const over = event.endAt ? event.endAt.getTime() < Date.now() : event.startAt.getTime() < Date.now();
+    if (over) throw AppError.conflict(event.endAt ? "This event has already ended" : "This event has already started");
     const existing = await findRsvp(tx, id, actor.membership.id);
     if (status === "YES" && existing?.status !== "YES" && event.maxAttendees && event.yesCount >= event.maxAttendees) {
       throw AppError.conflict("This event is full", "EVENT_FULL");

@@ -15,6 +15,13 @@
       "when": 1793386601256,
       "tag": "0001_extensions_views",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793468999869,
+      "tag": "0002_event_updated_notification",
+      "breakpoints": true
     }
   ]
 }

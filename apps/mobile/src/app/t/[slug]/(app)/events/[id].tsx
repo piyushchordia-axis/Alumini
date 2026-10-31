@@ -88,6 +88,7 @@ export default function EventDetailScreen() {
           </Row>
           {(e.isMine || isTenantAdmin) && (
             <Row>
+              {e.isMine && <Button title="Edit" variant="outline" onPress={() => router.push(`/t/${slug}/events/edit/${e.id}`)} />}
               {!e.isCancelled && <Button title="Cancel event" variant="outline" onPress={() => Alert.alert("Cancel this event?", "Attendees will be notified.", [{ text: "Keep", style: "cancel" }, { text: "Cancel event", style: "destructive", onPress: () => cancel.mutate() }])} loading={cancel.isPending} />}
               {e.isMine && <Button title="Delete" variant="ghost" onPress={() => Alert.alert("Delete this event?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} />}
             </Row>

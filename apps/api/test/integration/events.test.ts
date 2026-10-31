@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import request from "supertest";
+import { events } from "../../src/db/schema";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createTenant, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -101,5 +103,73 @@ describe.skipIf(!dbAvailable)("events + RSVP", () => {
     const edited = await api().patch(`${base}/${id}`).set(host.headers).send({ title: "Mumbai meetup v2", maxAttendees: null });
     expect(edited.body.data).toMatchObject({ title: "Mumbai meetup v2", maxAttendees: null });
     expect((await api().delete(`${base}/${id}`).set(host.headers)).status).toBe(204);
+  });
+});
+
+describe.skipIf(!dbAvailable)("event rules", () => {
+  let ctx: TestContext;
+  beforeAll(async () => {
+    ctx = await createTestContext();
+  });
+  beforeEach(async () => {
+    await ctx.truncateAll();
+  });
+  afterAll(async () => {
+    await ctx.dispose();
+  });
+  const api = () => request(ctx.app);
+
+  it("keeps capacity above the current RSVPs and notifies attendees of time/place changes", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/t/${tenant.slug}`;
+    const host = await memberSession(ctx, tenant.id);
+    const a = await memberSession(ctx, tenant.id);
+    const b = await memberSession(ctx, tenant.id);
+    const created = await api().post(`${base}/events`).set(host.headers).send({ ...EVENT, maxAttendees: 5 });
+    const id = created.body.data.id;
+    await api().put(`${base}/events/${id}/rsvp`).set(a.headers).send({ status: "YES" });
+    await api().put(`${base}/events/${id}/rsvp`).set(b.headers).send({ status: "YES" });
+    const tooSmall = await api().patch(`${base}/events/${id}`).set(host.headers).send({ maxAttendees: 1 });
+    expect(tooSmall.status).toBe(400);
+    expect(tooSmall.body.error.details[0].path).toBe("maxAttendees");
+
+    const titleOnly = await api().patch(`${base}/events/${id}`).set(host.headers).send({ title: "Renamed meetup" });
+    expect(titleOnly.status).toBe(200);
+    expect((await api().get(`${base}/notifications`).set(a.headers)).body.data.some((n: { type: string }) => n.type === "EVENT_UPDATED")).toBe(false);
+
+    const moved = await api().patch(`${base}/events/${id}`).set(host.headers).send({ venueName: "New cafe", startAt: future(8), endAt: future(8.1) });
+    expect(moved.status).toBe(200);
+    const notif = (await api().get(`${base}/notifications`).set(a.headers)).body.data.find((n: { type: string }) => n.type === "EVENT_UPDATED");
+    expect(notif.body).toContain("time and place");
+  });
+
+  it("allows editing a past event's details but not moving it into another past time, and blocks RSVPs once over", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/t/${tenant.slug}`;
+    const host = await memberSession(ctx, tenant.id);
+    const guest = await memberSession(ctx, tenant.id);
+    const created = await api().post(`${base}/events`).set(host.headers).send(EVENT);
+    const id = created.body.data.id;
+    // Move the event into the past directly in the database.
+    await ctx.db.update(events).set({ startAt: new Date(Date.now() - 3 * 86400000), endAt: new Date(Date.now() - 3 * 86400000 + 7200000) }).where(eq(events.id, id));
+
+    expect((await api().patch(`${base}/events/${id}`).set(host.headers).send({ description: "Thanks for coming!" })).status).toBe(200);
+    const backdated = await api().patch(`${base}/events/${id}`).set(host.headers).send({ startAt: new Date(Date.now() - 5 * 86400000).toISOString(), endAt: null });
+    expect(backdated.status).toBe(400);
+    const late = await api().put(`${base}/events/${id}/rsvp`).set(guest.headers).send({ status: "YES" });
+    expect(late.status).toBe(409);
+    expect(late.body.error.message).toMatch(/ended/);
+  });
+
+  it("notifies attendees when an upcoming event is deleted", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/t/${tenant.slug}`;
+    const host = await memberSession(ctx, tenant.id);
+    const guest = await memberSession(ctx, tenant.id);
+    const created = await api().post(`${base}/events`).set(host.headers).send(EVENT);
+    await api().put(`${base}/events/${created.body.data.id}/rsvp`).set(guest.headers).send({ status: "MAYBE" });
+    expect((await api().delete(`${base}/events/${created.body.data.id}`).set(host.headers)).status).toBe(204);
+    const n = (await api().get(`${base}/notifications`).set(guest.headers)).body.data[0];
+    expect(n).toMatchObject({ type: "EVENT_CANCELLED", body: "The organiser removed this gathering." });
   });
 });

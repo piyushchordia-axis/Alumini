@@ -1,29 +1,62 @@
-import { EVENT_KINDS, EVENT_KIND_LABELS, eventCreateSchema, type EventCreateInput, type EventDto } from "@illuminize/shared";
+import {
+  COMMON_TIME_ZONES,
+  EVENT_KINDS,
+  EVENT_KIND_LABELS,
+  eventCreateSchema,
+  eventEditSchema,
+  localTimeZone,
+  utcToZonedWallTime,
+  zonedWallTimeToUtc,
+  zoneOffsetLabel,
+  type EventCreateInput,
+  type EventDto,
+  type EventKind,
+} from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
+import { useMemo, useState } from "react";
+import { Controller, useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
-import type { z } from "zod";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { Button, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
-const COMMON_TZ = ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles", "America/Toronto", "Australia/Sydney", "UTC"];
-
-/** <input type="datetime-local"> works in the browser's local wall time; values are stored as ISO instants. */
-function toLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/**
+ * The form holds start/end as wall-clock times ("YYYY-MM-DDTHH:mm") in the event's own time zone,
+ * which is what <input type="datetime-local"> edits. They are converted to UTC instants with the
+ * selected zone only when the form is validated, so changing the zone after typing a time keeps
+ * the clock time the organiser typed.
+ */
+interface EventFormValues {
+  title: string;
+  description: string;
+  kind: EventKind;
+  city: string;
+  venueName: string | null;
+  address: string | null;
+  startAt: string;
+  endAt: string | null;
+  timezone: string;
+  maxAttendees: number | null;
+  coverImageUrl: string | null;
 }
-const fromLocalInput = (v: string): string | null => (v ? new Date(v).toISOString() : null);
 
 export function EventForm({ slug, initial, onSubmit, submitLabel }: { slug: string; initial?: EventDto; onSubmit: (v: EventCreateInput) => Promise<void>; submitLabel: string }) {
   const [serverError, setServerError] = useState<unknown>(null);
-  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const tzOptions = COMMON_TZ.includes(browserTz) ? COMMON_TZ : [browserTz, ...COMMON_TZ];
-  const { register, handleSubmit, formState, setError, control } = useForm<z.input<typeof eventCreateSchema>, unknown, EventCreateInput>({
-    resolver: zodResolver(eventCreateSchema),
+  const initialZone = initial?.timezone ?? localTimeZone();
+  const tzOptions = useMemo(() => [...new Set<string>([initialZone, localTimeZone(), ...COMMON_TIME_ZONES])], [initialZone]);
+
+  // Convert wall times to instants with the chosen zone, then validate with the shared schema.
+  const resolver = useMemo<Resolver<EventFormValues, unknown, EventCreateInput>>(() => {
+    const schema = initial ? eventEditSchema(initial.startAt) : eventCreateSchema;
+    const zod = zodResolver(schema) as unknown as Resolver<Record<string, unknown>, unknown, EventCreateInput>;
+    return (values, context, options) => {
+      const startAt = values.startAt ? zonedWallTimeToUtc(values.startAt, values.timezone) : null;
+      const endAt = values.endAt ? zonedWallTimeToUtc(values.endAt, values.timezone) : null;
+      return zod({ ...values, startAt: startAt ?? "", endAt: values.endAt ? (endAt ?? "invalid") : null }, context, options as never) as never;
+    };
+  }, [initial]);
+
+  const { register, handleSubmit, formState, setError, control } = useForm<EventFormValues, unknown, EventCreateInput>({
+    resolver,
     defaultValues: {
       title: initial?.title ?? "",
       description: initial?.description ?? "",
@@ -31,13 +64,14 @@ export function EventForm({ slug, initial, onSubmit, submitLabel }: { slug: stri
       city: initial?.city ?? "",
       venueName: initial?.venueName ?? null,
       address: initial?.address ?? null,
-      startAt: initial?.startAt ?? "",
-      endAt: initial?.endAt ?? null,
-      timezone: initial?.timezone ?? browserTz,
+      startAt: initial ? utcToZonedWallTime(initial.startAt, initialZone) : "",
+      endAt: initial?.endAt ? utcToZonedWallTime(initial.endAt, initialZone) : null,
+      timezone: initialZone,
       maxAttendees: initial?.maxAttendees ?? null,
       coverImageUrl: initial?.coverImageUrl ?? null,
     },
   });
+  const zone = useWatch({ control, name: "timezone" });
   const e = formState.errors;
   const nullable = { setValueAs: (v: string) => (v ? v : null) };
   return (
@@ -49,7 +83,7 @@ export function EventForm({ slug, initial, onSubmit, submitLabel }: { slug: stri
           await onSubmit(v);
         } catch (err) {
           if (isApiClientError(err) && Object.keys(err.fieldErrors).length) {
-            for (const [p, m] of Object.entries(err.fieldErrors)) setError(p as keyof z.input<typeof eventCreateSchema>, { message: m });
+            for (const [p, m] of Object.entries(err.fieldErrors)) setError(p as keyof EventFormValues, { message: m });
           } else setServerError(err);
         }
       })}
@@ -72,21 +106,23 @@ export function EventForm({ slug, initial, onSubmit, submitLabel }: { slug: stri
         <FormField label="City" required error={e.city?.message}>
           <Input {...register("city")} />
         </FormField>
-        <FormField label="Starts" required error={e.startAt?.message}>
-          <Controller control={control} name="startAt" render={({ field }) => <Input type="datetime-local" value={toLocalInput(field.value)} onChange={(ev) => field.onChange(fromLocalInput(ev.target.value) ?? "")} />} />
-        </FormField>
-        <FormField label="Ends" error={e.endAt?.message}>
-          <Controller control={control} name="endAt" render={({ field }) => <Input type="datetime-local" value={toLocalInput(field.value)} onChange={(ev) => field.onChange(fromLocalInput(ev.target.value))} />} />
-        </FormField>
-        <FormField label="Time zone" required error={e.timezone?.message}>
+        <FormField label="Time zone" required error={e.timezone?.message} hint="Start and end times are in this time zone.">
           <Select {...register("timezone")}>
             {tzOptions.map((tz) => (
-              <option key={tz}>{tz}</option>
+              <option key={tz} value={tz}>
+                {tz.replace(/_/g, " ")} ({zoneOffsetLabel(tz)})
+              </option>
             ))}
           </Select>
         </FormField>
         <FormField label="Max attendees" hint="Leave blank for unlimited" error={e.maxAttendees?.message}>
           <Input type="number" min={1} {...register("maxAttendees", { setValueAs: (v) => (v === "" || v === null ? null : Number(v)) })} />
+        </FormField>
+        <FormField label={`Starts (${zone.replace(/_/g, " ")})`} required error={e.startAt?.message}>
+          <Input type="datetime-local" {...register("startAt")} />
+        </FormField>
+        <FormField label={`Ends (${zone.replace(/_/g, " ")})`} error={e.endAt?.message}>
+          <Input type="datetime-local" {...register("endAt", nullable)} />
         </FormField>
         <FormField label="Venue" error={e.venueName?.message}>
           <Input {...register("venueName", nullable)} placeholder="Café, hall, link for online" />
