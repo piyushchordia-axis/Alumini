@@ -27,8 +27,8 @@ export function JobsPage() {
       {tab === "openings" ? (
         <>
           <div className="flex flex-wrap gap-2">
-            <Input placeholder="Search title or company" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-            <Select value={jobType} onChange={(e) => setJobType(e.target.value as JobType | "")} className="w-44">
+            <Input aria-label="Search jobs" placeholder="Search title or company" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
+            <Select aria-label="Job type" value={jobType} onChange={(e) => setJobType(e.target.value as JobType | "")} className="w-44">
               <option value="">All types</option>
               {JOB_TYPES.map((t) => (
                 <option key={t} value={t}>

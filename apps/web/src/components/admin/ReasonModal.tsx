@@ -44,7 +44,7 @@ export function ReasonModal({ open, title, label, placeholder, required, confirm
       }
     >
       {label && <p className="mb-2 text-sm text-slate-600">{label}</p>}
-      <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder ?? (required ? "Reason (shown to the member)" : "Optional note")} maxLength={500} />
+      <Textarea aria-label={label ?? title} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder ?? (required ? "Reason (shown to the member)" : "Optional note")} maxLength={500} />
     </Modal>
   );
 }

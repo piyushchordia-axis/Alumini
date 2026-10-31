@@ -3,12 +3,12 @@ import { useState } from "react";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { Card, ErrorBox, Loading, PageHeader, Tabs } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function AdminSettingsPage() {
-  const { tenant } = useMembership();
+  const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const qc = useQueryClient();
   const [tab, setTab] = useState<"settings" | "branding">("settings");

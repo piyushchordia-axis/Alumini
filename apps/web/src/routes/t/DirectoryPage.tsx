@@ -34,8 +34,8 @@ export function DirectoryPage() {
     <div className="space-y-4">
       <PageHeader title="Directory" subtitle="Find batchmates by year, city, company or profession" />
       <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Input placeholder="Name, company, role" value={q} onChange={(e) => setQ(e.target.value)} className="sm:col-span-2" />
-        <Select value={batchYear} onChange={(e) => setBatchYear(e.target.value)}>
+        <Input aria-label="Search members" placeholder="Name, company, role" value={q} onChange={(e) => setQ(e.target.value)} className="sm:col-span-2" />
+        <Select aria-label="Batch" value={batchYear} onChange={(e) => setBatchYear(e.target.value)}>
           <option value="">Any batch</option>
           {facets.data?.batchYears.map((y) => (
             <option key={y} value={y}>
@@ -43,7 +43,7 @@ export function DirectoryPage() {
             </option>
           ))}
         </Select>
-        <Select value={city} onChange={(e) => setCity(e.target.value)}>
+        <Select aria-label="City" value={city} onChange={(e) => setCity(e.target.value)}>
           <option value="">Any city</option>
           {facets.data?.cities.map((c) => (
             <option key={c} value={c}>
@@ -51,7 +51,7 @@ export function DirectoryPage() {
             </option>
           ))}
         </Select>
-        <Select value={country} onChange={(e) => setCountry(e.target.value)}>
+        <Select aria-label="Country" value={country} onChange={(e) => setCountry(e.target.value)}>
           <option value="">Any country</option>
           {facets.data?.countries.map((c) => (
             <option key={c} value={c}>
@@ -59,7 +59,7 @@ export function DirectoryPage() {
             </option>
           ))}
         </Select>
-        <Select value={professionType} onChange={(e) => setProfessionType(e.target.value as ProfessionType | "")}>
+        <Select aria-label="Profession" value={professionType} onChange={(e) => setProfessionType(e.target.value as ProfessionType | "")}>
           <option value="">Any profession</option>
           {PROFESSION_TYPES.map((p) => (
             <option key={p} value={p}>
@@ -67,7 +67,7 @@ export function DirectoryPage() {
             </option>
           ))}
         </Select>
-        <Select value={company} onChange={(e) => setCompany(e.target.value)} className="sm:col-span-2">
+        <Select aria-label="Company" value={company} onChange={(e) => setCompany(e.target.value)} className="sm:col-span-2">
           <option value="">Any company</option>
           {facets.data?.companies.map((c) => (
             <option key={c} value={c}>

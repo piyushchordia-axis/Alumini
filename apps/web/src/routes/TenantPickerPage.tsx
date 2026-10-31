@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Avatar, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
 import { useTenantList } from "@/hooks/useTenant";
+import { resetTheme } from "@/lib/theme";
 import { useIsAuthenticated } from "@/stores/authStore";
 import { useUiStore } from "@/stores/uiStore";
 
@@ -10,7 +11,11 @@ export function TenantPickerPage() {
   const tenants = useTenantList(q.trim() || undefined);
   const last = useUiStore((s) => s.lastTenantSlug);
   const authed = useIsAuthenticated();
-  const params = new URLSearchParams(window.location.search);
+  const [params] = useSearchParams();
+  // Coming back from an institution leaves its colours applied; the picker uses the Illuminize defaults.
+  useEffect(() => {
+    resetTheme();
+  }, []);
 
   if (authed && last && params.get("switch") !== "1") return <Navigate to={`/t/${last}/app`} replace />;
 

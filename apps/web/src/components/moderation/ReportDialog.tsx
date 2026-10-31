@@ -43,14 +43,14 @@ export function ReportButton({ slug, contentType, contentId, className }: { slug
         }
       >
         <div className="space-y-3">
-          <Select value={reason} onChange={(e) => setReason(e.target.value as ReportReason)}>
+          <Select aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value as ReportReason)}>
             {REPORT_REASONS.map((r) => (
               <option key={r} value={r}>
                 {REPORT_REASON_LABELS[r]}
               </option>
             ))}
           </Select>
-          <Textarea placeholder="Anything the admins should know? (optional)" value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} />
+          <Textarea aria-label="Details (optional)" placeholder="Anything the admins should know? (optional)" value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} />
         </div>
       </Modal>
     </>

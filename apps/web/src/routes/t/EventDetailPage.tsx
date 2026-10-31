@@ -1,12 +1,14 @@
 import { EVENT_KIND_LABELS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ReasonModal } from "@/components/admin/ReasonModal";
 import { MemberLink } from "@/components/common/MemberLink";
 import { RsvpButtons } from "@/components/events/RsvpButtons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, LoadMore, Loading } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -21,13 +23,16 @@ export function EventDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
-  const attendees = useInfiniteList(qk.attendees(slug, id, "YES"), (cursor) => api.events.attendees(slug, id, { status: "YES", cursor, limit: 30 }), !!ev.data);
+  const [who, setWho] = useState<"YES" | "MAYBE">("YES");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const attendees = useInfiniteList(qk.attendees(slug, id, who), (cursor) => api.events.attendees(slug, id, { status: who, cursor, limit: 30 }), !!ev.data);
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["events", slug] });
     void qc.invalidateQueries({ queryKey: qk.event(slug, id) });
+    void qc.invalidateQueries({ queryKey: ["attendees", slug, id] });
   };
   const cancel = useMutation({
-    mutationFn: () => api.events.cancel(slug, id, prompt("Reason for cancelling (optional)") || null),
+    mutationFn: (reason: string) => api.events.cancel(slug, id, reason || null),
     onSuccess: () => {
       invalidate();
       toast.success("Event cancelled; attendees have been notified");
@@ -90,7 +95,7 @@ export function EventDetailPage() {
                 </LinkButton>
               )}
               {(e.isMine || isTenantAdmin) && !e.isCancelled && (
-                <Button variant="outline" size="sm" onClick={() => confirm("Cancel this event? Attendees will be notified.") && cancel.mutate()} loading={cancel.isPending}>
+                <Button variant="outline" size="sm" onClick={() => setCancelOpen(true)} loading={cancel.isPending}>
                   Cancel event
                 </Button>
               )}
@@ -106,8 +111,20 @@ export function EventDetailPage() {
         </div>
       </Card>
       <Card className="p-5">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Who's going</h2>
-        {attendees.items.length === 0 && !attendees.isLoading && <p className="text-sm text-slate-400">No RSVPs yet — be the first!</p>}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-700">Who's coming</h2>
+          <Tabs
+            value={who}
+            onChange={setWho}
+            tabs={[
+              { value: "YES", label: "Going", count: e.yesCount },
+              { value: "MAYBE", label: "Maybe", count: e.maybeCount },
+            ]}
+          />
+        </div>
+        {attendees.isLoading && <Loading />}
+        {attendees.error && <ErrorBox error={attendees.error} />}
+        {attendees.items.length === 0 && !attendees.isLoading && !attendees.error && <p className="text-sm text-slate-400">{who === "YES" ? "No one has said yes yet. Be the first!" : "No maybes yet."}</p>}
         <ul className="grid gap-3 sm:grid-cols-2">
           {attendees.items.map((m) => (
             <li key={m.id}>
@@ -123,6 +140,16 @@ export function EventDetailPage() {
         </ul>
         <LoadMore hasNextPage={!!attendees.hasNextPage} isFetchingNextPage={attendees.isFetchingNextPage} fetchNextPage={() => void attendees.fetchNextPage()} />
       </Card>
+      <ReasonModal
+        open={cancelOpen}
+        title="Cancel this event?"
+        label="Everyone who said yes or maybe is notified. Add a reason if you like."
+        placeholder="Reason for cancelling (optional)"
+        tone="danger"
+        confirmLabel="Cancel event"
+        onClose={() => setCancelOpen(false)}
+        onConfirm={(reason) => cancel.mutateAsync(reason)}
+      />
     </div>
   );
 }

@@ -190,5 +190,6 @@ export function toModerationItemDto(item: ModerationItemRow, author: MembershipR
     moderatedAt: iso(item.moderatedAt),
     createdAt: item.createdAt.toISOString(),
     reportCount,
+    isPinned: item.isPinned,
   };
 }

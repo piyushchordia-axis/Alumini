@@ -142,6 +142,25 @@ try {
     await shot("p04-users");
   });
 
+  await step("platform admin opens an institution's admin console without being a member", async () => {
+    await page.goto(`${BASE}/t/demo-school/admin/members`);
+    await page.waitForURL(/\/t\/demo-school\/admin\/members$/);
+    await page.waitForSelector('nav[aria-label="Admin sections"] >> text=Moderation');
+    await page.waitForSelector("text=Platform console");
+  });
+
+  await step("admin console stacks on a phone", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/t/demo-school/admin/dashboard`);
+    const nav = await page.locator('nav[aria-label="Admin sections"]').boundingBox();
+    const main = await page.locator("main").boundingBox();
+    if (!nav || !main) throw new Error("admin nav or main missing");
+    if (main.width < 300) throw new Error(`main column is only ${Math.round(main.width)}px wide on a phone`);
+    if (main.y < nav.y + nav.height - 1) throw new Error("admin nav and content overlap on a phone");
+    await shot("p05-admin-phone");
+    await page.setViewportSize({ width: 1280, height: 900 });
+  });
+
   console.log(results.join("\n"));
   console.log("ADMIN SMOKE OK");
 } catch (err) {

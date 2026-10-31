@@ -22,6 +22,13 @@
       "when": 1793468999869,
       "tag": "0002_event_updated_notification",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793469000869,
+      "tag": "0003_moderation_items_pinned",
+      "breakpoints": true
     }
   ]
 }

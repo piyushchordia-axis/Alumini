@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { ErrorBox, Input, Loading, PageHeader, Pagination } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function AdminAuditPage() {
-  const { tenant } = useMembership();
+  const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const [page, setPage] = useState(1);
   const [action, setAction] = useState("");
@@ -16,7 +16,7 @@ export function AdminAuditPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Audit log" subtitle="Every admin and member action, newest first" />
-      <Input placeholder="Filter by action prefix, e.g. membership. or content." value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className="max-w-sm" />
+      <Input aria-label="Filter by action" placeholder="Filter by action prefix, e.g. membership. or content." value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className="max-w-sm" />
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
       {q.data && <AuditTable rows={q.data.data} />}

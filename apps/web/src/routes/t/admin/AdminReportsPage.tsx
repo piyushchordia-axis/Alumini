@@ -5,9 +5,10 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
@@ -15,7 +16,7 @@ function ReportRow({ slug, report }: { slug: string; report: AdminReportDto }) {
   const qc = useQueryClient();
   const [modal, setModal] = useState<"remove" | "dismiss" | "none" | null>(null);
   const refresh = (msg: string) => () => {
-    void qc.invalidateQueries({ queryKey: ["admin", slug] });
+    void invalidateTenant(qc, slug);
     toast.success(msg);
   };
   const resolve = useMutation({
@@ -62,7 +63,7 @@ function ReportRow({ slug, report }: { slug: string; report: AdminReportDto }) {
 }
 
 export function AdminReportsPage() {
-  const { tenant } = useMembership();
+  const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const [params, setParams] = useSearchParams();
   const status = (params.get("status") as ReportStatus) || "OPEN";

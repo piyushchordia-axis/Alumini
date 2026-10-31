@@ -1,15 +1,37 @@
 import { JOB_TYPES, JOB_TYPE_LABELS, jobCreateSchema, type JobCreateInput, type JobDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
 import type { z } from "zod";
 import { Button, Checkbox, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
+type JobFormValues = z.input<typeof jobCreateSchema>;
+
+/** "YYYY-MM-DD" in the viewer's zone for an instant, for <input type="date">. */
+function toLocalDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The closing date means "open until the end of that day" where the poster is. */
+function endOfLocalDay(date: string): string {
+  const d = new Date(`${date}T23:59:59`);
+  return Number.isNaN(d.getTime()) ? date : d.toISOString();
+}
+
 export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; onSubmit: (v: JobCreateInput) => Promise<void>; submitLabel: string }) {
   const [serverError, setServerError] = useState<unknown>(null);
-  const { register, handleSubmit, formState, setError } = useForm<z.input<typeof jobCreateSchema>, unknown, JobCreateInput>({
-    resolver: zodResolver(jobCreateSchema),
+  // The form edits the closing date as a calendar date; it becomes an end-of-day instant when validated.
+  const resolver = useMemo<Resolver<JobFormValues, unknown, JobCreateInput>>(() => {
+    const zod = zodResolver(jobCreateSchema) as unknown as Resolver<JobFormValues, unknown, JobCreateInput>;
+    return (values, context, options) => zod({ ...values, expiresAt: values.expiresAt ? endOfLocalDay(values.expiresAt) : null }, context, options);
+  }, []);
+  const { register, handleSubmit, formState, setError } = useForm<JobFormValues, unknown, JobCreateInput>({
+    resolver,
     defaultValues: {
       title: initial?.title ?? "",
       companyName: initial?.companyName ?? "",
@@ -21,7 +43,7 @@ export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; 
       contactEmail: initial?.contactEmail ?? null,
       contactPhone: initial?.contactPhone ?? null,
       salaryRange: initial?.salaryRange ?? null,
-      expiresAt: initial?.expiresAt ?? null,
+      expiresAt: toLocalDate(initial?.expiresAt),
     },
   });
   const e = formState.errors;
@@ -80,6 +102,9 @@ export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; 
         </FormField>
         <FormField label="Salary range" error={e.salaryRange?.message}>
           <Input {...register("salaryRange", nullable)} placeholder="e.g. ₹18–25 LPA" />
+        </FormField>
+        <FormField label="Applications close" hint="Optional. The job is hidden from the board after this day." error={e.expiresAt?.message}>
+          <Input type="date" min={toLocalDate(new Date().toISOString()) ?? undefined} {...register("expiresAt", nullable)} />
         </FormField>
       </div>
       {serverError ? <ErrorBox error={serverError} /> : null}

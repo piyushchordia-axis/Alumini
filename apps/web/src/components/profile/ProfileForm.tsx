@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { CountrySelect } from "@/components/common/CountrySelect";
+import { CommaListInput } from "@/components/common/CommaListInput";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { Button, Checkbox, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
@@ -124,20 +125,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: ProfileF
             <Controller
               control={control}
               name="interests"
-              render={({ field }) => (
-                <Input
-                  value={(field.value ?? []).join(", ")}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                        .slice(0, 20),
-                    )
-                  }
-                />
-              )}
+              render={({ field }) => <CommaListInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} max={20} placeholder="cricket, startups, travel" />}
             />
           </FormField>
           <div className="sm:col-span-2">

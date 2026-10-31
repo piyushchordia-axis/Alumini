@@ -372,6 +372,8 @@ export interface ModerationItemDto {
   moderatedAt: string | null;
   createdAt: string;
   reportCount: number;
+  /** Posts only: whether it is pinned to the top of the feed. */
+  isPinned: boolean;
 }
 
 export interface DirectoryFiltersDto {

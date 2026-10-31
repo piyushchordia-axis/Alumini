@@ -18,8 +18,8 @@ export function PlatformTenantsPage() {
     <div className="space-y-4">
       <PageHeader title="Institutions" subtitle="Every university, college and school on Illuminize" actions={<LinkButton to="/platform/tenants/new">+ Onboard institution</LinkButton>} />
       <div className="flex flex-wrap gap-2">
-        <Input placeholder="Search name, slug or city" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-xs" />
-        <Select value={status} onChange={(e) => { setStatus(e.target.value as TenantStatus | ""); setPage(1); }} className="w-40">
+        <Input aria-label="Search institutions" placeholder="Search name, slug or city" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-xs" />
+        <Select aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value as TenantStatus | ""); setPage(1); }} className="w-40">
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>

@@ -4,14 +4,14 @@ import { Link, useParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
 import { Avatar, Button, Card, ErrorBox, Loading } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { MemberActionButtons, useMemberActions } from "./AdminMembersPage";
 
 export function AdminMemberDetailPage() {
-  const { tenant, membership: me } = useMembership();
+  const { tenant, me } = useAdminTenant();
   const slug = tenant.slug;
   const { membershipId = "" } = useParams();
   const q = useQuery({ queryKey: qk.admin.member(slug, membershipId), queryFn: () => api.admin.members.get(slug, membershipId) });
@@ -19,7 +19,7 @@ export function AdminMemberDetailPage() {
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error ?? "Not found"} />;
   const m = q.data;
-  const isSelf = m.id === me.id;
+  const isSelf = m.id === me?.id;
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Phone", m.phone],
     ["Batch", m.batchYear],

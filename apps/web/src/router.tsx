@@ -1,8 +1,10 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import { RequireAuth } from "@/components/guards/RequireAuth";
+import { AppHomeRedirect, RequireFeature } from "@/components/guards/RequireFeature";
 import { RequireMembership } from "@/components/guards/RequireMembership";
 import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
+import { RouteErrorPage } from "@/routes/RouteErrorPage";
 import { TenantPickerPage } from "@/routes/TenantPickerPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
 import { EventDetailPage } from "@/routes/t/EventDetailPage";
@@ -27,49 +29,79 @@ import { RegisterPage } from "@/routes/t/RegisterPage";
 import { adminRoutes, platformRoutes } from "@/router.admin";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <TenantPickerPage /> },
-  { path: "/t/:slug", element: <LandingPage /> },
-  { path: "/t/:slug/login", element: <LoginPage /> },
   {
-    path: "/t/:slug",
-    element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
-      { path: "register", element: <RegisterPage /> },
-      { path: "pending", element: <PendingApprovalPage /> },
+      { path: "/", element: <TenantPickerPage /> },
+      { path: "/t/:slug", element: <LandingPage /> },
+      { path: "/t/:slug/login", element: <LoginPage /> },
       {
-        element: <RequireMembership />,
+        path: "/t/:slug",
+        element: <RequireAuth />,
         children: [
+          { path: "register", element: <RegisterPage /> },
+          { path: "pending", element: <PendingApprovalPage /> },
           {
-            path: "app",
-            element: <HomeLayout />,
+            element: <RequireMembership />,
             children: [
-              { index: true, element: <Navigate to="feed" replace /> },
-              { path: "feed", element: <FeedPage /> },
-              { path: "feed/:postId", element: <PostDetailPage /> },
-              { path: "jobs", element: <JobsPage /> },
-              { path: "jobs/new", element: <JobFormPage /> },
-              { path: "jobs/:jobId", element: <JobDetailPage /> },
-              { path: "jobs/:jobId/edit", element: <JobFormPage /> },
-              { path: "funding", element: <FundingPage /> },
-              { path: "funding/new", element: <FundingFormPage /> },
-              { path: "funding/:id", element: <FundingDetailPage /> },
-              { path: "funding/:id/edit", element: <FundingFormPage /> },
-              { path: "events", element: <EventsPage /> },
-              { path: "events/new", element: <EventFormPage /> },
-              { path: "events/:id", element: <EventDetailPage /> },
-              { path: "events/:id/edit", element: <EventFormPage /> },
-              { path: "directory", element: <DirectoryPage /> },
-              { path: "directory/:membershipId", element: <MemberProfilePage /> },
-              { path: "profile", element: <MyProfilePage /> },
-              { path: "my-content", element: <MyContentPage /> },
-              { path: "notifications", element: <NotificationsPage /> },
+              {
+                path: "app",
+                element: <HomeLayout />,
+                children: [
+                  { index: true, element: <AppHomeRedirect /> },
+                  {
+                    element: <RequireFeature feature="feed" />,
+                    children: [
+                      { path: "feed", element: <FeedPage /> },
+                      { path: "feed/:postId", element: <PostDetailPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireFeature feature="jobs" />,
+                    children: [
+                      { path: "jobs", element: <JobsPage /> },
+                      { path: "jobs/new", element: <JobFormPage /> },
+                      { path: "jobs/:jobId", element: <JobDetailPage /> },
+                      { path: "jobs/:jobId/edit", element: <JobFormPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireFeature feature="funding" />,
+                    children: [
+                      { path: "funding", element: <FundingPage /> },
+                      { path: "funding/new", element: <FundingFormPage /> },
+                      { path: "funding/:id", element: <FundingDetailPage /> },
+                      { path: "funding/:id/edit", element: <FundingFormPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireFeature feature="events" />,
+                    children: [
+                      { path: "events", element: <EventsPage /> },
+                      { path: "events/new", element: <EventFormPage /> },
+                      { path: "events/:id", element: <EventDetailPage /> },
+                      { path: "events/:id/edit", element: <EventFormPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireFeature feature="directory" />,
+                    children: [
+                      { path: "directory", element: <DirectoryPage /> },
+                      { path: "directory/:membershipId", element: <MemberProfilePage /> },
+                    ],
+                  },
+                  { path: "profile", element: <MyProfilePage /> },
+                  { path: "my-content", element: <MyContentPage /> },
+                  { path: "notifications", element: <NotificationsPage /> },
+                ],
+              },
             ],
           },
           adminRoutes,
         ],
       },
+      ...platformRoutes,
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
-  ...platformRoutes,
-  { path: "*", element: <NotFoundPage /> },
 ]);

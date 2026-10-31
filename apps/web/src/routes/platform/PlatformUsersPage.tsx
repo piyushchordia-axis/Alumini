@@ -26,7 +26,7 @@ export function PlatformUsersPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Users" subtitle="Every phone number that has signed in, across institutions" />
-      <Input placeholder="Search by phone digits" value={phone} onChange={(e) => { setPhone(e.target.value); setPage(1); }} className="max-w-xs" />
+      <Input aria-label="Search by phone" placeholder="Search by phone digits" value={phone} onChange={(e) => { setPhone(e.target.value); setPage(1); }} className="max-w-xs" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState title="No users found" />}

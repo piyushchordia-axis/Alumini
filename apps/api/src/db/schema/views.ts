@@ -1,4 +1,4 @@
-import { pgView, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgView, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { contentTypeEnum, moderationStatusEnum } from "./enums";
 
 /**
@@ -15,4 +15,5 @@ export const moderationItems = pgView("moderation_items", {
   moderationStatus: moderationStatusEnum("moderation_status").notNull(),
   moderatedAt: timestamp("moderated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  isPinned: boolean("is_pinned").notNull(),
 }).existing();

@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { initials } from "@/lib/format";
 
@@ -83,15 +83,39 @@ export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
   );
 });
 
-export function FormField({ label, error, hint, children, required }: { label: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; required?: boolean }) {
+/**
+ * A label + control + error/hint stack. Wrap a single input (the default) so clicking the label focuses it. Pass
+ * `group` when the children are several controls or buttons (colour pickers, image uploaders): a wrapping <label>
+ * would forward clicks on the caption to the first button inside.
+ */
+export function FormField({ label, error, hint, children, required, group }: { label: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; required?: boolean; group?: boolean }) {
+  const id = useId();
+  const caption = (
+    <span id={id} className="mb-1 block text-sm font-medium text-slate-700">
+      {label}
+      {required && <span className="text-red-500"> *</span>}
+    </span>
+  );
+  const footer = error ? (
+    <span className="mt-1 block text-xs text-red-600" role="alert">
+      {error}
+    </span>
+  ) : hint ? (
+    <span className="mt-1 block text-xs text-slate-500">{hint}</span>
+  ) : null;
+  if (group)
+    return (
+      <div role="group" aria-labelledby={id} className="block">
+        {caption}
+        {children}
+        {footer}
+      </div>
+    );
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">
-        {label}
-        {required && <span className="text-red-500"> *</span>}
-      </span>
+      {caption}
       {children}
-      {error ? <span className="mt-1 block text-xs text-red-600">{error}</span> : hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
+      {footer}
     </label>
   );
 }
@@ -128,13 +152,13 @@ export function Badge({ tone = "neutral", children, className }: { tone?: Tone; 
 
 export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const s = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-10 w-10" : "h-6 w-6";
-  return <span className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-primary", s, className)} aria-label="Loading" />;
+  return <span role="status" className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-primary", s, className)} aria-label="Loading" />;
 }
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 py-12 text-slate-500">
-      <Spinner /> <span className="text-sm">{label}</span>
+    <div className="flex items-center justify-center gap-3 py-12 text-slate-500" role="status" aria-live="polite">
+      <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent text-primary" aria-hidden /> <span className="text-sm">{label}</span>
     </div>
   );
 }
@@ -187,13 +211,45 @@ export function Avatar({ name, src, size = "md", className }: { name: string; sr
 }
 
 export function Modal({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode }) {
+  const titleId = useId();
+  const panel = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    // Focus the first form control (or the panel) so keyboard and screen-reader users land inside the dialog.
+    const first = panel.current?.querySelector<HTMLElement>("input, textarea, select, [data-autofocus]");
+    (first ?? panel.current)?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previous?.focus?.();
+    };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl outline-none sm:max-w-lg sm:rounded-2xl"
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close">
+          <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+            {title}
+          </h2>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close">
             ✕
           </button>
         </div>

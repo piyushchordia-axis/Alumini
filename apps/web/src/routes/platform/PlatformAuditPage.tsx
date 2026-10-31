@@ -13,7 +13,7 @@ export function PlatformAuditPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Audit log" subtitle="Platform-wide, newest first" />
-      <Input placeholder="Filter by action prefix, e.g. platform." value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className="max-w-sm" />
+      <Input aria-label="Filter by action" placeholder="Filter by action prefix, e.g. platform." value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className="max-w-sm" />
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
       {q.data && <AuditTable rows={q.data.data} />}

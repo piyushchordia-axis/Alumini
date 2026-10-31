@@ -28,7 +28,7 @@ export function PostComposer() {
       <div className="flex gap-3">
         <Avatar name={membership.fullName} src={membership.avatarUrl} />
         <div className="flex-1 space-y-3">
-          <Textarea placeholder={`Share something with ${tenant.shortName ?? "the network"}…`} value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} rows={3} />
+          <Textarea aria-label="New post" placeholder={`Share something with ${tenant.shortName ?? "the network"}…`} value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} rows={3} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} />
             <Button onClick={() => create.mutate()} loading={create.isPending} disabled={!body.trim()}>

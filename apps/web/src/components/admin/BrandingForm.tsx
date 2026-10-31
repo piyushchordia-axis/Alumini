@@ -66,16 +66,16 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
         <FormField label="Country">
           <CountrySelect value={v.country ?? ""} onChange={(e) => set("country", e.target.value || null)} />
         </FormField>
-        <FormField label="Primary colour">
+        <FormField label="Primary colour" group>
           <div className="flex gap-2">
-            <input type="color" value={v.primaryColor ?? "#1d4ed8"} onChange={(e) => set("primaryColor", e.target.value)} className="h-10 w-14 rounded border border-slate-300" />
-            <Input value={v.primaryColor ?? ""} onChange={(e) => set("primaryColor", e.target.value)} />
+            <input type="color" aria-label="Primary colour picker" value={v.primaryColor ?? "#1d4ed8"} onChange={(e) => set("primaryColor", e.target.value)} className="h-10 w-14 rounded border border-slate-300" />
+            <Input aria-label="Primary colour hex code" value={v.primaryColor ?? ""} onChange={(e) => set("primaryColor", e.target.value)} placeholder="#1d4ed8" />
           </div>
         </FormField>
-        <FormField label="Secondary colour">
+        <FormField label="Secondary colour" group>
           <div className="flex gap-2">
-            <input type="color" value={v.secondaryColor ?? "#0f172a"} onChange={(e) => set("secondaryColor", e.target.value)} className="h-10 w-14 rounded border border-slate-300" />
-            <Input value={v.secondaryColor ?? ""} onChange={(e) => set("secondaryColor", e.target.value)} />
+            <input type="color" aria-label="Secondary colour picker" value={v.secondaryColor ?? "#0f172a"} onChange={(e) => set("secondaryColor", e.target.value)} className="h-10 w-14 rounded border border-slate-300" />
+            <Input aria-label="Secondary colour hex code" value={v.secondaryColor ?? ""} onChange={(e) => set("secondaryColor", e.target.value)} placeholder="#0f172a" />
           </div>
         </FormField>
         <div className="sm:col-span-2">
@@ -83,10 +83,10 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
             <Textarea value={v.welcomeMessage ?? ""} onChange={(e) => set("welcomeMessage", nullable(e.target.value))} rows={4} maxLength={2000} />
           </FormField>
         </div>
-        <FormField label="Logo">
+        <FormField label="Logo" group>
           <ImageUploader slug={initial.slug} urls={v.logoUrl ? [v.logoUrl] : []} onChange={(u) => set("logoUrl", u[0] ?? null)} label="Upload logo" />
         </FormField>
-        <FormField label="Cover image">
+        <FormField label="Cover image" group>
           <ImageUploader slug={initial.slug} urls={v.coverImageUrl ? [v.coverImageUrl] : []} onChange={(u) => set("coverImageUrl", u[0] ?? null)} label="Upload cover" />
         </FormField>
       </div>

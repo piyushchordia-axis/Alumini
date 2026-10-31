@@ -21,6 +21,7 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; 
         inputMode="tel"
         autoComplete="tel-national"
         placeholder="Mobile number"
+        aria-label="Mobile number"
         value={value.number}
         autoFocus={autoFocus}
         onChange={(e) => onChange({ ...value, number: e.target.value.replace(/[^\d\s-]/g, "") })}

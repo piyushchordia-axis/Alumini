@@ -1,4 +1,4 @@
-import { and, eq, ilike, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { pushTokens, users } from "../db/schema";
 
@@ -79,7 +79,7 @@ export async function deletePushToken(db: DbClient, userId: string, token: strin
 
 export async function listPushTokensForUsers(db: DbClient, userIds: string[]): Promise<PushTokenRow[]> {
   if (userIds.length === 0) return [];
-  return db.select().from(pushTokens).where(sql`${pushTokens.userId} = ANY(${userIds})`);
+  return db.select().from(pushTokens).where(inArray(pushTokens.userId, userIds));
 }
 
 export async function searchUsers(

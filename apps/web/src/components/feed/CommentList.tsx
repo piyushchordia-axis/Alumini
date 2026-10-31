@@ -40,7 +40,7 @@ export function CommentList({ postId, canComment }: { postId: string; canComment
     <div className="space-y-4">
       {canComment && (
         <div className="flex gap-2">
-          <Textarea rows={2} placeholder="Write a comment…" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} />
+          <Textarea rows={2} aria-label="Write a comment" placeholder="Write a comment…" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} />
           <Button onClick={() => add.mutate()} loading={add.isPending} disabled={!body.trim()} className="self-end">
             Reply
           </Button>

@@ -30,6 +30,8 @@ export function MyProfilePage() {
               const updated = await api.membership.updateMe(tenant.slug, values);
               qc.setQueryData(qk.membership(tenant.slug), updated);
               void qc.invalidateQueries({ queryKey: qk.me });
+              void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
+              void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
               toast.success("Profile saved");
             } catch (err) {
               toast.error(errorMessage(err));

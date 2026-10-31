@@ -1,5 +1,6 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { listPushTokensForUsers } from "../../src/repositories/users.repo";
 import { auth, loginAs } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -93,6 +94,9 @@ describe.skipIf(!dbAvailable)("auth flow", () => {
       .set(auth(session.accessToken))
       .send({ token: "ExponentPushToken[abcdefghijklmnop]", platform: "ANDROID" });
     expect(push.status).toBe(204);
+    // Looked up in bulk when notifications fan out to devices.
+    const tokens = await listPushTokensForUsers(ctx.db, [session.user.id, "00000000-0000-4000-8000-000000000000"]);
+    expect(tokens.map((t) => t.token)).toEqual(["ExponentPushToken[abcdefghijklmnop]"]);
 
     const del = await request(ctx.app).post("/api/v1/me/delete").set(auth(session.accessToken)).send({ confirm: true });
     expect(del.status).toBe(204);

@@ -1,9 +1,18 @@
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Formats an instant, or a calendar date ("YYYY-MM-DD", e.g. a date of birth). Calendar dates are formatted in UTC
+ * so they never move by a day in time zones behind UTC.
+ */
 export function formatDate(iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = {}, timeZone?: string): string {
   if (!iso) return "";
+  const dateOnly = DATE_ONLY.test(iso);
+  const zone = dateOnly ? "UTC" : timeZone;
+  const date = new Date(dateOnly ? `${iso}T00:00:00Z` : iso);
   try {
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", ...opts, ...(timeZone ? { timeZone } : {}) }).format(new Date(iso));
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", ...opts, ...(zone ? { timeZone: zone } : {}) }).format(date);
   } catch {
-    return new Date(iso).toLocaleDateString();
+    return dateOnly ? iso : date.toLocaleDateString();
   }
 }
 

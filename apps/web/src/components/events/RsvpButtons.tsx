@@ -2,6 +2,7 @@ import type { EventDto, RsvpStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "@/stores/uiStore";
 
@@ -17,7 +18,9 @@ export function RsvpButtons({ slug, event }: { slug: string; event: EventDto }) 
     onSuccess: invalidate,
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const disabled = event.isCancelled || event.moderationStatus !== "APPROVED" || set.isPending;
+  const [now] = useState(() => Date.now());
+  const started = new Date(event.startAt).getTime() <= now;
+  const disabled = event.isCancelled || started || event.moderationStatus !== "APPROVED" || set.isPending;
   const full = !!event.maxAttendees && event.yesCount >= event.maxAttendees && event.myRsvp !== "YES";
   const options: Array<{ value: RsvpStatus; label: string; tone: string }> = [
     { value: "YES", label: full ? "Full" : "I'm going", tone: "bg-emerald-600 text-white" },
@@ -25,7 +28,7 @@ export function RsvpButtons({ slug, event }: { slug: string; event: EventDto }) 
     { value: "NO", label: "Can't make it", tone: "bg-slate-600 text-white" },
   ];
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Your RSVP">
       {options.map((o) => {
         const active = event.myRsvp === o.value;
         return (
@@ -33,6 +36,7 @@ export function RsvpButtons({ slug, event }: { slug: string; event: EventDto }) 
             key={o.value}
             type="button"
             disabled={disabled || (o.value === "YES" && full)}
+            aria-pressed={active}
             onClick={() => set.mutate(active ? null : o.value)}
             className={clsx("h-10 rounded-lg px-4 text-sm font-medium transition disabled:opacity-50", active ? o.tone : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50")}
           >
@@ -41,6 +45,7 @@ export function RsvpButtons({ slug, event }: { slug: string; event: EventDto }) 
           </button>
         );
       })}
+      {started && !event.isCancelled && <span className="text-xs text-slate-500">RSVPs are closed: this event has started.</span>}
     </div>
   );
 }

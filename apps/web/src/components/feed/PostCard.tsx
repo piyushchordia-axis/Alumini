@@ -11,6 +11,7 @@ import { timeAgo } from "@/lib/format";
 import { toast } from "@/stores/uiStore";
 
 const REACTION_EMOJI: Record<ReactionType, string> = { LIKE: "👍", LOVE: "❤️", CELEBRATE: "🎉", INSIGHTFUL: "💡" };
+const REACTION_LABEL: Record<ReactionType, string> = { LIKE: "Like", LOVE: "Love", CELEBRATE: "Celebrate", INSIGHTFUL: "Insightful" };
 
 export function PostCard({ slug, post, detail = false, onDeleted }: { slug: string; post: PostDto; detail?: boolean; onDeleted?: () => void }) {
   const qc = useQueryClient();
@@ -60,7 +61,8 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
             disabled={post.moderationStatus !== "APPROVED"}
             onClick={() => react.mutate(post.myReaction === t ? null : t)}
             className={`rounded-full px-2 py-1 transition hover:bg-slate-100 ${post.myReaction === t ? "bg-primary/10 ring-1 ring-primary/30" : ""}`}
-            aria-label={t.toLowerCase()}
+            aria-label={REACTION_LABEL[t]}
+            aria-pressed={post.myReaction === t}
           >
             {REACTION_EMOJI[t]}
           </button>

@@ -65,7 +65,7 @@ try {
     await page.click('button:has-text("Post")');
     const card = page.locator("article", { hasText: body }).first();
     await card.waitFor();
-    await card.locator('button[aria-label="celebrate"]').click();
+    await card.locator('button[aria-label="Celebrate"]').click();
     await card.locator("span.ml-1").filter({ hasText: /^\s*1\s*$/ }).waitFor({ timeout: 10000 });
     await card.locator("a", { hasText: "comments" }).click();
     await page.waitForURL(/\/app\/feed\/[0-9a-f-]+$/);
@@ -92,7 +92,7 @@ try {
   await step("RSVP to a seeded event", async () => {
     await page.click('nav >> text=Events');
     await page.click("text=Mumbai alumni coffee meetup");
-    await page.waitForSelector("text=Who's going");
+    await page.waitForSelector("text=Who's coming");
     const before = await page.locator("strong").first().textContent();
     await page.click("button:has-text(\"I'm going\")");
     await page.locator("strong").first().filter({ hasText: new RegExp(`^${Number(before) + 1}$`) }).waitFor({ timeout: 10000 });
@@ -109,8 +109,20 @@ try {
     await shot("08-member");
   });
 
+  await step("phone layout: More sheet reaches My posts and past events", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.click('nav[aria-label="Main"] >> button:has-text("More")');
+    await page.waitForSelector('[role="dialog"] >> text=Switch institution');
+    await page.click('[role="dialog"] >> text=My posts');
+    await page.waitForURL(/\/app\/my-content$/);
+    if (await page.locator('[role="dialog"]').count()) throw new Error("More sheet stayed open after navigating");
+    await page.click('[role="tab"]:has-text("Past events")');
+    await shot("08b-phone-my-content");
+    await page.setViewportSize({ width: 1280, height: 900 });
+  });
+
   await step("notifications page + sign out", async () => {
-    await page.click('a[aria-label="Notifications"]');
+    await page.click('a[aria-label^="Notifications"]');
     await page.waitForSelector("h1:has-text('Notifications')");
     await page.click("text=Sign out");
     await page.waitForURL(/\/t\/demo-university$/);

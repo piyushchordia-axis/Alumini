@@ -6,16 +6,17 @@ import { Link, useSearchParams } from "react-router-dom";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { Avatar, Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
 export function useMemberActions(slug: string) {
   const qc = useQueryClient();
   const done = (msg: string) => () => {
-    void qc.invalidateQueries({ queryKey: ["admin", slug] });
+    void invalidateTenant(qc, slug);
     toast.success(msg);
   };
   const onError = (e: unknown) => toast.error(errorMessage(e));
@@ -35,7 +36,7 @@ export function MemberActionButtons({ member, actions, compact }: { member: Admi
   return (
     <div className="flex flex-wrap gap-2">
       {(member.status === "PENDING" || member.status === "REJECTED") && (
-        <Button size={size} onClick={() => actions.approve.mutate(member.id)} loading={actions.approve.isPending}>
+        <Button size={size} onClick={() => actions.approve.mutate(member.id)} loading={actions.approve.isPending && actions.approve.variables === member.id}>
           Approve
         </Button>
       )}
@@ -50,7 +51,7 @@ export function MemberActionButtons({ member, actions, compact }: { member: Admi
         </Button>
       )}
       {member.status === "SUSPENDED" && (
-        <Button size={size} onClick={() => actions.reinstate.mutate(member.id)} loading={actions.reinstate.isPending}>
+        <Button size={size} onClick={() => actions.reinstate.mutate(member.id)} loading={actions.reinstate.isPending && actions.reinstate.variables === member.id}>
           Reinstate
         </Button>
       )}
@@ -79,7 +80,7 @@ export function MemberActionButtons({ member, actions, compact }: { member: Admi
 }
 
 export function AdminMembersPage() {
-  const { tenant } = useMembership();
+  const { tenant, me } = useAdminTenant();
   const slug = tenant.slug;
   const [params, setParams] = useSearchParams();
   const status = (params.get("status") as MembershipStatus) || "PENDING";
@@ -127,7 +128,7 @@ export function AdminMembersPage() {
         }}
         className="flex gap-2"
       >
-        <Input placeholder="Search name, company or phone" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
+        <Input aria-label="Search members" placeholder="Search name, company or phone" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
         <Button type="submit" variant="outline">
           Search
         </Button>
@@ -150,7 +151,7 @@ export function AdminMembersPage() {
               {m.statusReason && <div className="text-xs text-slate-400">Reason: {m.statusReason}</div>}
             </div>
             <MemberStatusBadge status={m.status} />
-            <MemberActionButtons member={m} actions={actions} compact />
+            {m.id === me?.id ? <span className="text-xs text-slate-400">You</span> : <MemberActionButtons member={m} actions={actions} compact />}
           </li>
         ))}
       </ul>

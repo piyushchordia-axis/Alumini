@@ -19,7 +19,7 @@ import { AdminModerationPage } from "@/routes/t/admin/AdminModerationPage";
 import { AdminReportsPage } from "@/routes/t/admin/AdminReportsPage";
 import { AdminSettingsPage } from "@/routes/t/admin/AdminSettingsPage";
 
-/** Tenant admin routes, nested under /t/:slug inside RequireMembership. */
+/** Tenant admin routes, nested under /t/:slug inside RequireAuth (RequireTenantAdmin loads the institution). */
 export const adminRoutes: RouteObject = {
   path: "admin",
   element: <RequireTenantAdmin />,

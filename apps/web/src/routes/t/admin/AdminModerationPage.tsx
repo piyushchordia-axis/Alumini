@@ -5,9 +5,10 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
@@ -54,8 +55,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   const [expanded, setExpanded] = useState(false);
   const full = useQuery({ queryKey: ["admin", slug, "content", item.contentType, item.id], queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["admin", slug] });
-    void qc.invalidateQueries({ queryKey: ["posts", slug] });
+    void invalidateTenant(qc, slug);
   };
   const act = useMutation({
     mutationFn: (v: { action: ModerationAction; note?: string }) => api.admin.moderation.act(slug, item.contentType, item.id, v.action, v.note),
@@ -73,7 +73,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const isPinned = full.data && "isPinned" in full.data ? full.data.isPinned : false;
+  const isPinned = item.isPinned;
   const s = item.moderationStatus;
   return (
     <li className="px-4 py-3">
@@ -139,7 +139,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
 }
 
 export function AdminModerationPage() {
-  const { tenant } = useMembership();
+  const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const [params, setParams] = useSearchParams();
   const status = (params.get("status") as ModerationStatus) || "PENDING";
@@ -159,7 +159,7 @@ export function AdminModerationPage() {
       <PageHeader title="Moderation" subtitle="Review what members post before (or after) it goes live" />
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={MODERATION_STATUSES.map((s) => ({ value: s, label: MODERATION_STATUS_LABELS[s] }))} className="w-fit" />
-        <Select value={contentType ?? ""} onChange={(e) => setParam("type", e.target.value)} className="w-44">
+        <Select aria-label="Content type" value={contentType ?? ""} onChange={(e) => setParam("type", e.target.value)} className="w-44">
           <option value="">All types</option>
           {CONTENT_TYPES.map((t) => (
             <option key={t} value={t}>

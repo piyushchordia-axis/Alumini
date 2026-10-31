@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, ErrorBox, Loading, PageHeader, Stat } from "@/components/ui";
-import { useMembership } from "@/hooks/useMembership";
+import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function AdminDashboardPage() {
-  const { tenant } = useMembership();
+  const { tenant } = useAdminTenant();
   const base = `/t/${tenant.slug}/admin`;
   const q = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug) });
   if (q.isLoading) return <Loading />;

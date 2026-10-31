@@ -8,6 +8,7 @@ export function OtpInput({ value, onChange, autoFocus }: { value: string; onChan
       autoComplete="one-time-code"
       pattern="\d*"
       maxLength={OTP_LENGTH}
+      aria-label={`${OTP_LENGTH}-digit code`}
       placeholder={"•".repeat(OTP_LENGTH)}
       className="text-center text-2xl tracking-[0.5em]"
       value={value}

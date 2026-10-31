@@ -21,6 +21,7 @@ export function PlatformTenantDetailPage() {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["platform"] });
     void qc.invalidateQueries({ queryKey: ["tenants"] });
+    void qc.invalidateQueries({ queryKey: ["tenant"] });
   };
   const setStatus = useMutation({
     mutationFn: (status: TenantStatus) => api.platform.tenants.update(tenantId, { status }),
@@ -55,7 +56,7 @@ export function PlatformTenantDetailPage() {
           </>
         }
         actions={
-          <Select value={tenant.status} onChange={(e) => setStatus.mutate(e.target.value as TenantStatus)} className="w-40">
+          <Select aria-label="Institution status" value={tenant.status} onChange={(e) => setStatus.mutate(e.target.value as TenantStatus)} className="w-40">
             <option value="ACTIVE">Active</option>
             <option value="SUSPENDED">Suspended</option>
             <option value="ARCHIVED">Archived</option>

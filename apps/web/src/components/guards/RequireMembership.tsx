@@ -1,7 +1,8 @@
 import { isApiClientError } from "@illuminize/shared/client";
 import { useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { Loading, ErrorBox } from "@/components/ui";
+import { TenantLoadError } from "@/components/common/TenantLoadError";
+import { Loading } from "@/components/ui";
 import { MembershipContext } from "@/hooks/useMembership";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
@@ -16,26 +17,29 @@ export function RequireMembership() {
   const tenant = useTenant(slug);
   const membership = useMembershipQuery(slug);
   const user = useAuthStore((s) => s.user);
+  const lastSlug = useUiStore((s) => s.lastTenantSlug);
   const setLast = useUiStore((s) => s.setLastTenantSlug);
+  const approved = membership.data?.status === "APPROVED";
 
   useEffect(() => {
-    if (tenant.data) {
-      applyTenantTheme(tenant.data);
-      setLast(tenant.data.slug);
-    }
-  }, [tenant.data, setLast]);
+    if (tenant.data) applyTenantTheme(tenant.data);
+  }, [tenant.data]);
+
+  // Only remember institutions the user can actually open, so the start page never bounces them back into a
+  // waiting or rejected screen.
+  useEffect(() => {
+    if (approved) setLast(slug);
+    else if ((membership.data || membership.error) && lastSlug === slug) setLast(null);
+  }, [approved, membership.data, membership.error, lastSlug, slug, setLast]);
 
   if (tenant.isLoading || membership.isLoading) return <Loading />;
-  if (tenant.error) return <ErrorBox error={tenant.error} className="m-6" />;
+  if (tenant.error) return <TenantLoadError error={tenant.error} onRetry={() => void tenant.refetch()} />;
   if (membership.error) {
-    if (isApiClientError(membership.error)) {
-      if (membership.error.code === "NOT_A_MEMBER" || membership.error.status === 404) return <Navigate to={`/t/${slug}/register`} replace />;
-      if (membership.error.code === "TENANT_INACTIVE") return <ErrorBox error={membership.error} className="m-6" />;
-    }
-    return <ErrorBox error={membership.error} className="m-6" />;
+    if (isApiClientError(membership.error) && (membership.error.code === "NOT_A_MEMBER" || membership.error.status === 404)) return <Navigate to={`/t/${slug}/register`} replace />;
+    return <TenantLoadError error={membership.error} onRetry={() => void membership.refetch()} />;
   }
   if (!tenant.data || !membership.data) return <Loading />;
-  if (membership.data.status !== "APPROVED") return <Navigate to={`/t/${slug}/pending`} replace />;
+  if (!approved) return <Navigate to={`/t/${slug}/pending`} replace />;
 
   const isPlatformAdmin = !!user?.isPlatformAdmin;
   return (

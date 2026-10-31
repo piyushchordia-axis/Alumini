@@ -59,6 +59,8 @@ export function PlatformTenantFormPage() {
       const created = await api.platform.tenants.create(input);
       void qc.invalidateQueries({ queryKey: ["platform"] });
       void qc.invalidateQueries({ queryKey: ["tenants"] });
+      void qc.invalidateQueries({ queryKey: ["tenant"] });
+    void qc.invalidateQueries({ queryKey: ["tenant"] });
       toast.success(`${created.tenant.name} onboarded`);
       navigate(`/platform/tenants/${created.tenant.id}`);
     } catch (err) {
