@@ -70,6 +70,25 @@ The mobile app talks to the API on port 4000, so that port must be public first.
 No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (8081)** from the Ports tab for a
 phone-sized preview in the browser. Port 4000 must still be public.
 
+## What's new
+
+**Fix pass after the first review** (web, iOS and Android)
+- **Event times** are saved in the event's own time zone, whatever zone your laptop or phone is in. The phone app
+  uses the native date and time pickers.
+- **Every country** is in the phone-number and country pickers, and they can be searched (try "+44" or "kingdom").
+  The US and Canada are now separate choices.
+- **Edit what you posted**: posts on the web and the phone; jobs, funding listings and events on the phone.
+- **Phones**: the admin and staff consoles fit on a phone screen; the web app has a **More** menu (My posts, Admin,
+  Switch institution, Sign out); the phone app shows one header per screen and stays signed in when it starts
+  offline.
+- **Directory** on the phone filters by company and country too.
+- **Push notifications** open the right post, event or listing in the right institution (needs a development
+  build and an Expo project id, see `README.md`).
+- **Billing**: usage counts the members active on any day of the period, in India time, and prorates the estimate
+  when the period is not one billing cycle. Staff can edit or end a plan and add a note to an invoice snapshot.
+- **Safer sign-in**: five wrong guesses use up the code instead of locking the number for everyone.
+- Suspended members' posts disappear for other members, and only the author sees an admin's note on their post.
+
 ## 5. Good to know
 
 - **Reset the demo data** with `pnpm db:reset` in a terminal. It wipes everything and reloads the sample institutions,
