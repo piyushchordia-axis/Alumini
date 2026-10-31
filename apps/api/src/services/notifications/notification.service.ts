@@ -3,6 +3,7 @@ import type { AppContext } from "../../context";
 import type { DbClient } from "../../db/client";
 import { findMembershipsByIds, listTenantAdmins } from "../../repositories/memberships.repo";
 import { insertNotifications } from "../../repositories/notifications.repo";
+import { findTenantById } from "../../repositories/tenants.repo";
 
 export interface NotifyInput {
   tenantId: string;
@@ -29,12 +30,14 @@ export async function notify(ctx: AppContext, input: NotifyInput, db: DbClient =
     })),
   );
   if (ctx.push) {
-    const recipients = await findMembershipsByIds(db, input.tenantId, ids);
     const push = ctx.push;
+    const [recipients, tenant] = await Promise.all([findMembershipsByIds(db, input.tenantId, ids), findTenantById(db, input.tenantId)]);
+    if (!tenant) return;
     void push
       .deliver(
         rows,
         recipients.map((m) => ({ membershipId: m.id, userId: m.userId })),
+        { tenantSlug: tenant.slug },
       )
       .catch((err) => ctx.logger.warn({ err }, "push delivery failed"));
   }

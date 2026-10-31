@@ -15,4 +15,6 @@ export const keys = {
   cacheDirectoryFilters: (tenantId: string) => `cache:directory:filters:${tenantId}`,
   rateLimit: (bucket: string, key: string) => `rl:${bucket}:${key}`,
   active: (membershipId: string) => `active:${membershipId}`,
+  /** Sorted set of "ticketId|token" scored by send time, for Expo receipt checks. */
+  pushReceipts: () => `push:receipts`,
 } as const;

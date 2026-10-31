@@ -77,6 +77,13 @@ export async function deletePushToken(db: DbClient, userId: string, token: strin
   await db.delete(pushTokens).where(and(eq(pushTokens.userId, userId), eq(pushTokens.token, token)));
 }
 
+/** Deletes tokens by value regardless of owner (Expo reported the device as gone). Returns how many were removed. */
+export async function deletePushTokensByValue(db: DbClient, tokens: string[]): Promise<number> {
+  if (tokens.length === 0) return 0;
+  const rows = await db.delete(pushTokens).where(inArray(pushTokens.token, tokens)).returning({ id: pushTokens.id });
+  return rows.length;
+}
+
 export async function listPushTokensForUsers(db: DbClient, userIds: string[]): Promise<PushTokenRow[]> {
   if (userIds.length === 0) return [];
   return db.select().from(pushTokens).where(inArray(pushTokens.userId, userIds));

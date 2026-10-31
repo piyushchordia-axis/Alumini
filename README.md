@@ -152,6 +152,18 @@ npx expo start                        # then press a / i, or scan with Expo Go
 (`npx expo run:android` / `eas build --profile development`) rather than Expo Go for push notifications. Images and
 tokens degrade gracefully on the web export.
 
+#### Push notifications
+
+1. Create an Expo project (`npx eas init` in `apps/mobile`, or expo.dev) and put its id in `apps/mobile/.env` as
+   `EAS_PROJECT_ID`; `app.config.ts` passes it to the app. Without it the app skips push registration.
+2. Optionally set `EXPO_ACCESS_TOKEN` on the API if you enabled enhanced push security in Expo.
+3. Install a development build on a real device and sign in; the device token is registered with the API and removed
+   again on sign-out.
+
+Every push carries the institution slug, the notification type and its ids, so tapping one opens the right screen in
+the right institution (also when the tap launches the app). The API reads Expo's send tickets and, about 15 minutes
+later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegistered`.
+
 ## Deployment notes
 
 - `apps/api/Dockerfile` builds a production image from the repo root (`docker build -f apps/api/Dockerfile .`); it runs
@@ -165,7 +177,8 @@ tokens degrade gracefully on the web export.
 
 ## Known gaps / next steps
 
-- Email/digest notifications, event reminders and chat are not included; notification types are reserved for them.
+- Email/digest notifications, event reminders and chat are not included yet; they are planned with the background
+  worker. Push receipt checks currently run on a timer inside the API process.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be
   tested; the console sender covers development.
 - Postgres enum additions need hand-written `ALTER TYPE` migrations.

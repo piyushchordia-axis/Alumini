@@ -3,6 +3,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { PushNotificationsBridge } from "@/components/PushNotificationsBridge";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { qk } from "@/lib/queryKeys";
@@ -34,6 +35,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <SessionSync />
+        <PushNotificationsBridge />
         {/* Screens are light, so keep dark status-bar content even when the phone is in dark mode. */}
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false }} />

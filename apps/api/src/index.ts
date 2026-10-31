@@ -17,6 +17,7 @@ async function main(): Promise<void> {
   const redis = createRedis(config.REDIS_URL);
   redis.on("error", (err) => logger.error({ err }, "Redis error"));
 
+  const push = new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN);
   const ctx: AppContext = {
     config,
     db,
@@ -25,9 +26,15 @@ async function main(): Promise<void> {
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: createOtpSender(config, logger),
     storage: createStorage(config),
-    push: new ExpoPushChannel(db, logger, config.EXPO_ACCESS_TOKEN),
+    push,
   };
   const app = createApp(ctx);
+
+  // Expo delivery receipts: drop tokens of uninstalled apps. (Moves to the background worker once it exists.)
+  const receipts = setInterval(() => {
+    push.checkReceipts().catch((err) => logger.warn({ err }, "push receipt check failed"));
+  }, 5 * 60 * 1000);
+  receipts.unref();
 
   const server = app.listen(config.PORT, () => {
     logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER }, "Illuminize API listening");
@@ -35,6 +42,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Shutting down");
+    clearInterval(receipts);
     server.close(async () => {
       try {
         await redis.quit();
