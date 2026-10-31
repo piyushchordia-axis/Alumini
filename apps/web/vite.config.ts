@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
+const inCodespaces = process.env.CODESPACES === "true";
+const apiTarget = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4000";
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -23,15 +26,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // GitHub Codespaces serves the dev server on *.app.github.dev over HTTPS (port 443).
+    allowedHosts: [".app.github.dev", ".github.dev"],
+    ...(inCodespaces ? { host: true, hmr: { clientPort: 443 } } : {}),
     proxy: {
-      "/api": {
-        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4000",
-        changeOrigin: true,
-      },
-      "/uploads": {
-        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4000",
-        changeOrigin: true,
-      },
+      // xfwd passes the browser's IP to the API so its per-IP rate limits apply per visitor.
+      "/api": { target: apiTarget, changeOrigin: true, xfwd: true },
+      "/uploads": { target: apiTarget, changeOrigin: true, xfwd: true },
     },
   },
 });

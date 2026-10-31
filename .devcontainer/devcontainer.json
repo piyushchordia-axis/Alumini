@@ -1,0 +1,27 @@
+{
+  "name": "Illuminize",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "remoteUser": "node",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [5173, 4000, 8081],
+  "portsAttributes": {
+    "5173": { "label": "Illuminize web app", "onAutoForward": "openBrowser" },
+    "4000": { "label": "Illuminize API", "onAutoForward": "silent" },
+    "8081": { "label": "Mobile app (Expo)", "onAutoForward": "silent" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "silent" },
+  "postCreateCommand": "bash scripts/dev-setup.sh",
+  "postAttachCommand": "bash scripts/demo.sh",
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["DEMO.md"]
+    },
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss"]
+    }
+  }
+}

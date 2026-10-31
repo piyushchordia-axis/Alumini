@@ -1,0 +1,94 @@
+# Try Illuminize
+
+The quickest way to try Illuminize is a **GitHub Codespace**: a cloud workspace that runs the database, the API and the
+web app for you. You need nothing installed except a browser (and the free **Expo Go** app if you want the phone app).
+
+## 1. Start the workspace
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/piyushchordia-axis/Alumini/tree/claude/illuminize-multi-tenant-platform-ho1w6e)
+
+Click the button above (or on GitHub: **Code → Codespaces → Create codespace**, on the branch
+`claude/illuminize-multi-tenant-platform-ho1w6e`).
+
+- The first start takes **about 3–5 minutes** while it installs everything and loads the demo data.
+- When it is ready, a terminal shows a box titled **Illuminize demo** and the web app opens in a new browser tab.
+- If the tab does not open: open the **Ports** tab at the bottom, find **Illuminize web app (5173)** and click the globe
+  icon.
+
+## 2. Sign in
+
+Every sign-in uses your mobile number and a one-time code. In this demo the code is always **`123456`**, and it is also
+shown on screen.
+
+| Who | Phone number | What you'll see |
+| --- | --- | --- |
+| A brand-new alumnus | any number you like | Picks an institution, registers, and is approved instantly (Demo University) or waits for approval (Demo College, Demo School) |
+| Member of Demo University | `+91 91000 00001` (Rahul Mehta) | The full member app with posts, jobs, funding, events and directory |
+| Admin of Demo University | `+91 90000 00001` | Members and posts are approved automatically |
+| Admin of Demo College | `+91 90000 00002` | Approval is required for members **and** posts; pending items and a spam report are waiting |
+| Admin of Demo School | `+91 90000 00003` | Members need approval, posts publish immediately |
+| Illuminize staff | `+91 99999 99999` | The platform console at `/platform` |
+
+The phone field has a country picker. Choose **IN +91**, then type the 10 digits.
+
+## 3. Things to try
+
+**As a new alumnus**
+1. On the first screen, pick **Demo University** and sign in with any new number.
+2. Fill in your profile: batch, profession, company, city, plus the optional details.
+3. Post in the community feed, react and comment on others' posts.
+4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
+5. Open **Events** and RSVP to the Mumbai coffee meetup, or plan your own gathering.
+6. Search the **Directory** by batch, city or company.
+7. Sign out, pick **Demo College**, register again with a new number, and see the "awaiting approval" screen.
+
+**As an institution admin** (sign in to Demo College with `+91 90000 00002`, then click **Admin**)
+1. **Members**: approve or reject the pending alumni, with a reason they will see.
+2. **Moderation**: approve or reject pending posts, the internship and the Toronto dinner.
+3. **Reports**: remove the reported spam post.
+4. **Settings**: switch member approval or post moderation between automatic and manual, turn features on or off,
+   and change the institution's colours and logo under **Branding**.
+
+**As Illuminize staff** (open `/platform` and sign in with `+91 99999 99999`)
+1. Onboard a new institution together with its first admin.
+2. Open an institution's **Billing** tab, record a per-active-member plan, and look at the usage estimate for the month.
+3. Check **Stats** and **Users**.
+
+## 4. Try the phone app
+
+The mobile app talks to the API on port 4000, so that port must be public first.
+
+1. Open the **Ports** tab, right-click **Illuminize API (4000)**, choose **Port Visibility → Public**.
+   The demo terminal tells you if this was already done automatically.
+2. Open a new terminal (**Terminal → New Terminal**) and run:
+   ```bash
+   pnpm mobile:tunnel
+   ```
+3. Install **Expo Go** from the App Store or Google Play. Scan the QR code from the terminal: with the camera on iPhone,
+   or from inside Expo Go on Android.
+
+No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (8081)** from the Ports tab for a
+phone-sized preview in the browser. Port 4000 must still be public.
+
+## 5. Good to know
+
+- **Reset the demo data** with `pnpm db:reset` in a terminal. It wipes everything and reloads the sample institutions,
+  members and posts.
+- **Restart the app** with `pnpm demo` if you closed its terminal.
+- **Stop the codespace when you are done** (github.com/codespaces → … → Stop) so it does not use up your free hours.
+  It also stops on its own after 30 minutes without activity, and your data is kept for next time.
+- Making port 4000 public means anyone with that address can reach this demo API while the codespace is running. It
+  only contains demo data.
+- Real codes are sent over WhatsApp, with SMS as a fallback, once a WhatsApp Business account is connected (see
+  `README.md`). The demo prints codes instead.
+
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| "Codespaces is not available" | Codespaces must be enabled for the account or organisation that owns the repository. Personal accounts include free monthly hours. For an organisation, ask an owner to allow Codespaces. |
+| Web tab shows "Blocked request" or a blank page | Wait until the terminal shows the demo box, then reload. Run `pnpm demo` if that terminal was closed. |
+| Expo Go says the project needs a different SDK | Update Expo Go from the store. If it still does not match, use `pnpm mobile:web` for the browser preview. |
+| Phone app shows "Could not reach the server" | Make port 4000 public (step 4.1), then restart `pnpm mobile:tunnel`. |
+| Uploaded photos do not show | Same fix: make port 4000 public. |
+| Tunnel will not start | Stop it with Ctrl+C and run `pnpm mobile:tunnel` again; the tunnel service is occasionally busy. |

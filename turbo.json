@@ -3,12 +3,23 @@
   "ui": "stream",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "CODESPACES",
+        "CODESPACE_NAME",
+        "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN",
+        "VITE_API_PROXY_TARGET"
+      ]
     },
     "start": {
       "cache": false,
@@ -16,13 +27,21 @@
     },
     "lint": {},
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": [
+        "^typecheck"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false
     },
-    "db:migrate": { "cache": false },
-    "db:seed": { "cache": false }
+    "db:migrate": {
+      "cache": false
+    },
+    "db:seed": {
+      "cache": false
+    }
   }
 }

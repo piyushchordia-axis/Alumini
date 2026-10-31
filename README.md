@@ -13,6 +13,15 @@ board, batch directory and events with RSVPs. Illuminize staff onboard instituti
 | Mobile (members) | Expo SDK 58, expo-router, React Native | `apps/mobile` |
 | Shared | zod schemas, DTO types, typed API client used by both apps | `packages/shared` |
 
+## Try it
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/piyushchordia-axis/Alumini/tree/claude/illuminize-multi-tenant-platform-ho1w6e)
+
+The fastest way to click through Illuminize is a GitHub Codespace: it starts Postgres, Redis, the API and the web app with
+demo data and opens the app in your browser. **[DEMO.md](DEMO.md)** has the logins, a guided tour and how to open the
+phone app with Expo Go. Developers using VS Code can open the same setup locally with **Dev Containers: Reopen in
+Container** (`.devcontainer/`).
+
 ## Quick start
 
 ```bash

@@ -18,6 +18,9 @@
     "api": "pnpm --filter @illuminize/api dev",
     "web": "pnpm --filter @illuminize/web dev",
     "mobile": "pnpm --filter @illuminize/mobile start",
+    "mobile:tunnel": "pnpm --filter @illuminize/mobile tunnel",
+    "mobile:web": "pnpm --filter @illuminize/mobile web:preview",
+    "demo": "bash scripts/demo.sh",
     "e2e:web": "node e2e/web-member.mjs",
     "e2e:admin": "node e2e/web-admin.mjs",
     "e2e:mobile-web": "node e2e/mobile-web.mjs"
