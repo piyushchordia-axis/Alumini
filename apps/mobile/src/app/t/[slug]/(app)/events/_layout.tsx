@@ -1,12 +1,16 @@
 import { Stack } from "expo-router";
+import { detailHeader, FeatureGate, useAppHeaderOptions } from "@/components/AppHeader";
 
 export default function EventsStack() {
+  const appHeader = useAppHeaderOptions();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[id]" options={{ headerShown: true, title: "Event", headerTitleStyle: { fontWeight: "700" } }} />
-      <Stack.Screen name="new" options={{ headerShown: true, title: "Plan a gathering", presentation: "modal" }} />
-      <Stack.Screen name="edit/[id]" options={{ headerShown: true, title: "Edit event", presentation: "modal" }} />
-    </Stack>
+    <FeatureGate feature="events">
+      <Stack>
+        <Stack.Screen name="index" options={appHeader} />
+        <Stack.Screen name="[id]" options={{ ...detailHeader, title: "Event" }} />
+        <Stack.Screen name="new" options={{ ...detailHeader, title: "Plan a gathering", presentation: "modal" }} />
+        <Stack.Screen name="edit/[id]" options={{ ...detailHeader, title: "Edit event", presentation: "modal" }} />
+      </Stack>
+    </FeatureGate>
   );
 }

@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Card, EmptyState, Muted, Row, Spinner, Tabs } from "@/components/ui";
+import { Badge, Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -63,10 +63,14 @@ export default function EventsScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
-        ListEmptyComponent={list.isLoading ? <Spinner /> : <EmptyState icon="📅" title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />}
+        ListEmptyComponent={
+          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <EmptyState icon="📅" title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />
+          </ListEmpty>
+        }
         renderItem={({ item }) => <EventCard slug={slug} event={item} />}
       />
-      <Pressable onPress={() => router.push(`/t/${slug}/events/new`)} style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
+      <Pressable onPress={() => router.push(`/t/${slug}/events/new`)} accessibilityRole="button" accessibilityLabel="Plan a gathering" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
         <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
       </Pressable>
     </View>

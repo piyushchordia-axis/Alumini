@@ -1,4 +1,4 @@
-import { countryByCode } from "@illuminize/shared";
+import { countryByCode, DEFAULT_TENANT_FEATURES } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -6,7 +6,9 @@ import { Pressable, Text, View } from "react-native";
 import { CountryPicker } from "@/components/CountryPicker";
 import { Button, ErrorText, Input, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useTenant } from "@/hooks/useTenant";
 import { toE164 } from "@/lib/format";
+import { homeHref } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, useTheme } from "@/theme";
 
@@ -15,6 +17,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
   const setSession = useAuthStore((s) => s.setSession);
+  const tenant = useTenant(slug);
   const [country, setCountry] = useState("IN");
   const dial = countryByCode(country)?.dial ?? "+91";
   const [number, setNumber] = useState("");
@@ -60,7 +63,8 @@ export default function LoginScreen() {
       const session = await api.auth.verifyOtp(phone, code);
       setSession(session);
       const m = session.memberships.find((x) => x.tenant.slug === slug);
-      router.replace(!m ? `/t/${slug}/register` : m.status === "APPROVED" ? `/t/${slug}/feed` : `/t/${slug}/pending`);
+      // The tenant layout has loaded the institution, so its feature switches are in the query cache.
+      router.replace(!m ? `/t/${slug}/register` : m.status === "APPROVED" ? homeHref(slug!, tenant.data?.settings.features ?? DEFAULT_TENANT_FEATURES) : `/t/${slug}/pending`);
     } catch (err) {
       setError(err);
     } finally {
@@ -69,7 +73,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen>
+    <Screen topInset>
+      <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace(`/t/${slug}`))} accessibilityRole="button" accessibilityLabel="Back" hitSlop={12} style={{ alignSelf: "flex-start", paddingVertical: 4 }}>
+        <Text style={{ color: theme.primary, fontSize: 15 }}>‹ Back</Text>
+      </Pressable>
       <Title sub="We'll send a one-time code on WhatsApp (SMS fallback).">Sign in</Title>
       {step === "phone" ? (
         <View style={{ gap: 12 }}>
@@ -92,10 +99,10 @@ export default function LoginScreen() {
           <Input keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(v) => setCode(v.replace(/\D/g, ""))} placeholder="••••••" style={{ textAlign: "center", fontSize: 24, letterSpacing: 8 }} autoFocus />
           <ErrorText error={error ? errorMessage(error) : null} />
           <Button title="Verify and continue" onPress={() => void verify()} loading={busy} disabled={code.length < 6} />
-          <Pressable onPress={() => (cooldown > 0 ? undefined : void request())} disabled={cooldown > 0}>
+          <Pressable onPress={() => (cooldown > 0 ? undefined : void request())} disabled={cooldown > 0} accessibilityRole="button" hitSlop={8}>
             <Text style={{ textAlign: "center", color: cooldown > 0 ? colors.faint : theme.primary }}>{cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}</Text>
           </Pressable>
-          <Pressable onPress={() => setStep("phone")}>
+          <Pressable onPress={() => setStep("phone")} accessibilityRole="button" hitSlop={8}>
             <Text style={{ textAlign: "center", color: colors.muted, fontSize: 12 }}>Change number</Text>
           </Pressable>
         </View>

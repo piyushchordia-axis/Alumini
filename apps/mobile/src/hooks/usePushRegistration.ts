@@ -3,6 +3,7 @@ import * as Device from "expo-device";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
+import { setRegisteredPushToken } from "@/lib/push";
 
 /** Expo Go cannot receive remote push notifications (removed on Android in SDK 53), so skip it there. */
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -23,7 +24,10 @@ export function usePushRegistration(enabled: boolean) {
           await Notifications.setNotificationChannelAsync("default", { name: "Default", importance: Notifications.AndroidImportance.DEFAULT });
         }
         const token = (await Notifications.getExpoPushTokenAsync()).data;
-        if (!cancelled) await api.me.registerPushToken({ token, platform: Platform.OS === "ios" ? "IOS" : "ANDROID" });
+        if (cancelled) return;
+        await api.me.registerPushToken({ token, platform: Platform.OS === "ios" ? "IOS" : "ANDROID" });
+        // Remembered so sign-out can unregister this device.
+        await setRegisteredPushToken(token);
       } catch {
         /* push is best-effort */
       }

@@ -76,6 +76,14 @@ try {
     await shot("05-post-detail");
   });
 
+  await step("edit your own post", async () => {
+    const card = page.locator("article").first();
+    await card.locator('button:has-text("Edit")').click();
+    await card.locator('textarea[aria-label="Edit post"]').fill(`Edited smoke post ${unique}`);
+    await card.locator('button:has-text("Save")').click();
+    await page.waitForSelector(`text=Edited smoke post ${unique}`);
+  });
+
   await step("create a job and view it", async () => {
     await page.click('nav >> text=Jobs');
     await page.waitForSelector("text=Backend Engineer (Node.js)");

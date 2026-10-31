@@ -1,10 +1,14 @@
 import { Stack } from "expo-router";
+import { detailHeader, FeatureGate, useAppHeaderOptions } from "@/components/AppHeader";
 
 export default function DirectoryStack() {
+  const appHeader = useAppHeaderOptions();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="[membershipId]" options={{ headerShown: true, title: "Member", headerTitleStyle: { fontWeight: "700" } }} />
-    </Stack>
+    <FeatureGate feature="directory">
+      <Stack>
+        <Stack.Screen name="index" options={appHeader} />
+        <Stack.Screen name="[membershipId]" options={{ ...detailHeader, title: "Member" }} />
+      </Stack>
+    </FeatureGate>
   );
 }

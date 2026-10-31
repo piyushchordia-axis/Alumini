@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Button, Card, ChipSelect, EmptyState, Input, Muted, Row, Spinner, Tabs } from "@/components/ui";
+import { Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -83,11 +83,15 @@ export default function JobsScreen() {
         onEndReached={active.loadMore}
         refreshing={active.isRefetching && !active.isFetchingNextPage}
         onRefresh={() => void active.refetch()}
-        ListEmptyComponent={active.isLoading ? <Spinner /> : <EmptyState icon={tab === "openings" ? "💼" : "🙋"} title={tab === "openings" ? "No openings right now" : "Nobody is looking right now"} />}
+        ListEmptyComponent={
+          <ListEmpty loading={active.isLoading} error={active.error} onRetry={() => void active.refetch()}>
+            <EmptyState icon={tab === "openings" ? "💼" : "🙋"} title={tab === "openings" ? "No openings right now" : "Nobody is looking right now"} />
+          </ListEmpty>
+        }
         renderItem={({ item }) => ("id" in item ? <JobCard slug={slug} job={item} /> : <SeekerCard slug={slug} seeker={item} />)}
       />
       {tab === "openings" && (
-        <Pressable onPress={() => router.push(`/t/${slug}/jobs/new`)} style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
+        <Pressable onPress={() => router.push(`/t/${slug}/jobs/new`)} accessibilityRole="button" accessibilityLabel="Post a job" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
           <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
         </Pressable>
       )}

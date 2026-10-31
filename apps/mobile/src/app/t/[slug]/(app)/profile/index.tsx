@@ -1,10 +1,13 @@
-import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
+import { countryName, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
+import { errorMessage } from "@illuminize/shared/client";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
-import { api } from "@/lib/api";
+import { qk } from "@/lib/queryKeys";
+import { useDeleteAccount, useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
 import { colors, useTheme } from "@/theme";
@@ -16,15 +19,35 @@ export default function MyProfileScreen() {
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
   const memberships = useAuthStore((s) => s.memberships);
-  const clear = useAuthStore((s) => s.clear);
   const setLast = useTenantStore((s) => s.setLastTenantSlug);
   const slug = tenant.slug;
-  const signOut = async () => {
-    await api.auth.logout();
-    clear();
-    qc.clear();
-    router.replace(`/t/${slug}`);
-  };
+  const signOut = useSignOut();
+  const deleteAccount = useDeleteAccount();
+  const [deleting, setDeleting] = useState(false);
+  // The institution list can change elsewhere (approved, joined on the web), so refresh it whenever this screen shows.
+  useFocusEffect(
+    useCallback(() => {
+      void qc.invalidateQueries({ queryKey: qk.me });
+    }, [qc]),
+  );
+  const confirmDelete = () =>
+    Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. It cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteAccount();
+          } catch (err) {
+            Alert.alert("Could not delete your account", errorMessage(err));
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
   return (
     <Screen>
       <Card>
@@ -39,7 +62,7 @@ export default function MyProfileScreen() {
             <Muted>
               Batch of {membership.batchYear}
               {membership.city ? ` · ${membership.city}` : ""}
-              {membership.country ? `, ${COUNTRY_NAME_BY_CODE[membership.country] ?? membership.country}` : ""}
+              {membership.country ? `, ${countryName(membership.country)}` : ""}
             </Muted>
           </View>
         </Row>
@@ -51,10 +74,10 @@ export default function MyProfileScreen() {
         <Button title="Edit profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />
       </Card>
       <Card>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)}>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" hitSlop={6}>
           <Text style={{ color: theme.primary, fontWeight: "600" }}>🗂️ My posts & listings</Text>
         </Pressable>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)}>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} accessibilityRole="link" hitSlop={6}>
           <Text style={{ color: theme.primary, fontWeight: "600" }}>🔔 Notifications</Text>
         </Pressable>
         {isTenantAdmin && <Muted>Admin tools (approvals, moderation, settings) are available on the web console.</Muted>}
@@ -72,11 +95,14 @@ export default function MyProfileScreen() {
             {m.tenant.slug !== slug && (
               <Pressable
                 onPress={() => {
-                  setLast(m.tenant.slug);
+                  if (m.status === "APPROVED") setLast(m.tenant.slug);
                   router.replace(`/t/${m.tenant.slug}`);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${m.tenant.name}`}
+                hitSlop={8}
               >
-                <Text style={{ color: theme.primary }}>Switch</Text>
+                <Text style={{ color: theme.primary }}>{m.status === "APPROVED" ? "Switch" : "Open"}</Text>
               </Pressable>
             )}
           </Row>
@@ -86,30 +112,14 @@ export default function MyProfileScreen() {
             setLast(null);
             router.replace("/");
           }}
+          accessibilityRole="button"
+          hitSlop={6}
         >
           <Text style={{ color: theme.primary }}>+ Join another institution</Text>
         </Pressable>
       </Card>
-      <Button title="Sign out" variant="outline" onPress={() => void signOut()} />
-      <Button
-        title="Delete my account"
-        variant="ghost"
-        onPress={() =>
-          Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. It cannot be undone.", [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Delete",
-              style: "destructive",
-              onPress: async () => {
-                await api.me.deleteAccount();
-                clear();
-                qc.clear();
-                router.replace("/");
-              },
-            },
-          ])
-        }
-      />
+      <Button title="Sign out" variant="outline" onPress={() => void signOut(`/t/${slug}`)} />
+      <Button title="Delete my account" variant="ghost" loading={deleting} onPress={confirmDelete} />
     </Screen>
   );
 }

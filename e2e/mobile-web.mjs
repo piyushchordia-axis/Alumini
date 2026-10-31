@@ -53,7 +53,7 @@ try {
     await tap("Verify and continue");
     await page.getByText("Create your profile").waitFor();
     await shot("m03-register");
-    const inputs = page.locator("input");
+    const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Mobile Smoke");
     await inputs.nth(1).fill("2014");
     await tap("Join the network");
@@ -62,10 +62,20 @@ try {
   });
 
   await step("create a post from the feed", async () => {
-    await page.getByText("+", { exact: true }).click();
+    await page.getByRole("button", { name: "New post" }).click();
     await page.locator("textarea").first().fill(`Hello from the mobile smoke ${unique}`);
     await tap("Post");
     await page.getByText(`Hello from the mobile smoke ${unique}`).waitFor();
+  });
+
+  await step("edit your own post", async () => {
+    await page.getByRole("button", { name: "Edit post" }).first().click();
+    const box = page.getByLabel("Post text").last();
+    await box.waitFor();
+    await box.fill(`Edited on mobile ${unique}`);
+    await tap("Save changes");
+    await page.getByText(`Edited on mobile ${unique}`).first().waitFor();
+    await shot("m04b-post-edited");
   });
 
   await step("jobs tab lists seeded openings", async () => {
@@ -87,6 +97,9 @@ try {
 
   await step("directory search and member profile", async () => {
     await tap("Directory");
+    await page.getByRole("button", { name: /^Filters/ }).locator("visible=true").first().click();
+    await page.getByText("Company", { exact: true }).locator("visible=true").first().waitFor();
+    await page.getByText("Country", { exact: true }).locator("visible=true").first().waitFor();
     await page.getByPlaceholder("Name, company, role").fill("Priya");
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
@@ -100,7 +113,7 @@ try {
     // deep link straight into the college (served with SPA fallback); signed in but not a member → register
     await page.goto(BASE + "/t/demo-college");
     await page.getByText("Create your profile").waitFor();
-    const inputs = page.locator("input");
+    const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Pending Mobile");
     await inputs.nth(1).fill("2011");
     await tap("Submit for approval");

@@ -1,26 +1,15 @@
-import type { NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Button, EmptyState, Muted, Spinner } from "@/components/ui";
+import { Button, EmptyState, ListEmpty, Muted } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { notificationHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
-function linkFor(slug: string, n: NotificationDto): string | null {
-  const d = n.data as { postId?: string; contentType?: string; contentId?: string; eventId?: string };
-  const base = `/t/${slug}`;
-  if (d.postId) return `${base}/feed/${d.postId}`;
-  if (d.eventId) return `${base}/events/${d.eventId}`;
-  if (d.contentType === "JOB" && d.contentId) return `${base}/jobs/${d.contentId}`;
-  if (d.contentType === "FUNDING" && d.contentId) return `${base}/funding/${d.contentId}`;
-  if (d.contentType === "EVENT" && d.contentId) return `${base}/events/${d.contentId}`;
-  if (d.contentType === "POST" && d.contentId) return `${base}/feed/${d.contentId}`;
-  return null;
-}
 
 export default function NotificationsScreen() {
   const { tenant } = useMembership();
@@ -46,11 +35,16 @@ export default function NotificationsScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching}
         onRefresh={() => void list.refetch()}
-        ListEmptyComponent={list.isLoading ? <Spinner /> : <EmptyState icon="🔔" title="You're all caught up" />}
+        ListEmptyComponent={
+          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <EmptyState icon="🔔" title="You're all caught up" />
+          </ListEmpty>
+        }
         renderItem={({ item: n }) => {
-          const to = linkFor(slug, n);
+          const to = notificationHref(slug, n.type, n.data);
           return (
             <Pressable
+              accessibilityRole="button"
               onPress={() => {
                 if (!n.readAt) readOne.mutate(n.id);
                 if (to) router.push(to);

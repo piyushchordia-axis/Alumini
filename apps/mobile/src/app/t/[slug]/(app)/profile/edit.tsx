@@ -21,6 +21,8 @@ export default function EditProfileScreen() {
           const updated = await api.membership.updateMe(tenant.slug, values);
           qc.setQueryData(qk.membership(tenant.slug), updated);
           void qc.invalidateQueries({ queryKey: qk.me });
+          void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
+          void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
           Alert.alert("Profile saved");
           router.back();
         }}

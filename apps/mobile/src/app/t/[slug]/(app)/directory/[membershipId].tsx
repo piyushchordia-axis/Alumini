@@ -2,7 +2,7 @@ import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Text, View } from "react-native";
-import { Avatar, Badge, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -16,7 +16,7 @@ export default function MemberProfileScreen() {
   const router = useRouter();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
   if (profile.isLoading) return <Spinner />;
-  if (profile.error || !profile.data) return <ErrorText error={profile.error ?? "Not found"} />;
+  if (profile.error || !profile.data) return <LoadError error={profile.error ?? "Not found"} onRetry={() => void profile.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const m = profile.data;
   return (
     <Screen>

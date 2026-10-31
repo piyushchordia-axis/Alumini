@@ -2,11 +2,12 @@ import { EVENT_KIND_LABELS, type RsvpStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge } from "@/components/ModerationBadge";
+import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Body, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Avatar, Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -21,6 +22,7 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
+  const [openedAt] = useState(() => Date.now());
   const attendees = useInfiniteList(qk.attendees(slug, id), (cursor) => api.events.attendees(slug, id, { status: "YES", cursor, limit: 30 }), !!ev.data);
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["events", slug] });
@@ -35,10 +37,11 @@ export default function EventDetailScreen() {
   const cancel = useMutation({ mutationFn: () => api.events.cancel(slug, id, null), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   const remove = useMutation({ mutationFn: () => api.events.remove(slug, id), onSuccess: () => { invalidate(); router.back(); }, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   if (ev.isLoading) return <Spinner />;
-  if (ev.error || !ev.data) return <ErrorText error={ev.error ?? "Not found"} />;
+  if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const e = ev.data;
   const full = !!e.maxAttendees && e.yesCount >= e.maxAttendees && e.myRsvp !== "YES";
-  const disabled = e.isCancelled || e.moderationStatus !== "APPROVED" || rsvp.isPending;
+  const started = new Date(e.startAt).getTime() <= openedAt;
+  const disabled = e.isCancelled || started || e.moderationStatus !== "APPROVED" || rsvp.isPending;
   const options: { value: RsvpStatus; label: string; color: string }[] = [
     { value: "YES", label: full ? "Full" : "I'm going", color: colors.success },
     { value: "MAYBE", label: "Maybe", color: colors.warning },
@@ -64,6 +67,7 @@ export default function EventDetailScreen() {
             {e.isCancelled && <Badge label="Cancelled" tone="danger" />}
             <ModerationBadge status={e.moderationStatus} />
           </Row>
+          <ModerationNote status={e.moderationStatus} note={e.moderationNote} />
           <Body>{e.description}</Body>
           <Text style={{ color: colors.muted, fontSize: 13 }}>
             <Text style={{ fontWeight: "700", color: colors.text }}>{e.yesCount}</Text> going{e.maybeCount ? ` · ${e.maybeCount} maybe` : ""}
@@ -73,7 +77,13 @@ export default function EventDetailScreen() {
             {options.map((o) => {
               const active = e.myRsvp === o.value;
               return (
-                <Pressable key={o.value} disabled={disabled || (o.value === "YES" && full)} onPress={() => rsvp.mutate(active ? null : o.value)} style={{ paddingHorizontal: 14, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: active ? o.color : "#fff", borderWidth: 1, borderColor: active ? o.color : colors.border, opacity: disabled ? 0.5 : 1 }}>
+                <Pressable
+                  key={o.value}
+                  disabled={disabled || (o.value === "YES" && full)}
+                  onPress={() => rsvp.mutate(active ? null : o.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active, disabled: disabled || (o.value === "YES" && full) }}
+                  style={{ paddingHorizontal: 14, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: active ? o.color : "#fff", borderWidth: 1, borderColor: active ? o.color : colors.border, opacity: disabled ? 0.5 : 1 }}>
                   <Text style={{ color: active ? "#fff" : colors.text, fontWeight: "600" }}>
                     {active ? "✓ " : ""}
                     {o.label}
@@ -82,6 +92,7 @@ export default function EventDetailScreen() {
               );
             })}
           </Row>
+          {started && !e.isCancelled && <Muted>RSVPs are closed: this event has started.</Muted>}
           <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
             <MemberRow slug={slug} member={e.author} meta="Organiser" />
             {!e.isMine && <ReportButton slug={slug} contentType="EVENT" contentId={e.id} />}
@@ -99,7 +110,7 @@ export default function EventDetailScreen() {
         <Text style={{ fontWeight: "700", color: colors.text }}>Who&apos;s going</Text>
         {attendees.items.length === 0 && !attendees.isLoading && <Muted>No RSVPs yet — be the first!</Muted>}
         {attendees.items.map((m) => (
-          <Pressable key={m.id} onPress={() => router.push(`/t/${slug}/directory/${m.id}`)}>
+          <Pressable key={m.id} onPress={() => router.push(`/t/${slug}/directory/${m.id}`)} accessibilityRole="link">
             <Row gap={8}>
               <Avatar name={m.fullName} src={m.avatarUrl} size={28} />
               <Text style={{ color: colors.text }}>

@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { PostCard } from "@/components/PostCard";
-import { EmptyState, ErrorText, Spinner } from "@/components/ui";
+import { EmptyState, ListEmpty, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -25,12 +25,15 @@ export default function FeedScreen() {
         onEndReachedThreshold={0.4}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
-        ListHeaderComponent={list.error ? <ErrorText error={list.error} /> : undefined}
-        ListEmptyComponent={list.isLoading ? <Spinner /> : <EmptyState icon="💬" title="No posts yet" description="Be the first to say hello to your batchmates." />}
+        ListEmptyComponent={
+          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <EmptyState icon="💬" title="No posts yet" description="Be the first to say hello to your batchmates." />
+          </ListEmpty>
+        }
         ListFooterComponent={list.isFetchingNextPage ? <Spinner /> : undefined}
         renderItem={({ item }) => <PostCard slug={slug} post={item} />}
       />
-      <Pressable onPress={() => router.push(`/t/${slug}/feed/new`)} style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
+      <Pressable onPress={() => router.push(`/t/${slug}/feed/new`)} accessibilityRole="button" accessibilityLabel="New post" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
         <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
       </Pressable>
     </View>

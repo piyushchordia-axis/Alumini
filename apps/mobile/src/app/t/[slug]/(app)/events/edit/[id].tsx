@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "react-native";
 import { EventForm } from "@/components/forms/EventForm";
-import { ErrorText, Screen, Spinner } from "@/components/ui";
+import { LoadError, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -15,7 +15,7 @@ export default function EditEventScreen() {
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
   if (ev.isLoading) return <Spinner />;
-  if (ev.error || !ev.data) return <ErrorText error={ev.error ?? "Not found"} />;
+  if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
   return (
     <Screen>
       <EventForm

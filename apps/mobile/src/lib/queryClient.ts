@@ -1,5 +1,6 @@
 import { isApiClientError } from "@illuminize/shared/client";
-import { QueryClient } from "@tanstack/react-query";
+import { focusManager, QueryClient } from "@tanstack/react-query";
+import { AppState, Platform } from "react-native";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -9,3 +10,11 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Refetch stale queries when the app returns to the foreground (React Native has no window focus event).
+if (Platform.OS !== "web") {
+  focusManager.setEventListener((setFocused) => {
+    const sub = AppState.addEventListener("change", (state) => setFocused(state === "active"));
+    return () => sub.remove();
+  });
+}

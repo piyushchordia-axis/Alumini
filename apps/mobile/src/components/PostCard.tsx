@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Alert, Image, Pressable, Text, View } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge } from "@/components/ModerationBadge";
+import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { Badge, Body, Card, Muted, Row } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -12,6 +12,7 @@ import { timeAgo } from "@/lib/format";
 import { colors, useTheme } from "@/theme";
 
 const EMOJI: Record<ReactionType, string> = { LIKE: "👍", LOVE: "❤️", CELEBRATE: "🎉", INSIGHTFUL: "💡" };
+const LABEL: Record<ReactionType, string> = { LIKE: "Like", LOVE: "Love", CELEBRATE: "Celebrate", INSIGHTFUL: "Insightful" };
 
 export function PostCard({ slug, post, detail = false, onDeleted }: { slug: string; post: PostDto; detail?: boolean; onDeleted?: () => void }) {
   const router = useRouter();
@@ -41,32 +42,46 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
         {post.isPinned && <Badge label="📌 Pinned" tone="primary" />}
         <ModerationBadge status={post.moderationStatus} />
       </Row>
-      <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)}>
+      <ModerationNote status={post.moderationStatus} note={post.moderationNote} />
+      <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} disabled={detail} accessibilityRole={detail ? undefined : "link"}>
         <Body>{post.body}</Body>
       </Pressable>
       {post.imageUrls.length > 0 && (
         <View style={{ gap: 6 }}>
           {post.imageUrls.map((u) => (
-            <Image key={u} source={{ uri: u }} style={{ width: "100%", height: 220, borderRadius: 10 }} resizeMode="cover" />
+            <Image key={u} source={{ uri: u }} style={{ width: "100%", height: 220, borderRadius: 10 }} resizeMode="cover" accessibilityIgnoresInvertColors accessibilityLabel="Post image" />
           ))}
         </View>
       )}
       <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
         <Row gap={4}>
           {REACTION_TYPES.map((t) => (
-            <Pressable key={t} disabled={post.moderationStatus !== "APPROVED"} onPress={() => react.mutate(post.myReaction === t ? null : t)} style={{ padding: 6, borderRadius: 999, backgroundColor: post.myReaction === t ? theme.primarySoft : "transparent" }}>
+            <Pressable
+              key={t}
+              disabled={post.moderationStatus !== "APPROVED"}
+              onPress={() => react.mutate(post.myReaction === t ? null : t)}
+              accessibilityRole="button"
+              accessibilityLabel={LABEL[t]}
+              accessibilityState={{ selected: post.myReaction === t, disabled: post.moderationStatus !== "APPROVED" }}
+              hitSlop={4}
+              style={{ padding: 6, borderRadius: 999, backgroundColor: post.myReaction === t ? theme.primarySoft : "transparent" }}>
               <Text style={{ fontSize: 16 }}>{EMOJI[t]}</Text>
             </Pressable>
           ))}
           <Muted size={13}>{post.reactionCount}</Muted>
-          <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} style={{ marginLeft: 10 }}>
+          <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} style={{ marginLeft: 10 }} accessibilityRole="button" accessibilityLabel={`${post.commentCount} comments`}>
             <Muted size={13}>💬 {post.commentCount}</Muted>
           </Pressable>
         </Row>
         {post.isMine ? (
-          <Pressable onPress={() => Alert.alert("Delete post?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])}>
-            <Text style={{ color: colors.faint, fontSize: 12 }}>Delete</Text>
-          </Pressable>
+          <Row gap={14}>
+            <Pressable onPress={() => router.push(`/t/${slug}/feed/edit/${post.id}`)} accessibilityRole="button" accessibilityLabel="Edit post" hitSlop={8}>
+              <Text style={{ color: colors.faint, fontSize: 12 }}>Edit</Text>
+            </Pressable>
+            <Pressable onPress={() => Alert.alert("Delete post?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} accessibilityRole="button" accessibilityLabel="Delete post" hitSlop={8}>
+              <Text style={{ color: colors.faint, fontSize: 12 }}>Delete</Text>
+            </Pressable>
+          </Row>
         ) : (
           <ReportButton slug={slug} contentType="POST" contentId={post.id} />
         )}

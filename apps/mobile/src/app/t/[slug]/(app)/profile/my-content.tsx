@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FlatList, View , Text } from "react-native";
 import { PostCard } from "@/components/PostCard";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Card, EmptyState, Muted, Row, Spinner, Tabs } from "@/components/ui";
+import { Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -33,7 +33,11 @@ export default function MyContentScreen() {
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 48 }}
         onEndReached={active.loadMore}
-        ListEmptyComponent={active.isLoading ? <Spinner /> : <EmptyState title="Nothing here yet" />}
+        ListEmptyComponent={
+          <ListEmpty loading={active.isLoading} error={active.error} onRetry={() => void active.refetch()}>
+            <EmptyState title="Nothing here yet" />
+          </ListEmpty>
+        }
         renderItem={({ item }) =>
           tab === "posts" ? (
             <PostCard slug={slug} post={item as Parameters<typeof PostCard>[0]["post"]} />

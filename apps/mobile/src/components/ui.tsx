@@ -1,14 +1,40 @@
 import type { ReactNode } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type TextInputProps, type ViewStyle } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type TextInputProps, type ViewStyle } from "react-native";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
-export function Screen({ children, scroll = true, padded = true, style }: { children: ReactNode; scroll?: boolean; padded?: boolean; style?: ViewStyle }) {
-  const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={style}>{children}</View>;
+/**
+ * Standard screen container. Pass `topInset` on screens without a navigation header so content clears the status bar
+ * and notch. The content moves up with the keyboard on iOS (Android resizes the window itself).
+ */
+export function Screen({ children, scroll = true, padded = true, topInset = false, style }: { children: ReactNode; scroll?: boolean; padded?: boolean; topInset?: boolean; style?: ViewStyle }) {
+  const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={[{ flex: scroll ? undefined : 1 }, style]}>{children}</View>;
+  const edges: Edge[] = topInset ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
   return (
-    <SafeAreaView style={styles.screen} edges={["left", "right", "bottom"]}>
-      {scroll ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: spacing.xl }}>{content}</ScrollView> : content}
+    <SafeAreaView style={styles.screen} edges={edges}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {scroll ? (
+          <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
+            {content}
+          </ScrollView>
+        ) : (
+          content
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+/** Full-screen error with a retry and an optional way back (failed institution or membership load, offline). */
+export function LoadError({ error, onRetry, onBack, backLabel = "Choose another institution" }: { error: unknown; onRetry?: () => void; onBack?: () => void; backLabel?: string }) {
+  return (
+    <SafeAreaView style={[styles.screen, { justifyContent: "center", padding: spacing.xl, gap: spacing.md }]}>
+      <Text style={{ fontSize: 40, textAlign: "center" }}>📡</Text>
+      <Text style={[styles.title, { textAlign: "center", fontSize: 18 }]}>{"Couldn't load this"}</Text>
+      <ErrorText error={error} />
+      {onRetry && <Button title="Try again" onPress={onRetry} />}
+      {onBack && <Button title={backLabel} variant="ghost" onPress={onBack} />}
     </SafeAreaView>
   );
 }
@@ -20,6 +46,9 @@ export function Button({ title, variant = "primary", loading, disabled, style, .
   return (
     <Pressable
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [styles.button, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
       {...rest}
     >
@@ -32,7 +61,7 @@ export function Input({ label, error, hint, style, ...rest }: TextInputProps & {
   return (
     <View style={{ gap: 4 }}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <TextInput placeholderTextColor={colors.faint} style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, style]} {...rest} />
+      <TextInput placeholderTextColor={colors.faint} accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder} style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, style]} {...rest} />
       {error ? <Text style={styles.error}>{error}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
@@ -58,7 +87,7 @@ export function Chip({ label, active, onPress, color }: { label: string; active?
   const theme = useTheme();
   const c = color ?? theme.primary;
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active ? { backgroundColor: c, borderColor: c } : null]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!active }} style={[styles.chip, active ? { backgroundColor: c, borderColor: c } : null]}>
       <Text style={[styles.chipText, active ? { color: "#fff" } : null]}>{label}</Text>
     </Pressable>
   );
@@ -66,9 +95,9 @@ export function Chip({ label, active, onPress, color }: { label: string; active?
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
-    <View style={styles.tabs}>
+    <View style={styles.tabs} accessibilityRole="tablist">
       {tabs.map((t) => (
-        <Pressable key={t.value} onPress={() => onChange(t.value)} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
+        <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" accessibilityState={{ selected: value === t.value }} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
           <Text style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>{t.label}</Text>
         </Pressable>
       ))}
@@ -76,10 +105,10 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
   );
 }
 
-export function Card({ children, style, onPress }: { children: ReactNode; style?: ViewStyle; onPress?: () => void }) {
+export function Card({ children, style, onPress, accessibilityLabel }: { children: ReactNode; style?: ViewStyle; onPress?: () => void; accessibilityLabel?: string }) {
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed ? { opacity: 0.85 } : null, style]}>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} style={({ pressed }) => [styles.card, pressed ? { opacity: 0.85 } : null, style]}>
         {children}
       </Pressable>
     );
@@ -106,7 +135,7 @@ export function Badge({ label, tone = "neutral" }: { label: string; tone?: "neut
 
 export function Avatar({ name, src, size = 40 }: { name: string; src?: string | null; size?: number }) {
   const theme = useTheme();
-  if (src) return <Image source={{ uri: src }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  if (src) return <Image source={{ uri: src }} accessibilityIgnoresInvertColors accessible={false} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
       <Text style={{ color: theme.primary, fontWeight: "700", fontSize: size * 0.36 }}>{initials(name)}</Text>
@@ -117,7 +146,7 @@ export function Avatar({ name, src, size = 40 }: { name: string; src?: string | 
 export function Spinner({ label }: { label?: string }) {
   const theme = useTheme();
   return (
-    <View style={{ padding: spacing.xl, alignItems: "center", gap: 8 }}>
+    <View style={{ padding: spacing.xl, alignItems: "center", gap: 8 }} accessibilityRole="progressbar" accessibilityLabel={label ?? "Loading"}>
       <ActivityIndicator color={theme.primary} />
       {label && <Text style={styles.hint}>{label}</Text>}
     </View>
@@ -134,11 +163,24 @@ export function EmptyState({ icon, title, description }: { icon?: string; title:
   );
 }
 
+/** Empty-list slot: spinner while loading, the error with a retry, otherwise the given empty state. */
+export function ListEmpty({ loading, error, onRetry, children }: { loading: boolean; error: unknown; onRetry: () => void; children: ReactNode }) {
+  if (loading) return <Spinner />;
+  if (error)
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <ErrorText error={error} />
+        <Button title="Try again" variant="outline" onPress={onRetry} />
+      </View>
+    );
+  return <>{children}</>;
+}
+
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
   const msg = error instanceof Error ? error.message : String(error);
   return (
-    <View style={styles.errorBox}>
+    <View style={styles.errorBox} accessibilityRole="alert">
       <Text style={{ color: "#991b1b", fontSize: 13 }}>{msg}</Text>
     </View>
   );

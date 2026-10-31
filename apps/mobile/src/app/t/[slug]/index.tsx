@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar, Button, Spinner } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
+import { homeHref } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, spacing, useTheme } from "@/theme";
 
@@ -14,13 +15,14 @@ export default function TenantLandingScreen() {
   const router = useRouter();
   const theme = useTheme();
   const tenant = useTenant(slug);
+  const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const membership = useMembershipQuery(authed ? slug : undefined);
 
-  if (!tenant.data) return <Spinner />;
+  if (!tenant.data || !hydrated) return <Spinner />;
   if (authed) {
     if (membership.isLoading) return <Spinner label="Checking your membership…" />;
-    if (membership.data) return <Redirect href={membership.data.status === "APPROVED" ? `/t/${slug}/feed` : `/t/${slug}/pending`} />;
+    if (membership.data) return <Redirect href={membership.data.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
     if (membership.error && isApiClientError(membership.error) && membership.error.status === 404) return <Redirect href={`/t/${slug}/register`} />;
   }
   const t = tenant.data;
@@ -48,7 +50,7 @@ export default function TenantLandingScreen() {
         <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>
           {t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "New members are verified by the alumni office." : "New members get instant access."}
         </Text>
-        <Pressable onPress={() => router.replace("/")}>
+        <Pressable onPress={() => router.replace("/")} accessibilityRole="button" hitSlop={8}>
           <Text style={{ textAlign: "center", color: colors.faint, fontSize: 12 }}>Choose a different institution</Text>
         </Pressable>
       </View>

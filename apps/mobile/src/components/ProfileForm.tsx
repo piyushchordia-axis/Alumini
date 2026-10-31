@@ -118,7 +118,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
           }}
         />
         {f.avatarUrl && (
-          <Pressable onPress={() => set("avatarUrl", null)}>
+          <Pressable onPress={() => set("avatarUrl", null)} accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={8}>
             <Muted>Remove</Muted>
           </Pressable>
         )}
@@ -140,7 +140,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
         error={errors.dateOfBirth}
         clearable
       />
-      <Pressable onPress={() => setMore((m) => !m)}>
+      <Pressable onPress={() => setMore((m) => !m)} accessibilityRole="button" accessibilityState={{ expanded: more }} hitSlop={8}>
         <Text style={{ color: theme.primary, fontWeight: "600" }}>{more ? "Hide optional details" : "More about you (optional)"}</Text>
       </Pressable>
       {more && (

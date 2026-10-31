@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Button, Card, EmptyState, Muted, Row, Spinner, Tabs } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -57,7 +57,11 @@ export default function FundingScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
-        ListEmptyComponent={list.isLoading ? <Spinner /> : <EmptyState icon="🚀" title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
+        ListEmptyComponent={
+          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <EmptyState icon="🚀" title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
+          </ListEmpty>
+        }
         renderItem={({ item }) => <FundingCard slug={slug} item={item} />}
       />
     </View>

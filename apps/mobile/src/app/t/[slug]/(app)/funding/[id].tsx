@@ -4,9 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking, Text } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge } from "@/components/ModerationBadge";
+import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Badge, Body, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatAmountRange, formatDate } from "@/lib/format";
@@ -24,7 +24,7 @@ export default function FundingDetailScreen() {
   const close = useMutation({ mutationFn: () => api.funding.close(slug, id), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   const remove = useMutation({ mutationFn: () => api.funding.remove(slug, id), onSuccess: () => { invalidate(); router.back(); }, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   if (item.isLoading) return <Spinner />;
-  if (item.error || !item.data) return <ErrorText error={item.error ?? "Not found"} />;
+  if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const f = item.data;
   return (
     <Screen>
@@ -37,6 +37,7 @@ export default function FundingDetailScreen() {
           {f.isClosed && <Badge label="Closed" />}
           <ModerationBadge status={f.moderationStatus} />
         </Row>
+        <ModerationNote status={f.moderationStatus} note={f.moderationNote} />
         <Body>{f.pitch}</Body>
         {f.sectors.length > 0 && <Muted>{f.sectors.map((s) => `#${s}`).join("  ")}</Muted>}
         {f.websiteUrl && <Button title="🌐 Website" variant="outline" onPress={() => void Linking.openURL(f.websiteUrl!)} />}
@@ -48,6 +49,7 @@ export default function FundingDetailScreen() {
         </Row>
         {f.isMine && (
           <Row>
+            <Button title="Edit" variant="outline" onPress={() => router.push(`/t/${slug}/funding/edit/${f.id}`)} />
             {!f.isClosed && <Button title="Mark closed" variant="outline" onPress={() => close.mutate()} loading={close.isPending} />}
             <Button title="Delete" variant="ghost" onPress={() => Alert.alert("Delete this listing?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} />
           </Row>

@@ -1,4 +1,4 @@
-import type { NotificationDto } from "@illuminize/shared";
+import { notificationTarget, type NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
@@ -10,30 +10,24 @@ import { timeAgo } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 
 function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | null {
-  const d = n.data as { postId?: string; contentType?: string; contentId?: string; eventId?: string; membershipId?: string; reportId?: string };
+  const t = notificationTarget(n.type, n.data);
   const base = `/t/${slug}/app`;
-  switch (n.type) {
-    case "POST_COMMENT":
-    case "POST_REACTION":
-      return d.postId ? `${base}/feed/${d.postId}` : null;
-    case "EVENT_RSVP":
-    case "EVENT_CANCELLED":
-      return d.eventId ? `${base}/events/${d.eventId}` : null;
-    case "NEW_MEMBER_PENDING":
-      return isAdmin ? `/t/${slug}/admin/members?status=PENDING` : null;
-    case "CONTENT_PENDING":
-      return isAdmin ? `/t/${slug}/admin/moderation` : null;
-    case "REPORT_FILED":
-      return isAdmin ? `/t/${slug}/admin/reports` : null;
-    case "CONTENT_APPROVED":
-    case "CONTENT_REJECTED":
-    case "CONTENT_REMOVED":
-      if (d.contentType === "POST" && d.contentId) return `${base}/feed/${d.contentId}`;
-      if (d.contentType === "JOB" && d.contentId) return `${base}/jobs/${d.contentId}`;
-      if (d.contentType === "FUNDING" && d.contentId) return `${base}/funding/${d.contentId}`;
-      if (d.contentType === "EVENT" && d.contentId) return `${base}/events/${d.contentId}`;
-      if (d.postId) return `${base}/feed/${d.postId}`;
+  switch (t?.kind) {
+    case "post":
+      return `${base}/feed/${t.id}`;
+    case "event":
+      return `${base}/events/${t.id}`;
+    case "job":
+      return `${base}/jobs/${t.id}`;
+    case "funding":
+      return `${base}/funding/${t.id}`;
+    case "myContent":
       return `${base}/my-content`;
+    case "profile":
+      return `${base}/profile`;
+    case "admin":
+      if (!isAdmin) return null;
+      return t.section === "members" ? `/t/${slug}/admin/members?status=PENDING` : `/t/${slug}/admin/${t.section}`;
     default:
       return null;
   }

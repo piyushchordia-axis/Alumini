@@ -1,19 +1,20 @@
-import { PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type MemberCardDto, type ProfessionType, countryName } from "@illuminize/shared";
+import { countryName, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type MemberCardDto, type ProfessionType } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, Text, View } from "react-native";
-import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, Muted, Row, Spinner } from "@/components/ui";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row } from "@/components/ui";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
-import { colors, spacing } from "@/theme";
+import { colors, spacing, useTheme } from "@/theme";
 
 function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
   const router = useRouter();
   return (
-    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)}>
+    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={`${member.fullName}, batch of ${member.batchYear}`}>
       <Row gap={12} style={{ flexWrap: "nowrap" }}>
         <Avatar name={member.fullName} src={member.avatarUrl} size={48} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -42,20 +43,59 @@ function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
 export default function DirectoryScreen() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
+  const theme = useTheme();
   const [q, setQ] = useState("");
+  const search = useDebounced(q.trim());
   const [batchYear, setBatchYear] = useState<string>("");
   const [city, setCity] = useState<string>("");
+  const [country, setCountry] = useState<string>("");
+  const [company, setCompany] = useState<string>("");
   const [professionType, setProfessionType] = useState<ProfessionType | "">("");
+  const [showFilters, setShowFilters] = useState(false);
   const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
-  const filters = { q: q || undefined, batchYear: batchYear ? Number(batchYear) : undefined, city: city || undefined, professionType: professionType || undefined };
+  const filters = {
+    q: search || undefined,
+    batchYear: batchYear ? Number(batchYear) : undefined,
+    city: city || undefined,
+    country: country || undefined,
+    company: company || undefined,
+    professionType: professionType || undefined,
+  };
+  const active = [batchYear, city, country, company, professionType].filter(Boolean).length;
+  const clear = () => {
+    setBatchYear("");
+    setCity("");
+    setCountry("");
+    setCompany("");
+    setProfessionType("");
+  };
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
-        <Input placeholder="Name, company, role" value={q} onChangeText={setQ} />
-        <ChipSelect options={(facets.data?.batchYears ?? []).map((y) => ({ value: String(y), label: `Batch ${y}` }))} value={batchYear} onChange={setBatchYear} allowEmpty />
-        <ChipSelect options={(facets.data?.cities ?? []).map((c) => ({ value: c, label: c }))} value={city} onChange={setCity} allowEmpty />
-        <ChipSelect options={PROFESSION_TYPES.map((p) => ({ value: p, label: PROFESSION_TYPE_LABELS[p] }))} value={professionType} onChange={setProfessionType} allowEmpty />
+        <Input accessibilityLabel="Search members" placeholder="Name, company, role" value={q} onChangeText={setQ} autoCorrect={false} />
+        <Row style={{ justifyContent: "space-between" }}>
+          <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showFilters }} hitSlop={8}>
+            <Text style={{ color: theme.primary, fontWeight: "600" }}>
+              {showFilters ? "Hide filters" : "Filters"}
+              {active ? ` (${active})` : ""}
+            </Text>
+          </Pressable>
+          {active > 0 && (
+            <Pressable onPress={clear} accessibilityRole="button" hitSlop={8}>
+              <Text style={{ color: colors.muted }}>Clear filters</Text>
+            </Pressable>
+          )}
+        </Row>
+        {showFilters && (
+          <View style={{ gap: spacing.sm }}>
+            <ChipSelect label="Batch" options={(facets.data?.batchYears ?? []).map((y) => ({ value: String(y), label: String(y) }))} value={batchYear} onChange={setBatchYear} allowEmpty />
+            <ChipSelect label="City" options={(facets.data?.cities ?? []).map((c) => ({ value: c, label: c }))} value={city} onChange={setCity} allowEmpty />
+            <ChipSelect label="Country" options={(facets.data?.countries ?? []).map((c) => ({ value: c, label: countryName(c) }))} value={country} onChange={setCountry} allowEmpty />
+            <ChipSelect label="Company" options={(facets.data?.companies ?? []).map((c) => ({ value: c, label: c }))} value={company} onChange={setCompany} allowEmpty />
+            <ChipSelect label="Profession" options={PROFESSION_TYPES.map((p) => ({ value: p, label: PROFESSION_TYPE_LABELS[p] }))} value={professionType} onChange={setProfessionType} allowEmpty />
+          </View>
+        )}
       </View>
       <FlatList
         data={list.items}
@@ -64,7 +104,11 @@ export default function DirectoryScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
-        ListEmptyComponent={list.isLoading ? <Spinner /> : <EmptyState icon="🎓" title="No members match" description="Try removing a filter." />}
+        ListEmptyComponent={
+          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <EmptyState icon="🎓" title="No members match" description="Try removing a filter." />
+          </ListEmpty>
+        }
         renderItem={({ item }) => <MemberCard slug={slug} member={item} />}
       />
     </View>
