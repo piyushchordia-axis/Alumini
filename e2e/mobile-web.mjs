@@ -36,6 +36,15 @@ try {
     await page.getByText("Sign in / Join with mobile number").waitFor();
     await shot("m02-landing");
     await tap("Sign in / Join with mobile number");
+    // The country code picker searches the full list; pick the UK, then switch back to India.
+    await page.getByRole("button", { name: /^Country code, India \+91/ }).click();
+    await page.getByPlaceholder(/Search by name or code/).fill("kingdom");
+    await page.getByText("United Kingdom", { exact: true }).click();
+    await page.getByRole("button", { name: /^Country code, United Kingdom \+44/ }).waitFor();
+    await page.getByRole("button", { name: /^Country code, United Kingdom/ }).click();
+    await page.getByPlaceholder(/Search by name or code/).fill("+91");
+    await page.getByText("India", { exact: true }).click();
+    await page.getByRole("button", { name: /^Country code, India \+91/ }).waitFor();
     await page.getByPlaceholder("98765 43210").fill(PHONE);
     await tap("Send code");
     const dev = await page.getByText(/Development mode/).textContent();

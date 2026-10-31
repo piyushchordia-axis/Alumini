@@ -1,3 +1,4 @@
+import { countryName } from "@illuminize/shared";
 import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { AuthShell } from "@/components/layout/AuthShell";
@@ -20,7 +21,7 @@ export function LandingPage() {
   if (authed) return <Navigate to={`/t/${slug}/app`} replace />;
   const t = tenant.data;
   return (
-    <AuthShell tenant={t} title={t.tagline ?? `${t.shortName ?? t.name} alumni network`} subtitle={[t.city, t.country].filter(Boolean).join(", ")}>
+    <AuthShell tenant={t} title={t.tagline ?? `${t.shortName ?? t.name} alumni network`} subtitle={[t.city, countryName(t.country)].filter(Boolean).join(", ")}>
       {t.welcomeMessage && <p className="whitespace-pre-line text-sm text-slate-600">{t.welcomeMessage}</p>}
       <ul className="mt-4 grid grid-cols-2 gap-2 text-sm text-slate-600">
         {t.settings.features.feed && <li>💬 Community feed</li>}

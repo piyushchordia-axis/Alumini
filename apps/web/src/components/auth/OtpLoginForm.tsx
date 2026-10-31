@@ -9,7 +9,7 @@ import { PhoneInput, toE164, type PhoneValue } from "./PhoneInput";
 
 /** Two-step phone → OTP login shared by the tenant and platform login pages. */
 export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDto) => void }) {
-  const [phone, setPhone] = useState<PhoneValue>({ dial: "+91", number: "" });
+  const [phone, setPhone] = useState<PhoneValue>({ country: "IN", number: "" });
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [code, setCode] = useState("");
   const [channel, setChannel] = useState<string>("");

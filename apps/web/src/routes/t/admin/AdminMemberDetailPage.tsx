@@ -1,4 +1,4 @@
-import { MARITAL_STATUS_LABELS, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
+import { MARITAL_STATUS_LABELS, PROFESSION_TYPE_LABELS, countryName } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
@@ -26,7 +26,7 @@ export function AdminMemberDetailPage() {
     ["Profession", PROFESSION_TYPE_LABELS[m.professionType]],
     ["Company", m.companyName],
     ["Designation", m.designation],
-    ["City", [m.city, m.country].filter(Boolean).join(", ")],
+    ["City", [m.city, countryName(m.country)].filter(Boolean).join(", ")],
     ["Date of birth", m.dateOfBirth ? formatDate(m.dateOfBirth) : null],
     ["Marital status", m.maritalStatus ? MARITAL_STATUS_LABELS[m.maritalStatus] : null],
     ["Kids", m.kidsCount],

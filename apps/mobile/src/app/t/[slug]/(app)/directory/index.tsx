@@ -1,4 +1,4 @@
-import { PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type MemberCardDto, type ProfessionType } from "@illuminize/shared";
+import { PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type MemberCardDto, type ProfessionType, countryName } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -31,7 +31,7 @@ function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
           <Muted>
             Batch of {member.batchYear}
             {member.city ? ` · ${member.city}` : ""}
-            {member.country && member.country !== "IN" ? `, ${member.country}` : ""}
+            {member.country && member.country !== "IN" ? `, ${countryName(member.country)}` : ""}
           </Muted>
         </View>
       </Row>

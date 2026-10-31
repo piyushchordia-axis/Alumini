@@ -1,3 +1,4 @@
+import { countryName } from "@illuminize/shared";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
@@ -46,7 +47,7 @@ export default function TenantPickerScreen() {
             <Avatar name={t.shortName ?? t.name} src={t.logoUrl} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontWeight: "600", color: colors.text }}>{t.name}</Text>
-              <Text style={{ color: colors.muted, fontSize: 12 }}>{[t.city, t.country].filter(Boolean).join(", ")}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>{[t.city, countryName(t.country)].filter(Boolean).join(", ")}</Text>
             </View>
             <Text style={{ color: colors.faint }}>›</Text>
           </Pressable>

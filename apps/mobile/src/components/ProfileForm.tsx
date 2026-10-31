@@ -1,7 +1,8 @@
-import { MARITAL_STATUSES, MARITAL_STATUS_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, COUNTRIES, membershipProfileSchema, type MembershipDto, type MembershipProfileInput, type TenantPublicDto } from "@illuminize/shared";
+import { MARITAL_STATUSES, MARITAL_STATUS_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, membershipProfileSchema, type MembershipDto, type MembershipProfileInput, type TenantPublicDto } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
+import { CountryPicker } from "@/components/CountryPicker";
 import { DateTimeField } from "@/components/DateTimeField";
 import { Avatar, Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
@@ -128,7 +129,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
       <Input label={f.professionType === "STUDENT" ? "Institution" : f.professionType === "EMPLOYED" ? "Company" : "Company / business"} value={f.companyName} onChangeText={(v) => set("companyName", v)} error={errors.companyName} />
       <Input label="Designation / role" value={f.designation} onChangeText={(v) => set("designation", v)} error={errors.designation} />
       <Input label="Current city" value={f.city} onChangeText={(v) => set("city", v)} error={errors.city} />
-      <ChipSelect label="Country" options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))} value={f.country} onChange={(v) => set("country", v)} allowEmpty />
+      <CountryPicker label="Country" value={f.country || null} onChange={(v) => set("country", v ?? "")} clearable error={errors.country} />
       <DateTimeField
         label="Date of birth"
         mode="date"

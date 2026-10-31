@@ -1,3 +1,4 @@
+import { countryName } from "@illuminize/shared";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Avatar, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
@@ -42,7 +43,7 @@ export function TenantPickerPage() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-slate-900">{t.name}</div>
                 <div className="text-sm text-slate-500">
-                  {[t.city, t.country].filter(Boolean).join(", ")}
+                  {[t.city, countryName(t.country)].filter(Boolean).join(", ")}
                 </div>
               </div>
               <span className="text-slate-400">›</span>

@@ -1,22 +1,22 @@
-import { COUNTRIES } from "@illuminize/shared";
+import { countryByCode } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
-import { Button, ChipSelect, ErrorText, Input, Screen, Title } from "@/components/ui";
+import { Pressable, Text, View } from "react-native";
+import { CountryPicker } from "@/components/CountryPicker";
+import { Button, ErrorText, Input, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { toE164 } from "@/lib/format";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, useTheme } from "@/theme";
-
-const TOP_DIALS = ["+91", "+1", "+44", "+971", "+65", "+61", "+49", "+966"];
 
 export default function LoginScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const theme = useTheme();
   const setSession = useAuthStore((s) => s.setSession);
-  const [dial, setDial] = useState<string>("+91");
+  const [country, setCountry] = useState("IN");
+  const dial = countryByCode(country)?.dial ?? "+91";
   const [number, setNumber] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [code, setCode] = useState("");
@@ -68,23 +68,12 @@ export default function LoginScreen() {
     }
   };
 
-  const dials = COUNTRIES.filter((c) => TOP_DIALS.includes(c.dial)).map((c) => ({ value: c.dial, label: `${c.code} ${c.dial}` }));
-
   return (
     <Screen>
       <Title sub="We'll send a one-time code on WhatsApp (SMS fallback).">Sign in</Title>
       {step === "phone" ? (
         <View style={{ gap: 12 }}>
-          <ChipSelect label="Country" options={dials} value={dial} onChange={(v) => setDial(v || "+91")} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {COUNTRIES.filter((c) => !TOP_DIALS.includes(c.dial)).map((c) => (
-              <Pressable key={c.code} onPress={() => setDial(c.dial)}>
-                <Text style={{ color: dial === c.dial ? theme.primary : colors.faint, fontSize: 12 }}>
-                  {c.code} {c.dial}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <CountryPicker label="Country code" variant="dial" value={country} onChange={(c) => setCountry(c ?? "IN")} />
           <Input label={`Mobile number (${dial})`} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" value={number} onChangeText={(v) => setNumber(v.replace(/[^\d\s-]/g, ""))} placeholder="98765 43210" autoFocus />
           <ErrorText error={error ? errorMessage(error) : null} />
           <Button title="Send code" onPress={() => void request()} loading={busy} disabled={number.replace(/\D/g, "").length < 6} />

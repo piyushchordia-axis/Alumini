@@ -1,3 +1,5 @@
+import { COUNTRIES, type Country } from "./data/countries";
+
 export const TENANT_TYPES = ["UNIVERSITY", "COLLEGE", "SCHOOL", "OTHER"] as const;
 export type TenantType = (typeof TENANT_TYPES)[number];
 
@@ -179,55 +181,42 @@ export const BILLING_MODEL_LABELS: Record<BillingModel, string> = {
   FREE: "Free",
 };
 
-/** ISO-3166 alpha-2 country list with dial codes; India first since it is the primary market. */
-export const COUNTRIES: ReadonlyArray<{ code: string; name: string; dial: string }> = [
-  { code: "IN", name: "India", dial: "+91" },
-  { code: "US", name: "United States", dial: "+1" },
-  { code: "GB", name: "United Kingdom", dial: "+44" },
-  { code: "AE", name: "United Arab Emirates", dial: "+971" },
-  { code: "SG", name: "Singapore", dial: "+65" },
-  { code: "AU", name: "Australia", dial: "+61" },
-  { code: "CA", name: "Canada", dial: "+1" },
-  { code: "DE", name: "Germany", dial: "+49" },
-  { code: "FR", name: "France", dial: "+33" },
-  { code: "NL", name: "Netherlands", dial: "+31" },
-  { code: "IE", name: "Ireland", dial: "+353" },
-  { code: "CH", name: "Switzerland", dial: "+41" },
-  { code: "SE", name: "Sweden", dial: "+46" },
-  { code: "JP", name: "Japan", dial: "+81" },
-  { code: "KR", name: "South Korea", dial: "+82" },
-  { code: "CN", name: "China", dial: "+86" },
-  { code: "HK", name: "Hong Kong", dial: "+852" },
-  { code: "MY", name: "Malaysia", dial: "+60" },
-  { code: "ID", name: "Indonesia", dial: "+62" },
-  { code: "TH", name: "Thailand", dial: "+66" },
-  { code: "PH", name: "Philippines", dial: "+63" },
-  { code: "VN", name: "Vietnam", dial: "+84" },
-  { code: "NZ", name: "New Zealand", dial: "+64" },
-  { code: "SA", name: "Saudi Arabia", dial: "+966" },
-  { code: "QA", name: "Qatar", dial: "+974" },
-  { code: "KW", name: "Kuwait", dial: "+965" },
-  { code: "OM", name: "Oman", dial: "+968" },
-  { code: "BH", name: "Bahrain", dial: "+973" },
-  { code: "ZA", name: "South Africa", dial: "+27" },
-  { code: "KE", name: "Kenya", dial: "+254" },
-  { code: "NG", name: "Nigeria", dial: "+234" },
-  { code: "BR", name: "Brazil", dial: "+55" },
-  { code: "MX", name: "Mexico", dial: "+52" },
-  { code: "ES", name: "Spain", dial: "+34" },
-  { code: "IT", name: "Italy", dial: "+39" },
-  { code: "PT", name: "Portugal", dial: "+351" },
-  { code: "PL", name: "Poland", dial: "+48" },
-  { code: "LK", name: "Sri Lanka", dial: "+94" },
-  { code: "NP", name: "Nepal", dial: "+977" },
-  { code: "BD", name: "Bangladesh", dial: "+880" },
-  { code: "PK", name: "Pakistan", dial: "+92" },
-  { code: "MU", name: "Mauritius", dial: "+230" },
-  { code: "IL", name: "Israel", dial: "+972" },
-  { code: "TR", name: "Türkiye", dial: "+90" },
-  { code: "RU", name: "Russia", dial: "+7" },
-];
+export { COUNTRIES, type Country } from "./data/countries";
 
-export const COUNTRY_NAME_BY_CODE: Record<string, string> = Object.fromEntries(
-  COUNTRIES.map((c) => [c.code, c.name]),
-);
+/** Shown above the full list in country pickers: India first, then the biggest alumni destinations. */
+export const POPULAR_COUNTRY_CODES = ["IN", "US", "GB", "AE", "CA", "AU", "SG", "DE", "SA", "QA"] as const;
+
+export const COUNTRY_NAME_BY_CODE: Record<string, string> = Object.fromEntries(COUNTRIES.map((c) => [c.code, c.name]));
+const COUNTRY_BY_CODE = new Map<string, Country>(COUNTRIES.map((c) => [c.code, c]));
+
+export function countryByCode(code: string | null | undefined): Country | undefined {
+  return code ? COUNTRY_BY_CODE.get(code.toUpperCase()) : undefined;
+}
+
+/** Display name for a stored country code, falling back to the code itself. */
+export function countryName(code: string | null | undefined): string {
+  if (!code) return "";
+  return COUNTRY_BY_CODE.get(code.toUpperCase())?.name ?? code;
+}
+
+/** Regional-indicator flag emoji (renders as two letters on platforms without flag glyphs). */
+export function flagEmoji(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code)) return "";
+  return String.fromCodePoint(...[...code.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+
+/** Popular countries first, then the rest in list order (India-first, alphabetical). */
+export function countriesPopularFirst(): Country[] {
+  const popular = POPULAR_COUNTRY_CODES.map((c) => COUNTRY_BY_CODE.get(c)).filter((c): c is Country => !!c);
+  const set = new Set<string>(POPULAR_COUNTRY_CODES);
+  return [...popular, ...COUNTRIES.filter((c) => !set.has(c.code))];
+}
+
+/** Case- and accent-insensitive match on name, ISO code or dial code ("ind", "in", "+91", "91"). */
+export function searchCountries(query: string, list: readonly Country[] = COUNTRIES): Country[] {
+  const fold = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const q = fold(query.trim());
+  if (!q) return [...list];
+  const digits = q.replace(/^\+/, "");
+  return list.filter((c) => fold(c.name).includes(q) || c.code.toLowerCase() === q || (/^\d+$/.test(digits) && c.dial.slice(1).startsWith(digits)));
+}

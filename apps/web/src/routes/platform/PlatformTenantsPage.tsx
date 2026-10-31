@@ -1,4 +1,4 @@
-import { BILLING_MODEL_LABELS, TENANT_TYPE_LABELS, type TenantStatus } from "@illuminize/shared";
+import { BILLING_MODEL_LABELS, TENANT_TYPE_LABELS, type TenantStatus, countryName } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -50,7 +50,7 @@ export function PlatformTenantsPage() {
                     <span>
                       <span className="block font-medium text-slate-900">{t.name}</span>
                       <span className="block text-xs text-slate-500">
-                        /{t.slug} · {TENANT_TYPE_LABELS[t.type]} · {[t.city, t.country].filter(Boolean).join(", ")}
+                        /{t.slug} · {TENANT_TYPE_LABELS[t.type]} · {[t.city, countryName(t.country)].filter(Boolean).join(", ")}
                       </span>
                     </span>
                   </Link>

@@ -1,4 +1,4 @@
-import { PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type ProfessionType } from "@illuminize/shared";
+import { PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type ProfessionType, countryName } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MemberCard } from "@/components/directory/MemberCard";
@@ -55,7 +55,7 @@ export function DirectoryPage() {
           <option value="">Any country</option>
           {facets.data?.countries.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {countryName(c)}
             </option>
           ))}
         </Select>

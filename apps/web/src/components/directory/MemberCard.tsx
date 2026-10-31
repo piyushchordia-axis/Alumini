@@ -1,4 +1,4 @@
-import { PROFESSION_TYPE_LABELS, type MemberCardDto } from "@illuminize/shared";
+import { PROFESSION_TYPE_LABELS, type MemberCardDto, countryName } from "@illuminize/shared";
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card } from "@/components/ui";
 
@@ -20,7 +20,7 @@ export function MemberCard({ slug, member }: { slug: string; member: MemberCardD
           <p className="text-xs text-slate-500">
             Batch of {member.batchYear}
             {member.city ? ` · ${member.city}` : ""}
-            {member.country && member.country !== "IN" ? `, ${member.country}` : ""}
+            {member.country && member.country !== "IN" ? `, ${countryName(member.country)}` : ""}
           </p>
         </div>
       </Card>
