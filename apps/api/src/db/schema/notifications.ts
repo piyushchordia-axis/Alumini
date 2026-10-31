@@ -16,8 +16,8 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body"),
     data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
-    readAt: timestamp("read_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true, precision: 3 }),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [
     index("notifications_recipient_created_idx").on(t.recipientMembershipId, t.createdAt),

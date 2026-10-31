@@ -1,6 +1,6 @@
-import { and, desc, eq, gte, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
-import { jobSeekers, memberships, tenants, users } from "../db/schema";
+import { jobSeekers, memberActivityDays, memberships, tenants, users } from "../db/schema";
 import type { UserRow } from "./users.repo";
 import type { MembershipRow, TenantRow } from "../types/request";
 
@@ -181,19 +181,29 @@ export async function countActiveMembersGlobal(db: DbClient, since: Date): Promi
 }
 
 /** Counts used for billing a period: approved now, active within the period, newly created within the period. */
+/**
+ * Billing counts for a period. `fromDay`/`toDay` are calendar days in the billing time zone (inclusive); `from` and
+ * `toExclusive` are the matching instants.
+ * - active: distinct members with at least one activity day in the period
+ * - approved: members approved by the end of the period and not suspended or rejected by then
+ * - created: members first approved during the period
+ */
 export async function billingCountsForPeriod(
   db: DbClient,
   tenantId: string,
-  from: Date,
-  toExclusive: Date,
+  period: { fromDay: string; toDay: string; from: Date; toExclusive: Date },
 ): Promise<{ approved: number; active: number; created: number }> {
-  const [row] = await db
+  const { from, toExclusive } = period;
+  const [counts] = await db
     .select({
-      approved: sql<number>`count(*) filter (where ${memberships.status} = 'APPROVED')::int`,
-      active: sql<number>`count(*) filter (where ${memberships.status} = 'APPROVED' and ${memberships.lastActiveAt} >= ${from} and ${memberships.lastActiveAt} < ${toExclusive})::int`,
-      created: sql<number>`count(*) filter (where ${memberships.createdAt} >= ${from} and ${memberships.createdAt} < ${toExclusive})::int`,
+      approved: sql<number>`count(*) filter (where ${memberships.approvedAt} < ${toExclusive} and not (${memberships.status} in ('SUSPENDED', 'REJECTED') and ${memberships.statusChangedAt} < ${toExclusive}))::int`,
+      created: sql<number>`count(*) filter (where ${memberships.approvedAt} >= ${from} and ${memberships.approvedAt} < ${toExclusive})::int`,
     })
     .from(memberships)
     .where(eq(memberships.tenantId, tenantId));
-  return row ?? { approved: 0, active: 0, created: 0 };
+  const [active] = await db
+    .select({ active: sql<number>`count(distinct ${memberActivityDays.membershipId})::int` })
+    .from(memberActivityDays)
+    .where(and(eq(memberActivityDays.tenantId, tenantId), gte(memberActivityDays.day, period.fromDay), lte(memberActivityDays.day, period.toDay)));
+  return { approved: counts?.approved ?? 0, created: counts?.created ?? 0, active: active?.active ?? 0 };
 }

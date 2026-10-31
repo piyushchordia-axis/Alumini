@@ -15,7 +15,7 @@ export const auditLog = pgTable(
     targetId: uuid("target_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     ip: text("ip"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [index("audit_log_tenant_created_idx").on(t.tenantId, t.createdAt), index("audit_log_actor_created_idx").on(t.actorUserId, t.createdAt)],
 );

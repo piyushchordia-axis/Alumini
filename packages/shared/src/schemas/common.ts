@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COUNTRIES, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "../constants";
+import { isValidCalendarDate } from "../lib/time";
 
 export const uuidSchema = z.uuid();
 export const phoneE164Schema = z
@@ -22,7 +23,10 @@ export const httpUrlSchema = z
   .trim()
   .url()
   .refine((u) => /^https?:\/\//i.test(u), "URL must start with http:// or https://");
-export const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+export const dateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine(isValidCalendarDate, "Not a real date");
 export const isoDateTimeSchema = z.iso.datetime({ offset: true });
 
 export const cursorQuerySchema = z.object({

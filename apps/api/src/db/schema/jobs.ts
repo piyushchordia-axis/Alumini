@@ -22,7 +22,7 @@ export const jobs = pgTable(
     contactPhone: text("contact_phone"),
     salaryRange: text("salary_range"),
     isClosed: boolean("is_closed").notNull().default(false),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, precision: 3 }),
     ...moderationColumns(),
     ...timestamps(),
   },

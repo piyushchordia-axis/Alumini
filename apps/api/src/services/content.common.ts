@@ -1,7 +1,8 @@
-import type { ContentType, ModerationStatus } from "@illuminize/shared";
+import type { ContentType, MembershipStatus, ModerationStatus } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { AppError } from "../lib/errors";
 import type { AuthContext, MembershipRow, TenantContext } from "../types/request";
+import type { Viewer } from "../dto/content.dto";
 import { recordAudit } from "./audit.service";
 import { canViewContent, initialModerationStatus, statusAfterAuthorEdit } from "./moderation";
 import { notifyTenantAdmins } from "./notifications/notification.service";
@@ -17,8 +18,16 @@ export function viewerFlags(actor: ContentActor, authorMembershipId: string) {
   return { isAuthor, isAdmin };
 }
 
-export function assertCanView(actor: ContentActor, status: ModerationStatus, authorMembershipId: string, label: string): void {
-  if (!canViewContent(status, viewerFlags(actor, authorMembershipId))) {
+/** 404 unless the viewer may see the item: moderation rules, and suspended authors' content is hidden from members. */
+/** The viewer for DTO mapping (isMine, moderation note). */
+export function viewerOf(actor: ContentActor): Viewer {
+  return { membershipId: actor.membership.id, isAdmin: viewerFlags(actor, "").isAdmin };
+}
+
+export function assertCanView(actor: ContentActor, status: ModerationStatus, authorMembershipId: string, label: string, authorStatus?: MembershipStatus): void {
+  const flags = viewerFlags(actor, authorMembershipId);
+  const hiddenAuthor = authorStatus === "SUSPENDED" && !flags.isAuthor && !flags.isAdmin;
+  if (hiddenAuthor || !canViewContent(status, flags)) {
     throw AppError.notFound(`${label} not found`);
   }
 }

@@ -8,9 +8,12 @@ import type { ContentActor } from "../../../services/content.common";
 import type { Request } from "express";
 import { adminActor } from "../_actor";
 
-const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
-/** Admin reads of content need a membership for `isMine`; platform admins without one get a synthetic viewer. */
+/**
+ * Admin reads of content need a membership for `isMine`; platform admins without one get a synthetic viewer. The
+ * synthetic id is only ever used for comparisons, never written (see setPostPinnedState).
+ */
 function adminViewer(req: Request): ContentActor {
   const membership =
     req.membership ??

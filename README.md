@@ -70,14 +70,22 @@ Any other phone number registers as a brand-new member.
 ### Billing / chargeback (offline)
 
 Billing is settled outside the product. The platform console records a **plan** per institution (per active member,
-flat fee, or free; a new plan closes the previous one), computes **usage** for any period (approved, active and new
-members and the estimated amount) and freezes **snapshots** for invoicing. "Active" means the member used the app in
-the period (`last_active_at`, updated at most hourly).
+flat fee, or free, billed monthly, quarterly or yearly; a new plan closes the previous one, and plans can be edited or
+ended), computes **usage** for any period and freezes **snapshots** (with a note) for invoicing.
+
+- Periods are calendar days in `BILLING_TIMEZONE` (default `Asia/Kolkata`).
+- **Active** members used the app on at least one day of the period (`member_activity_days`, one row per member per
+  day). **Approved** counts members approved by the period end and not suspended by then; **new** counts members first
+  approved during the period. Re-running a past period gives the same numbers.
+- The estimate is the plan's per-cycle price prorated to the period: a calendar month on a quarterly plan is a third of
+  the fee, half of July is 15/31 of a monthly fee.
 
 ### Authentication
 
-Phone + 6-digit OTP. Codes are stored hashed in Redis with a 5-minute TTL, a 60-second resend cooldown, per-phone,
-per-IP and global rate limits, and a 15-minute lock after 5 wrong attempts. Successful verification issues a 15-minute
+Phone + 6-digit OTP. Codes are stored hashed in Redis with a 5-minute TTL, a 60-second resend cooldown and per-phone,
+per-IP and global rate limits. Each code allows 5 guesses (counted atomically before comparing) and is then discarded;
+a number whose codes are discarded 3 times in an hour is locked for 15 minutes, and an IP is throttled after 30 wrong
+guesses an hour. Someone guessing at your number costs you one code, not a lock-out. Successful verification issues a 15-minute
 JWT access token and a 30-day rotating refresh token; sessions live in Redis so logout and revocation are immediate.
 
 OTP delivery is pluggable (`OTP_PROVIDER`):
@@ -168,7 +176,11 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 
 - `apps/api/Dockerfile` builds a production image from the repo root (`docker build -f apps/api/Dockerfile .`); it runs
   pending migrations on start. Set `NODE_ENV=production`, strong `JWT_SECRET` and `OTP_PEPPER`, `PUBLIC_BASE_URL`,
-  `CORS_ORIGINS`, `PLATFORM_ADMIN_PHONES` and the OTP provider variables. Put Redis in persistent (AOF) mode.
+  `CORS_ORIGINS`, `PLATFORM_ADMIN_PHONES` and the OTP provider variables. Production refuses `OTP_PROVIDER=console`
+  (codes would only be logged) unless `OTP_ALLOW_CONSOLE_IN_PRODUCTION=true` for a throwaway demo. Put Redis in
+  persistent (AOF) mode.
+- `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) limits image uploads per institution per day; `BILLING_TIMEZONE` sets the
+  billing calendar.
 - Uploads are stored on local disk under `UPLOAD_DIR` and served from `/uploads`; `services/storage/StorageProvider.ts`
   is the seam for S3-compatible storage.
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
@@ -181,5 +193,6 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   worker. Push receipt checks currently run on a timer inside the API process.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be
   tested; the console sender covers development.
-- Postgres enum additions need hand-written `ALTER TYPE` migrations.
+- Postgres enum additions need hand-written `ALTER TYPE` migrations. Migration 0005 adds a trigger that stamps
+  `memberships.approved_at`.
 - Phone-number changes/merges are a manual platform-admin task.

@@ -2,13 +2,13 @@ import { idParamsSchema, notificationsQuerySchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../../context";
 import { toNotificationDto } from "../../dto/membership.dto";
-import { requireMember } from "../../middleware/tenant";
+import { requireAnyMembership } from "../../middleware/tenant";
 import { noContent, ok, route } from "../../middleware/validate";
 import { countUnread, listNotifications, markAllRead, markRead } from "../../repositories/notifications.repo";
 
 export function notificationRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
-  router.use("/notifications", requireMember);
+  router.use("/notifications", requireAnyMembership);
 
   router.get(
     "/notifications",

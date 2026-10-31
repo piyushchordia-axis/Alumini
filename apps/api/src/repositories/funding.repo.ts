@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
 import type { FundingListQuery } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { fundingListings, memberships } from "../db/schema";
@@ -20,7 +20,7 @@ export async function listFunding(
   if (q.mine) {
     conds.push(eq(fundingListings.authorMembershipId, viewerMembershipId));
   } else {
-    conds.push(eq(fundingListings.moderationStatus, "APPROVED"));
+    conds.push(eq(fundingListings.moderationStatus, "APPROVED"), ne(memberships.status, "SUSPENDED"));
     if (!q.includeClosed) conds.push(eq(fundingListings.isClosed, false));
   }
   if (q.kind) conds.push(eq(fundingListings.kind, q.kind));

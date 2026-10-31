@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AppError } from "../../src/lib/errors";
 import { keys } from "../../src/redis/keys";
-import { OTP_MAX_ATTEMPTS, OTP_MAX_PER_HOUR, requestOtp, verifyOtp } from "../../src/services/otp.service";
+import { OTP_MAX_ATTEMPTS, OTP_MAX_BURNED_CODES_PER_HOUR, OTP_MAX_PER_HOUR, OTP_MAX_WRONG_PER_IP_HOUR, requestOtp, verifyOtp } from "../../src/services/otp.service";
 import { createUnitContext } from "../helpers/unitContext";
 
 const PHONE = "+919876543210";
@@ -67,18 +67,57 @@ describe("otp.service", () => {
     await expect(verifyOtp(ctx, PHONE, code)).rejects.toMatchObject({ code: "OTP_EXPIRED" });
   });
 
-  it("rejects wrong codes with remaining attempts and locks after too many", async () => {
+  const wrongFor = (code: string) => (code === "000000" ? "111111" : "000000");
+
+  it("rejects wrong codes with remaining attempts, then discards the code", async () => {
     await requestOtp(ctx, PHONE, undefined);
     const code = ctx.otpCapture.codes.get(PHONE)!;
-    const wrong = code === "000000" ? "111111" : "000000";
+    const wrong = wrongFor(code);
     for (let i = 1; i < OTP_MAX_ATTEMPTS; i++) {
       const err = await verifyOtp(ctx, PHONE, wrong).catch((e: AppError) => e);
       expect(err).toMatchObject({ code: "OTP_INVALID", details: { attemptsLeft: OTP_MAX_ATTEMPTS - i } });
     }
-    await expect(verifyOtp(ctx, PHONE, wrong)).rejects.toMatchObject({ code: "OTP_LOCKED", status: 429 });
-    // locked: even the right code and new requests are refused
-    await expect(verifyOtp(ctx, PHONE, code)).rejects.toMatchObject({ code: "OTP_LOCKED" });
+    await expect(verifyOtp(ctx, PHONE, wrong)).rejects.toMatchObject({ code: "OTP_LOCKED", status: 429, details: { requestNewCode: true } });
+    // The code is gone, but the number is not locked: the owner can ask for a new one.
+    await expect(verifyOtp(ctx, PHONE, code)).rejects.toMatchObject({ code: "OTP_EXPIRED" });
+    await ctx.redis.del(keys.otpCooldown(PHONE));
+    await requestOtp(ctx, PHONE, undefined);
+    await expect(verifyOtp(ctx, PHONE, ctx.otpCapture.codes.get(PHONE)!)).resolves.toBe(PHONE);
+  });
+
+  it("locks the number after repeatedly discarded codes", async () => {
+    for (let round = 0; round < OTP_MAX_BURNED_CODES_PER_HOUR; round++) {
+      await ctx.redis.del(keys.otpCooldown(PHONE));
+      await requestOtp(ctx, PHONE, undefined);
+      const wrong = wrongFor(ctx.otpCapture.codes.get(PHONE)!);
+      for (let i = 0; i < OTP_MAX_ATTEMPTS; i++) await verifyOtp(ctx, PHONE, wrong).catch(() => undefined);
+    }
+    expect(await ctx.redis.ttl(keys.otpLock(PHONE))).toBeGreaterThan(0);
+    await ctx.redis.del(keys.otpCooldown(PHONE));
     await expect(requestOtp(ctx, PHONE, undefined)).rejects.toMatchObject({ code: "OTP_LOCKED" });
+  });
+
+  it("counts attempts before comparing, so a parallel burst cannot exceed the limit", async () => {
+    await requestOtp(ctx, PHONE, undefined);
+    const code = ctx.otpCapture.codes.get(PHONE)!;
+    const wrong = wrongFor(code);
+    // Ten wrong guesses race ahead of the right one; the right one arrives after the limit and must be refused.
+    const results = await Promise.allSettled([...Array.from({ length: 10 }, () => verifyOtp(ctx, PHONE, wrong)), verifyOtp(ctx, PHONE, code)]);
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+    expect(await ctx.redis.exists(keys.otp(PHONE))).toBe(0);
+  });
+
+  it("throttles an IP that keeps guessing across numbers", async () => {
+    for (let n = 0; n * OTP_MAX_ATTEMPTS < OTP_MAX_WRONG_PER_IP_HOUR; n++) {
+      const phone = `+91987654${String(3300 + n)}`;
+      await requestOtp(ctx, phone, undefined);
+      const wrong = wrongFor(ctx.otpCapture.codes.get(phone)!);
+      for (let i = 0; i < OTP_MAX_ATTEMPTS; i++) await verifyOtp(ctx, phone, wrong, "9.9.9.9").catch(() => undefined);
+    }
+    await requestOtp(ctx, PHONE, undefined);
+    await expect(verifyOtp(ctx, PHONE, ctx.otpCapture.codes.get(PHONE)!, "9.9.9.9")).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    // Other IPs are unaffected.
+    await expect(verifyOtp(ctx, PHONE, ctx.otpCapture.codes.get(PHONE)!, "8.8.8.8")).resolves.toBe(PHONE);
   });
 
   it("reports OTP_EXPIRED when nothing was requested", async () => {

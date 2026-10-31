@@ -23,7 +23,7 @@ export function authRoutes(ctx: AppContext): Router {
     "/auth/otp/verify",
     rateLimit(ctx, { bucket: "otp-verify-ip", limit: 60, windowSec: 900, keyFn: byIp }),
     route({ body: otpVerifySchema }, async ({ req, res, body }) => {
-      const phone = await verifyOtp(ctx, body.phone, body.code);
+      const phone = await verifyOtp(ctx, body.phone, body.code, req.ip);
       const session = await loginWithVerifiedPhone(ctx, phone, { ip: req.ip, userAgent: req.header("user-agent") });
       ok(res, session);
     }),

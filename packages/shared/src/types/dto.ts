@@ -438,12 +438,19 @@ export interface BillingSnapshotDto {
 }
 
 export interface BillingUsageDto {
+  /** Inclusive calendar days in `timeZone`. */
   periodStart: string;
   periodEnd: string;
+  timeZone: string;
+  /** Approved at the end of the period (and not suspended by then). */
   approvedMembers: number;
+  /** Distinct members who used the app on at least one day of the period. */
   activeMembers: number;
+  /** Members first approved during the period. */
   newMembers: number;
   plan: BillingPlanDto | null;
+  /** Share of the plan's billing cycle the period covers (1 = one full cycle); the estimate is prorated by it. */
+  cycleFraction: number;
   estimatedAmountMinor: number;
   currency: string;
 }

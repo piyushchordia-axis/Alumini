@@ -4,8 +4,8 @@ import { tenants } from "./tenants";
 import { users } from "./users";
 
 export const timestamps = () => ({
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 });
 
 export const tenantScoped = () => ({
@@ -17,6 +17,6 @@ export const tenantScoped = () => ({
 export const moderationColumns = () => ({
   moderationStatus: moderationStatusEnum("moderation_status").notNull(),
   moderatedByUserId: uuid("moderated_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  moderatedAt: timestamp("moderated_at", { withTimezone: true }),
+  moderatedAt: timestamp("moderated_at", { withTimezone: true, precision: 3 }),
   moderationNote: text("moderation_note"),
 });

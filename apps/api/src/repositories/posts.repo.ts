@@ -28,7 +28,8 @@ export async function listPosts(
 ): Promise<CursorPage<PostWithAuthor>> {
   const conds: SQL[] = [eq(posts.tenantId, tenantId)];
   if (q.mine) conds.push(eq(posts.authorMembershipId, viewerMembershipId));
-  else conds.push(eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, false));
+  // Suspended members' posts disappear from the feed until they are reinstated.
+  else conds.push(eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, false), ne(memberships.status, "SUSPENDED"));
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(posts.createdAt, posts.id, cursor, "desc");
   if (keyset) conds.push(keyset);
@@ -47,7 +48,7 @@ export async function listPinnedPosts(db: DbClient, tenantId: string, viewerMemb
     .select(postSelect(viewerMembershipId))
     .from(posts)
     .innerJoin(memberships, eq(memberships.id, posts.authorMembershipId))
-    .where(and(eq(posts.tenantId, tenantId), eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, true)))
+    .where(and(eq(posts.tenantId, tenantId), eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, true), ne(memberships.status, "SUSPENDED")))
     .orderBy(desc(posts.updatedAt))
     .limit(5);
 }
@@ -122,7 +123,7 @@ export async function listComments(
   includeRemoved = false,
 ): Promise<CursorPage<{ comment: CommentRow; author: MembershipRow }>> {
   const conds: SQL[] = [eq(postComments.tenantId, tenantId), eq(postComments.postId, postId)];
-  if (!includeRemoved) conds.push(ne(postComments.moderationStatus, "REMOVED"));
+  if (!includeRemoved) conds.push(ne(postComments.moderationStatus, "REMOVED"), ne(memberships.status, "SUSPENDED"));
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(postComments.createdAt, postComments.id, cursor, "asc");
   if (keyset) conds.push(keyset);

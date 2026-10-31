@@ -33,16 +33,16 @@ import {
   upsertReaction,
 } from "../repositories/posts.repo";
 import type { TenantContext } from "../types/request";
-import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, viewerFlags, type ContentActor } from "./content.common";
+import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerFlags, viewerOf } from "./content.common";
 import { notify } from "./notifications/notification.service";
 
 export async function listTenantPosts(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: PostListQuery): Promise<PostPageDto> {
   const tenantId = tenantCtx.tenant.id;
   const page = await listPosts(ctx.db, tenantId, query, actor.membership.id);
-  const result: PostPageDto = { data: page.data.map((r) => toPostDto(r, actor.membership.id)), nextCursor: page.nextCursor };
+  const result: PostPageDto = { data: page.data.map((r) => toPostDto(r, viewerOf(actor))), nextCursor: page.nextCursor };
   if (!query.cursor && !query.mine) {
     const pinned = await listPinnedPosts(ctx.db, tenantId, actor.membership.id);
-    result.pinned = pinned.map((r) => toPostDto(r, actor.membership.id));
+    result.pinned = pinned.map((r) => toPostDto(r, viewerOf(actor)));
   }
   return result;
 }
@@ -58,7 +58,7 @@ export async function createPost(ctx: AppContext, tenantCtx: TenantContext, acto
     moderatedAt: status === "APPROVED" ? new Date() : null,
   });
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "POST", id: row.id, title: row.body, status, action: "create" });
-  return toPostDto({ post: row, author: actor.membership, myReaction: null }, actor.membership.id);
+  return toPostDto({ post: row, author: actor.membership, myReaction: null }, viewerOf(actor));
 }
 
 async function loadPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string) {
@@ -69,12 +69,12 @@ async function loadPost(ctx: AppContext, tenantCtx: TenantContext, actor: Conten
 
 export async function getPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<PostDto> {
   const found = await loadPost(ctx, tenantCtx, actor, id);
-  assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post");
-  return toPostDto(found, actor.membership.id);
+  assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post", found.author.status);
+  return toPostDto(found, viewerOf(actor));
 }
 
 export async function getPostForAdmin(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<PostDto> {
-  return toPostDto(await loadPost(ctx, tenantCtx, actor, id), actor.membership.id);
+  return toPostDto(await loadPost(ctx, tenantCtx, actor, id), viewerOf(actor));
 }
 
 export async function updatePostBody(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, input: PostUpdateInput): Promise<PostDto> {
@@ -88,7 +88,7 @@ export async function updatePostBody(ctx: AppContext, tenantCtx: TenantContext, 
     moderationNote: status === found.post.moderationStatus ? found.post.moderationNote : null,
   }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "POST", id, title: row.body, status, action: "update" });
-  return toPostDto({ post: row, author: found.author, myReaction: found.myReaction }, actor.membership.id);
+  return toPostDto({ post: row, author: found.author, myReaction: found.myReaction }, viewerOf(actor));
 }
 
 export async function removePost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<void> {
@@ -102,7 +102,7 @@ export async function removePost(ctx: AppContext, tenantCtx: TenantContext, acto
 
 async function loadVisiblePost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, postId: string) {
   const found = await loadPost(ctx, tenantCtx, actor, postId);
-  assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post");
+  assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post", found.author.status);
   return found;
 }
 

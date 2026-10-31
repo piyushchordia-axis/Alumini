@@ -7,19 +7,13 @@ import { billingCountsForPeriod } from "../repositories/memberships.repo";
 import { findTenantById } from "../repositories/tenants.repo";
 import type { AuthContext } from "../types/request";
 import { recordAudit } from "./audit.service";
+import { billingPeriod, currentMonth, cycleFraction, todayIn } from "./billing.periods";
 
 interface PlatformActor extends AuthContext {
   ip?: string;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
-function monthBounds(): { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
-}
+const today = (ctx: AppContext) => todayIn(ctx.config.BILLING_TIMEZONE);
 
 async function assertTenant(ctx: AppContext, tenantId: string) {
   const tenant = await findTenantById(ctx.db, tenantId);
@@ -29,7 +23,7 @@ async function assertTenant(ctx: AppContext, tenantId: string) {
 
 export async function getTenantBilling(ctx: AppContext, tenantId: string): Promise<{ currentPlan: BillingPlanDto | null; plans: BillingPlanDto[]; snapshots: BillingSnapshotDto[] }> {
   await assertTenant(ctx, tenantId);
-  const [current, plans, snapshots] = await Promise.all([findPlanEffectiveOn(ctx.db, tenantId, today()), listPlans(ctx.db, tenantId), listSnapshots(ctx.db, tenantId)]);
+  const [current, plans, snapshots] = await Promise.all([findPlanEffectiveOn(ctx.db, tenantId, today(ctx)), listPlans(ctx.db, tenantId), listSnapshots(ctx.db, tenantId)]);
   return { currentPlan: current ? toBillingPlanDto(current) : null, plans: plans.map(toBillingPlanDto), snapshots: snapshots.map(toBillingSnapshotDto) };
 }
 
@@ -70,7 +64,11 @@ export async function createBillingPlan(ctx: AppContext, actor: PlatformActor, t
 export async function updateBillingPlan(ctx: AppContext, actor: PlatformActor, planId: string, input: BillingPlanUpdateInput): Promise<BillingPlanDto> {
   const plan = await findPlanById(ctx.db, planId);
   if (!plan) throw AppError.notFound("Billing plan not found");
-  if (input.effectiveTo && input.effectiveTo < plan.effectiveFrom) throw AppError.badRequest("effectiveTo must be on or after effectiveFrom");
+  if (input.effectiveTo && input.effectiveTo < plan.effectiveFrom) throw AppError.badRequest("effectiveTo must be on or after effectiveFrom", [{ path: "effectiveTo", message: "Must be on or after the start date" }]);
+  // A partial update must leave the plan consistent with its model (a per-user plan needs its price).
+  const merged = { ...plan, ...input };
+  if (plan.billingModel === "PER_ACTIVE_USER" && merged.pricePerActiveUserMinor == null) throw AppError.badRequest("A per-active-user plan needs a price per user", [{ path: "pricePerActiveUserMinor", message: "Required for this plan" }]);
+  if (plan.billingModel === "FLAT_FEE" && merged.flatFeeMinor == null) throw AppError.badRequest("A flat-fee plan needs a fee", [{ path: "flatFeeMinor", message: "Required for this plan" }]);
   const row = (await updatePlan(ctx.db, planId, {
     ...(input.billingCycle !== undefined ? { billingCycle: input.billingCycle } : {}),
     ...(input.currency !== undefined ? { currency: input.currency } : {}),
@@ -91,36 +89,43 @@ export async function updateBillingPlan(ctx: AppContext, actor: PlatformActor, p
   return toBillingPlanDto(row);
 }
 
-function estimateAmount(plan: BillingPlanDto | null, activeMembers: number): number {
+/** Estimated charge for the period: the plan's per-cycle price, prorated to the period's length. */
+function estimateAmount(plan: BillingPlanDto | null, activeMembers: number, fraction: number): number {
   if (!plan) return 0;
   switch (plan.billingModel) {
     case "PER_ACTIVE_USER":
-      return (plan.pricePerActiveUserMinor ?? 0) * activeMembers;
+      return Math.round((plan.pricePerActiveUserMinor ?? 0) * activeMembers * fraction);
     case "FLAT_FEE":
-      return plan.flatFeeMinor ?? 0;
+      return Math.round((plan.flatFeeMinor ?? 0) * fraction);
     case "FREE":
       return 0;
   }
 }
 
+/**
+ * Usage for a period of calendar days in the billing time zone (default: the current month). Counts are as of the
+ * period end, so re-running a past period later gives the same numbers.
+ */
 export async function computeUsage(ctx: AppContext, tenantId: string, query: BillingUsageQuery): Promise<BillingUsageDto> {
   await assertTenant(ctx, tenantId);
-  const bounds = monthBounds();
-  const periodStart = query.from ?? bounds.from;
-  const periodEnd = query.to ?? bounds.to;
-  const from = new Date(`${periodStart}T00:00:00.000Z`);
-  const toExclusive = new Date(`${periodEnd}T00:00:00.000Z`);
-  toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
-  const [counts, planRow] = await Promise.all([billingCountsForPeriod(ctx.db, tenantId, from, toExclusive), findPlanEffectiveOn(ctx.db, tenantId, periodEnd)]);
+  const timeZone = ctx.config.BILLING_TIMEZONE;
+  const month = currentMonth(timeZone);
+  const periodStart = query.from ?? month.fromDay;
+  const periodEnd = query.to ?? month.toDay;
+  const period = billingPeriod(periodStart, periodEnd, timeZone);
+  const [counts, planRow] = await Promise.all([billingCountsForPeriod(ctx.db, tenantId, period), findPlanEffectiveOn(ctx.db, tenantId, periodEnd)]);
   const plan = planRow ? toBillingPlanDto(planRow) : null;
+  const fraction = plan ? cycleFraction(periodStart, periodEnd, plan.billingCycle) : 1;
   return {
     periodStart,
     periodEnd,
+    timeZone,
     approvedMembers: counts.approved,
     activeMembers: counts.active,
     newMembers: counts.created,
     plan,
-    estimatedAmountMinor: estimateAmount(plan, counts.active),
+    cycleFraction: Math.round(fraction * 10_000) / 10_000,
+    estimatedAmountMinor: estimateAmount(plan, counts.active, fraction),
     currency: plan?.currency ?? "INR",
   };
 }

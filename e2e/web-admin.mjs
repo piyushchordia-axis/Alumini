@@ -129,6 +129,16 @@ try {
     await page.waitForSelector("text=Billing plan recorded");
     await page.waitForSelector("text=Per active user · ₹50 per active member");
     await page.waitForSelector("text=Estimated amount");
+    await page.waitForSelector("text=/calendar days in Asia\\/Kolkata/");
+    // Edit the plan's price and notes; the cycle and currency stay as they were.
+    await page.click('li:has-text("Per active user") >> button:has-text("Edit")');
+    const dialog = page.locator('[role="dialog"]');
+    await dialog.locator('input[type="number"]').fill("60");
+    await dialog.locator("textarea").fill("Renewed for the academic year");
+    await dialog.locator('button:has-text("Save")').click();
+    await page.waitForSelector("text=Plan updated");
+    await page.waitForSelector("text=Per active user · ₹60 per active member");
+    await page.waitForSelector("text=Renewed for the academic year");
     await shot("p03-billing");
   });
 

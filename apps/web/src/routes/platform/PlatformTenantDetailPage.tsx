@@ -1,11 +1,11 @@
-import { BILLING_CYCLES, BILLING_MODELS, BILLING_MODEL_LABELS, type BillingModel, type BillingPlanCreateInput, type TenantStatus } from "@illuminize/shared";
+import { BILLING_CYCLES, BILLING_MODELS, BILLING_MODEL_LABELS, type BillingModel, type BillingPlanCreateInput, type BillingPlanDto, type BillingPlanUpdateInput, type TenantStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
-import { Avatar, Badge, Button, Card, ErrorBox, FormField, Input, Loading, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -178,12 +178,108 @@ function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: A
   );
 }
 
+/** Billing periods are calendar days in the platform's billing time zone (India unless configured otherwise). */
+const BILLING_ZONE = "Asia/Kolkata";
+
+function currentMonthIn(timeZone: string): { start: string; end: string; today: string } {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [y, m] = today.split("-").map(Number) as [number, number];
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, "0");
+  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}`, today };
+}
+
+/** Edit an existing plan's price, cycle, currency or notes, or end it on a date. Only changed fields are sent. */
+function PlanEditModal({ plan, mode, onClose, onSaved }: { plan: BillingPlanDto; mode: "edit" | "end"; onClose: () => void; onSaved: () => void }) {
+  const [cycle, setCycle] = useState(plan.billingCycle);
+  const [currency, setCurrency] = useState(plan.currency);
+  const [price, setPrice] = useState(plan.pricePerActiveUserMinor != null ? String(plan.pricePerActiveUserMinor / 100) : "");
+  const [flat, setFlat] = useState(plan.flatFeeMinor != null ? String(plan.flatFeeMinor / 100) : "");
+  const [notes, setNotes] = useState(plan.notes ?? "");
+  const [endOn, setEndOn] = useState(plan.effectiveTo ?? currentMonthIn(BILLING_ZONE).today);
+  const save = useMutation({
+    mutationFn: () => {
+      const input: BillingPlanUpdateInput = {};
+      if (mode === "end") input.effectiveTo = endOn;
+      else {
+        if (cycle !== plan.billingCycle) input.billingCycle = cycle;
+        if (currency !== plan.currency) input.currency = currency;
+        if (plan.billingModel === "PER_ACTIVE_USER") input.pricePerActiveUserMinor = Math.round(Number(price) * 100);
+        if (plan.billingModel === "FLAT_FEE") input.flatFeeMinor = Math.round(Number(flat) * 100);
+        if (notes !== (plan.notes ?? "")) input.notes = notes || null;
+      }
+      return api.platform.billing.updatePlan(plan.id, input);
+    },
+    onSuccess: () => {
+      onSaved();
+      toast.success(mode === "end" ? "Plan end date saved" : "Plan updated");
+      onClose();
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={mode === "end" ? "End this plan" : "Edit plan"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => save.mutate()} loading={save.isPending}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      {mode === "end" ? (
+        <FormField label="Last day of the plan" hint={`Usage after this day has no plan unless a new one starts. Started ${formatDate(plan.effectiveFrom)}.`}>
+          <Input type="date" min={plan.effectiveFrom} value={endOn} onChange={(e) => setEndOn(e.target.value)} />
+        </FormField>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="Cycle">
+            <Select value={cycle} onChange={(e) => setCycle(e.target.value as (typeof BILLING_CYCLES)[number])}>
+              {BILLING_CYCLES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Currency">
+            <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              {["INR", "USD", "EUR", "GBP", "AED", "SGD"].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </FormField>
+          {plan.billingModel === "PER_ACTIVE_USER" && (
+            <FormField label="Price per active member" required>
+              <Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </FormField>
+          )}
+          {plan.billingModel === "FLAT_FEE" && (
+            <FormField label="Flat fee per cycle" required>
+              <Input type="number" min={0} step="0.01" value={flat} onChange={(e) => setFlat(e.target.value)} />
+            </FormField>
+          )}
+          <div className="sm:col-span-2">
+            <FormField label="Notes">
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            </FormField>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function BillingTab({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const billing = useQuery({ queryKey: qk.platform.billing(tenantId), queryFn: () => api.platform.billing.get(tenantId) });
-  const today = new Date();
-  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)).toISOString().slice(0, 10);
-  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+  const { start: monthStart, end: monthEnd } = currentMonthIn(BILLING_ZONE);
+  const [editing, setEditing] = useState<{ plan: BillingPlanDto; mode: "edit" | "end" } | null>(null);
+  const [snapshotNotes, setSnapshotNotes] = useState("");
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(monthEnd);
   const usage = useQuery({ queryKey: qk.platform.usage(tenantId, { from, to }), queryFn: () => api.platform.billing.usage(tenantId, { from, to }), enabled: !!from && !!to && from <= to });
@@ -217,8 +313,9 @@ function BillingTab({ tenantId }: { tenantId: string }) {
     onError: (e) => toast.error(errorMessage(e)),
   });
   const snapshot = useMutation({
-    mutationFn: () => api.platform.billing.createSnapshot(tenantId, { periodStart: from, periodEnd: to, notes: null }),
+    mutationFn: () => api.platform.billing.createSnapshot(tenantId, { periodStart: from, periodEnd: to, notes: snapshotNotes.trim() || null }),
     onSuccess: () => {
+      setSnapshotNotes("");
       refresh();
       toast.success("Snapshot saved for invoicing");
     },
@@ -252,17 +349,27 @@ function BillingTab({ tenantId }: { tenantId: string }) {
           <FormField label="To">
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </FormField>
+          <FormField label="Snapshot note">
+            <Input value={snapshotNotes} onChange={(e) => setSnapshotNotes(e.target.value)} placeholder="Invoice #, PO…" maxLength={1000} />
+          </FormField>
           <Button variant="outline" onClick={() => snapshot.mutate()} loading={snapshot.isPending} disabled={!usage.data}>
             Freeze snapshot for invoice
           </Button>
         </div>
         {usage.data && (
-          <div className="mt-4 grid gap-3 sm:grid-cols-4">
-            <Stat label="Approved members" value={usage.data.approvedMembers} />
-            <Stat label="Active in period" value={usage.data.activeMembers} />
-            <Stat label="New in period" value={usage.data.newMembers} />
-            <Stat label="Estimated amount" value={formatMoneyMinor(usage.data.estimatedAmountMinor, usage.data.currency)} hint={usage.data.plan ? BILLING_MODEL_LABELS[usage.data.plan.billingModel] : "no plan"} />
-          </div>
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              <Stat label="Approved at period end" value={usage.data.approvedMembers} />
+              <Stat label="Active in period" value={usage.data.activeMembers} hint="Used the app on at least one day" />
+              <Stat label="New in period" value={usage.data.newMembers} hint="First approved in the period" />
+              <Stat
+                label="Estimated amount"
+                value={formatMoneyMinor(usage.data.estimatedAmountMinor, usage.data.currency)}
+                hint={usage.data.plan ? `${BILLING_MODEL_LABELS[usage.data.plan.billingModel]} · ${usage.data.cycleFraction === 1 ? "one full" : `${usage.data.cycleFraction} of a`} ${usage.data.plan.billingCycle.toLowerCase()} cycle` : "no plan"}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Days are calendar days in {usage.data.timeZone}. The estimate is prorated when the period is not exactly one billing cycle.</p>
+          </>
         )}
       </Card>
 
@@ -335,9 +442,18 @@ function BillingTab({ tenantId }: { tenantId: string }) {
                 {p.pricePerActiveUserMinor != null && ` · ${formatMoneyMinor(p.pricePerActiveUserMinor, p.currency)}/active member`}
                 {p.flatFeeMinor != null && ` · ${formatMoneyMinor(p.flatFeeMinor, p.currency)}`}
               </span>
-              <span className="text-slate-500">
+              <span className="flex items-center gap-3 text-slate-500">
                 {formatDate(p.effectiveFrom)} → {p.effectiveTo ? formatDate(p.effectiveTo) : "open"}
+                <Button size="sm" variant="ghost" onClick={() => setEditing({ plan: p, mode: "edit" })}>
+                  Edit
+                </Button>
+                {!p.effectiveTo && (
+                  <Button size="sm" variant="ghost" onClick={() => setEditing({ plan: p, mode: "end" })}>
+                    End
+                  </Button>
+                )}
               </span>
+              {p.notes && <span className="w-full text-xs text-slate-500">{p.notes}</span>}
             </li>
           ))}
           {b.plans.length === 0 && <li className="py-2 text-slate-400">No plans yet.</li>}
@@ -353,11 +469,13 @@ function BillingTab({ tenantId }: { tenantId: string }) {
                 {formatDate(s.periodStart)} – {formatDate(s.periodEnd)} · {s.activeMemberCount} active · {s.approvedMemberCount} approved
               </span>
               <span className="font-medium text-slate-900">{formatMoneyMinor(s.amountMinor, s.currency)}</span>
+              {s.notes && <span className="w-full text-xs text-slate-500">{s.notes}</span>}
             </li>
           ))}
           {b.snapshots.length === 0 && <li className="py-2 text-slate-400">No snapshots yet.</li>}
         </ul>
       </Card>
+      {editing && <PlanEditModal plan={editing.plan} mode={editing.mode} onClose={() => setEditing(null)} onSaved={refresh} />}
     </div>
   );
 }

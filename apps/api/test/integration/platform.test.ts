@@ -1,7 +1,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { memberships } from "../../src/db/schema";
+import { memberActivityDays, memberships } from "../../src/db/schema";
 import { PROFILE, auth, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -98,7 +98,6 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
 
   it("records billing plans, computes usage and freezes snapshots", async () => {
     const { tenant } = await createTenant(ctx);
-    for (let i = 0; i < 3; i++) await memberSession(ctx, tenant.id); // active today (touchActivity via login? no — memberSession hits no tenant route)
     const base = `/api/v1/platform/tenants/${tenant.id}/billing`;
 
     const bad = await api().post(`${base}/plans`).set(H).send({ billingModel: "PER_ACTIVE_USER", effectiveFrom: "2026-01-01" });
@@ -112,23 +111,71 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
     expect(billing.body.data.currentPlan.id).toBe(p2.body.data.id);
     expect(billing.body.data.plans.find((p: { id: string }) => p.id === p1.body.data.id).effectiveTo).toBe("2026-05-31");
 
-    // make members "active" inside a period by touching a tenant route
-    const member = await memberSession(ctx, tenant.id);
-    await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(member.headers);
-    const today = new Date().toISOString().slice(0, 10);
-    const usage = await api().get(`${base}/usage?from=${today}&to=${today}`).set(H);
-    expect(usage.status).toBe(200);
-    expect(usage.body.data).toMatchObject({ approvedMembers: 4, activeMembers: 1, plan: { id: p2.body.data.id }, estimatedAmountMinor: 5000, currency: "INR" });
-    expect((await api().get(`${base}/usage?from=2026-01-10&to=2026-01-09`).set(H)).status).toBe(400);
+    // Four members approved in January; activity recorded on specific (India) calendar days.
+    const [a, b, c, d] = await Promise.all([0, 1, 2, 3].map(() => memberSession(ctx, tenant.id)));
+    await ctx.db.update(memberships).set({ approvedAt: new Date("2026-01-01T00:00:00Z") }).where(eq(memberships.tenantId, tenant.id));
+    await ctx.db.insert(memberActivityDays).values([
+      { tenantId: tenant.id, membershipId: a!.membership.id, day: "2026-07-03" },
+      { tenantId: tenant.id, membershipId: a!.membership.id, day: "2026-07-20" },
+      { tenantId: tenant.id, membershipId: b!.membership.id, day: "2026-06-30" },
+      { tenantId: tenant.id, membershipId: c!.membership.id, day: "2026-07-31" },
+    ]);
+    // d was suspended in June (not billable in July); a fifth member joined in August.
+    await ctx.db.update(memberships).set({ status: "SUSPENDED", statusChangedAt: new Date("2026-06-15T00:00:00Z") }).where(eq(memberships.id, d!.membership.id));
+    const late = await memberSession(ctx, tenant.id);
+    await ctx.db.update(memberships).set({ approvedAt: new Date("2026-08-05T00:00:00Z") }).where(eq(memberships.id, late.membership.id));
 
-    const snap = await api().post(`${base}/snapshots`).set(H).send({ periodStart: today, periodEnd: today, notes: "Invoice #1" });
+    const july = await api().get(`${base}/usage?from=2026-07-01&to=2026-07-31`).set(H);
+    expect(july.status).toBe(200);
+    expect(july.body.data).toMatchObject({ timeZone: "Asia/Kolkata", approvedMembers: 3, activeMembers: 2, newMembers: 0, cycleFraction: 1, estimatedAmountMinor: 10000, plan: { id: p2.body.data.id } });
+
+    // Half a month is billed as half a cycle.
+    const firstHalf = await api().get(`${base}/usage?from=2026-07-01&to=2026-07-15`).set(H);
+    expect(firstHalf.body.data).toMatchObject({ activeMembers: 1, estimatedAmountMinor: Math.round(5000 * (15 / 31)) });
+    expect((await api().get(`${base}/usage?from=2026-01-10&to=2026-01-09`).set(H)).status).toBe(400);
+    expect((await api().get(`${base}/usage?from=2026-02-30&to=2026-03-01`).set(H)).status).toBe(400);
+
+    // August: the late joiner is new; nobody was active.
+    const august = await api().get(`${base}/usage?from=2026-08-01&to=2026-08-31`).set(H);
+    expect(august.body.data).toMatchObject({ approvedMembers: 4, newMembers: 1, activeMembers: 0, estimatedAmountMinor: 0 });
+
+    const snap = await api().post(`${base}/snapshots`).set(H).send({ periodStart: "2026-07-01", periodEnd: "2026-07-31", notes: "Invoice #1" });
     expect(snap.status).toBe(201);
-    expect(snap.body.data).toMatchObject({ amountMinor: 5000, activeMemberCount: 1, billingPlanId: p2.body.data.id });
-    expect((await api().post(`${base}/snapshots`).set(H).send({ periodStart: today, periodEnd: today })).status).toBe(409);
+    expect(snap.body.data).toMatchObject({ amountMinor: 10000, activeMemberCount: 2, approvedMemberCount: 3, billingPlanId: p2.body.data.id, notes: "Invoice #1" });
+    expect((await api().post(`${base}/snapshots`).set(H).send({ periodStart: "2026-07-01", periodEnd: "2026-07-31" })).status).toBe(409);
 
     const upd = await api().patch(`/api/v1/platform/billing/plans/${p2.body.data.id}`).set(H).send({ pricePerActiveUserMinor: 6000, notes: "Renegotiated" });
     expect(upd.body.data).toMatchObject({ pricePerActiveUserMinor: 6000, notes: "Renegotiated" });
+    expect((await api().patch(`/api/v1/platform/billing/plans/${p2.body.data.id}`).set(H).send({ pricePerActiveUserMinor: null })).status).toBe(400);
     expect((await api().get(base).set(H)).body.data.snapshots).toHaveLength(1);
+  });
+
+  it("editing one field of a plan leaves the others alone, and quarterly plans are prorated", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/platform/tenants/${tenant.id}/billing`;
+    const plan = await api().post(`${base}/plans`).set(H).send({ billingModel: "FLAT_FEE", flatFeeMinor: 300000, billingCycle: "QUARTERLY", currency: "USD", effectiveFrom: "2026-01-01" });
+    expect(plan.status).toBe(201);
+    const upd = await api().patch(`/api/v1/platform/billing/plans/${plan.body.data.id}`).set(H).send({ notes: "Paid by wire" });
+    expect(upd.body.data).toMatchObject({ billingCycle: "QUARTERLY", currency: "USD", flatFeeMinor: 300000, notes: "Paid by wire" });
+
+    const month = await api().get(`${base}/usage?from=2026-04-01&to=2026-04-30`).set(H);
+    expect(month.body.data).toMatchObject({ cycleFraction: 0.3333, estimatedAmountMinor: 100000, currency: "USD" });
+    const quarter = await api().get(`${base}/usage?from=2026-04-01&to=2026-06-30`).set(H);
+    expect(quarter.body.data).toMatchObject({ cycleFraction: 1, estimatedAmountMinor: 300000 });
+
+    // Ending a plan: effectiveTo can be set, not before it started.
+    expect((await api().patch(`/api/v1/platform/billing/plans/${plan.body.data.id}`).set(H).send({ effectiveTo: "2025-12-31" })).status).toBe(400);
+    const ended = await api().patch(`/api/v1/platform/billing/plans/${plan.body.data.id}`).set(H).send({ effectiveTo: "2026-06-30" });
+    expect(ended.body.data.effectiveTo).toBe("2026-06-30");
+  });
+
+  it("records a member's activity day in the billing time zone", async () => {
+    const { tenant } = await createTenant(ctx);
+    const member = await memberSession(ctx, tenant.id);
+    await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(member.headers);
+    const rows = await ctx.db.select().from(memberActivityDays).where(eq(memberActivityDays.membershipId, member.membership.id));
+    const todayInIndia = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    expect(rows.map((r) => r.day)).toEqual([todayInIndia]);
   });
 
   it("reports platform stats, searches users and toggles platform admins", async () => {

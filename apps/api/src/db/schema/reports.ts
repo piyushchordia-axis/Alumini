@@ -18,9 +18,9 @@ export const contentReports = pgTable(
     details: text("details"),
     status: reportStatusEnum("status").notNull().default("OPEN"),
     resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, precision: 3 }),
     resolutionNote: text("resolution_note"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("content_reports_unique_reporter_uq").on(t.tenantId, t.contentType, t.contentId, t.reporterMembershipId),

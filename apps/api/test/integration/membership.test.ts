@@ -58,9 +58,11 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(reg.body.data.status).toBe("PENDING");
     const membershipId = reg.body.data.id as string;
 
-    const blocked = await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(auth(session.accessToken));
+    // Member areas stay closed while pending; their own notifications stay readable.
+    const blocked = await api().get(`/api/v1/t/${tenant.slug}/posts`).set(auth(session.accessToken));
     expect(blocked.status).toBe(403);
     expect(blocked.body.error.code).toBe("MEMBERSHIP_PENDING");
+    expect((await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(auth(session.accessToken))).status).toBe(200);
 
     const adminNotifs = await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(admin.headers);
     expect(adminNotifs.body.data[0]).toMatchObject({ type: "NEW_MEMBER_PENDING", data: { membershipId } });
@@ -107,8 +109,11 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     const reject = await api().post(`${base}/admin/members/${id}/reject`).set(admin.headers).send({ reason: "Batch could not be verified" });
     expect(reject.body.data).toMatchObject({ status: "REJECTED", statusReason: "Batch could not be verified" });
 
-    const blocked = await api().get(`${base}/notifications`).set(auth(session.accessToken));
+    const blocked = await api().get(`${base}/posts`).set(auth(session.accessToken));
     expect(blocked.body.error).toMatchObject({ code: "MEMBERSHIP_REJECTED", details: { statusReason: "Batch could not be verified" } });
+    // The rejection, with its reason, is waiting in their notifications.
+    const own = await api().get(`${base}/notifications`).set(auth(session.accessToken));
+    expect(own.body.data[0]).toMatchObject({ type: "MEMBERSHIP_REJECTED" });
 
     const reapply = await api().post(`${base}/memberships`).set(auth(session.accessToken)).send({ ...PROFILE, batchYear: 2013 });
     expect(reapply.status).toBe(201);
@@ -117,12 +122,14 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     await api().post(`${base}/admin/members/${id}/approve`).set(admin.headers);
     const suspend = await api().post(`${base}/admin/members/${id}/suspend`).set(admin.headers).send({ reason: "Spam" });
     expect(suspend.body.data.status).toBe("SUSPENDED");
-    const suspended = await api().get(`${base}/notifications`).set(auth(session.accessToken));
+    const suspended = await api().get(`${base}/posts`).set(auth(session.accessToken));
     expect(suspended.body.error.code).toBe("MEMBERSHIP_SUSPENDED");
+    const notice = await api().get(`${base}/notifications`).set(auth(session.accessToken));
+    expect(notice.body.data[0]).toMatchObject({ type: "MEMBERSHIP_SUSPENDED" });
 
     const reinstate = await api().post(`${base}/admin/members/${id}/reinstate`).set(admin.headers);
     expect(reinstate.body.data.status).toBe("APPROVED");
-    expect((await api().get(`${base}/notifications`).set(auth(session.accessToken))).status).toBe(200);
+    expect((await api().get(`${base}/posts`).set(auth(session.accessToken))).status).toBe(200);
   });
 
   it("bulk-approves pending members", async () => {

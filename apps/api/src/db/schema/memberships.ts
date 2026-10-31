@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -28,7 +29,7 @@ export const memberships = pgTable(
     role: membershipRoleEnum("role").notNull().default("MEMBER"),
     status: membershipStatusEnum("status").notNull().default("PENDING"),
     statusReason: text("status_reason"),
-    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true, precision: 3 }),
     statusChangedByUserId: uuid("status_changed_by_user_id").references(() => users.id, { onDelete: "set null" }),
 
     fullName: text("full_name").notNull(),
@@ -50,7 +51,9 @@ export const memberships = pgTable(
     avatarUrl: text("avatar_url"),
     isPhoneVisible: boolean("is_phone_visible").notNull().default(false),
     extra: jsonb("extra").$type<Record<string, unknown>>().notNull().default({}),
-    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true, precision: 3 }),
+    /** First time the membership was approved; billing counts "approved as of" and "new in period" from it. */
+    approvedAt: timestamp("approved_at", { withTimezone: true, precision: 3 }),
     ...timestamps(),
   },
   (t) => [
@@ -63,5 +66,22 @@ export const memberships = pgTable(
     index("memberships_tenant_role_idx").on(t.tenantId, t.role),
     index("memberships_tenant_active_idx").on(t.tenantId, t.lastActiveAt),
     index("memberships_user_idx").on(t.userId),
+    index("memberships_tenant_approved_idx").on(t.tenantId, t.approvedAt),
   ],
+);
+
+/**
+ * One row per member per day they used the app (day in the billing time zone, BILLING_TIMEZONE). Billing counts
+ * distinct active members for any period from this, which `last_active_at` alone cannot do for past periods.
+ */
+export const memberActivityDays = pgTable(
+  "member_activity_days",
+  {
+    tenantId: uuid("tenant_id").notNull(),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.membershipId, t.day] }), index("member_activity_days_tenant_day_idx").on(t.tenantId, t.day)],
 );

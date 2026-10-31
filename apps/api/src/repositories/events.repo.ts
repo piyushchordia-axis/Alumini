@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, lt, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, sql, type SQL } from "drizzle-orm";
 import type { EventListQuery, RsvpStatus } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { eventRsvps, events, memberships } from "../db/schema";
@@ -25,7 +25,7 @@ export async function listEvents(db: DbClient, tenantId: string, q: EventListQue
   if (q.mine) {
     conds.push(eq(events.authorMembershipId, viewerMembershipId));
   } else {
-    conds.push(eq(events.moderationStatus, "APPROVED"));
+    conds.push(eq(events.moderationStatus, "APPROVED"), ne(memberships.status, "SUSPENDED"));
   }
   const upcoming = q.scope === "upcoming";
   conds.push(upcoming ? gte(events.startAt, now) : lt(events.startAt, now));
@@ -146,7 +146,7 @@ export async function listAttendees(
   eventId: string,
   q: { cursor?: string; limit: number; status: RsvpStatus },
 ): Promise<CursorPage<{ rsvp: RsvpRow; member: MembershipRow }>> {
-  const conds: SQL[] = [eq(eventRsvps.eventId, eventId), eq(eventRsvps.status, q.status)];
+  const conds: SQL[] = [eq(eventRsvps.eventId, eventId), eq(eventRsvps.status, q.status), eq(memberships.status, "APPROVED")];
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(eventRsvps.createdAt, eventRsvps.membershipId, cursor, "asc");
   if (keyset) conds.push(keyset);

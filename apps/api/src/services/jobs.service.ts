@@ -4,7 +4,7 @@ import { toJobDto, toJobSeekerDto } from "../dto/content.dto";
 import { AppError } from "../lib/errors";
 import { deleteJob, deleteSeeker, findJobWithAuthor, findSeeker, insertJob, listJobs, listSeekers, updateJob, upsertSeeker } from "../repositories/jobs.repo";
 import type { TenantContext } from "../types/request";
-import { afterContentWrite, assertAuthor, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor } from "./content.common";
+import { afterContentWrite, assertAuthor, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerOf } from "./content.common";
 
 function jobColumns(input: JobCreateInput | JobUpdateInput) {
   const out: Record<string, unknown> = {};
@@ -17,7 +17,7 @@ function jobColumns(input: JobCreateInput | JobUpdateInput) {
 
 export async function listTenantJobs(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: JobListQuery): Promise<CursorPage<JobDto>> {
   const page = await listJobs(ctx.db, tenantCtx.tenant.id, query, actor.membership.id);
-  return { data: page.data.map((r) => toJobDto(r, actor.membership.id)), nextCursor: page.nextCursor };
+  return { data: page.data.map((r) => toJobDto(r, viewerOf(actor))), nextCursor: page.nextCursor };
 }
 
 export async function createJob(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: JobCreateInput): Promise<JobDto> {
@@ -34,20 +34,20 @@ export async function createJob(ctx: AppContext, tenantCtx: TenantContext, actor
     moderatedAt: status === "APPROVED" ? new Date() : null,
   });
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "JOB", id: row.id, title: row.title, status, action: "create" });
-  return toJobDto({ job: row, author: actor.membership }, actor.membership.id);
+  return toJobDto({ job: row, author: actor.membership }, viewerOf(actor));
 }
 
 export async function getJob(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<JobDto> {
   const found = await findJobWithAuthor(ctx.db, tenantCtx.tenant.id, id);
   if (!found) throw AppError.notFound("Job not found");
-  assertCanView(actor, found.job.moderationStatus, found.job.authorMembershipId, "Job");
-  return toJobDto(found, actor.membership.id);
+  assertCanView(actor, found.job.moderationStatus, found.job.authorMembershipId, "Job", found.author.status);
+  return toJobDto(found, viewerOf(actor));
 }
 
 export async function getJobForAdmin(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<JobDto> {
   const found = await findJobWithAuthor(ctx.db, tenantCtx.tenant.id, id);
   if (!found) throw AppError.notFound("Job not found");
-  return toJobDto(found, actor.membership.id);
+  return toJobDto(found, viewerOf(actor));
 }
 
 export async function updateJobListing(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, input: JobUpdateInput): Promise<JobDto> {
@@ -61,7 +61,7 @@ export async function updateJobListing(ctx: AppContext, tenantCtx: TenantContext
     moderationNote: status === found.job.moderationStatus ? found.job.moderationNote : null,
   }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "JOB", id, title: row.title, status, action: "update" });
-  return toJobDto({ job: row, author: found.author }, actor.membership.id);
+  return toJobDto({ job: row, author: found.author }, viewerOf(actor));
 }
 
 export async function removeJobListing(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<void> {
@@ -78,7 +78,7 @@ export async function closeJobListing(ctx: AppContext, tenantCtx: TenantContext,
   assertAuthor(actor, found.job.authorMembershipId);
   const row = (await updateJob(ctx.db, tenantCtx.tenant.id, id, { isClosed: true }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "JOB", id, title: row.title, status: row.moderationStatus, action: "close" });
-  return toJobDto({ job: row, author: found.author }, actor.membership.id);
+  return toJobDto({ job: row, author: found.author }, viewerOf(actor));
 }
 
 // ---- seekers ----

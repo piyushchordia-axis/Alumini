@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import type { JobListQuery } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { jobSeekers, jobs, memberships } from "../db/schema";
@@ -21,7 +21,7 @@ export async function listJobs(
   if (q.mine) {
     conds.push(eq(jobs.authorMembershipId, viewerMembershipId));
   } else {
-    conds.push(eq(jobs.moderationStatus, "APPROVED"));
+    conds.push(eq(jobs.moderationStatus, "APPROVED"), ne(memberships.status, "SUSPENDED"));
     if (!q.includeClosed) {
       conds.push(eq(jobs.isClosed, false));
       conds.push(or(isNull(jobs.expiresAt), gt(jobs.expiresAt, new Date()))!);

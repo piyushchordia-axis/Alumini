@@ -64,7 +64,7 @@ export const postReactions = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     type: reactionTypeEnum("type").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.postId, t.membershipId] }),

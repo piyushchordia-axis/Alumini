@@ -33,8 +33,8 @@ export const tenants = pgTable(
     tagline: text("tagline"),
     welcomeMessage: text("welcome_message"),
     websiteUrl: text("website_url"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [index("tenants_status_idx").on(t.status)],
 );
@@ -50,7 +50,7 @@ export const tenantSettings = pgTable("tenant_settings", {
   maxBatchYear: integer("max_batch_year").notNull().default(2032),
   features: jsonb("features").$type<TenantFeatures>().notNull().default(DEFAULT_TENANT_FEATURES),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 });
 
 export const tenantBillingPlans = pgTable(
@@ -69,8 +69,8 @@ export const tenantBillingPlans = pgTable(
     effectiveTo: date("effective_to"),
     notes: text("notes"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [index("billing_plans_tenant_from_idx").on(t.tenantId, t.effectiveFrom)],
 );
@@ -92,7 +92,7 @@ export const tenantBillingSnapshots = pgTable(
     currency: char("currency", { length: 3 }).notNull(),
     notes: text("notes"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("billing_snapshots_period_uq").on(t.tenantId, t.periodStart, t.periodEnd)],
 );

@@ -18,7 +18,7 @@ import {
   upsertRsvp,
 } from "../repositories/events.repo";
 import type { TenantContext } from "../types/request";
-import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor } from "./content.common";
+import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerOf } from "./content.common";
 import { notify } from "./notifications/notification.service";
 
 function eventColumns(input: EventCreateInput | EventUpdateInput) {
@@ -33,7 +33,7 @@ function eventColumns(input: EventCreateInput | EventUpdateInput) {
 
 export async function listTenantEvents(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: EventListQuery): Promise<CursorPage<EventDto>> {
   const page = await listEvents(ctx.db, tenantCtx.tenant.id, query, actor.membership.id);
-  return { data: page.data.map((r) => toEventDto(r, actor.membership.id)), nextCursor: page.nextCursor };
+  return { data: page.data.map((r) => toEventDto(r, viewerOf(actor))), nextCursor: page.nextCursor };
 }
 
 export async function createEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: EventCreateInput): Promise<EventDto> {
@@ -52,7 +52,7 @@ export async function createEvent(ctx: AppContext, tenantCtx: TenantContext, act
     moderatedAt: status === "APPROVED" ? new Date() : null,
   });
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "EVENT", id: row.id, title: row.title, status, action: "create" });
-  return toEventDto({ event: row, author: actor.membership, myRsvp: null }, actor.membership.id);
+  return toEventDto({ event: row, author: actor.membership, myRsvp: null }, viewerOf(actor));
 }
 
 async function loadEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string) {
@@ -63,13 +63,13 @@ async function loadEvent(ctx: AppContext, tenantCtx: TenantContext, actor: Conte
 
 export async function getEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<EventDto> {
   const found = await loadEvent(ctx, tenantCtx, actor, id);
-  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event");
+  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event", found.author.status);
   const preview = await listAttendees(ctx.db, id, { limit: 5, status: "YES" });
-  return toEventDto(found, actor.membership.id, preview.data.map((r) => r.member));
+  return toEventDto(found, viewerOf(actor), preview.data.map((r) => r.member));
 }
 
 export async function getEventForAdmin(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<EventDto> {
-  return toEventDto(await loadEvent(ctx, tenantCtx, actor, id), actor.membership.id);
+  return toEventDto(await loadEvent(ctx, tenantCtx, actor, id), viewerOf(actor));
 }
 
 export async function updateEventListing(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, input: EventUpdateInput): Promise<EventDto> {
@@ -108,7 +108,7 @@ export async function updateEventListing(ctx: AppContext, tenantCtx: TenantConte
       data: { eventId: id, contentType: "EVENT", contentId: id },
     });
   }
-  return toEventDto({ event: row, author: found.author, myRsvp: found.myRsvp }, actor.membership.id);
+  return toEventDto({ event: row, author: found.author, myRsvp: found.myRsvp }, viewerOf(actor));
 }
 
 export async function removeEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<void> {
@@ -132,7 +132,7 @@ export async function removeEvent(ctx: AppContext, tenantCtx: TenantContext, act
 export async function cancelEvent(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, reason?: string | null): Promise<EventDto> {
   const found = await loadEvent(ctx, tenantCtx, actor, id);
   assertAuthorOrAdmin(actor, found.event.authorMembershipId);
-  if (found.event.isCancelled) return toEventDto(found, actor.membership.id);
+  if (found.event.isCancelled) return toEventDto(found, viewerOf(actor));
   const row = (await updateEvent(ctx.db, tenantCtx.tenant.id, id, { isCancelled: true }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "EVENT", id, title: row.title, status: row.moderationStatus, action: "cancel" });
   const attendees = await listRsvpMembershipIds(ctx.db, id, ["YES", "MAYBE"]);
@@ -144,7 +144,7 @@ export async function cancelEvent(ctx: AppContext, tenantCtx: TenantContext, act
     body: reason ? `Reason: ${reason}` : "The organiser cancelled this gathering.",
     data: { eventId: id, contentType: "EVENT", contentId: id },
   });
-  return toEventDto({ event: row, author: found.author, myRsvp: found.myRsvp }, actor.membership.id);
+  return toEventDto({ event: row, author: found.author, myRsvp: found.myRsvp }, viewerOf(actor));
 }
 
 // ---- RSVP ----
@@ -181,7 +181,7 @@ export async function setRsvp(ctx: AppContext, tenantCtx: TenantContext, actor: 
 
 export async function clearRsvp(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<RsvpSummaryDto> {
   const found = await loadEvent(ctx, tenantCtx, actor, id);
-  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event");
+  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event", found.author.status);
   await deleteRsvp(ctx.db, id, actor.membership.id);
   const counts = await recountRsvps(ctx.db, id);
   return { myRsvp: null, ...counts };
@@ -189,7 +189,7 @@ export async function clearRsvp(ctx: AppContext, tenantCtx: TenantContext, actor
 
 export async function listEventAttendees(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, query: AttendeesQuery): Promise<CursorPage<MemberCardDto>> {
   const found = await loadEvent(ctx, tenantCtx, actor, id);
-  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event");
+  assertCanView(actor, found.event.moderationStatus, found.event.authorMembershipId, "Event", found.author.status);
   const page = await listAttendees(ctx.db, id, query);
   return { data: page.data.map((r) => toMemberCardDto(r.member)), nextCursor: page.nextCursor };
 }

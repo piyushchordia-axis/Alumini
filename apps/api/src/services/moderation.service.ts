@@ -181,13 +181,17 @@ export async function getContentForAdmin(ctx: AppContext, tenantCtx: TenantConte
   }
 }
 
+/** Id of the stand-in membership the admin routes give platform admins who are not members. */
+const SYNTHETIC_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000000";
+
 export async function setPostPinnedState(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, postId: string, isPinned: boolean): Promise<PostDto> {
   const row = await setPostPinned(ctx.db, tenantCtx.tenant.id, postId, isPinned);
   if (!row) throw AppError.notFound("Post not found");
   await recordAudit(ctx, {
     tenantId: tenantCtx.tenant.id,
     actorUserId: actor.userId,
-    actorMembershipId: actor.membership.id,
+    // Illuminize staff act without a membership of the institution: record that, not a placeholder id.
+    actorMembershipId: actor.membership.id === SYNTHETIC_MEMBERSHIP_ID ? null : actor.membership.id,
     action: isPinned ? "content.pin" : "content.unpin",
     targetType: "post",
     targetId: postId,

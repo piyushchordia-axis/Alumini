@@ -13,7 +13,7 @@ export const moderationItems = pgView("moderation_items", {
   title: text("title"),
   excerpt: text("excerpt"),
   moderationStatus: moderationStatusEnum("moderation_status").notNull(),
-  moderatedAt: timestamp("moderated_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  moderatedAt: timestamp("moderated_at", { withTimezone: true, precision: 3 }),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull(),
   isPinned: boolean("is_pinned").notNull(),
 }).existing();

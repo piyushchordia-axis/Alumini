@@ -72,7 +72,17 @@ export const billingPlanCreateSchema = z
   .refine((v) => !v.effectiveTo || v.effectiveTo >= v.effectiveFrom, { message: "effectiveTo must be on or after effectiveFrom", path: ["effectiveTo"] });
 export type BillingPlanCreateInput = z.infer<typeof billingPlanCreateSchema>;
 
-export const billingPlanUpdateSchema = z.object(planFields).partial();
+/** Partial update: no defaults here, or editing just the notes would reset the cycle and currency. */
+export const billingPlanUpdateSchema = z
+  .object({
+    billingCycle: z.enum(BILLING_CYCLES),
+    currency: z.string().trim().toUpperCase().length(3),
+    pricePerActiveUserMinor: z.number().int().nonnegative().nullable(),
+    flatFeeMinor: z.number().int().nonnegative().nullable(),
+    effectiveTo: dateOnlySchema.nullable(),
+    notes: optionalTrimmed(1000),
+  })
+  .partial();
 export type BillingPlanUpdateInput = z.infer<typeof billingPlanUpdateSchema>;
 
 export const billingUsageQuerySchema = z

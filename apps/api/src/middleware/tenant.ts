@@ -1,8 +1,8 @@
-import { tenantSlugSchema, type TenantFeature } from "@illuminize/shared";
+import { tenantSlugSchema, utcToZonedWallTime, type TenantFeature } from "@illuminize/shared";
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../context";
-import { memberships } from "../db/schema";
+import { memberActivityDays, memberships } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { keys } from "../redis/keys";
 import { findMembership } from "../repositories/memberships.repo";
@@ -56,6 +56,15 @@ export const requireMember: RequestHandler = (req, _res, next) => {
   }
 };
 
+/**
+ * Any membership of the tenant, whatever its status. For the member's own data (notifications), which pending,
+ * rejected and suspended members must still be able to read: that is where they learn the outcome.
+ */
+export const requireAnyMembership: RequestHandler = (req, _res, next) => {
+  if (!req.membership) return next(AppError.forbidden("You are not a member of this institution", "NOT_A_MEMBER"));
+  next();
+};
+
 export function isTenantAdmin(req: { auth?: { isPlatformAdmin: boolean }; membership?: { status: string; role: string } | null }): boolean {
   if (req.auth?.isPlatformAdmin) return true;
   return req.membership?.status === "APPROVED" && req.membership.role === "TENANT_ADMIN";
@@ -75,7 +84,7 @@ export function requireFeature(feature: TenantFeature): RequestHandler {
   };
 }
 
-/** Records member activity at most once per hour (used for billing "active member" counts). */
+/** Records member activity at most once per hour: last_active_at, plus the day in member_activity_days for billing. */
 export function touchActivity(ctx: AppContext): RequestHandler {
   return async (req, _res, next) => {
     const m = req.membership;
@@ -83,7 +92,13 @@ export function touchActivity(ctx: AppContext): RequestHandler {
       try {
         const set = await ctx.redis.set(keys.active(m.id), "1", "EX", 3600, "NX");
         if (set === "OK") {
-          await ctx.db.update(memberships).set({ lastActiveAt: new Date() }).where(eq(memberships.id, m.id));
+          const now = new Date();
+          // The activity day is the calendar day in the billing time zone, so periods line up with invoices.
+          const day = utcToZonedWallTime(now.toISOString(), ctx.config.BILLING_TIMEZONE).slice(0, 10) || now.toISOString().slice(0, 10);
+          await Promise.all([
+            ctx.db.update(memberships).set({ lastActiveAt: now }).where(eq(memberships.id, m.id)),
+            ctx.db.insert(memberActivityDays).values({ tenantId: m.tenantId, membershipId: m.id, day }).onConflictDoNothing(),
+          ]);
         }
       } catch (err) {
         ctx.logger.warn({ err }, "touchActivity failed");

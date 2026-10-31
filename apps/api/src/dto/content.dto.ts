@@ -22,7 +22,16 @@ import { toMemberCardDto } from "./membership.dto";
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
-export function toJobDto({ job, author }: JobWithAuthor, viewerMembershipId: string | null): JobDto {
+/** Who is looking at a piece of content: decides `isMine` and whether the admin's moderation note is included. */
+export interface Viewer {
+  membershipId: string | null;
+  isAdmin: boolean;
+}
+
+/** The moderation note is between the admins and the author; other members never receive it. */
+const noteFor = (note: string | null, authorId: string, viewer: Viewer | null) => (viewer && (viewer.isAdmin || viewer.membershipId === authorId) ? note : null);
+
+export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null): JobDto {
   return {
     id: job.id,
     title: job.title,
@@ -38,10 +47,10 @@ export function toJobDto({ job, author }: JobWithAuthor, viewerMembershipId: str
     isClosed: job.isClosed,
     expiresAt: iso(job.expiresAt),
     moderationStatus: job.moderationStatus,
-    moderationNote: job.moderationNote,
+    moderationNote: noteFor(job.moderationNote, author.id, viewer),
     moderatedAt: iso(job.moderatedAt),
     author: toMemberCardDto(author),
-    isMine: author.id === viewerMembershipId,
+    isMine: author.id === viewer?.membershipId,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
   };
@@ -58,7 +67,7 @@ export function toJobSeekerDto(seeker: JobSeekerRow, member: MembershipRow): Job
   };
 }
 
-export function toFundingDto({ listing, author }: FundingWithAuthor, viewerMembershipId: string | null): FundingDto {
+export function toFundingDto({ listing, author }: FundingWithAuthor, viewer: Viewer | null): FundingDto {
   return {
     id: listing.id,
     kind: listing.kind,
@@ -74,16 +83,16 @@ export function toFundingDto({ listing, author }: FundingWithAuthor, viewerMembe
     contactPhone: listing.contactPhone,
     isClosed: listing.isClosed,
     moderationStatus: listing.moderationStatus,
-    moderationNote: listing.moderationNote,
+    moderationNote: noteFor(listing.moderationNote, author.id, viewer),
     moderatedAt: iso(listing.moderatedAt),
     author: toMemberCardDto(author),
-    isMine: author.id === viewerMembershipId,
+    isMine: author.id === viewer?.membershipId,
     createdAt: listing.createdAt.toISOString(),
     updatedAt: listing.updatedAt.toISOString(),
   };
 }
 
-export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewerMembershipId: string | null): PostDto {
+export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: Viewer | null): PostDto {
   return {
     id: post.id,
     body: post.body,
@@ -93,10 +102,10 @@ export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewerMe
     myReaction: myReaction ?? null,
     isPinned: post.isPinned,
     moderationStatus: post.moderationStatus,
-    moderationNote: post.moderationNote,
+    moderationNote: noteFor(post.moderationNote, author.id, viewer),
     moderatedAt: iso(post.moderatedAt),
     author: toMemberCardDto(author),
-    isMine: author.id === viewerMembershipId,
+    isMine: author.id === viewer?.membershipId,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
   };
@@ -118,7 +127,7 @@ export function toReactionEntryDto(reaction: ReactionRow, member: MembershipRow)
   return { member: toMemberCardDto(member), type: reaction.type, createdAt: reaction.createdAt.toISOString() };
 }
 
-export function toEventDto({ event, author, myRsvp }: EventWithAuthor, viewerMembershipId: string | null, attendeePreview?: MembershipRow[]): EventDto {
+export function toEventDto({ event, author, myRsvp }: EventWithAuthor, viewer: Viewer | null, attendeePreview?: MembershipRow[]): EventDto {
   return {
     id: event.id,
     title: event.title,
@@ -137,10 +146,10 @@ export function toEventDto({ event, author, myRsvp }: EventWithAuthor, viewerMem
     maybeCount: event.maybeCount,
     myRsvp: myRsvp ?? null,
     moderationStatus: event.moderationStatus,
-    moderationNote: event.moderationNote,
+    moderationNote: noteFor(event.moderationNote, author.id, viewer),
     moderatedAt: iso(event.moderatedAt),
     author: toMemberCardDto(author),
-    isMine: author.id === viewerMembershipId,
+    isMine: author.id === viewer?.membershipId,
     ...(attendeePreview ? { attendeePreview: attendeePreview.map((m) => toMemberCardDto(m)) } : {}),
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),

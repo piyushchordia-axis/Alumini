@@ -22,6 +22,25 @@ const envSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   OTP_GLOBAL_DAILY_CAP: z.coerce.number().int().positive().default(5000),
+  /** Time zone for billing periods and member activity days (IANA name). */
+  BILLING_TIMEZONE: z
+    .string()
+    .default("Asia/Kolkata")
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown time zone"),
+  /** Image uploads allowed per institution per day (all members together), a guard against storage abuse. */
+  UPLOADS_PER_TENANT_DAILY_CAP: z.coerce.number().int().positive().default(2000),
+  /** Escape hatch for throwaway demo deployments: lets production run with the console OTP sender. Never in real use. */
+  OTP_ALLOW_CONSOLE_IN_PRODUCTION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
@@ -83,6 +102,10 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),
   };
 
+  if (config.isProduction && config.OTP_PROVIDER === "console" && !config.OTP_ALLOW_CONSOLE_IN_PRODUCTION) {
+    // The console sender only logs codes, so anyone with log access could sign in as anyone.
+    throw new Error("OTP_PROVIDER=console is not allowed in production. Use whatsapp or sms (or set OTP_ALLOW_CONSOLE_IN_PRODUCTION=true for a throwaway demo).");
+  }
   if (config.isProduction && config.OTP_PROVIDER === "whatsapp") {
     if (!config.WHATSAPP_ACCESS_TOKEN || !config.WHATSAPP_PHONE_NUMBER_ID) {
       throw new Error("OTP_PROVIDER=whatsapp requires WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID");
