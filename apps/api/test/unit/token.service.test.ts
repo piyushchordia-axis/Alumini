@@ -10,7 +10,8 @@ describe("token.service", () => {
     const ctx = createUnitContext();
     const session = await issueSession(ctx, user, { ip: "1.1.1.1", userAgent: "vitest" });
     const claims = await ctx.jwt.verify(session.accessToken);
-    expect(claims).toEqual({ sub: user.id, sid: session.sid, pa: false });
+    expect(claims).toEqual({ sub: user.id, sid: session.sid, pa: false, exp: expect.any(Number) });
+    expect(claims.exp * 1000).toBeGreaterThan(Date.now());
     expect(await isSessionAlive(ctx, session.sid)).toBe(true);
     expect(await ctx.redis.smembers(keys.userSessions(user.id))).toEqual([session.sid]);
     expect(await ctx.redis.ttl(keys.session(session.sid))).toBeGreaterThan(0);

@@ -33,6 +33,8 @@ cat <<BANNER
   Admin, Demo College      +91 90000 00002   (approval needed; has pending items)
   Admin, Demo School       +91 90000 00003
   Members                  +91 91000 00001 … 00025
+  Live updates: open the app in two browsers as two members; reactions and comments
+                update the other one's bell without reloading.
 
   ${api_note}
   Phone app: run  pnpm mobile:tunnel  in a new terminal and scan the QR code with Expo Go,

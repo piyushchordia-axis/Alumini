@@ -1,8 +1,10 @@
+import http from "node:http";
 import { createApp } from "./app";
 import { createRuntime } from "./bootstrap";
 import { loadConfig, loadDotenvFiles } from "./config/env";
 import { startWorkers, type RunningWorkers } from "./jobs/runWorkers";
 import { createLogger } from "./lib/logger";
+import { attachRealtime } from "./realtime/server";
 
 async function main(): Promise<void> {
   loadDotenvFiles();
@@ -12,7 +14,11 @@ async function main(): Promise<void> {
   const { ctx } = runtime;
   const app = createApp(ctx);
 
-  const server = app.listen(config.PORT, () => {
+  // REST and live updates (Socket.IO at /socket.io) share one HTTP server.
+  const server = http.createServer(app);
+  const realtime = attachRealtime(server, ctx);
+  ctx.realtime = realtime.publisher;
+  server.listen(config.PORT, () => {
     logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER, workerMode: config.workerMode }, "Illuminize API listening");
   });
 
@@ -24,14 +30,16 @@ async function main(): Promise<void> {
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, "Shutting down");
-    server.close(async () => {
+    void (async () => {
       try {
+        // Closes sockets and the HTTP server, then background work, then connections.
+        await realtime.close();
         await workers?.close();
         await runtime.close();
       } finally {
         process.exit(0);
       }
-    });
+    })();
     setTimeout(() => process.exit(1), 10_000).unref();
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));

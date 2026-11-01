@@ -6,6 +6,7 @@ import { Avatar, Modal } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { usePollInterval } from "@/lib/realtime";
 import { enabledSections, homePath } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -19,7 +20,8 @@ export function HomeLayout() {
   const barSections = sections.length > BOTTOM_BAR_SECTIONS + 1 ? sections.slice(0, BOTTOM_BAR_SECTIONS) : sections;
   const overflow = sections.slice(barSections.length);
 
-  const unread = useQuery({ queryKey: qk.unread(tenant.slug), queryFn: () => api.notifications.unreadCount(tenant.slug), refetchInterval: 60_000 });
+  const pollInterval = usePollInterval();
+  const unread = useQuery({ queryKey: qk.unread(tenant.slug), queryFn: () => api.notifications.unreadCount(tenant.slug), refetchInterval: pollInterval });
   const unreadCount = unread.data?.count ?? 0;
   const navigate = useNavigate();
   const qc = useQueryClient();

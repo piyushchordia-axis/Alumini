@@ -129,6 +129,20 @@ Outside production, channels without settings log the message instead of sending
 call `POST /api/v1/platform/messages/test` with a phone and/or email and follow `GET /api/v1/platform/messages/:id`.
 Message types and their per-channel templates live in `templates.ts`.
 
+### Live updates (Socket.IO)
+
+The API serves Socket.IO at `/socket.io` on its own port (WebSocket transport only). Apps connect with their access
+token; the server checks the session, puts each socket in its user's and session's rooms, and closes it when the token
+expires (the shared client in `packages/shared/src/realtime` refreshes and reconnects) or the session is signed out.
+
+- Events: `notification:new` (with the new unread count) and `notification:unread` (another device read some). Chat
+  events join in Wave 2. Polling stays as a fallback, slowing to every 5 minutes while connected.
+- Several API nodes share events through the Redis adapter; a separate worker publishes through Redis with the
+  emitter. WebSocket-only transport means no sticky sessions are needed, but the load balancer must allow WebSocket
+  upgrades and an idle timeout above 25 seconds.
+- The web app reaches it through the Vite proxy in development; in production serve `/socket.io` from the API origin
+  (or proxy it with WebSocket upgrade). Browser origins must be in `CORS_ORIGINS`; native apps send no origin.
+
 ### Multi-tenancy
 
 One Postgres database; every tenant-scoped table carries `tenant_id` and every repository function takes the tenant

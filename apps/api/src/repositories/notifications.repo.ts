@@ -38,6 +38,17 @@ export async function countUnread(db: DbClient, recipientMembershipId: string): 
   return row?.count ?? 0;
 }
 
+/** Unread counts for several members in one query (members with none are absent from the map). */
+export async function countUnreadByMemberships(db: DbClient, membershipIds: string[]): Promise<Map<string, number>> {
+  if (membershipIds.length === 0) return new Map();
+  const rows = await db
+    .select({ membershipId: notifications.recipientMembershipId, count: sql<number>`count(*)::int` })
+    .from(notifications)
+    .where(and(inArray(notifications.recipientMembershipId, membershipIds), isNull(notifications.readAt)))
+    .groupBy(notifications.recipientMembershipId);
+  return new Map(rows.map((r) => [r.membershipId, r.count]));
+}
+
 export async function markRead(db: DbClient, recipientMembershipId: string, id: string): Promise<boolean> {
   const rows = await db
     .update(notifications)

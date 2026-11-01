@@ -23,6 +23,11 @@ page.setDefaultTimeout(20000);
 page.on("dialog", (d) => d.accept());
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: false });
 const tap = (text) => page.getByText(text, { exact: true }).last().click();
+// Live updates: record the app's Socket.IO WebSocket once it opens.
+const liveSockets = [];
+page.on("websocket", (ws) => {
+  if (ws.url().includes("/socket.io/")) liveSockets.push(ws);
+});
 
 try {
   await step("tenant picker renders from the API", async () => {
@@ -58,6 +63,8 @@ try {
     await inputs.nth(1).fill("2014");
     await tap("Join the network");
     await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).waitFor();
+    for (let i = 0; i < 50 && liveSockets.length === 0; i++) await page.waitForTimeout(100);
+    if (liveSockets.length === 0) throw new Error("the app did not open a live-updates connection after signing in");
     await shot("m04-feed");
   });
 

@@ -72,6 +72,13 @@ phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
 
+**Live updates and background work**
+- **The bell updates live.** Open the web app in two browsers (one in a private window) as two members of Demo
+  University. When one reacts to or comments on the other's post, the other's bell count changes within a second, with
+  no reload. The phone app gets the same live updates while it is open.
+- Push notifications, and from now on invites, digests and reminders, are delivered in the background, so actions in
+  the app return immediately and temporary provider outages are retried.
+
 **Fix pass after the first review** (web, iOS and Android)
 - **Event times** are saved in the event's own time zone, whatever zone your laptop or phone is in. The phone app
   uses the native date and time pickers.
@@ -110,4 +117,5 @@ phone-sized preview in the browser. Port 4000 must still be public.
 | Expo Go says the project needs a different SDK | Update Expo Go from the store. If it still does not match, use `pnpm mobile:web` for the browser preview. |
 | Phone app shows "Could not reach the server" | Make port 4000 public (step 4.1), then restart `pnpm mobile:tunnel`. |
 | Uploaded photos do not show | Same fix: make port 4000 public. |
+| Phone app's bell does not update live | Same fix: make port 4000 public. The web app's live updates go through the web port and need nothing. |
 | Tunnel will not start | Stop it with Ctrl+C and run `pnpm mobile:tunnel` again; the tunnel service is occasionally busy. |

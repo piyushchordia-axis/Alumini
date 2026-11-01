@@ -2,6 +2,7 @@ import { loadConfig } from "../../src/config/env";
 import type { AppContext } from "../../src/context";
 import { MemoryJobQueue } from "../../src/jobs/MemoryJobQueue";
 import { createJwtSigner } from "../../src/lib/jwt";
+import { NoopRealtimePublisher } from "../../src/realtime/publisher";
 import { createLogger } from "../../src/lib/logger";
 import { createStorage } from "../../src/services/storage";
 import { CapturingOtpSender, newRedisMock } from "./testContext";
@@ -19,6 +20,7 @@ export function createUnitContext(overrides: Record<string, string | undefined> 
     otpSender: otpCapture,
     storage: createStorage(config),
     messageSenders: {},
+    realtime: new NoopRealtimePublisher(),
     otpCapture,
   } as unknown as AppContext & { otpCapture: CapturingOtpSender; jobs: MemoryJobQueue };
   ctx.jobs = new MemoryJobQueue(() => ctx);

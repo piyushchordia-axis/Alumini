@@ -33,6 +33,8 @@ export default defineConfig({
       // xfwd passes the browser's IP to the API so its per-IP rate limits apply per visitor.
       "/api": { target: apiTarget, changeOrigin: true, xfwd: true },
       "/uploads": { target: apiTarget, changeOrigin: true, xfwd: true },
+      // Live updates (Socket.IO over WebSocket).
+      "/socket.io": { target: apiTarget, ws: true, changeOrigin: true, xfwd: true },
     },
   },
 });

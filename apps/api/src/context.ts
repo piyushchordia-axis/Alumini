@@ -4,6 +4,7 @@ import type { JwtSigner } from "./lib/jwt";
 import type { Logger } from "./lib/logger";
 import type { RedisClient } from "./redis/client";
 import type { JobQueue } from "./jobs/JobQueue";
+import type { RealtimePublisher } from "./realtime/publisher";
 import type { MessageSenders } from "./services/messages/types";
 import type { PushChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
@@ -23,4 +24,6 @@ export interface AppContext {
   push?: PushChannel;
   /** WhatsApp/SMS/email senders per channel; channels without one are skipped. */
   messageSenders: MessageSenders;
+  /** Live events to connected apps (Socket.IO); a no-op until the server is attached. */
+  realtime: RealtimePublisher;
 }

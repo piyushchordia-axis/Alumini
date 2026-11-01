@@ -3,6 +3,7 @@ import type { TokenPairDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { AppError } from "../lib/errors";
 import { opaqueToken, sha256 } from "../lib/random";
+import { rooms } from "../realtime/rooms";
 import { keys } from "../redis/keys";
 import { findUserById } from "../repositories/users.repo";
 
@@ -97,12 +98,15 @@ async function revokeSessionById(ctx: AppContext, sid: string, userId: string, r
 export async function revokeSession(ctx: AppContext, sid: string, userId: string, refreshToken?: string): Promise<void> {
   await revokeSessionById(ctx, sid, userId, refreshToken ? sha256(refreshToken) : undefined);
   if (refreshToken) await ctx.redis.del(keys.refresh(sha256(refreshToken)));
+  // Live connections opened with this session close straight away.
+  ctx.realtime.disconnect(rooms.session(sid));
 }
 
 export async function revokeAllSessions(ctx: AppContext, userId: string): Promise<void> {
   const sids = await ctx.redis.smembers(keys.userSessions(userId));
   for (const sid of sids) await revokeSessionById(ctx, sid, userId);
   await ctx.redis.del(keys.userSessions(userId));
+  ctx.realtime.disconnect(rooms.user(userId));
 }
 
 export async function isSessionAlive(ctx: AppContext, sid: string): Promise<boolean> {

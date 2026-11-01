@@ -5,6 +5,8 @@ import { BullJobQueue } from "./jobs/BullJobQueue";
 import { createBullConnection } from "./jobs/connection";
 import { createJwtSigner } from "./lib/jwt";
 import type { Logger } from "./lib/logger";
+import { Emitter } from "@socket.io/redis-emitter";
+import { NoopRealtimePublisher, RedisEmitterPublisher } from "./realtime/publisher";
 import { createRedis } from "./redis/client";
 import { createMessageSenders } from "./services/messages";
 import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
@@ -25,6 +27,9 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
   const producer = createBullConnection(config.REDIS_URL, "producer");
   producer.on("error", (err) => logger.error({ err }, "Job queue Redis error"));
   const jobs = new BullJobQueue({ connection: producer });
+  // The API attaches its Socket.IO server and swaps in its publisher; a separate worker publishes through Redis.
+  const emitterRedis = o.role === "worker" ? createRedis(config.REDIS_URL) : null;
+  emitterRedis?.on("error", (err) => logger.error({ err }, "Realtime emitter Redis error"));
 
   const ctx: AppContext = {
     config,
@@ -37,6 +42,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
     jobs,
     push: new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN),
     messageSenders: createMessageSenders(config, logger),
+    realtime: emitterRedis ? new RedisEmitterPublisher(new Emitter(emitterRedis)) : new NoopRealtimePublisher(),
   };
 
   return {
@@ -44,6 +50,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
     async close() {
       await jobs.close().catch(() => undefined);
       await producer.quit().catch(() => undefined);
+      await emitterRedis?.quit().catch(() => undefined);
       await redis.quit().catch(() => undefined);
       await pool.end();
     },

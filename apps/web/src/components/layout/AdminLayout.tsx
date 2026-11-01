@@ -5,11 +5,13 @@ import { Avatar } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { usePollInterval } from "@/lib/realtime";
 
 export function AdminLayout() {
   const { tenant, me, isPlatformAdmin } = useAdminTenant();
   const base = `/t/${tenant.slug}/admin`;
-  const dashboard = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug), refetchInterval: 60_000 });
+  const pollInterval = usePollInterval();
+  const dashboard = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug), refetchInterval: pollInterval });
   const d = dashboard.data;
   const items = [
     { to: `${base}/dashboard`, label: "Dashboard", icon: "📊" },

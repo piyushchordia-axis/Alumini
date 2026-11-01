@@ -16,3 +16,4 @@ export * from "./schemas/reports";
 export * from "./schemas/platform";
 export * from "./types/dto";
 export * from "./lib/notifications";
+export * from "./realtime/events";

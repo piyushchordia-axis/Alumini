@@ -9,7 +9,8 @@ export interface AccessTokenClaims {
 
 export interface JwtSigner {
   sign(claims: AccessTokenClaims): Promise<string>;
-  verify(token: string): Promise<AccessTokenClaims>;
+  /** Verified claims plus `exp` (seconds since epoch), so long-lived connections know when the token runs out. */
+  verify(token: string): Promise<AccessTokenClaims & { exp: number }>;
 }
 
 export function createJwtSigner(secret: string, ttlSec: number): JwtSigner {
@@ -29,7 +30,7 @@ export function createJwtSigner(secret: string, ttlSec: number): JwtSigner {
         if (typeof payload.sub !== "string" || typeof payload.sid !== "string") {
           throw AppError.unauthenticated("Invalid token");
         }
-        return { sub: payload.sub, sid: payload.sid, pa: payload.pa === true };
+        return { sub: payload.sub, sid: payload.sid, pa: payload.pa === true, exp: typeof payload.exp === "number" ? payload.exp : Math.floor(Date.now() / 1000) };
       } catch (err) {
         if (err instanceof AppError) throw err;
         if (err instanceof joseErrors.JWTExpired) {

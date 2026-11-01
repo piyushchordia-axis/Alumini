@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { PushNotificationsBridge } from "@/components/PushNotificationsBridge";
+import { RealtimeBridge } from "@/components/RealtimeBridge";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { qk } from "@/lib/queryKeys";
@@ -35,6 +36,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <SessionSync />
+        <RealtimeBridge />
         <PushNotificationsBridge />
         {/* Screens are light, so keep dark status-bar content even when the phone is in dark mode. */}
         <StatusBar style="dark" />

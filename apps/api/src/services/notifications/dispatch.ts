@@ -1,7 +1,9 @@
 import type { JobHandler } from "../../jobs/JobQueue";
 import { PermanentJobError } from "../../jobs/JobQueue";
 import { findMembershipsByIds } from "../../repositories/memberships.repo";
-import { findNotificationsByIds } from "../../repositories/notifications.repo";
+import { toNotificationDto } from "../../dto/membership.dto";
+import { rooms } from "../../realtime/rooms";
+import { countUnreadByMemberships, findNotificationsByIds } from "../../repositories/notifications.repo";
 import { findTenantById } from "../../repositories/tenants.repo";
 import { PUSH_BATCH_SIZE } from "./ExpoPushChannel";
 import { PushSendError } from "./NotificationChannel";
@@ -16,6 +18,21 @@ export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async
   const tenant = await findTenantById(ctx.db, tenantId);
   if (!tenant) return;
   const recipients = await findMembershipsByIds(ctx.db, tenantId, [...new Set(rows.map((r) => r.recipientMembershipId))]);
+
+  // Open apps update the bell straight away.
+  const userByMembership = new Map(recipients.map((m) => [m.id, m.userId]));
+  const unread = await countUnreadByMemberships(ctx.db, [...userByMembership.keys()]);
+  for (const row of rows) {
+    const userId = userByMembership.get(row.recipientMembershipId);
+    if (!userId) continue;
+    ctx.realtime.emit(rooms.user(userId), "notification:new", {
+      tenantSlug: tenant.slug,
+      membershipId: row.recipientMembershipId,
+      notification: toNotificationDto(row),
+      unreadCount: unread.get(row.recipientMembershipId) ?? 0,
+    });
+  }
+
   if (!ctx.push) return;
   const messages = await ctx.push.prepare(
     rows,

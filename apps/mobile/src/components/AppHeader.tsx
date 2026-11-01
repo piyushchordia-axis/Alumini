@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { usePollInterval } from "@/lib/realtime";
 import { homeHref } from "@/lib/sections";
 import { colors } from "@/theme";
 
@@ -18,7 +19,8 @@ export function useAppHeaderOptions() {
   const { tenant, membership } = useMembership();
   const router = useRouter();
   const slug = tenant.slug;
-  const unread = useQuery({ queryKey: qk.unread(slug), queryFn: () => api.notifications.unreadCount(slug), refetchInterval: 60_000 });
+  const pollInterval = usePollInterval();
+  const unread = useQuery({ queryKey: qk.unread(slug), queryFn: () => api.notifications.unreadCount(slug), refetchInterval: pollInterval });
   const count = unread.data?.count ?? 0;
   return {
     headerShown: true,

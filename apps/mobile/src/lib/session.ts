@@ -3,6 +3,7 @@ import { useRouter, type Href } from "expo-router";
 import { useCallback } from "react";
 import { api } from "@/lib/api";
 import { getRegisteredPushToken, setRegisteredPushToken } from "@/lib/push";
+import { realtime } from "@/lib/realtime";
 import { secureTokenStorage } from "@/lib/storage";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
@@ -22,6 +23,7 @@ export function useSignOut() {
         if (token) await api.me.removePushToken(token).catch(() => undefined);
         await api.auth.logout(await secureTokenStorage.getRefreshToken()).catch(() => undefined);
       } finally {
+        realtime.stop();
         await setRegisteredPushToken(null);
         await secureTokenStorage.clear().catch(() => undefined);
         clear();

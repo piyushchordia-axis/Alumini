@@ -17,19 +17,20 @@ const step = async (name, fn) => {
 const unique = String(Date.now()).slice(-8); // 8 digits → +919N phone
 const PHONE_A = `9${unique.slice(0, 9).padEnd(9, "1")}`; // 10 digits starting with 9
 const PHONE_B = `8${unique.slice(0, 9).padEnd(9, "2")}`;
+const PHONE_C = `7${unique.slice(0, 9).padEnd(9, "3")}`;
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.setDefaultTimeout(15000);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
 
-async function loginWithPhone(number) {
-  await page.fill('input[type="tel"]', number);
-  await page.click('button:has-text("Send code")');
-  await page.waitForSelector("text=Development mode");
-  const code = (await page.textContent("span.font-mono")).trim();
-  await page.fill('input[inputmode="numeric"]', code);
-  await page.click('button:has-text("Verify and continue")');
+async function loginWithPhone(number, p = page) {
+  await p.fill('input[type="tel"]', number);
+  await p.click('button:has-text("Send code")');
+  await p.waitForSelector("text=Development mode");
+  const code = (await p.textContent("span.font-mono")).trim();
+  await p.fill('input[inputmode="numeric"]', code);
+  await p.click('button:has-text("Verify and continue")');
 }
 
 try {
@@ -82,6 +83,34 @@ try {
     await card.locator('textarea[aria-label="Edit post"]').fill(`Edited smoke post ${unique}`);
     await card.locator('button:has-text("Save")').click();
     await page.waitForSelector(`text=Edited smoke post ${unique}`);
+  });
+
+  await step("live notification: the bell updates without a reload", async () => {
+    // A second member in their own browser posts; the first member reacts; the second member's bell updates live.
+    const other = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const pageB = await other.newPage();
+    pageB.setDefaultTimeout(15000);
+    await pageB.goto(`${BASE}/t/demo-university/login`);
+    await loginWithPhone(PHONE_C, pageB);
+    await pageB.waitForURL(/\/register$/);
+    await pageB.fill('input[name="fullName"]', "Live Listener");
+    await pageB.selectOption('select[name="batchYear"]', "2015");
+    await pageB.click('button:has-text("Join the network")');
+    await pageB.waitForURL(/\/app\/feed$/);
+    const body = `Live check ${unique}`;
+    await pageB.fill("textarea", body);
+    await pageB.click('button:has-text("Post")');
+    await pageB.locator("article", { hasText: body }).first().waitFor();
+    await pageB.waitForSelector('a[aria-label="Notifications"]');
+
+    await page.goto(`${BASE}/t/demo-university/app/feed`);
+    const card = page.locator("article", { hasText: body }).first();
+    await card.locator('button[aria-label="Celebrate"]').click();
+
+    // While connected, polling only runs every 5 minutes, so only the live update can pass within 8 seconds.
+    await pageB.waitForSelector('a[aria-label="Notifications, 1 unread"]', { timeout: 8000 });
+    await pageB.screenshot({ path: `${SHOTS}/06b-live-bell.png` });
+    await other.close();
   });
 
   await step("create a job and view it", async () => {
