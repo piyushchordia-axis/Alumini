@@ -19,8 +19,10 @@ pnpm web                                 # http://localhost:5173 (proxies /api t
 mkdir -p e2e/screenshots && node e2e/web-member.mjs
 ```
 
-Covers: tenant picker → landing → phone + OTP → registration → auto-approved feed → post, react, comment → post a job →
-RSVP → directory → notifications → sign out → ADMIN_APPROVAL tenant lands on the pending screen.
+Covers: tenant picker → landing → phone + OTP → registration (with a profile question) → auto-approved feed → post,
+react, comment → live bell → pinned announcement and a poll vote → celebrations card and wishes → weekly digest (run
+through the platform job endpoint, see `lib.mjs`) → post a job → RSVP → directory → notification settings → sign out
+→ ADMIN_APPROVAL tenant lands on the pending screen.
 
 ## Web (tenant admin + platform console)
 
@@ -29,8 +31,11 @@ node e2e/web-admin.mjs
 ```
 
 Covers: tenant admin dashboard, approve/reject members, approve a job from the moderation queue, resolve a spam report by
-removing content, settings; platform login, onboarding an institution with its first admin, recording a billing plan,
-usage, stats and user search. Re-run `pnpm db:reset` between runs so the pending fixtures exist.
+removing content, settings, adding a profile question, importing an invitation CSV and joining through its link in a
+second browser, an announcement that also goes by email, analytics charts and the members CSV; platform login,
+onboarding an institution with its first admin, recording a billing plan, usage, stats, user search and the
+institution comparison with its CSV. Re-run `pnpm db:reset` between runs so the pending fixtures exist (it also clears
+Redis, which resets the OTP rate limits the scripts use up).
 
 ## Mobile (Expo app exported for the web)
 

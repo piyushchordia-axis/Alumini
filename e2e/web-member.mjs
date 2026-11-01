@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
+import { runJob } from "./lib.mjs";
 
 const BASE = "http://localhost:5173";
 const SHOTS = process.env.SHOTS ?? new URL("./screenshots/", import.meta.url).pathname;
@@ -54,6 +55,9 @@ try {
     await page.selectOption('select[name="professionType"]', "FOUNDER");
     await page.fill('input[name="companyName"]', "Smoke Labs");
     await page.fill('input[name="city"]', "Mumbai");
+    // The institution's own profile questions (seeded, optional) live under "More about you".
+    await page.click("text=More about you (optional)");
+    await page.getByLabel("Department").selectOption({ label: "Computer Science" });
     await page.click('button:has-text("Join the network")');
     await page.waitForURL(/\/app\/feed$/);
     await page.waitForSelector("text=Welcome to the official Demo University alumni network");
@@ -113,6 +117,40 @@ try {
     await other.close();
   });
 
+  await step("announcement is pinned with its badge; vote in a poll", async () => {
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    const ann = page.locator("article", { hasText: "Registrations for DemoU Alumni Day 2026" }).first();
+    await ann.waitFor();
+    await ann.locator("text=📣 Announcement").waitFor();
+    const poll = page.locator("article", { hasText: "Where should we hold the next London meetup?" }).first();
+    await poll.waitFor();
+    await poll.locator('[aria-label="Poll"] button:has-text("Shoreditch")').click();
+    await poll.locator("text=Shoreditch ✓").waitFor();
+    await poll.locator("text=/\\d+%/").first().waitFor();
+    await shot("04b-announcement-poll");
+  });
+
+  await step("celebrations card: send birthday wishes", async () => {
+    const card = page.locator("section", { hasText: "Celebrating today" }).first();
+    await card.waitFor();
+    await card.locator('button:has-text("Send wishes")').first().click();
+    await card.locator("text=Wished ✓").first().waitFor();
+  });
+
+  await step("weekly digest: run it now and read “This week”", async () => {
+    await runJob("digest", "demo-university");
+    for (let i = 0; i < 10; i++) {
+      await page.goto(BASE + "/t/demo-university/app/digest");
+      await page.waitForSelector("text=This week at DemoU");
+      if (await page.locator("h2:has-text('Popular posts')").count()) break;
+      await page.waitForTimeout(1000);
+    }
+    await page.waitForSelector("h2:has-text('Popular posts')");
+    await shot("04c-digest");
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    await page.waitForSelector("text=This week");
+  });
+
   await step("create a job and view it", async () => {
     await page.click('nav >> text=Jobs');
     await page.waitForSelector("text=Backend Engineer (Node.js)");
@@ -158,9 +196,16 @@ try {
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
-  await step("notifications page + sign out", async () => {
+  await step("notifications page, notification settings + sign out", async () => {
     await page.click('a[aria-label^="Notifications"]');
     await page.waitForSelector("h1:has-text('Notifications')");
+    await page.click("text=⚙️ Settings");
+    await page.waitForSelector("h1:has-text('Notification settings')");
+    const celebrations = page.locator('[role="radiogroup"][aria-label="Birthdays and anniversaries"]');
+    await celebrations.locator('[role="radio"]:has-text("Off")').click();
+    await page.reload();
+    await celebrations.locator('[role="radio"][aria-checked="true"]:has-text("Off")').waitFor();
+    await shot("08c-notification-settings");
     await page.click("text=Sign out");
     await page.waitForURL(/\/t\/demo-university$/);
   });

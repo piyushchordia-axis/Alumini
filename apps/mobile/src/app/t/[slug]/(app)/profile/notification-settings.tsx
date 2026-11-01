@@ -23,7 +23,9 @@ function LevelPicker({ label, value, min, onChange }: { label: string; value: No
           <Pressable
             key={l}
             accessibilityRole="radio"
-            accessibilityState={{ checked: on }}
+            // aria-checked rather than accessibilityState: React Native maps it on devices, and react-native-web only
+            // emits the ARIA form.
+            aria-checked={on}
             onPress={() => onChange(l)}
             style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: on ? theme.primary : "transparent" }}
           >

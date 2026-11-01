@@ -56,7 +56,7 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
           <Pressable
             key={o.id}
             accessibilityRole={poll.allowsMultiple ? "checkbox" : "button"}
-            accessibilityState={poll.allowsMultiple ? { checked: on } : undefined}
+            aria-checked={poll.allowsMultiple ? on : undefined}
             disabled={vote.isPending}
             onPress={() => (poll.allowsMultiple ? setPicked((p) => (on ? p.filter((x) => x !== o.id) : [...p, o.id])) : vote.mutate([o.id]))}
             style={{ borderWidth: 1, borderColor: on ? theme.primary : colors.border, backgroundColor: on ? `${theme.primary}1a` : "#fff", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }}

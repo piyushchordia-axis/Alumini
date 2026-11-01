@@ -24,7 +24,7 @@ const weekTitle = (w: string) => `Week of ${formatWeek(w, true)}`;
 /** "+12% vs the previous 12 weeks" — neutral text with an arrow, so the change is never shown by colour alone. */
 function Delta({ now, prev, weeks }: { now: number; prev: number; weeks: number }) {
   const span = weeks === 52 ? "12 months" : weeks === 26 ? "6 months" : `${weeks} weeks`;
-  if (!prev) return <span>{now ? `New this period · previous ${span}: 0` : `No change vs the previous ${span}`}</span>;
+  if (!prev) return <span>{now ? `None in the previous ${span}` : `None in this or the previous ${span}`}</span>;
   const pct = Math.round(((now - prev) / prev) * 100);
   const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
   return (

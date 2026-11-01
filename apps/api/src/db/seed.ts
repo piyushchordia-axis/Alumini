@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createDb, type Db } from "./client";
+import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
 import { contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
@@ -351,7 +352,7 @@ export async function seedContent(db: Db, tenantIds: Record<string, string>, m: 
 /** One offline billing plan per demo tenant (skipped when the tenant already has plans). */
 export async function seedBilling(db: Db, tenantIds: Record<string, string>, createdByUserId: string): Promise<void> {
   const plans: Array<{ slug: string; values: Omit<typeof tenantBillingPlans.$inferInsert, "tenantId"> }> = [
-    { slug: "demo-university", values: { billingModel: "PER_ACTIVE_USER", billingCycle: "MONTHLY", currency: "INR", pricePerActiveUserMinor: 5000, effectiveFrom: "2026-01-01", notes: "₹50 per active member per month, invoiced quarterly in arrears." } },
+    { slug: "demo-university", values: { billingModel: "PER_ACTIVE_USER", billingCycle: "MONTHLY", currency: "INR", pricePerActiveUserMinor: 5000, effectiveFrom: "2026-01-01", includedChannels: ["WHATSAPP", "SMS", "EMAIL"], messageRatesMinor: { WHATSAPP: 80, SMS: 25, EMAIL: 0.5 }, notes: "₹50 per active member per month, invoiced quarterly in arrears. Messages at cost: WhatsApp ₹0.80, SMS ₹0.25, email ₹0.005." } },
     { slug: "demo-college", values: { billingModel: "FLAT_FEE", billingCycle: "YEARLY", currency: "INR", flatFeeMinor: 25_000_000, effectiveFrom: "2026-04-01", notes: "₹2.5L per year, paid by the alumni association." } },
     { slug: "demo-school", values: { billingModel: "FREE", billingCycle: "YEARLY", currency: "INR", effectiveFrom: "2026-01-01", notes: "Pilot — free for the first year." } },
   ];
@@ -364,12 +365,13 @@ export async function seedBilling(db: Db, tenantIds: Record<string, string>, cre
   }
 }
 
-export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number }> {
+export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number; history: DemoHistoryResult }> {
   const core = await seedCore(db, platformAdminPhones);
   const membershipIds = await seedMembers(db, core.tenantIds);
   const tenantsWithContent = await seedContent(db, core.tenantIds, membershipIds);
   await seedBilling(db, core.tenantIds, core.platformAdminUserId);
-  return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent };
+  const history = await seedDemoHistory(db, core.tenantIds, membershipIds);
+  return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent, history };
 }
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);

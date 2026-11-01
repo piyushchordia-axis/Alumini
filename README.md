@@ -47,8 +47,15 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 | Tenant admin, Demo College (`demo-college`) | `+919000000002` | admin approves members **and** content; has pending members, pending posts/job/event and an open spam report |
 | Tenant admin, Demo School (`demo-school`) | `+919000000003` | admin approves members, content published immediately |
 | Members | `+9191000000xx` | see `apps/api/src/db/seed.ts` |
+| Generated members | `+91931…`, `+91932…`, `+91933…` | 110 extra alumni across the three institutions, approved over the last six months |
 
 Any other phone number registers as a brand-new member.
+
+The seed also builds history relative to today (`apps/api/src/db/seedDemoHistory.ts`), so the analytics and engagement
+features have something to show: 26 weeks of activity and posts, profile questions with answers, invitations in every
+state, a poll, a pinned announcement, a birthday (Meera) and a membership anniversary (Rahul) today, and confirmed
+emails for Rahul, Priya and Sneha. Demo University's plan includes WhatsApp, SMS and email at per-message rates
+(logged to the API console in development). Each part is skipped when it already exists, so re-running is safe.
 
 ## How it works
 
@@ -56,8 +63,13 @@ Any other phone number registers as a brand-new member.
 
 - A **user** is a phone number (global). A **membership** is that user inside one tenant and carries the profile
   (name, batch year, date of birth, profession, company, designation, city/country, optional marital status, kids,
-  bio, LinkedIn, interests, free-form `extra` fields) and the approval state. One person can belong to several
-  institutions.
+  bio, LinkedIn, interests, and the institution's own profile questions) and the approval state. One person can belong
+  to several institutions.
+- **Profile questions** are defined per institution (up to 30: text, long text, number, date, single or multiple
+  choice, yes/no). Each can be required (asked at sign-up), visible to members or to admins only, editable by the
+  member or set by admins, and choice questions can filter the directory (`?field=key:value`, repeatable). Values are
+  validated by the same shared schema in the API, web and mobile apps. The legacy `extra` column is no longer written;
+  responses still fill `extra` from members-visible answers for older app builds, and the column goes in Wave 2.
 - Per-tenant **member approval mode**: `AUTO_APPROVE` or `ADMIN_APPROVAL`. Pending members see a waiting screen and
   are notified when approved or rejected (with the reason). Rejected members can update their details and re-apply;
   admins can suspend and reinstate.
@@ -79,6 +91,13 @@ ended), computes **usage** for any period and freezes **snapshots** (with a note
   approved during the period. Re-running a past period gives the same numbers.
 - The estimate is the plan's per-cycle price prorated to the period: a calendar month on a quarterly plan is a third of
   the fee, half of July is 15/31 of a monthly fee.
+- A plan also lists the **messaging channels** it includes (WhatsApp, SMS, email) and an optional per-message rate for
+  each. Institutions can send invitations and announcements only on channels their plan includes *and* the server has
+  configured; in-app and push are always available. Messages delivered in the period (not failed or cancelled) are
+  counted per channel and added to the estimate and snapshots. System email (address confirmation, the weekly digest)
+  is not limited by the plan.
+- **Compare** (`/platform/compare`) shows every institution side by side for a period (members, active rate, content,
+  messages per channel and the estimated charge) and downloads it as CSV for chargeback.
 
 ### Authentication
 
@@ -129,14 +148,78 @@ Outside production, channels without settings log the message instead of sending
 call `POST /api/v1/platform/messages/test` with a phone and/or email and follow `GET /api/v1/platform/messages/:id`.
 Message types and their per-channel templates live in `templates.ts`.
 
+### Member email
+
+Members can add an email address (per person, shared across institutions) under their profile. It is used only after
+they open the confirmation link (`/verify-email?token=…`, confirmed with a button so link scanners can't do it); a new
+address replaces the old one only once confirmed. Addresses are never shown to other members. Requests are rate-limited
+per member, address, IP and globally (`EMAIL_VERIFY_GLOBAL_DAILY_CAP`). Links in emails use `WEB_APP_URL`.
+
+### Invitations
+
+Admins import a CSV (phone, and optionally name, batch, email and any profile-question key) from **Admin →
+Invitations**; the browser parses it and sends it in chunks of 500, and each row comes back as new, updated, already a
+member or invalid with a reason. Phones without a country code use the institution's country.
+
+- Sending uses the plan's channels (WhatsApp, SMS, email), at most `INVITES_DAILY_LIMIT` per institution per day and
+  one resend per invitation per day. Without paid channels the admin copies the link or shares it from their own
+  WhatsApp.
+- The link is `WEB_APP_URL/i/<token>`. The token only identifies the invitation: joining still needs an OTP-verified
+  phone that matches. Invited members join even when self-registration is closed, are approved straight away when
+  *invite auto-approve* is on (Settings), have their answers prefilled, and are never reinstated if suspended.
+- WhatsApp needs an approved template per message type in `WHATSAPP_TEMPLATES` (`INVITE=name:language,…`). The invite
+  template's body is `Hi {{1}}, you're invited to join the {{2}} alumni network on Illuminize.` with a URL button whose
+  base is `WEB_APP_URL/i/` and variable part `{{1}}`. For SMS in India, register the link's domain with your DLT
+  template (MSG91 flow ids in `MSG91_FLOW_TEMPLATE_IDS`).
+
+### Engagement: polls, announcements, celebrations, weekly digest
+
+- **Polls.** A post can carry a poll (2 to 6 options, single or multiple choice, optional closing time). Votes are
+  anonymous; members see counts. Options are locked once anyone votes.
+- **Announcements.** Admins can post as an announcement: pinned by default, a 📣 badge, an in-app notification and push
+  to every member, and optionally email, WhatsApp or SMS when the plan includes them (members can opt out of those in
+  their notification settings, and emails carry one-click unsubscribe). The send runs as a background job in batches
+  of 1000 and stops if the post is removed first. The feed's pinned strip shows five; further pinned posts stay in the
+  feed with their badge.
+- **Celebrations.** A feed card lists today's birthdays (day and month only, never the year) and membership
+  anniversaries (from the approval date), with *Send wishes*. The member gets one greeting, and wishes collect into one
+  notification ("Asha and 23 others…"). Members can opt out of either in their profile.
+- **Weekly digest.** Every Monday the top posts, new jobs and upcoming events of the past week are saved for each
+  institution, shown in the app ("This week") and emailed to members with a confirmed email who haven't turned it off.
+  Only ids are stored, so content removed since never appears.
+- **Scheduling.** An `engagement.tick` job runs every 15 minutes and, for each institution, queues celebrations from
+  09:00 and the digest from Monday 08:00 in the **institution's time zone** (Settings, default `Asia/Kolkata`). Each
+  run is claimed in `tenant_job_runs`, so retries and overlapping ticks never send twice. To run one now: platform
+  `POST /api/v1/platform/jobs/run {job: "celebrations" | "digest", tenantId, force}` or
+  `pnpm jobs:run digest demo-university --force`.
+
+### Notification preferences and unsubscribe
+
+Members choose per category (comments and reactions, events, announcements, birthdays and anniversaries) between off,
+in-app, and in-app plus push; account notices (approvals, moderation decisions) always arrive and announcements always
+show in the app. They can also turn off the digest email and announcement messages. Emails carry signed unsubscribe
+links and `List-Unsubscribe` headers (one-click, RFC 8058) handled by `POST /api/v1/unsubscribe?token=…`, no sign-in
+needed. Bulk notifications are written in chunks of 1000 with dedupe keys and broadcast once per chunk.
+
+### Analytics and exports
+
+**Admin → Analytics** charts the last 12 weeks, 6 months or 12 months (weeks start on Monday in the institution's time
+zone): new and active members per week (active means the same as for billing), posts, comments, jobs and events per
+week, and who the members are (batches, cities, countries, professions, profile completeness, answers to choice
+questions, invitation funnel), with each headline number compared with the period before. Every chart has a table
+view. *Members CSV* exports every member with all profile answers (admin-only ones included) and confirmed email;
+*Activity CSV* gives active days and content per member for the chosen period. Exports stream in batches of 1000,
+start with a UTF-8 BOM so Excel reads them correctly, prefix cells starting with `= + - @` with `'` so spreadsheets
+don't run them as formulas (this includes `+91…` phone numbers), and are audited and rate-limited.
+
 ### Live updates (Socket.IO)
 
 The API serves Socket.IO at `/socket.io` on its own port (WebSocket transport only). Apps connect with their access
 token; the server checks the session, puts each socket in its user's and session's rooms, and closes it when the token
 expires (the shared client in `packages/shared/src/realtime` refreshes and reconnects) or the session is signed out.
 
-- Events: `notification:new` (with the new unread count) and `notification:unread` (another device read some). Chat
-  events join in Wave 2. Polling stays as a fallback, slowing to every 5 minutes while connected.
+- Events: `notification:new` (with the new unread count), `notification:unread` (another device read some) and
+  `notification:bulk` (an announcement reached many members at once). Chat events join in Wave 2. Polling stays as a fallback, slowing to every 5 minutes while connected.
 - Several API nodes share events through the Redis adapter; a separate worker publishes through Redis with the
   emitter. WebSocket-only transport means no sticky sessions are needed, but the load balancer must allow WebSocket
   upgrades and an idle timeout above 25 seconds.
@@ -193,12 +276,12 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 
 | Area | Endpoints |
 | --- | --- |
-| Public | `GET /tenants`, `GET /tenants/:slug`, `GET /health`, `POST /webhooks/razorpay` |
-| Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` |
-| Me | `GET /me`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
-| Tenant `/t/:slug` | `memberships` (register, me, update), `uploads`, `directory`, `jobs` (+ `seekers`), `funding`, `posts` (+ comments, reactions), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `payments` (get, confirm) |
-| Tenant admin `/t/:slug/admin` | `dashboard`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `settings`, `branding`, `audit` |
-| Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `users` (platform-admin toggle), `audit`, `messages` (test send, status) |
+| Public | `GET /tenants`, `GET /tenants/:slug`, `GET /invites/:token`, `GET/POST /unsubscribe`, `GET /health`, `POST /webhooks/razorpay` |
+| Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`, `POST /auth/email/verify` |
+| Me | `GET /me`, `GET/POST/DELETE /me/email`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
+| Tenant `/t/:slug` | `memberships` (register, me, update, invitation), `profile-fields`, `uploads`, `directory`, `jobs` (+ `seekers`), `funding`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
+| Tenant admin `/t/:slug/admin` | `dashboard`, `analytics`, `exports/members.csv`, `exports/activity.csv`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `settings`, `branding`, `profile-fields`, `invitations` (import/send/revoke), `announcements/audience`, `audit` |
+| Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `analytics/comparison`, `exports/comparison.csv`, `jobs/run`, `users` (platform-admin toggle), `audit`, `messages` (test send, status) |
 
 ## Development
 
@@ -246,6 +329,12 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   persistent (AOF) mode.
 - `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) limits image uploads per institution per day; `BILLING_TIMEZONE` sets the
   billing calendar.
+- `WEB_APP_URL` is the web app's public origin, used for links in invitations, announcements, digests and confirmation
+  emails. It defaults to `http://localhost:5173` outside production; in production it is required once any outbound
+  channel is configured (otherwise the API logs a warning at start). Also: `WHATSAPP_TEMPLATES`, `INVITES_DAILY_LIMIT`,
+  `EMAIL_VERIFY_GLOBAL_DAILY_CAP` (see `apps/api/.env.example`).
+- Deploy the worker together with, or before, the API: new job types (announcement fan-out, celebrations, digest) are
+  queued by the API and must have a worker that knows them.
 - Uploads: `STORAGE_PROVIDER=local` (default) keeps images under `UPLOAD_DIR`, served from `/uploads`, which suits one
   server with a persistent disk. For anything else set `STORAGE_PROVIDER=s3` with an S3-compatible bucket (AWS S3,
   Cloudflare R2 with `S3_REGION=auto`, DigitalOcean Spaces, MinIO): `S3_BUCKET`, `S3_PUBLIC_BASE_URL` (the bucket's
@@ -258,8 +347,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 
 ## Known gaps / next steps
 
-- Email/digest notifications, event reminders and chat are not included yet; they build on the background jobs
-  described above.
+- Event reminders and chat are not included yet; they build on the background jobs described above.
+- The `memberships.extra` column is kept read-only for older app builds and is dropped in Wave 2.
+- On the mobile web export, controls that still use `accessibilityState` (reactions, tabs, chips) don't expose their
+  selected state, because react-native-web only emits the `aria-*` props; the Wave 1 screens use `aria-checked`.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be
   tested; the console sender covers development.
 - Postgres enum additions need hand-written `ALTER TYPE` migrations. Migration 0005 adds a trigger that stamps

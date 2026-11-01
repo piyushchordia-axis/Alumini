@@ -61,7 +61,9 @@ export default function AppTabsLayout() {
         <Tabs.Screen name="funding" options={{ title: "Funding", href: f.funding ? undefined : null }} />
         <Tabs.Screen name="events" options={{ title: "Events", href: f.events ? undefined : null }} />
         <Tabs.Screen name="directory" options={{ title: "Directory", href: f.directory ? undefined : null }} />
-        <Tabs.Screen name="profile" options={{ href: null }} />
+        {/* Reached from the header (avatar and bell), so no tab button. Not `href: null`: expo-router now treats that as a
+            hidden screen and redirects away from it, which would make every profile screen unreachable. */}
+        <Tabs.Screen name="profile" options={{ title: "Profile", tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
       </Tabs>
     </MembershipContext.Provider>
   );

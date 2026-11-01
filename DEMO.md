@@ -52,7 +52,7 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
 **As Illuminize staff** (open `/platform` and sign in with `+91 99999 99999`)
 1. Onboard a new institution together with its first admin.
 2. Open an institution's **Billing** tab, record a per-active-member plan, and look at the usage estimate for the month.
-3. Check **Stats** and **Users**.
+3. Check **Stats**, **Compare** and **Users**.
 
 ## 4. Try the phone app
 
@@ -71,6 +71,30 @@ No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (80
 phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
+
+**Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)
+- **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed opens with today's birthday (Meera) and Rahul's own
+  third anniversary of joining. Tap **Send wishes**; Meera sees them under the bell. Only the day and month are ever
+  shown. Members can opt out in their profile.
+- **Polls and announcements.** Vote in Priya's London meetup poll. The pinned 📣 announcement came from the admin;
+  as Demo University's admin (`+91 90000 00001`) write a post, choose **📣 Announcement**, and tick **Also email it**.
+  Email, WhatsApp and SMS are offered only when the institution's plan includes them; in this demo they're printed in
+  the API terminal.
+- **This week.** Every Monday morning members get a digest of popular posts, new jobs and upcoming events, in the app
+  and by email if they have confirmed one (Profile → Email). To see it now, run `pnpm jobs:run digest demo-university
+  --force` in a terminal, then open **This week** from the feed.
+- **Notification settings** (bell → ⚙️ Settings): choose off, in-app, or in-app and push per kind of notification,
+  and turn off the digest or announcement emails. Every email has an unsubscribe link.
+- **Profile questions.** As an admin, open **Admin → Profile fields** and add a question (for example "Hostel" with
+  choices). Choice questions can filter the directory; admin-only questions stay private.
+- **Invitations.** **Admin → Invitations → Import a list** takes a CSV of phone numbers (download the template). Copy
+  an invitation's link and open it in a private window: the invited alumnus signs in with that number and joins
+  straight away, with their details filled in.
+- **Analytics.** **Admin → Analytics** charts new and active members, activity per week, and who your members are,
+  compared with the previous period. **Members CSV** and **Activity CSV** open in Excel or Google Sheets.
+- **Staff: Compare** (`/platform/compare`) puts every institution side by side for a month, with messages sent and the
+  estimated charge, and downloads it as CSV for chargeback. A plan's **Messaging included** section sets which
+  channels an institution can use and their per-message rates.
 
 **Live updates and background work**
 - **The bell updates live.** Open the web app in two browsers (one in a private window) as two members of Demo

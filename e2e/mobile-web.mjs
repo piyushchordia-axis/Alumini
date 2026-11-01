@@ -91,6 +91,21 @@ try {
     await shot("m04b-post-edited");
   });
 
+  await step("celebrations card and a poll vote on the feed", async () => {
+    const card = page.getByText("🎉 Celebrating today").locator("visible=true").first();
+    await card.waitFor();
+    await page.getByRole("button", { name: "Send wishes" }).locator("visible=true").first().click();
+    await page.getByText("Wished ✓").locator("visible=true").first().waitFor();
+    await shot("m04c-celebrations");
+    // The poll is a few posts down; scroll until the list has rendered it.
+    const question = page.getByText("Where should we hold the next London meetup?").locator("visible=true").first();
+    for (let i = 0; i < 30 && !(await question.count()); i++) await page.mouse.wheel(0, 600);
+    await question.scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: "Canary Wharf" }).locator("visible=true").first().click();
+    await page.locator('[aria-label^="Canary Wharf"][aria-label*="your vote"]').first().waitFor();
+    await shot("m04d-poll");
+  });
+
   await step("jobs tab lists seeded openings", async () => {
     await tap("Jobs");
     await page.getByText("Backend Engineer (Node.js)").waitFor();
@@ -120,6 +135,23 @@ try {
     await hit.dispatchEvent("click");
     await page.getByText("Member since").waitFor();
     await shot("m07-member");
+  });
+
+  await step("notification settings persist", async () => {
+    const group = () => page.locator('[role="radiogroup"][aria-label="Birthdays and anniversaries"]').locator("visible=true").first();
+    const openSettings = async () => {
+      await page.getByRole("button", { name: /^Notifications/ }).locator("visible=true").first().click();
+      await page.getByRole("button", { name: "⚙️ Settings" }).locator("visible=true").first().click();
+      await group().waitFor();
+    };
+    await tap("Feed");
+    await openSettings();
+    await group().getByText("Off", { exact: true }).click();
+    await group().locator('[role="radio"][aria-checked="true"]').getByText("Off", { exact: true }).waitFor();
+    await page.goto(BASE + "/t/demo-university");
+    await openSettings();
+    await group().locator('[role="radio"][aria-checked="true"]').getByText("Off", { exact: true }).waitFor();
+    await shot("m07b-notification-settings");
   });
 
   await step("ADMIN_APPROVAL tenant lands on the pending screen", async () => {
