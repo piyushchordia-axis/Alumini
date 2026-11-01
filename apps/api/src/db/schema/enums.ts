@@ -22,6 +22,7 @@ import {
   PAYMENT_ORDER_STATUSES,
   PAYMENT_PURPOSES,
   PAYMENT_REFUND_STATUSES,
+  POST_KINDS,
   PUSH_PLATFORMS,
   REACTION_TYPES,
   REPORT_REASONS,
@@ -60,3 +61,4 @@ export const paymentRefundStatusEnum = pgEnum("payment_refund_status", PAYMENT_R
 export const profileFieldTypeEnum = pgEnum("profile_field_type", PROFILE_FIELD_TYPES);
 export const profileFieldVisibilityEnum = pgEnum("profile_field_visibility", PROFILE_FIELD_VISIBILITIES);
 export const invitationStatusEnum = pgEnum("invitation_status", INVITATION_STATUSES);
+export const postKindEnum = pgEnum("post_kind", POST_KINDS);

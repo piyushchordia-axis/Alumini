@@ -2,6 +2,12 @@ import { EMAIL_VERIFICATION_TTL_SECONDS, type MessageChannel } from "@illuminize
 import type { AppContext } from "../../context";
 import { findEmailVerification } from "../../repositories/emailVerifications.repo";
 import { findInvitationById } from "../../repositories/invitations.repo";
+import { findMembershipByIdUnscoped } from "../../repositories/memberships.repo";
+import { findNotificationPrefs } from "../../repositories/notifications.repo";
+import { findPostById } from "../../repositories/posts.repo";
+import { findUserById } from "../../repositories/users.repo";
+import { unsubscribeLinks } from "../../lib/unsubscribe";
+import { resolveNotificationPrefs } from "@illuminize/shared";
 import { emailButton, emailLayout, escapeHtml, textToHtml } from "./emailLayout";
 import type { RenderedMessage, WhatsAppTemplateSpec } from "./types";
 
@@ -14,6 +20,8 @@ export interface MessagePayloads {
   PLATFORM_TEST: { sentBy: string; recipientName?: string | null };
   /** Confirms a member's email address. */
   EMAIL_VERIFY: { verificationId: string; link: string };
+  /** An admin's announcement, sent by email/WhatsApp/SMS when the admin chose to (and the plan allows). */
+  ANNOUNCEMENT: { postId: string; membershipId: string; tenantName: string; color: string; excerpt: string; link: string; path: string };
   /** An invitation to join an institution (from an admin's import). */
   INVITE: { invitationId: string; tenantName: string; color: string; recipientName: string | null; link: string; token: string };
 }
@@ -23,8 +31,9 @@ export type MessageType = keyof MessagePayloads;
  * What a template renders from when it has a `load` step that turns the stored ids into content (keyed by type).
  * Types without an entry render from their stored payload.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface LoadedPayloads {}
+export interface LoadedPayloads {
+  ANNOUNCEMENT: MessagePayloads["ANNOUNCEMENT"] & { unsubscribePage: string; unsubscribeHeaders: Record<string, string> };
+}
 export type RenderPayload<T extends MessageType> = T extends keyof LoadedPayloads ? LoadedPayloads[T] : MessagePayloads[T];
 
 export interface LoadContext {
@@ -115,6 +124,48 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
         ].join(""),
       });
       return { subject: "Confirm your email address", text, html };
+    },
+  },
+
+  ANNOUNCEMENT: {
+    channels: ["EMAIL", "WHATSAPP", "SMS"],
+    priority: 10,
+    bulk: true,
+    // Re-checked at send time: the post still up, the member still in and still wanting these, the current email.
+    load: async (ctx, p) => {
+      const m = await findMembershipByIdUnscoped(ctx.db, p.membershipId);
+      if (!m || m.status !== "APPROVED") return { cancel: "no longer a member" };
+      const [post, prefs, user] = await Promise.all([findPostById(ctx.db, m.tenantId, p.postId), findNotificationPrefs(ctx.db, m.id), findUserById(ctx.db, m.userId)]);
+      if (!post || post.moderationStatus !== "APPROVED") return { cancel: "announcement removed" };
+      if (!resolveNotificationPrefs(prefs).announcementMessages) return { cancel: "unsubscribed from announcement messages" };
+      const links = unsubscribeLinks(ctx.config, m.id, "announcements");
+      return { payload: { ...p, unsubscribePage: links.page, unsubscribeHeaders: links.headers }, to: { email: user?.email ?? null } };
+    },
+    // Template body: "{{1}}: {{2}}" (institution, announcement) with a URL button whose base is <WEB_APP_URL>/ and
+    // whose variable part is the path to the post.
+    whatsapp: (p, configured) =>
+      configured
+        ? {
+            name: configured.name,
+            language: configured.language,
+            components: [
+              { type: "body", parameters: [{ type: "text", text: p.tenantName }, { type: "text", text: p.excerpt.slice(0, 600) }] },
+              { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: p.path }] },
+            ],
+          }
+        : null,
+    sms: (p) => ({ institution: p.tenantName, message: p.excerpt.slice(0, 100), link: p.link }),
+    email: (p) => {
+      const text = [p.excerpt, `Read it and reply on Illuminize: ${p.link}`, `You get announcement emails from ${p.tenantName} as a member. To stop them: ${p.unsubscribePage}`].join("\n\n");
+      const html = emailLayout({
+        title: `Announcement from ${p.tenantName}`,
+        color: p.color,
+        preheader: p.excerpt.slice(0, 120),
+        bodyHtml: [textToHtml(p.excerpt), emailButton(p.link, "Read and reply", p.color)].join(""),
+        footerHtml: `You get announcement emails from ${escapeHtml(p.tenantName)} as a member. <a href="${escapeHtml(p.unsubscribePage)}" style="color:#64748b">Unsubscribe from announcement emails</a>.`,
+      });
+      const subject = `${p.tenantName}: ${p.excerpt.length > 70 ? `${p.excerpt.slice(0, 67)}…` : p.excerpt}`;
+      return { subject, text, html, headers: p.unsubscribeHeaders };
     },
   },
 

@@ -102,6 +102,7 @@ export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: 
     reactionCount: post.reactionCount,
     myReaction: myReaction ?? null,
     isPinned: post.isPinned,
+    kind: post.kind,
     poll,
     moderationStatus: post.moderationStatus,
     moderationNote: noteFor(post.moderationNote, author.id, viewer),
@@ -202,5 +203,6 @@ export function toModerationItemDto(item: ModerationItemRow, author: MembershipR
     createdAt: item.createdAt.toISOString(),
     reportCount,
     isPinned: item.isPinned,
+    kind: item.kind,
   };
 }

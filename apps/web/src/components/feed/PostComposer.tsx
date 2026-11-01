@@ -1,6 +1,6 @@
-import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, type PollCreateInput } from "@illuminize/shared";
+import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, type MessageChannel, type PollCreateInput } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { Avatar, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
@@ -13,6 +13,9 @@ export function PostComposer() {
   const [body, setBody] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [poll, setPoll] = useState<{ options: string[]; allowsMultiple: boolean; closesInDays: string } | null>(null);
+  const isAdmin = membership.role === "TENANT_ADMIN";
+  const [announce, setAnnounce] = useState<{ pin: boolean; channels: MessageChannel[] } | null>(null);
+  const audience = useQuery({ queryKey: ["admin", tenant.slug, "announcement-audience"], queryFn: () => api.admin.announcements.audience(tenant.slug), enabled: !!announce });
   const qc = useQueryClient();
   const pollInput = (): PollCreateInput | undefined =>
     poll
@@ -24,13 +27,14 @@ export function PostComposer() {
       : undefined;
   const pollReady = !poll || poll.options.filter((o) => o.trim()).length >= 2;
   const create = useMutation({
-    mutationFn: () => api.posts.create(tenant.slug, { body: body.trim(), imageUrls: images, poll: pollInput() }),
+    mutationFn: () => api.posts.create(tenant.slug, { body: body.trim(), imageUrls: images, poll: pollInput(), ...(announce ? { announcement: announce } : {}) }),
     onSuccess: (post) => {
       setBody("");
       setImages([]);
       setPoll(null);
+      setAnnounce(null);
       void qc.invalidateQueries({ queryKey: ["posts", tenant.slug] });
-      toast.success(post.moderationStatus === "PENDING" ? "Posted — awaiting admin approval" : "Posted!");
+      toast.success(post.kind === "ANNOUNCEMENT" ? "Announcement posted; members are being notified" : post.moderationStatus === "PENDING" ? "Posted — awaiting admin approval" : "Posted!");
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -82,15 +86,53 @@ export function PostComposer() {
               </div>
             </fieldset>
           )}
+          {announce && (
+            <fieldset className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+              <legend className="px-1 font-medium text-slate-800">📣 Announcement</legend>
+              <p className="text-slate-600">
+                Every member{audience.data ? ` (${audience.data.members})` : ""} gets it in the app and as a push notification.
+              </p>
+              <Checkbox label="Pin to the top of the feed" checked={announce.pin} onChange={(e) => setAnnounce({ ...announce, pin: e.target.checked })} />
+              {(audience.data?.channels ?? []).map((c) => (
+                <Checkbox
+                  key={c}
+                  label={
+                    c === "EMAIL"
+                      ? `Also email it (${audience.data!.withEmail} members with a confirmed email)`
+                      : `Also send by ${c === "WHATSAPP" ? "WhatsApp" : "SMS"} (${audience.data!.withPhone} members)`
+                  }
+                  checked={announce.channels.includes(c)}
+                  onChange={(e) => setAnnounce({ ...announce, channels: e.target.checked ? [...announce.channels, c] : announce.channels.filter((x) => x !== c) })}
+                />
+              ))}
+              {audience.data && audience.data.channels.length === 0 && <p className="text-xs text-slate-500">Your plan doesn&apos;t include email, WhatsApp or SMS announcements.</p>}
+            </fieldset>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} />
+              {isAdmin && (
+                <Button variant="ghost" size="sm" aria-pressed={!!announce} onClick={() => setAnnounce(announce ? null : { pin: true, channels: [] })}>
+                  📣 {announce ? "Not an announcement" : "Announcement"}
+                </Button>
+              )}
               <Button variant="ghost" size="sm" aria-pressed={!!poll} onClick={() => setPoll(poll ? null : { options: ["", ""], allowsMultiple: false, closesInDays: "" })}>
                 📊 {poll ? "Remove poll" : "Poll"}
               </Button>
             </div>
-            <Button onClick={() => create.mutate()} loading={create.isPending} disabled={!body.trim() || !pollReady}>
-              Post
+            <Button
+              onClick={() => {
+                if (announce?.channels.length) {
+                  const d = audience.data;
+                  const parts = announce.channels.map((c) => (c === "EMAIL" ? `email to ${d?.withEmail ?? 0}` : `${c === "WHATSAPP" ? "WhatsApp" : "SMS"} to ${d?.withPhone ?? 0}`));
+                  if (!confirm(`Send this announcement by ${parts.join(" and ")} members? Messages are billed to your institution.`)) return;
+                }
+                create.mutate();
+              }}
+              loading={create.isPending}
+              disabled={!body.trim() || !pollReady}
+            >
+              {announce ? "Post announcement" : "Post"}
             </Button>
           </div>
           {membership.role !== "TENANT_ADMIN" && <p className="text-xs text-slate-400">Posts are subject to this institution's moderation settings.</p>}

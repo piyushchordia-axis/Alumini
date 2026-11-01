@@ -34,7 +34,9 @@ import {
   upsertReaction,
 } from "../repositories/posts.repo";
 import type { TenantContext } from "../types/request";
-import { runInTransaction } from "../lib/transaction";
+import { afterCommit, runInTransaction } from "../lib/transaction";
+import { insertAnnouncement } from "../repositories/announcements.repo";
+import { tenantOutboundChannels } from "./billing.service";
 import { insertPoll, loadPolls, lockPoll, replaceVotes } from "../repositories/polls.repo";
 import type { PostWithAuthor } from "../repositories/posts.repo";
 import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerFlags, viewerOf } from "./content.common";
@@ -54,17 +56,29 @@ const toOnePostDto = async (ctx: AppContext, actor: ContentActor, row: PostWithA
 
 export async function listTenantPosts(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: PostListQuery): Promise<PostPageDto> {
   const tenantId = tenantCtx.tenant.id;
-  const page = await listPosts(ctx.db, tenantId, query, actor.membership.id);
+  // Only the posts in the pinned strip are left out of the feed; any further pinned posts stay in it (with their badge).
+  const pinned = query.mine ? [] : await listPinnedPosts(ctx.db, tenantId, actor.membership.id);
+  const page = await listPosts(
+    ctx.db,
+    tenantId,
+    query,
+    actor.membership.id,
+    pinned.map((p) => p.post.id),
+  );
   const result: PostPageDto = { data: await toPostDtos(ctx, actor, page.data), nextCursor: page.nextCursor };
-  if (!query.cursor && !query.mine) {
-    const pinned = await listPinnedPosts(ctx.db, tenantId, actor.membership.id);
-    result.pinned = await toPostDtos(ctx, actor, pinned);
-  }
+  if (!query.cursor && !query.mine) result.pinned = await toPostDtos(ctx, actor, pinned);
   return result;
 }
 
 export async function createPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: PostCreateInput): Promise<PostDto> {
   const status = initialStatusFor(tenantCtx, actor, "POST");
+  const ann = input.announcement;
+  if (ann) {
+    if (actor.membership.role !== "TENANT_ADMIN" || actor.membership.status !== "APPROVED") throw AppError.forbidden("Only admins can post announcements");
+    const allowed = await tenantOutboundChannels(ctx, tenantCtx.tenant.id);
+    const notAllowed = ann.channels.filter((c) => !allowed.includes(c));
+    if (notAllowed.length) throw AppError.badRequest(`Your plan doesn't include ${notAllowed.join(", ").toLowerCase()} for announcements`, [{ path: "announcement.channels", message: "Not included in your plan" }]);
+  }
   const row = await runInTransaction(ctx, async (tx) => {
     const post = await insertPost(tx, {
       tenantId: tenantCtx.tenant.id,
@@ -73,8 +87,13 @@ export async function createPost(ctx: AppContext, tenantCtx: TenantContext, acto
       imageUrls: input.imageUrls ?? [],
       moderationStatus: status,
       moderatedAt: status === "APPROVED" ? new Date() : null,
+      ...(ann ? { kind: "ANNOUNCEMENT" as const, isPinned: ann.pin } : {}),
     });
     if (input.poll) await insertPoll(tx, tenantCtx.tenant.id, post.id, input.poll);
+    if (ann) {
+      await insertAnnouncement(tx, { postId: post.id, tenantId: tenantCtx.tenant.id, channels: ann.channels, createdByUserId: actor.userId });
+      await afterCommit(ctx, tx, () => ctx.jobs.enqueue("announcements.fanout", { tenantId: tenantCtx.tenant.id, postId: post.id }, { jobId: `ann-${post.id}-start` }));
+    }
     return post;
   });
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "POST", id: row.id, title: row.body, status, action: "create" });

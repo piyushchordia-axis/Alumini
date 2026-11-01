@@ -99,6 +99,13 @@
       "when": 1793511286214,
       "tag": "0013_wave1_polls",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793511666471,
+      "tag": "0014_wave1_announcements",
+      "breakpoints": true
     }
   ]
 }

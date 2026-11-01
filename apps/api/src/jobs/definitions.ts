@@ -26,6 +26,8 @@ export interface JobPayloads {
   "payments.webhook": { webhookEventId: string };
   /** Send (or resend) a batch of invitations over the channels the institution's plan allows. */
   "invitations.send": { tenantId: string; invitationIds: string[] };
+  /** Deliver an announcement to one page of members (each page queues the next). */
+  "announcements.fanout": { tenantId: string; postId: string; afterMembershipId?: string | null };
 }
 
 export type JobName = keyof JobPayloads;
@@ -50,4 +52,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "messages.sweep": { queue: "jobs", attempts: 1 },
   "payments.webhook": { queue: "jobs", attempts: 8, backoff: { type: "exponential", delayMs: 10_000 } },
   "invitations.send": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 10_000 } },
+  "announcements.fanout": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
 };

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { AppContext } from "../../../context";
 import { requireTenantAdmin } from "../../../middleware/tenant";
+import { announcementRoutes } from "./announcements.routes";
 import { auditRoutes } from "./audit.routes";
 import { dashboardRoutes } from "./dashboard.routes";
 import { memberRoutes } from "./members.routes";
@@ -20,6 +21,7 @@ export function adminRoutes(ctx: AppContext): Router {
   router.use(settingsRoutes(ctx));
   router.use(profileFieldRoutes(ctx));
   router.use(invitationRoutes(ctx));
+  router.use(announcementRoutes(ctx));
   router.use(auditRoutes(ctx));
   return router;
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, REACTION_TYPES } from "../constants";
+import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, MESSAGE_CHANNELS, REACTION_TYPES } from "../constants";
 import { booleanQuerySchema, cursorQuerySchema, httpUrlSchema, isoDateTimeSchema, trimmedString, uuidSchema } from "./common";
 
 /** A poll on a post: the post's text is the question. Polls can't be edited once posted. */
@@ -22,9 +22,23 @@ const postFields = {
   imageUrls: z.array(httpUrlSchema).max(MAX_POST_IMAGES).optional(),
 };
 
+/** Admins only: post as an announcement (every member is notified; optionally also by email/WhatsApp/SMS). */
+export const announcementOptionsSchema = z.object({
+  /** Outbound channels to also send it by, limited to what the institution's plan includes. */
+  channels: z
+    .array(z.enum(MESSAGE_CHANNELS))
+    .max(MESSAGE_CHANNELS.length)
+    .default([])
+    .transform((v) => [...new Set(v)]),
+  /** Pin to the top of the feed (default). */
+  pin: z.boolean().default(true),
+});
+export type AnnouncementOptions = z.infer<typeof announcementOptionsSchema>;
+
 export const postCreateSchema = z.object({
   ...postFields,
   poll: pollCreateSchema.optional(),
+  announcement: announcementOptionsSchema.optional(),
 });
 export type PostCreateInput = z.infer<typeof postCreateSchema>;
 

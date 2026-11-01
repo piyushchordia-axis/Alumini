@@ -81,6 +81,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="info">{CONTENT_TYPE_LABELS[item.contentType]}</Badge>
+            {item.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
             {item.reportCount > 0 && <Badge tone="danger">🚩 {item.reportCount} report(s)</Badge>}
             <span className="text-xs text-slate-500">
               by {item.author.fullName} (batch of {item.author.batchYear}) · {timeAgo(item.createdAt)}

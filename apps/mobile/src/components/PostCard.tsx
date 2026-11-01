@@ -37,9 +37,10 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
     onError: (e) => Alert.alert("Could not delete", errorMessage(e)),
   });
   return (
-    <Card>
+    <Card style={post.kind === "ANNOUNCEMENT" ? { borderLeftWidth: 4, borderLeftColor: theme.primary } : undefined}>
       <Row style={{ justifyContent: "space-between" }}>
         <MemberRow slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
+        {post.kind === "ANNOUNCEMENT" && <Badge label="📣 Announcement" tone="primary" />}
         {post.isPinned && <Badge label="📌 Pinned" tone="primary" />}
         <ModerationBadge status={post.moderationStatus} />
       </Row>

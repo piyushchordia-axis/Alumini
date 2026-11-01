@@ -141,6 +141,10 @@ export const DEFAULT_TENANT_FEATURES: TenantFeatures = {
   directory: true,
 };
 
+/** ANNOUNCEMENT: an admin's notice, pinned by default and sent to every member. */
+export const POST_KINDS = ["POST", "ANNOUNCEMENT"] as const;
+export type PostKind = (typeof POST_KINDS)[number];
+
 export const MAX_POST_IMAGES = 4;
 export const MAX_POLL_OPTIONS = 6;
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;

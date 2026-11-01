@@ -55,10 +55,11 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
   });
 
   return (
-    <Card as="article" className="p-4">
+    <Card as="article" className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary p-4" : "p-4"}>
       <div className="flex items-start justify-between gap-3">
         <MemberLink slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
         <div className="flex items-center gap-2">
+          {post.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
           {post.isPinned && <Badge tone="primary">📌 Pinned</Badge>}
           <ModerationStatusBadge status={post.moderationStatus} note={post.moderationNote} />
         </div>

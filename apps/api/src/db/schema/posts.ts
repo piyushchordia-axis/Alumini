@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
 import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { reactionTypeEnum } from "./enums";
+import { messageChannelEnum, postKindEnum, reactionTypeEnum } from "./enums";
 import { moderationColumns, tenantScoped, timestamps } from "./helpers";
 import { memberships } from "./memberships";
 import { tenants } from "./tenants";
+import { users } from "./users";
 
 export const posts = pgTable(
   "posts",
@@ -21,6 +22,7 @@ export const posts = pgTable(
     commentCount: integer("comment_count").notNull().default(0),
     reactionCount: integer("reaction_count").notNull().default(0),
     isPinned: boolean("is_pinned").notNull().default(false),
+    kind: postKindEnum("kind").notNull().default("POST"),
     ...moderationColumns(),
     ...timestamps(),
   },
@@ -115,3 +117,18 @@ export const pollVotes = pgTable(
   },
   (t) => [primaryKey({ columns: [t.optionId, t.membershipId] }), index("poll_votes_post_member_idx").on(t.postId, t.membershipId)],
 );
+
+/** How an announcement was sent: the channels chosen, fan-out progress and how many it reached. */
+export const postAnnouncements = pgTable("post_announcements", {
+  postId: uuid("post_id")
+    .primaryKey()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  ...tenantScoped(),
+  channels: messageChannelEnum("channels").array().notNull().default(sql`'{}'::message_channel[]`),
+  notifiedCount: integer("notified_count").notNull().default(0),
+  messagedCount: integer("messaged_count").notNull().default(0),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  fanoutStartedAt: timestamp("fanout_started_at", { withTimezone: true, precision: 3 }),
+  fanoutFinishedAt: timestamp("fanout_finished_at", { withTimezone: true, precision: 3 }),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+});

@@ -17,6 +17,7 @@ import type {
   OutboundMessageStatus,
   PaymentOrderStatus,
   PaymentPurpose,
+  PostKind,
   ProfessionType,
   ProfileFieldType,
   ProfileFieldVisibility,
@@ -417,6 +418,18 @@ export interface FundingDto extends ModerationFields {
   updatedAt: string;
 }
 
+/** Who an announcement would reach, for the confirmation before posting. */
+export interface AnnouncementAudienceDto {
+  /** Approved members (besides you): all get it in the app. */
+  members: number;
+  /** Of those, how many have a confirmed email and haven't turned announcement messages off. */
+  withEmail: number;
+  /** Of those, how many haven't turned announcement messages off (everyone has a phone). */
+  withPhone: number;
+  /** Channels your plan lets you also send announcements by. */
+  channels: MessageChannel[];
+}
+
 export interface PollDto {
   options: Array<{ id: string; label: string; votes: number }>;
   /** People who voted (with several choices allowed, one person counts once here). */
@@ -436,6 +449,7 @@ export interface PostDto extends ModerationFields {
   reactionCount: number;
   myReaction: ReactionType | null;
   isPinned: boolean;
+  kind: PostKind;
   /** A poll attached to the post (the body is the question). */
   poll: PollDto | null;
   author: MemberCardDto;
@@ -531,6 +545,8 @@ export interface ModerationItemDto {
   reportCount: number;
   /** Posts only: whether it is pinned to the top of the feed. */
   isPinned: boolean;
+  /** Posts only: a regular post or an announcement. */
+  kind: PostKind | null;
 }
 
 export interface DirectoryFiltersDto {

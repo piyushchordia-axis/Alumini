@@ -1,5 +1,5 @@
 import { boolean, pgView, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { contentTypeEnum, moderationStatusEnum } from "./enums";
+import { contentTypeEnum, moderationStatusEnum, postKindEnum } from "./enums";
 
 /**
  * Union of all moderatable content. Created by the hand-written migration
@@ -16,4 +16,6 @@ export const moderationItems = pgView("moderation_items", {
   moderatedAt: timestamp("moderated_at", { withTimezone: true, precision: 3 }),
   createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull(),
   isPinned: boolean("is_pinned").notNull(),
+  /** Posts only (null for other content). */
+  kind: postKindEnum("kind"),
 }).existing();

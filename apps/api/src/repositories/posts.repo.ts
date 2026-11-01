@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ne, notInArray, type SQL, sql } from "drizzle-orm";
 import type { ReactionType } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { memberships, postComments, postReactions, posts } from "../db/schema";
@@ -25,11 +25,16 @@ export async function listPosts(
   tenantId: string,
   q: { cursor?: string; limit: number; mine?: boolean },
   viewerMembershipId: string,
+  /** Posts shown in the pinned strip above the feed (left out of the feed so they don't appear twice). */
+  excludeIds: string[] = [],
 ): Promise<CursorPage<PostWithAuthor>> {
   const conds: SQL[] = [eq(posts.tenantId, tenantId)];
   if (q.mine) conds.push(eq(posts.authorMembershipId, viewerMembershipId));
   // Suspended members' posts disappear from the feed until they are reinstated.
-  else conds.push(eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, false), ne(memberships.status, "SUSPENDED"));
+  else {
+    conds.push(eq(posts.moderationStatus, "APPROVED"), ne(memberships.status, "SUSPENDED"));
+    if (excludeIds.length) conds.push(notInArray(posts.id, excludeIds));
+  }
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(posts.createdAt, posts.id, cursor, "desc");
   if (keyset) conds.push(keyset);
@@ -43,6 +48,9 @@ export async function listPosts(
   return buildCursorPage(rows, q.limit, (r) => ({ v: r.post.createdAt.toISOString(), id: r.post.id }), (r) => r);
 }
 
+/** The pinned strip above the feed: up to five pinned posts, most recently pinned or edited first. */
+export const PINNED_STRIP_SIZE = 5;
+
 export async function listPinnedPosts(db: DbClient, tenantId: string, viewerMembershipId: string): Promise<PostWithAuthor[]> {
   return db
     .select(postSelect(viewerMembershipId))
@@ -50,7 +58,7 @@ export async function listPinnedPosts(db: DbClient, tenantId: string, viewerMemb
     .innerJoin(memberships, eq(memberships.id, posts.authorMembershipId))
     .where(and(eq(posts.tenantId, tenantId), eq(posts.moderationStatus, "APPROVED"), eq(posts.isPinned, true), ne(memberships.status, "SUSPENDED")))
     .orderBy(desc(posts.updatedAt))
-    .limit(5);
+    .limit(PINNED_STRIP_SIZE);
 }
 
 export async function findPostWithAuthor(db: DbClient, tenantId: string, id: string, viewerMembershipId: string): Promise<PostWithAuthor | undefined> {
