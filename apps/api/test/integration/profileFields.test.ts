@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { and, eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { memberFieldValues, memberships, tenantProfileFields } from "../../src/db/schema";
+import { memberships } from "../../src/db/schema";
 import { PROFILE, createTenant, createUser, loginAs, auth, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -103,7 +100,6 @@ describe.skipIf(!dbAvailable)("custom profile fields", () => {
       { key: "roll_no", label: "Roll number", type: "TEXT", visibility: "ADMINS", value: "EE-042", display: "EE-042" },
       { key: "hostel", label: "Hostel", type: "BOOLEAN", visibility: "MEMBERS", value: true, display: "Yes" },
     ]);
-    expect(ok.body.data.extra).toEqual({ House: "Blue House", Sports: "Chess, Cricket", Hostel: "Yes" });
 
     // Profile edits: other changes work without resending answers; clearing a required answer doesn't.
     expect((await api().patch(`${base}/memberships/me`).set(h).send({ city: "Pune" })).status).toBe(200);
@@ -161,41 +157,5 @@ describe.skipIf(!dbAvailable)("custom profile fields", () => {
     const typeChange = await api().patch(`${base}/admin/profile-fields/${f.house.id}`).set(admin.headers).send({ type: "TEXT", options: [], filterable: false });
     expect(typeChange.status).toBe(409);
     expect((await api().patch(`${base}/admin/profile-fields/${f.roll.id}`).set(admin.headers).send({ type: "LONG_TEXT" })).status).toBe(409);
-  });
-
-  it("copies the old free-form profile info into fields (migration step)", async () => {
-    const { tenant } = await createTenant(ctx);
-    const { tenant: other } = await createTenant(ctx);
-    const a = await memberSession(ctx, tenant.id);
-    const b = await memberSession(ctx, tenant.id);
-    const c = await memberSession(ctx, other.id);
-    await ctx.db.update(memberships).set({ extra: { Hobby: "trekking", "Blood group": "O+", "blood_group": "dup", empty: "  " } }).where(eq(memberships.id, a.membership.id));
-    await ctx.db.update(memberships).set({ extra: { Hobby: "chess", Kids_school: 3 } }).where(eq(memberships.id, b.membership.id));
-    await ctx.db.update(memberships).set({ extra: { "9 lives": true } }).where(eq(memberships.id, c.membership.id));
-
-    const migration = readFileSync(resolve(import.meta.dirname, "../../drizzle/0011_wave1_profile_fields.sql"), "utf8");
-    const copySql = migration.slice(migration.indexOf("-- extra-copy:start"), migration.indexOf("-- extra-copy:end"));
-    await ctx.db.execute(sql.raw(copySql));
-    await ctx.db.execute(sql.raw(copySql)); // safe to run again
-
-    const fields = await ctx.db.select().from(tenantProfileFields).where(eq(tenantProfileFields.tenantId, tenant.id));
-    const keys = fields.map((x) => x.key).sort();
-    expect(keys).toHaveLength(5);
-    expect(keys).toEqual(expect.arrayContaining(["hobby", "kids_school", "empty"]));
-    expect(keys.filter((k) => k.startsWith("blood_group_"))).toHaveLength(2); // two raw keys, one slug: hashed suffixes
-    expect(fields.every((x) => x.type === "TEXT" && x.visibility === "MEMBERS")).toBe(true);
-    const hobby = fields.find((x) => x.key === "hobby")!;
-    const values = await ctx.db.select().from(memberFieldValues).where(eq(memberFieldValues.fieldId, hobby.id));
-    expect(values.map((v) => v.value).sort()).toEqual(["chess", "trekking"]);
-    const kids = fields.find((x) => x.key === "kids_school")!;
-    expect((await ctx.db.select().from(memberFieldValues).where(and(eq(memberFieldValues.fieldId, kids.id))))[0]!.value).toBe("3");
-    const empty = fields.find((x) => x.key === "empty")!;
-    expect(await ctx.db.select().from(memberFieldValues).where(eq(memberFieldValues.fieldId, empty.id))).toHaveLength(0);
-    const otherFields = await ctx.db.select().from(tenantProfileFields).where(eq(tenantProfileFields.tenantId, other.id));
-    expect(otherFields.map((x) => x.key)).toEqual(["f_9_lives"]);
-
-    // The member's DTO now shows the copied answers (and the legacy extra shape built from them).
-    const me = await request(ctx.app).get(`/api/v1/t/${tenant.slug}/memberships/me`).set(a.headers);
-    expect(me.body.data.extra).toMatchObject({ Hobby: "trekking", "Blood group": "O+" });
   });
 });

@@ -86,8 +86,7 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 
 ## What's next
 
-- **Wave 2:** messaging and groups (chat over Socket.IO), mentorship and referrals, a business directory, and dropping
-  the read-only `memberships.extra` column.
+- **Wave 2:** messaging and groups (chat over Socket.IO), mentorship and referrals, and a business directory.
 - **Wave 3:** event upgrades (tickets, reminders) and giving campaigns, on the payments layer
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**

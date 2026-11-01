@@ -120,8 +120,7 @@ emails for Rahul, Priya and Sneha. Demo University's plan includes WhatsApp, SMS
 - **Profile questions** are defined per institution (up to 30: text, long text, number, date, single or multiple
   choice, yes/no). Each can be required (asked at sign-up), visible to members or to admins only, editable by the
   member or set by admins, and choice questions can filter the directory (`?field=key:value`, repeatable). Values are
-  validated by the same shared schema in the API, web and mobile apps. The legacy `extra` column is no longer written;
-  responses still fill `extra` from members-visible answers for older app builds, and the column goes in Wave 2.
+  validated by the same shared schema in the API, web and mobile apps.
 - Per-tenant **member approval mode**: `AUTO_APPROVE` or `ADMIN_APPROVAL`. Pending members see a waiting screen and
   are notified when approved or rejected (with the reason). Rejected members can update their details and re-apply;
   admins can suspend and reinstate.
@@ -405,7 +404,6 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 ## Known gaps / next steps
 
 - Event reminders and chat are not included yet; they build on the background jobs described above.
-- The `memberships.extra` column is kept read-only for older app builds and is dropped in Wave 2.
 - On the mobile web export, controls that still use `accessibilityState` (reactions, tabs, chips) don't expose their
   selected state, because react-native-web only emits the `aria-*` props; the Wave 1 screens use `aria-checked`.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be

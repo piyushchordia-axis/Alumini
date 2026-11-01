@@ -289,8 +289,6 @@ export interface MembershipDto {
   celebrateAnniversary: boolean;
   /** Answers to the institution's questions (the member's own and admins' views include admin-only ones). */
   fields: ProfileFieldAnswerDto[];
-  /** Deprecated (older app versions): members-visible answers as { label: text }. */
-  extra: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -316,8 +314,6 @@ export interface MemberProfileDto extends MemberCardDto {
   interests: string[];
   /** Answers to the institution's questions that members may see. */
   fields: ProfileFieldAnswerDto[];
-  /** Deprecated (older app versions): the same answers as { label: text }. */
-  extra: Record<string, unknown>;
   /** Present only when the member chose to share it. */
   phone: string | null;
   memberSince: string;

@@ -5,7 +5,6 @@ import {
   date,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   smallint,
@@ -53,7 +52,6 @@ export const memberships = pgTable(
     /** Shown on the feed's celebrations card on their birthday (day and month only) / membership anniversary. */
     celebrateBirthday: boolean("celebrate_birthday").notNull().default(true),
     celebrateAnniversary: boolean("celebrate_anniversary").notNull().default(true),
-    extra: jsonb("extra").$type<Record<string, unknown>>().notNull().default({}),
     lastActiveAt: timestamp("last_active_at", { withTimezone: true, precision: 3 }),
     /** First time the membership was approved; billing counts "approved as of" and "new in period" from it. */
     approvedAt: timestamp("approved_at", { withTimezone: true, precision: 3 }),

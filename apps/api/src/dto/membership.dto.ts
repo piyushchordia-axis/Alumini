@@ -6,10 +6,6 @@ import type { MembershipRow } from "../types/request";
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
-/** The old free-form `extra` shape, rebuilt from members-visible answers so older app versions keep showing them. */
-const legacyExtra = (fields: ProfileFieldAnswerDto[]): Record<string, unknown> =>
-  Object.fromEntries(fields.filter((f) => f.visibility === "MEMBERS").map((f) => [f.label, f.display]));
-
 /** `fields`: the answers this viewer may see (load them with answersFor). */
 export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[] = []): MembershipDto {
   return {
@@ -37,7 +33,6 @@ export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[
     celebrateBirthday: m.celebrateBirthday,
     celebrateAnniversary: m.celebrateAnniversary,
     fields,
-    extra: legacyExtra(fields),
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
   };
@@ -66,7 +61,6 @@ export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE
     linkedinUrl: m.linkedinUrl,
     interests: m.interests,
     fields,
-    extra: legacyExtra(fields),
     phone: m.isPhoneVisible ? user.phoneE164 : null,
     memberSince: m.createdAt.toISOString(),
   };
