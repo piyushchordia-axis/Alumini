@@ -68,9 +68,15 @@ try {
     await shot("m04-feed");
   });
 
-  await step("create a post from the feed", async () => {
+  await step("create a post with a photo from the feed", async () => {
     await page.getByRole("button", { name: "New post" }).click();
     await page.locator("textarea").first().fill(`Hello from the mobile smoke ${unique}`);
+    // A real 1×1 PNG through the browser's file chooser: the upload must send a File, not { uri, name, type }.
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    const chooser = page.waitForEvent("filechooser");
+    await tap("📷 Add image");
+    await (await chooser).setFiles({ name: "smoke.png", mimeType: "image/png", buffer: png });
+    await page.locator('img[src*="/uploads/"]').first().waitFor();
     await tap("Post");
     await page.getByText(`Hello from the mobile smoke ${unique}`).waitFor();
   });

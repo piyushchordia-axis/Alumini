@@ -228,8 +228,12 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   persistent (AOF) mode.
 - `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) limits image uploads per institution per day; `BILLING_TIMEZONE` sets the
   billing calendar.
-- Uploads are stored on local disk under `UPLOAD_DIR` and served from `/uploads`; `services/storage/StorageProvider.ts`
-  is the seam for S3-compatible storage.
+- Uploads: `STORAGE_PROVIDER=local` (default) keeps images under `UPLOAD_DIR`, served from `/uploads`, which suits one
+  server with a persistent disk. For anything else set `STORAGE_PROVIDER=s3` with an S3-compatible bucket (AWS S3,
+  Cloudflare R2 with `S3_REGION=auto`, DigitalOcean Spaces, MinIO): `S3_BUCKET`, `S3_PUBLIC_BASE_URL` (the bucket's
+  public URL or a CDN), optional `S3_ENDPOINT`/`S3_FORCE_PATH_STYLE`, and keys or the default AWS credentials. The
+  bucket must be publicly readable; objects are immutable and cached for a year. `/uploads` keeps serving older local
+  files after a switch. Try it locally with `docker compose --profile s3 up -d` (MinIO, see `apps/api/.env.example`).
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
   at the API (or proxy `/api` and `/uploads`).
 - CI (`.github/workflows/ci.yml`) runs lint, typecheck, the API test-suite against Postgres + Redis services, and builds.

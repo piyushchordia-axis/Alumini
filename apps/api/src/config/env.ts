@@ -64,6 +64,21 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().default("loopback"),
 
   EXPO_ACCESS_TOKEN: z.string().optional(),
+  /** Where uploaded images go: local disk (UPLOAD_DIR, served at /uploads) or an S3-compatible bucket. */
+  STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+  S3_BUCKET: z.string().optional(),
+  /** AWS region; Cloudflare R2 uses "auto". */
+  S3_REGION: z.string().default("us-east-1"),
+  /** For R2, Spaces or MinIO, e.g. https://<account>.r2.cloudflarestorage.com or http://localhost:9000. */
+  S3_ENDPOINT: z.string().optional(),
+  S3_FORCE_PATH_STYLE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** Public URL prefix of the bucket or its CDN; image URLs are this plus the object key. */
+  S3_PUBLIC_BASE_URL: z.string().optional(),
   /** Outbound email over SMTP, e.g. smtps://user:pass@smtp.zoho.in:465 or smtp://…:587 (STARTTLS). */
   SMTP_URL: z.string().optional(),
   /** Sender, e.g. "Illuminize <no-reply@illuminize.app>"; the domain needs SPF/DKIM for the SMTP provider. */
@@ -124,6 +139,10 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),
   };
 
+  if (config.STORAGE_PROVIDER === "s3") {
+    if (!config.S3_BUCKET || !config.S3_PUBLIC_BASE_URL) throw new Error("STORAGE_PROVIDER=s3 needs S3_BUCKET and S3_PUBLIC_BASE_URL");
+    if (!!config.S3_ACCESS_KEY_ID !== !!config.S3_SECRET_ACCESS_KEY) throw new Error("Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither (default AWS credentials)");
+  }
   if (config.SMTP_URL && !config.EMAIL_FROM) {
     throw new Error("SMTP_URL is set but EMAIL_FROM is not; set the sender address, e.g. EMAIL_FROM=\"Illuminize <no-reply@example.com>\"");
   }

@@ -1,5 +1,6 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { S3Storage } from "../../src/services/storage";
 import { createTenant, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -42,5 +43,22 @@ describe.skipIf(!dbAvailable)("image uploads", () => {
     expect(spoof.body.error.code).toBe("UNSUPPORTED_MEDIA");
     const missing = await api().post(base).set(member.headers);
     expect(missing.status).toBe(400);
+  });
+
+  it("stores uploads in S3-compatible storage when configured", async () => {
+    const commands: unknown[] = [];
+    const s3 = new S3Storage({ bucket: "photos", region: "auto", forcePathStyle: true, publicBaseUrl: "https://photos.example.com" }, { send: async (c: unknown) => void commands.push(c) } as never);
+    const previous = ctx.storage;
+    ctx.storage = s3;
+    try {
+      const { tenant } = await createTenant(ctx);
+      const member = await memberSession(ctx, tenant.id);
+      const res = await api().post(`/api/v1/t/${tenant.slug}/uploads`).set(member.headers).attach("file", PNG, { filename: "a.png", contentType: "image/png" });
+      expect(res.status).toBe(201);
+      expect(res.body.data.url).toMatch(new RegExp(`^https://photos\\.example\\.com/${tenant.id}/[0-9a-f-]+\\.png$`));
+      expect(commands).toHaveLength(1);
+    } finally {
+      ctx.storage = previous;
+    }
   });
 });

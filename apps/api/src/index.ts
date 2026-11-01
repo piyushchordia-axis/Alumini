@@ -19,7 +19,10 @@ async function main(): Promise<void> {
   const realtime = attachRealtime(server, ctx);
   ctx.realtime = realtime.publisher;
   server.listen(config.PORT, () => {
-    logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER, workerMode: config.workerMode }, "Illuminize API listening");
+    logger.info({ port: config.PORT, env: config.NODE_ENV, otpProvider: config.OTP_PROVIDER, workerMode: config.workerMode, storage: config.STORAGE_PROVIDER }, "Illuminize API listening");
+    if (config.isProduction && config.STORAGE_PROVIDER === "local") {
+      logger.warn("Uploads are stored on this server's disk; use STORAGE_PROVIDER=s3 when running several servers or on ephemeral disks");
+    }
   });
 
   // Development and the Codespaces demo run the background workers in this process; production runs `pnpm worker`.
