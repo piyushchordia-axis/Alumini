@@ -85,6 +85,16 @@ describe.skipIf(!redisAvailable)("BullMQ job queue (real Redis)", () => {
     await events.close();
   });
 
+  it("adds jobs in bulk with priorities and job ids", async () => {
+    const before = calls.filter((c) => c.name === "receipts").length;
+    await queue.enqueueBulk([
+      { name: "push.checkReceipts", data: {}, opts: { jobId: "bulk-a", priority: 5 } },
+      { name: "push.checkReceipts", data: {}, opts: { jobId: "bulk-b", priority: 1 } },
+      { name: "push.checkReceipts", data: {}, opts: { jobId: "bulk-a", priority: 5 } },
+    ]);
+    await eventually(() => expect(calls.filter((c) => c.name === "receipts").length - before).toBe(2));
+  });
+
   it("dedupes jobs with the same id", async () => {
     const before = calls.filter((c) => c.name === "receipts").length;
     const q = queue.queue("jobs");

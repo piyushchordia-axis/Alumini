@@ -57,6 +57,13 @@
       "when": 1793491615930,
       "tag": "0007_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793507770356,
+      "tag": "0008_wave1_email_timezone",
+      "breakpoints": true
     }
   ]
 }

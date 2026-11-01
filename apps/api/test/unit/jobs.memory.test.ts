@@ -61,4 +61,22 @@ describe("MemoryJobQueue", () => {
     await q.drain({ includeDelayed: true });
     expect(runs).toBe(2);
   });
+
+  it("runs the most urgent job on a queue first, oldest first among equals, and bulk-adds jobs", async () => {
+    const order: string[] = [];
+    const q = queueWith({
+      "messages.send": async (_c, data) => {
+        order.push(data.messageId);
+      },
+    });
+    await q.enqueue("messages.send", { messageId: "digest-1" }, { priority: 20 });
+    await q.enqueueBulk([
+      { name: "messages.send", data: { messageId: "digest-2" }, opts: { priority: 20 } },
+      { name: "messages.send", data: { messageId: "verify" }, opts: { priority: 1 } },
+      { name: "messages.send", data: { messageId: "invite" }, opts: { priority: 5, jobId: "dup" } },
+      { name: "messages.send", data: { messageId: "invite-again" }, opts: { priority: 5, jobId: "dup" } },
+    ]);
+    await q.drain();
+    expect(order).toEqual(["verify", "invite", "digest-1", "digest-2"]);
+  });
 });

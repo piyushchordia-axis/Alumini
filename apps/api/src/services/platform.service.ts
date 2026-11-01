@@ -145,6 +145,7 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
       type: input.type,
       city: input.city ?? null,
       country: input.country ?? null,
+      ...(input.timezone ? { timezone: input.timezone } : {}),
       tagline: input.tagline ?? null,
       welcomeMessage: input.welcomeMessage ?? null,
       websiteUrl: input.websiteUrl ?? null,

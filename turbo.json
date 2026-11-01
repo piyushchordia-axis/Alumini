@@ -19,6 +19,7 @@
         "CODESPACE_NAME",
         "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN",
         "VITE_API_PROXY_TARGET",
+        "WEB_APP_URL",
         "WORKER_MODE"
       ]
     },

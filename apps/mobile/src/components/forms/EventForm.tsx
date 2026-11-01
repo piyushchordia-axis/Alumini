@@ -23,10 +23,25 @@ import { useImageUpload } from "@/hooks/useImagePicker";
  * time zone and converted to instants on submit, so they are right even when the
  * organiser's phone is set to a different zone.
  */
-export function EventForm({ slug, defaultCity, initial, submitLabel, onSubmit }: { slug: string; defaultCity?: string | null; initial?: EventDto; submitLabel: string; onSubmit: (v: EventCreateInput) => Promise<void> }) {
+export function EventForm({
+  slug,
+  defaultCity,
+  initial,
+  submitLabel,
+  onSubmit,
+  tenantZone,
+}: {
+  slug: string;
+  defaultCity?: string | null;
+  initial?: EventDto;
+  submitLabel: string;
+  onSubmit: (v: EventCreateInput) => Promise<void>;
+  /** The institution's time zone, offered next to the phone's. */
+  tenantZone?: string;
+}) {
   const deviceTz = localTimeZone();
   const initialZone = initial?.timezone ?? deviceTz;
-  const tzOptions = useMemo(() => [...new Set<string>([initialZone, deviceTz, ...COMMON_TIME_ZONES])], [initialZone, deviceTz]);
+  const tzOptions = useMemo(() => [...new Set<string>([initialZone, deviceTz, ...(tenantZone ? [tenantZone] : []), ...COMMON_TIME_ZONES])], [initialZone, deviceTz, tenantZone]);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [kind, setKind] = useState<EventKind | "">(initial?.kind ?? "CASUAL_MEETUP");

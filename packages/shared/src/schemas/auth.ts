@@ -33,6 +33,20 @@ export type PushTokenInput = z.infer<typeof pushTokenSchema>;
 
 export const pushTokenParamsSchema = z.object({ token: z.string().min(10).max(500) });
 
+/** An email address as members type it; stored lower-cased. */
+export const emailAddressSchema = z
+  .string()
+  .trim()
+  .max(254)
+  .pipe(z.email("Enter a valid email address"))
+  .transform((v) => v.toLowerCase());
+
+export const emailChangeSchema = z.object({ email: emailAddressSchema });
+export type EmailChangeInput = z.infer<typeof emailChangeSchema>;
+
+export const emailVerifySchema = z.object({ token: z.string().trim().min(20).max(100) });
+export type EmailVerifyInput = z.infer<typeof emailVerifySchema>;
+
 export const deleteAccountSchema = z.object({
   confirm: z.literal(true),
 });

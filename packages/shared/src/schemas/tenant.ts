@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { APPROVAL_MODES, MIN_BATCH_YEAR, TENANT_FEATURES } from "../constants";
 import { hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, trimmedString } from "./common";
+import { timezoneSchema } from "./events";
 
 export const tenantListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
@@ -42,6 +43,8 @@ export const tenantBrandingUpdateSchema = z
     websiteUrl: httpUrlSchema.nullable(),
     city: optionalTrimmed(80),
     country: isoCountrySchema.nullable(),
+    /** IANA zone for scheduled sends (birthdays, digest) and the default for new events. */
+    timezone: timezoneSchema,
   })
   .partial();
 export type TenantBrandingUpdate = z.infer<typeof tenantBrandingUpdateSchema>;

@@ -41,6 +41,7 @@ if [ -n "${CODESPACE_NAME:-}" ]; then
   mobile_url="https://${CODESPACE_NAME}-8081.${domain}"
   # Uploaded photos are linked through the API's public URL so they load on the web and on phones.
   set_env "$API_ENV" PUBLIC_BASE_URL "$api_url"
+  set_env "$API_ENV" WEB_APP_URL "$web_url"
   set_env "$API_ENV" CORS_ORIGINS "http://localhost:5173,http://localhost:8081,${web_url},${mobile_url}"
   set_env "$MOBILE_ENV" EXPO_PUBLIC_API_URL "$api_url"
 else

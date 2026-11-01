@@ -22,6 +22,9 @@ export interface Runtime {
 /** Builds the shared runtime (database, Redis, job queue and providers) for the API or the worker process. */
 export async function createRuntime(o: { role: "api" | "worker"; config: Config; logger: Logger }): Promise<Runtime> {
   const { config, logger } = o;
+  if (config.isProduction && !config.webAppUrl && o.role === "api") {
+    logger.warn("WEB_APP_URL is not set: email confirmation, invites and digests are off until it points at the web app");
+  }
   const { pool, db } = createDb(config.DATABASE_URL);
   const redis = createRedis(config.REDIS_URL);
   redis.on("error", (err) => logger.error({ err }, "Redis error"));

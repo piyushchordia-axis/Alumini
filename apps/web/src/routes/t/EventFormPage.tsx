@@ -23,6 +23,7 @@ export function EventFormPage() {
         <EventForm
           slug={slug}
           initial={existing.data}
+          tenantZone={tenant.timezone}
           submitLabel={id ? "Save changes" : "Publish event"}
           onSubmit={async (v) => {
             const ev = id ? await api.events.update(slug, id, v) : await api.events.create(slug, v);

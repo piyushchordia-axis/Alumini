@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BILLING_CYCLES, BILLING_MODELS, MESSAGE_CHANNELS, MIN_BATCH_YEAR, TENANT_STATUSES, TENANT_TYPES } from "../constants";
 import { phoneInputSchema } from "./auth";
 import { dateOnlySchema, hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, pageQuerySchema, tenantSlugSchema, trimmedString, uuidSchema } from "./common";
+import { timezoneSchema } from "./events";
 import { tenantBrandingUpdateSchema, tenantSettingsUpdateSchema } from "./tenant";
 
 const currentYear = new Date().getFullYear();
@@ -31,6 +32,7 @@ export const platformTenantCreateSchema = z.object({
   type: z.enum(TENANT_TYPES).default("COLLEGE"),
   city: optionalTrimmed(80),
   country: isoCountrySchema.nullable().optional(),
+  timezone: timezoneSchema.optional(),
   tagline: optionalTrimmed(160),
   welcomeMessage: optionalTrimmed(2000),
   websiteUrl: httpUrlSchema.nullable().optional(),

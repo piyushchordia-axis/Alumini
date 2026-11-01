@@ -84,8 +84,11 @@ export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 export const MESSAGE_CHANNELS = ["WHATSAPP", "SMS", "EMAIL"] as const;
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 
-/** DELIVERED and READ are reported by provider webhooks (WhatsApp/MSG91 status callbacks). */
-export const OUTBOUND_MESSAGE_STATUSES = ["QUEUED", "SENDING", "SENT", "DELIVERED", "READ", "FAILED"] as const;
+/**
+ * DELIVERED and READ are reported by provider webhooks (WhatsApp/MSG91 status callbacks). CANCELLED: dropped before
+ * sending because it no longer applied (the member unsubscribed, the email changed, the content was removed).
+ */
+export const OUTBOUND_MESSAGE_STATUSES = ["QUEUED", "SENDING", "SENT", "DELIVERED", "READ", "FAILED", "CANCELLED"] as const;
 export type OutboundMessageStatus = (typeof OUTBOUND_MESSAGE_STATUSES)[number];
 
 /** What a payment is for; each purpose has a handler that prices it and acts when it is paid (Wave 3). */
@@ -119,6 +122,9 @@ export const MIN_BATCH_YEAR = 1950;
 export const OTP_LENGTH = 6;
 export const OTP_TTL_SECONDS = 300;
 export const OTP_RESEND_COOLDOWN_SECONDS = 60;
+/** Email confirmation links expire after this long. */
+export const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600;
+export const DEFAULT_TENANT_TIMEZONE = "Asia/Kolkata";
 
 export const PROFESSION_TYPE_LABELS: Record<ProfessionType, string> = {
   EMPLOYED: "Working at a company",

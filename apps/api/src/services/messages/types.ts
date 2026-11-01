@@ -17,7 +17,7 @@ export interface WhatsAppTemplateSpec {
 export type RenderedMessage =
   | { channel: "WHATSAPP"; to: string; template: WhatsAppTemplateSpec }
   | { channel: "SMS"; to: string; flowTemplateId: string; vars: Record<string, string> }
-  | { channel: "EMAIL"; to: string; toName?: string | null; subject: string; text: string; html?: string };
+  | { channel: "EMAIL"; to: string; toName?: string | null; subject: string; text: string; html?: string; headers?: Record<string, string> };
 
 /** Sends rendered messages over one channel through one provider. */
 export interface ChannelSender<C extends MessageChannel = MessageChannel> {

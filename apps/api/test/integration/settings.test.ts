@@ -54,4 +54,17 @@ describe.skipIf(!dbAvailable)("tenant admin settings + branding", () => {
     expect(pub.body.data).toMatchObject({ name: "Renamed College", primaryColor: "#123456", websiteUrl: "https://example.org" });
     expect((await api().get(`/api/v1/tenants`)).body.data[0].name).toBe("Renamed College");
   });
+
+  it("sets the institution's time zone (validated) and serves it through the cache", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/t/${tenant.slug}`;
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    expect((await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.timezone).toBe("Asia/Kolkata");
+    expect((await api().patch(`${base}/admin/branding`).set(admin.headers).send({ timezone: "Mars/Olympus" })).status).toBe(400);
+    const upd = await api().patch(`${base}/admin/branding`).set(admin.headers).send({ timezone: "Europe/London" });
+    expect(upd.body.data.timezone).toBe("Europe/London");
+    // Twice: the second read is served from the (versioned) Redis cache.
+    expect((await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.timezone).toBe("Europe/London");
+    expect((await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.timezone).toBe("Europe/London");
+  });
 });

@@ -80,6 +80,9 @@ export default function MyProfileScreen() {
         <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} accessibilityRole="link" hitSlop={6}>
           <Text style={{ color: theme.primary, fontWeight: "600" }}>🔔 Notifications</Text>
         </Pressable>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/account`)} accessibilityRole="link" hitSlop={6}>
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>✉️ Email & account</Text>
+        </Pressable>
         {isTenantAdmin && <Muted>Admin tools (approvals, moderation, settings) are available on the web console.</Muted>}
       </Card>
       <Card>

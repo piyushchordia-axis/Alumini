@@ -78,6 +78,18 @@ describe("SMTP email sender", () => {
     expect(raw[0]).toContain("Subject: Hello");
     expect(raw[0]).toContain("Plain body");
   });
+  it("passes extra headers such as List-Unsubscribe", async () => {
+    const raw: string[] = [];
+    const capturing = {
+      sendMail: async (opts: { headers?: Record<string, string> }) => {
+        raw.push(JSON.stringify(opts.headers ?? {}));
+        return { messageId: "<id@test>" };
+      },
+    };
+    const sender = new SmtpEmailSender(capturing as never, "a@b.c");
+    await sender.send({ channel: "EMAIL", to: "x@y.z", subject: "s", text: "t", headers: { "List-Unsubscribe": "<https://x/u>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
+    expect(JSON.parse(raw[0]!)).toEqual({ "List-Unsubscribe": "<https://x/u>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" });
+  });
   it("retries temporary SMTP replies and connection problems, not permanent ones", async () => {
     const failing = (error: object) => new SmtpEmailSender({ sendMail: async () => Promise.reject(Object.assign(new Error("smtp"), error)) }, "a@b.c");
     const m = { channel: "EMAIL" as const, to: "x@y.z", subject: "s", text: "t" };
@@ -89,6 +101,16 @@ describe("SMTP email sender", () => {
 });
 
 describe("message templates", () => {
+  it("renders the email confirmation with no member-supplied text and escapes the link", () => {
+    const r = renderForChannel("EMAIL_VERIFY", "EMAIL", { verificationId: "v1", link: 'https://app.test/verify-email?token=a"b' }, { phone: null, email: "a@b.c", name: "<b>Eve</b>" }, {});
+    expect("message" in r && r.message.channel === "EMAIL").toBe(true);
+    if (!("message" in r) || r.message.channel !== "EMAIL") return;
+    expect(r.message.subject).toBe("Confirm your email address");
+    expect(r.message.text).toContain('https://app.test/verify-email?token=a"b');
+    expect(r.message.html).toContain("token=a&quot;b");
+    expect(r.message.html).not.toContain("Eve");
+    expect(renderForChannel("EMAIL_VERIFY", "WHATSAPP", { verificationId: "v1", link: "x" }, { phone: "+91", email: null, name: null }, {})).toEqual({ skip: "no WhatsApp template" });
+  });
   const to = { phone: "+919876543210", email: "asha@example.com", name: "Asha" };
   it("renders each channel of the platform test message", () => {
     expect(renderForChannel("PLATFORM_TEST", "WHATSAPP", { sentBy: "Staff" }, to, {})).toEqual({ message: { channel: "WHATSAPP", to: to.phone, template: { name: "hello_world", language: "en_US", components: [] } } });

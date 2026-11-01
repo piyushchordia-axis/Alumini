@@ -1,31 +1,78 @@
-import type { MessageChannel } from "@illuminize/shared";
+import { EMAIL_VERIFICATION_TTL_SECONDS, type MessageChannel } from "@illuminize/shared";
+import type { AppContext } from "../../context";
+import { findEmailVerification } from "../../repositories/emailVerifications.repo";
+import { emailButton, emailLayout, escapeHtml, textToHtml } from "./emailLayout";
 import type { RenderedMessage, WhatsAppTemplateSpec } from "./types";
 
 /**
- * Message types and their parameters. Payloads are stored in outbound_messages.payload, so keep them to the values a
- * template needs (names, links), never secrets. Wave 1 adds INVITE, DIGEST, EVENT_REMINDER and others.
+ * Message types and their parameters. Payloads are stored in outbound_messages.payload, so keep them to ids and the
+ * values a template needs; list anything sensitive (a confirmation link) in the template's `secretKeys`.
  */
 export interface MessagePayloads {
   /** Staff check that WhatsApp, SMS and email are configured (POST /platform/messages/test). */
   PLATFORM_TEST: { sentBy: string; recipientName?: string | null };
+  /** Confirms a member's email address. */
+  EMAIL_VERIFY: { verificationId: string; link: string };
 }
 export type MessageType = keyof MessagePayloads;
+
+/**
+ * What a template renders from when it has a `load` step that turns the stored ids into content (keyed by type).
+ * Types without an entry render from their stored payload.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface LoadedPayloads {}
+export type RenderPayload<T extends MessageType> = T extends keyof LoadedPayloads ? LoadedPayloads[T] : MessagePayloads[T];
+
+export interface LoadContext {
+  messageId: string;
+  tenantId: string | null;
+  recipientUserId: string | null;
+}
+
+/** A load step either supplies what to render (and optionally a fresher recipient address) or cancels the message. */
+export type LoadResult<T extends MessageType> =
+  | { payload: RenderPayload<T>; to?: { phone?: string | null; email?: string | null; name?: string | null } }
+  | { cancel: string };
+
+export interface RenderedEmail {
+  subject: string;
+  text: string;
+  html?: string;
+  /** Extra headers, e.g. List-Unsubscribe. */
+  headers?: Record<string, string>;
+}
 
 export interface MessageTemplate<T extends MessageType> {
   /** Default channel order; the first that works delivers the message. */
   channels: readonly MessageChannel[];
+  /**
+   * Queue priority, 1 = most urgent. Transactional messages (confirmations) stay fast while bulk sends (digest,
+   * announcements) wait behind them.
+   */
+  priority: number;
+  /** Bulk sends can sit in the queue for a while, so the stale-message sweeper waits longer before re-queueing them. */
+  bulk?: boolean;
+  /** Payload keys removed from the stored row once the message is final (sent, failed or cancelled). */
+  secretKeys?: ReadonlyArray<keyof MessagePayloads[T] & string>;
+  /**
+   * Runs just before sending: resolves ids into content and re-checks that the message still applies (consent,
+   * a verified address, content not removed). Throwing retries the message later.
+   */
+  load?: (ctx: AppContext, payload: MessagePayloads[T], message: LoadContext) => Promise<LoadResult<T>>;
   /** WhatsApp: an approved template in the WhatsApp Business account. */
-  whatsapp?: (p: MessagePayloads[T]) => WhatsAppTemplateSpec;
+  whatsapp?: (p: RenderPayload<T>) => WhatsAppTemplateSpec;
   /** SMS: MSG91 flow variables; the flow template id comes from MSG91_FLOW_TEMPLATE_IDS (DLT-registered text). */
-  sms?: (p: MessagePayloads[T]) => Record<string, string>;
-  email?: (p: MessagePayloads[T]) => { subject: string; text: string; html?: string };
+  sms?: (p: RenderPayload<T>) => Record<string, string>;
+  email?: (p: RenderPayload<T>) => RenderedEmail;
 }
 
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+const VERIFY_HOURS = Math.round(EMAIL_VERIFICATION_TTL_SECONDS / 3600);
 
 export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
   PLATFORM_TEST: {
     channels: ["WHATSAPP", "SMS", "EMAIL"],
+    priority: 1,
     // Meta's sample template, available on every WhatsApp Business account.
     whatsapp: () => ({ name: "hello_world", language: "en_US", components: [] }),
     sms: (p) => ({ name: p.recipientName ?? "there" }),
@@ -34,11 +81,44 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
       return { subject: "Illuminize test message", text, html: `<p>${escapeHtml(text).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>` };
     },
   },
+
+  EMAIL_VERIFY: {
+    channels: ["EMAIL"],
+    priority: 1,
+    secretKeys: ["link"],
+    // A newer request (or a confirmed address) makes an older link useless; don't send it.
+    load: async (ctx, p) => {
+      const v = await findEmailVerification(ctx.db, p.verificationId);
+      if (!v || v.consumedAt || v.expiresAt.getTime() <= Date.now()) return { cancel: "confirmation no longer pending" };
+      return { payload: p };
+    },
+    // No member-supplied text (names, institution names) in this email: anyone can request it for any address.
+    email: (p) => {
+      const text = [
+        "Someone asked to use this email address for an Illuminize account.",
+        `To confirm it, open this link within ${VERIFY_HOURS} hours:\n${p.link}`,
+        "If this wasn't you, ignore this email and the address won't be used.",
+      ].join("\n\n");
+      const html = emailLayout({
+        title: "Confirm your email address",
+        preheader: "Confirm this address for your Illuminize account",
+        bodyHtml: [
+          textToHtml("Someone asked to use this email address for an Illuminize account."),
+          emailButton(p.link, "Confirm email address"),
+          textToHtml(`The link works for ${VERIFY_HOURS} hours. If this wasn't you, ignore this email and the address won't be used.`),
+        ].join(""),
+      });
+      return { subject: "Confirm your email address", text, html };
+    },
+  },
 };
 
 export function isMessageType(type: string): type is MessageType {
   return Object.prototype.hasOwnProperty.call(messageTemplates, type);
 }
+
+/** Message types whose template marks them as bulk sends. */
+export const BULK_MESSAGE_TYPES: MessageType[] = (Object.keys(messageTemplates) as MessageType[]).filter((t) => messageTemplates[t].bulk);
 
 /**
  * Renders one message for one channel, or returns why it cannot go that way (no address for the channel, no template
@@ -51,8 +131,8 @@ export function renderForChannel(
   to: { phone: string | null; email: string | null; name: string | null },
   msg91FlowTemplateIds: Record<string, string>,
 ): { message: RenderedMessage } | { skip: string } {
-  const template = messageTemplates[type] as MessageTemplate<MessageType>;
-  const p = payload as MessagePayloads[MessageType];
+  const template = messageTemplates[type] as unknown as MessageTemplate<MessageType>;
+  const p = payload as never;
   switch (channel) {
     case "WHATSAPP":
       if (!to.phone) return { skip: "no phone number" };

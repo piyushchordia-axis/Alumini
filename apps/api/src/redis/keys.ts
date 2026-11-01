@@ -13,9 +13,13 @@ export const keys = {
   session: (sid: string) => `session:${sid}`,
   userSessions: (userId: string) => `user:sessions:${userId}`,
   cacheTenantsList: () => `cache:tenants:list`,
-  cacheTenant: (slug: string) => `cache:tenant:${slug}`,
+  /** Versioned: bump when the cached tenant/settings row shape changes, so old entries are not revived. */
+  cacheTenant: (slug: string) => `cache:tenant:v2:${slug}`,
   cacheDirectoryFilters: (tenantId: string) => `cache:directory:filters:${tenantId}`,
   rateLimit: (bucket: string, key: string) => `rl:${bucket}:${key}`,
+  /** Confirmation emails sent to one address (hashed) per day, and platform-wide per day. */
+  emailVerifyAddressDay: (addressHash: string) => `email:verify:addr:${addressHash}`,
+  emailVerifyGlobalDay: (day: string) => `email:verify:global:${day}`,
   uploadsDay: (tenantId: string, day: string) => `uploads:day:${tenantId}:${day}`,
   active: (membershipId: string) => `active:${membershipId}`,
   /** Sorted set of "ticketId|token" scored by send time, for Expo receipt checks. */

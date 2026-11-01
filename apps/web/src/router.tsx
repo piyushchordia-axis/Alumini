@@ -6,6 +6,7 @@ import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 import { RouteErrorPage } from "@/routes/RouteErrorPage";
 import { TenantPickerPage } from "@/routes/TenantPickerPage";
+import { VerifyEmailPage } from "@/routes/VerifyEmailPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
 import { EventDetailPage } from "@/routes/t/EventDetailPage";
 import { EventFormPage } from "@/routes/t/EventFormPage";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: "/", element: <TenantPickerPage /> },
+      { path: "/verify-email", element: <VerifyEmailPage /> },
       { path: "/t/:slug", element: <LandingPage /> },
       { path: "/t/:slug/login", element: <LoginPage /> },
       {

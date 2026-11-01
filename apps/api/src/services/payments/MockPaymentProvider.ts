@@ -15,7 +15,7 @@ export class MockPaymentProvider implements PaymentProvider {
   readonly name = "mock" as const;
   readonly publicKeyId = "mock_key";
 
-  async createOrder(input: { amountMinor: number; currency: string; receipt: string }) {
+  async createOrder(_input: { amountMinor: number; currency: string; receipt: string }) {
     return { providerOrderId: `mock_order_${randomUUID().replace(/-/g, "").slice(0, 16)}` };
   }
 

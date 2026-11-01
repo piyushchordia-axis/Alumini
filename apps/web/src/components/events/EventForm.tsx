@@ -39,10 +39,23 @@ interface EventFormValues {
   coverImageUrl: string | null;
 }
 
-export function EventForm({ slug, initial, onSubmit, submitLabel }: { slug: string; initial?: EventDto; onSubmit: (v: EventCreateInput) => Promise<void>; submitLabel: string }) {
+export function EventForm({
+  slug,
+  initial,
+  onSubmit,
+  submitLabel,
+  tenantZone,
+}: {
+  slug: string;
+  initial?: EventDto;
+  onSubmit: (v: EventCreateInput) => Promise<void>;
+  submitLabel: string;
+  /** The institution's time zone, offered next to the device's. */
+  tenantZone?: string;
+}) {
   const [serverError, setServerError] = useState<unknown>(null);
   const initialZone = initial?.timezone ?? localTimeZone();
-  const tzOptions = useMemo(() => [...new Set<string>([initialZone, localTimeZone(), ...COMMON_TIME_ZONES])], [initialZone]);
+  const tzOptions = useMemo(() => [...new Set<string>([initialZone, localTimeZone(), ...(tenantZone ? [tenantZone] : []), ...COMMON_TIME_ZONES])], [initialZone, tenantZone]);
 
   // Convert wall times to instants with the chosen zone, then validate with the shared schema.
   const resolver = useMemo<Resolver<EventFormValues, unknown, EventCreateInput>>(() => {

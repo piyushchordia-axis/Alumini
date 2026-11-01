@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useState } from "react";
 import { CountrySelect } from "@/components/common/CountrySelect";
 import { ImageUploader } from "@/components/common/ImageUploader";
+import { TimeZoneSelect } from "@/components/common/TimeZoneSelect";
 import { Avatar, Button, FormField, Input, Textarea } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
@@ -15,6 +16,7 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
     websiteUrl: initial.websiteUrl,
     city: initial.city,
     country: initial.country,
+    timezone: initial.timezone,
     primaryColor: initial.primaryColor,
     secondaryColor: initial.secondaryColor,
     logoUrl: initial.logoUrl,
@@ -65,6 +67,9 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
         </FormField>
         <FormField label="Country">
           <CountrySelect value={v.country ?? ""} onChange={(e) => set("country", e.target.value || null)} />
+        </FormField>
+        <FormField label="Time zone" hint="Birthday greetings go out at 9:00 and the weekly digest on Monday morning in this time zone.">
+          <TimeZoneSelect value={v.timezone ?? "Asia/Kolkata"} onChange={(e) => set("timezone", e.target.value)} />
         </FormField>
         <FormField label="Primary colour" group>
           <div className="flex gap-2">

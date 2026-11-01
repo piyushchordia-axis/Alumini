@@ -1,10 +1,11 @@
-import { logoutSchema, otpRequestSchema, otpVerifySchema, refreshSchema } from "@illuminize/shared";
+import { emailVerifySchema, logoutSchema, otpRequestSchema, otpVerifySchema, refreshSchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../context";
 import { requireAuth } from "../middleware/auth";
 import { byIp, rateLimit } from "../middleware/rateLimit";
 import { noContent, ok, route } from "../middleware/validate";
 import { loginWithVerifiedPhone } from "../services/auth.service";
+import { confirmEmail } from "../services/email.service";
 import { requestOtp, verifyOtp } from "../services/otp.service";
 import { revokeAllSessions, revokeSession, rotateRefresh } from "../services/token.service";
 
@@ -26,6 +27,16 @@ export function authRoutes(ctx: AppContext): Router {
       const phone = await verifyOtp(ctx, body.phone, body.code, req.ip);
       const session = await loginWithVerifiedPhone(ctx, phone, { ip: req.ip, userAgent: req.header("user-agent") });
       ok(res, session);
+    }),
+  );
+
+  // Public: the confirmation link may be opened on a device where the member isn't signed in. A POST (from a button on
+  // the page) rather than the link itself, so mail scanners that prefetch links can't confirm addresses.
+  router.post(
+    "/auth/email/verify",
+    rateLimit(ctx, { bucket: "email-verify-ip", limit: 30, windowSec: 900, keyFn: byIp }),
+    route({ body: emailVerifySchema }, async ({ req, res, body }) => {
+      ok(res, await confirmEmail(ctx, body.token, req.ip));
     }),
   );
 

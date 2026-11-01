@@ -1,7 +1,7 @@
 import type { AppContext } from "../context";
 import { JOB_POLICIES, type JobName, type JobPayloads } from "./definitions";
 import { jobHandlers } from "./handlers";
-import { PermanentJobError, type EnqueueOptions, type JobHandler, type JobHandlers, type JobQueue } from "./JobQueue";
+import { PermanentJobError, type BulkJob, type EnqueueOptions, type JobHandler, type JobHandlers, type JobQueue } from "./JobQueue";
 import { scheduledJobs, type ScheduledJob } from "./schedules";
 
 interface PendingJob {
@@ -34,6 +34,10 @@ export class MemoryJobQueue implements JobQueue {
     this.pending.push({ name, data, opts, attempt: 1, delayed: !!opts?.delayMs });
   }
 
+  async enqueueBulk(jobs: BulkJob[]): Promise<void> {
+    for (const job of jobs) await this.enqueue(job.name, job.data as never, job.opts);
+  }
+
   /** Pending jobs of one name (or all), without running them. */
   peek(name?: JobName): Array<{ name: JobName; data: unknown }> {
     return this.pending.filter((p) => !name || p.name === name).map(({ name: n, data }) => ({ name: n, data }));
@@ -41,14 +45,15 @@ export class MemoryJobQueue implements JobQueue {
 
   /**
    * Runs pending jobs first in, first out, including jobs they enqueue, honouring attempts and PermanentJobError.
-   * Delayed jobs run only with includeDelayed. Returns what ran and what failed for good.
+   * Jobs on the same queue run lowest priority number first (as BullMQ does; no priority counts as 0). Delayed jobs
+   * run only with includeDelayed. Returns what ran and what failed for good.
    */
   async drain(opts: { includeDelayed?: boolean; maxJobs?: number } = {}): Promise<{ ran: number; failed: Array<{ name: JobName; error: unknown }> }> {
     const max = opts.maxJobs ?? 1000;
     const failed: Array<{ name: JobName; error: unknown }> = [];
     let ran = 0;
     for (;;) {
-      const index = this.pending.findIndex((p) => opts.includeDelayed || !p.delayed);
+      const index = this.nextIndex(!!opts.includeDelayed);
       if (index === -1 || ran >= max) break;
       const job = this.pending.splice(index, 1)[0]!;
       ran += 1;
@@ -78,6 +83,20 @@ export class MemoryJobQueue implements JobQueue {
 
   async close(): Promise<void> {
     this.clear();
+  }
+
+  /** The first runnable job's queue decides; within that queue the most urgent job (then the oldest) goes next. */
+  private nextIndex(includeDelayed: boolean): number {
+    const runnable = (p: PendingJob) => includeDelayed || !p.delayed;
+    const first = this.pending.findIndex(runnable);
+    if (first === -1) return -1;
+    const queue = JOB_POLICIES[this.pending[first]!.name].queue;
+    let best = first;
+    for (let i = first + 1; i < this.pending.length; i++) {
+      const p = this.pending[i]!;
+      if (runnable(p) && JOB_POLICIES[p.name].queue === queue && (p.opts?.priority ?? 0) < (this.pending[best]!.opts?.priority ?? 0)) best = i;
+    }
+    return best;
   }
 
   private handlerFor<N extends JobName>(name: N): JobHandler<N> {

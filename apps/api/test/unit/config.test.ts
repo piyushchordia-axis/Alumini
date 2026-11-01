@@ -45,4 +45,12 @@ describe("config", () => {
     expect(() => loadConfig({ ...dev, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_test_1" })).toThrow(/RAZORPAY_KEY_SECRET/);
     expect(loadConfig({ ...prod, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_live_1", RAZORPAY_KEY_SECRET: "s", RAZORPAY_WEBHOOK_SECRET: "w" }).paymentsProvider).toBe("razorpay");
   });
+
+  it("defaults the web app URL outside production and leaves it unset (features off) in production", () => {
+    expect(loadConfig({ NODE_ENV: "development", JWT_SECRET: "x".repeat(32), OTP_PEPPER: "p".repeat(16), DATABASE_URL: "postgres://x" }).webAppUrl).toBe("http://localhost:5173");
+    const prod = { ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t" };
+    expect(loadConfig({ ...prod, WEB_APP_URL: "" }).webAppUrl).toBeNull();
+    expect(loadConfig({ ...prod, WEB_APP_URL: "https://alumni.example.org/" }).webAppUrl).toBe("https://alumni.example.org");
+    expect(() => loadConfig({ ...prod, WEB_APP_URL: "javascript:alert(1)" })).toThrow(/WEB_APP_URL/);
+  });
 });

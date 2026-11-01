@@ -8,12 +8,25 @@ export interface EnqueueOptions {
    */
   jobId?: string;
   delayMs?: number;
+  /**
+   * 1 (most urgent) to 1000. Within a queue, lower numbers run first; give every job on a queue a priority, because
+   * BullMQ runs jobs without one before all prioritised jobs.
+   */
+  priority?: number;
+}
+
+export interface BulkJob<N extends JobName = JobName> {
+  name: N;
+  data: JobPayloads[N];
+  opts?: EnqueueOptions;
 }
 
 /** Where request handlers and jobs put background work. BullMQ in the app, in memory in tests. */
 export interface JobQueue {
   readonly kind: "bullmq" | "memory";
   enqueue<N extends JobName>(name: N, data: JobPayloads[N], opts?: EnqueueOptions): Promise<void>;
+  /** Adds many jobs in one round trip (fan-outs). Same semantics as enqueue for each job. */
+  enqueueBulk(jobs: BulkJob[]): Promise<void>;
   close(): Promise<void>;
 }
 

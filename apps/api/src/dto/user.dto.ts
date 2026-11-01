@@ -8,6 +8,8 @@ export function toUserDto(u: UserRow): UserDto {
     id: u.id,
     phone: u.phoneE164,
     displayName: u.displayName,
+    email: u.email,
+    emailVerifiedAt: u.emailVerifiedAt ? u.emailVerifiedAt.toISOString() : null,
     isPlatformAdmin: u.isPlatformAdmin,
     createdAt: u.createdAt.toISOString(),
   };

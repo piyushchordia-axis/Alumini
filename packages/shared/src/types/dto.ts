@@ -70,6 +70,8 @@ export interface TenantPublicDto extends TenantSummaryDto {
   tagline: string | null;
   welcomeMessage: string | null;
   websiteUrl: string | null;
+  /** IANA time zone of the institution. */
+  timezone: string;
   settings: TenantPublicSettings;
 }
 
@@ -97,8 +99,18 @@ export interface UserDto {
   id: string;
   phone: string;
   displayName: string | null;
+  /** The confirmed email address, if any. Never shown to other members. */
+  email: string | null;
+  emailVerifiedAt: string | null;
   isPlatformAdmin: boolean;
   createdAt: string;
+}
+
+/** The caller's email: the confirmed address, and an address waiting for its confirmation link to be opened. */
+export interface EmailStatusDto {
+  email: string | null;
+  verifiedAt: string | null;
+  pending: { email: string; expiresAt: string } | null;
 }
 
 export interface MembershipSummaryDto {

@@ -36,6 +36,7 @@ export function toTenantPublicDto(t: TenantRow, s: TenantSettingsRow): TenantPub
     tagline: t.tagline,
     welcomeMessage: t.welcomeMessage,
     websiteUrl: t.websiteUrl,
+    timezone: t.timezone,
     settings: {
       memberApprovalMode: s.memberApprovalMode,
       allowSelfRegistration: s.allowSelfRegistration,

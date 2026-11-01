@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CountrySelect } from "@/components/common/CountrySelect";
+import { TimeZoneSelect } from "@/components/common/TimeZoneSelect";
 import { Button, Card, Checkbox, ErrorBox, FormField, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { toast } from "@/stores/uiStore";
@@ -25,6 +26,7 @@ export function PlatformTenantFormPage() {
   const [type, setType] = useState<TenantType>("COLLEGE");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("IN");
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [tagline, setTagline] = useState("");
   const [welcome, setWelcome] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#1d4ed8");
@@ -49,6 +51,7 @@ export function PlatformTenantFormPage() {
       type,
       city: city || null,
       country: country || null,
+      timezone,
       tagline: tagline || null,
       welcomeMessage: welcome || null,
       primaryColor,
@@ -118,6 +121,9 @@ export function PlatformTenantFormPage() {
             </FormField>
             <FormField label="Country" error={errors.country}>
               <CountrySelect value={country} onChange={(e) => setCountry(e.target.value)} />
+            </FormField>
+            <FormField label="Time zone" error={errors.timezone} hint="For birthday greetings, the weekly digest and new events.">
+              <TimeZoneSelect value={timezone} onChange={(e) => setTimezone(e.target.value)} />
             </FormField>
             <FormField label="Tagline" error={errors.tagline}>
               <Input value={tagline} onChange={(e) => setTagline(e.target.value)} />

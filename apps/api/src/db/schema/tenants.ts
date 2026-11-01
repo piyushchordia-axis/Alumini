@@ -1,4 +1,4 @@
-import { DEFAULT_TENANT_FEATURES, type TenantFeatures } from "@illuminize/shared";
+import { DEFAULT_TENANT_FEATURES, DEFAULT_TENANT_TIMEZONE, type TenantFeatures } from "@illuminize/shared";
 import {
   boolean,
   char,
@@ -26,6 +26,8 @@ export const tenants = pgTable(
     status: tenantStatusEnum("status").notNull().default("ACTIVE"),
     city: text("city"),
     country: char("country", { length: 2 }),
+    /** IANA zone for scheduled sends (birthdays at 09:00, the Monday digest) and the default for new events. */
+    timezone: text("timezone").notNull().default(DEFAULT_TENANT_TIMEZONE),
     logoUrl: text("logo_url"),
     coverImageUrl: text("cover_image_url"),
     primaryColor: text("primary_color").notNull().default("#1d4ed8"),

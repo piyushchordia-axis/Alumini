@@ -15,6 +15,7 @@ export default function NewEventScreen() {
       <EventForm
         slug={tenant.slug}
         defaultCity={membership.city ?? tenant.city}
+        tenantZone={tenant.timezone}
         submitLabel="Publish event"
         onSubmit={async (input) => {
           const ev = await api.events.create(tenant.slug, input);

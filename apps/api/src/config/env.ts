@@ -59,6 +59,13 @@ const envSchema = z.object({
   PLATFORM_ADMIN_PHONES: z.string().default(""),
 
   PUBLIC_BASE_URL: z.string().default("http://localhost:4000"),
+  /**
+   * Where members open the web app, for links in emails and messages (email confirmation, invites, the digest).
+   * Defaults to the Vite dev server outside production; in production, features that send links are off until set.
+   */
+  WEB_APP_URL: z.url({ protocol: /^https?$/ }).optional(),
+  /** Email confirmation links sent per day across the platform, a guard against abuse. */
+  EMAIL_VERIFY_GLOBAL_DAILY_CAP: z.coerce.number().int().positive().default(5000),
   CORS_ORIGINS: z.string().default("*"),
   UPLOAD_DIR: z.string().default("./uploads"),
   TRUST_PROXY: z.string().default("loopback"),
@@ -107,6 +114,8 @@ export type Config = z.infer<typeof envSchema> & {
   msg91FlowTemplateIds: Record<string, string>;
   /** Resolved WORKER_MODE: inline outside production unless set. */
   workerMode: "inline" | "separate";
+  /** WEB_APP_URL without a trailing slash, or null in production when it is not set. */
+  webAppUrl: string | null;
 };
 
 const emptyToUndefined = (v: string | undefined) => (v === "" ? undefined : v);
@@ -143,6 +152,7 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
         .map((pair) => pair.split("=").map((x) => x.trim()) as [string, string | undefined])
         .filter((pair): pair is [string, string] => !!pair[0] && !!pair[1]),
     ),
+    webAppUrl: (c.WEB_APP_URL ?? (c.NODE_ENV === "production" ? null : "http://localhost:5173"))?.replace(/\/+$/, "") ?? null,
     platformAdminPhones,
     corsOrigins,
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),

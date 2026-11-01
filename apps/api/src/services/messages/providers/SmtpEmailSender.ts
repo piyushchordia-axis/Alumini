@@ -27,6 +27,7 @@ export class SmtpEmailSender implements ChannelSender<"EMAIL"> {
         subject: m.subject,
         text: m.text,
         ...(m.html ? { html: m.html } : {}),
+        ...(m.headers ? { headers: m.headers } : {}),
       });
       return { providerMessageId: (info as { messageId?: string }).messageId ?? null };
     } catch (err) {

@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import type Redis from "ioredis";
 import { JOB_POLICIES, QUEUE_NAMES, type JobName, type JobPayloads, type JobPolicy, type QueueName } from "./definitions";
-import type { EnqueueOptions, JobQueue } from "./JobQueue";
+import type { BulkJob, EnqueueOptions, JobQueue } from "./JobQueue";
 
 export const DEFAULT_JOB_PREFIX = "bull";
 
@@ -32,13 +32,31 @@ export class BullJobQueue implements JobQueue {
   }
 
   async enqueue<N extends JobName>(name: N, data: JobPayloads[N], opts: EnqueueOptions = {}): Promise<void> {
+    await this.queue(this.policies[name].queue).add(name, data, this.jobOptions(name, opts));
+  }
+
+  async enqueueBulk(jobs: BulkJob[]): Promise<void> {
+    const byQueue = new Map<QueueName, Array<{ name: string; data: unknown; opts: ReturnType<BullJobQueue["jobOptions"]> }>>();
+    for (const job of jobs) {
+      const queue = this.policies[job.name].queue;
+      const list = byQueue.get(queue) ?? [];
+      list.push({ name: job.name, data: job.data, opts: this.jobOptions(job.name, job.opts ?? {}) });
+      byQueue.set(queue, list);
+    }
+    for (const [queue, list] of byQueue) {
+      for (let i = 0; i < list.length; i += 500) await this.queue(queue).addBulk(list.slice(i, i + 500));
+    }
+  }
+
+  private jobOptions(name: JobName, opts: EnqueueOptions) {
     const policy = this.policies[name];
-    await this.queue(policy.queue).add(name, data, {
+    return {
       jobId: opts.jobId,
       delay: opts.delayMs,
+      ...(opts.priority ? { priority: opts.priority } : {}),
       attempts: policy.attempts,
       ...(policy.backoff ? { backoff: { type: policy.backoff.type, delay: policy.backoff.delayMs } } : {}),
-    });
+    };
   }
 
   async close(): Promise<void> {

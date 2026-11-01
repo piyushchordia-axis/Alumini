@@ -2,6 +2,7 @@ export const qk = {
   tenants: (q?: string) => ["tenants", q ?? ""] as const,
   tenant: (slug: string) => ["tenant", slug] as const,
   me: ["me"] as const,
+  myEmail: ["me", "email"] as const,
   membership: (slug: string) => ["membership", slug] as const,
   posts: (slug: string, f?: Record<string, unknown>) => ["posts", slug, f ?? {}] as const,
   post: (slug: string, id: string) => ["post", slug, id] as const,

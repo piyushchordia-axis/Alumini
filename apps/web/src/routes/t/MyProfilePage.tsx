@@ -1,6 +1,7 @@
 import { errorMessage } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { Avatar, Button, Card, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -39,6 +40,9 @@ export function MyProfilePage() {
             }
           }}
         />
+      </Card>
+      <Card className="p-5">
+        <EmailSettings />
       </Card>
       <Card className="p-5">
         <h2 className="font-semibold text-slate-900">Your institutions</h2>

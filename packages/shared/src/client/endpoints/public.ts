@@ -1,5 +1,5 @@
 import type { PushTokenInput } from "../../schemas/auth";
-import type { AuthSessionDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto } from "../../types/dto";
+import type { AuthSessionDto, EmailStatusDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto } from "../../types/dto";
 import type { ApiCore } from "../core";
 
 export function tenantEndpoints(core: ApiCore) {
@@ -17,6 +17,8 @@ export function authEndpoints(core: ApiCore) {
       await core.setTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken });
       return session;
     },
+    /** Confirms an email address from the link in the confirmation email (no sign-in needed). */
+    verifyEmail: (token: string) => core.data<{ email: string }>({ method: "POST", path: "/auth/email/verify", body: { token }, auth: false }),
     refresh: (refreshToken: string) => core.data<TokenPairDto>({ method: "POST", path: "/auth/refresh", body: { refreshToken }, auth: false }),
     logout: async (refreshToken?: string | null) => {
       try {
@@ -39,6 +41,12 @@ export function meEndpoints(core: ApiCore) {
   return {
     get: () => core.data<MeDto>({ path: "/me" }),
     registerPushToken: (input: PushTokenInput) => core.request<void>({ method: "POST", path: "/me/push-tokens", body: input }),
+    email: {
+      get: () => core.data<EmailStatusDto>({ path: "/me/email" }),
+      /** Sends a confirmation link; the address replaces the current one only once the link is opened. */
+      set: (email: string) => core.data<EmailStatusDto>({ method: "POST", path: "/me/email", body: { email } }),
+      remove: () => core.data<EmailStatusDto>({ method: "DELETE", path: "/me/email" }),
+    },
     removePushToken: (token: string) => core.request<void>({ method: "DELETE", path: `/me/push-tokens/${encodeURIComponent(token)}` }),
     deleteAccount: async () => {
       await core.request<void>({ method: "POST", path: "/me/delete", body: { confirm: true } });
