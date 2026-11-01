@@ -1,8 +1,11 @@
+# Local Postgres and Redis for development: `node scripts/setup-local.mjs` starts them (or `docker compose up -d`).
+# If 5432 or 6379 is taken on your machine (for example by a native PostgreSQL service on Windows), pick other host
+# ports with POSTGRES_PORT / REDIS_PORT; the setup script writes the matching URLs into apps/api/.env.
 services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -19,7 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data

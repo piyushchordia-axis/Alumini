@@ -12,6 +12,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "setup:local": "node scripts/setup-local.mjs",
+    "db:create": "pnpm --filter @illuminize/api db:create",
     "db:migrate": "pnpm --filter @illuminize/api db:migrate",
     "db:seed": "pnpm --filter @illuminize/api db:seed",
     "db:reset": "pnpm --filter @illuminize/api db:reset",
@@ -21,10 +23,12 @@
     "mobile": "pnpm --filter @illuminize/mobile start",
     "mobile:tunnel": "pnpm --filter @illuminize/mobile tunnel",
     "mobile:web": "pnpm --filter @illuminize/mobile web:preview",
-    "demo": "bash scripts/demo.sh",
+    "demo": "node scripts/demo.mjs",
     "e2e:web": "node e2e/web-member.mjs",
     "e2e:admin": "node e2e/web-admin.mjs",
     "e2e:mobile-web": "node e2e/mobile-web.mjs",
+    "e2e:mobile:export": "node e2e/export-mobile.mjs",
+    "e2e:mobile:serve": "node e2e/spa-server.cjs e2e/.expo-web 8081",
     "jobs:run": "pnpm --filter @illuminize/api jobs:run"
   },
   "devDependencies": {

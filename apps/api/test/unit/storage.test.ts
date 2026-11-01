@@ -90,7 +90,7 @@ describe("S3 storage with the real AWS SDK", () => {
 describe("local disk storage", () => {
   let dir: string;
   afterAll(async () => {
-    if (dir) await rm(dir, { recursive: true, force: true });
+    if (dir) await rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); // Windows: antivirus can hold files briefly
   });
 
   it("saves, maps URLs back to keys and deletes", async () => {

@@ -49,15 +49,23 @@ export function newRedisMock(): RedisClient {
   return new RedisMock({ db: redisDbCounter++ }) as unknown as RedisClient;
 }
 
+/**
+ * Whether the test database is reachable; integration tests skip without it. REQUIRE_DB=1 (CI, and worth setting
+ * locally) fails instead, so a stopped database can't make a run look green.
+ */
 export async function isDatabaseAvailable(): Promise<boolean> {
   const url = process.env.DATABASE_URL;
-  if (!url) return false;
+  const unavailable = (reason: string) => {
+    if (process.env.REQUIRE_DB === "1") throw new Error(`REQUIRE_DB=1 but the test database is not reachable: ${reason}`);
+    return false;
+  };
+  if (!url) return unavailable("DATABASE_URL is not set");
   const pool = new pg.Pool({ connectionString: url, connectionTimeoutMillis: 2000 });
   try {
     await pool.query("select 1");
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    return unavailable((err as Error).message);
   } finally {
     await pool.end();
   }

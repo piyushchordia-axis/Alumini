@@ -14,8 +14,8 @@
     "8081": { "label": "Mobile app (Expo)", "onAutoForward": "silent" }
   },
   "otherPortsAttributes": { "onAutoForward": "silent" },
-  "postCreateCommand": "bash scripts/dev-setup.sh",
-  "postAttachCommand": "bash scripts/demo.sh",
+  "postCreateCommand": "node scripts/setup-local.mjs --skip-docker",
+  "postAttachCommand": "pnpm demo",
   "customizations": {
     "codespaces": {
       "openFiles": ["DEMO.md"]

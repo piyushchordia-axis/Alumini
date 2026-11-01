@@ -7,7 +7,7 @@ They are deliberately simple (no test runner) so they double as a walkthrough of
 
 ```bash
 pnpm install
-npx playwright install chromium          # once (or set PLAYWRIGHT_CHROMIUM_PATH to an existing Chromium binary)
+pnpm exec playwright install chromium    # once (or set PLAYWRIGHT_CHROMIUM_PATH to an existing Chromium binary)
 pnpm db:reset                            # fresh schema + demo data (pending members, open report, …)
 pnpm api                                 # http://localhost:4000, OTP_PROVIDER=console
 ```
@@ -16,7 +16,7 @@ pnpm api                                 # http://localhost:4000, OTP_PROVIDER=c
 
 ```bash
 pnpm web                                 # http://localhost:5173 (proxies /api to the API)
-mkdir -p e2e/screenshots && node e2e/web-member.mjs
+pnpm e2e:web                             # screenshots go to e2e/screenshots (or set SHOTS)
 ```
 
 Covers: tenant picker → landing → phone + OTP → registration (with a profile question) → auto-approved feed → post,
@@ -27,7 +27,7 @@ through the platform job endpoint, see `lib.mjs`) → post a job → RSVP → di
 ## Web (tenant admin + platform console)
 
 ```bash
-node e2e/web-admin.mjs
+pnpm e2e:admin
 ```
 
 Covers: tenant admin dashboard, approve/reject members, approve a job from the moderation queue, resolve a spam report by
@@ -43,9 +43,9 @@ The Expo app can be exported with Metro and driven in a browser, which is a chea
 device. The API must allow the origin (`CORS_ORIGINS` includes `http://localhost:8081` in `.env.example`).
 
 ```bash
-cd apps/mobile && EXPO_PUBLIC_API_URL=http://localhost:4000 npx expo export --platform web --output-dir ../../e2e/.expo-web
-node e2e/spa-server.cjs e2e/.expo-web 8081 &
-node e2e/mobile-web.mjs
+pnpm e2e:mobile:export        # Expo web export pointed at http://localhost:4000 (EXPO_PUBLIC_API_URL to change it)
+pnpm e2e:mobile:serve         # in a second terminal: serves it on http://localhost:8081
+pnpm e2e:mobile-web
 ```
 
 Note: on the web export React Navigation keeps inactive tab stacks mounted, so the script dispatches clicks directly in

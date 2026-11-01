@@ -22,14 +22,66 @@ demo data and opens the app in your browser. **[DEMO.md](DEMO.md)** has the logi
 phone app with Expo Go. Developers using VS Code can open the same setup locally with **Dev Containers: Reopen in
 Container** (`.devcontainer/`).
 
-## Quick start
+## Run it on your computer (Windows, macOS, Linux)
+
+You need **Git**, **Node.js 22 LTS** (nodejs.org; on Windows the .msi installer) and **Docker Desktop**, running. Then,
+in PowerShell, Terminal or any shell:
+
+```bash
+git clone -b claude/illuminize-multi-tenant-platform-ho1w6e https://github.com/piyushchordia-axis/Alumini.git
+cd Alumini
+node scripts/setup-local.mjs      # once: Postgres + Redis in Docker, env files, install, migrate, demo data
+pnpm demo                         # every time: API on :4000 and web app on http://localhost:5173 (Ctrl+C stops)
+```
+
+The setup script needs nothing but Node:
+- It checks your tools, enables pnpm through corepack, and starts `postgres:16` and `redis:7` with Docker Compose.
+- It writes `apps/api/.env` (with fresh secrets) and `apps/mobile/.env`, installs dependencies, creates the
+  development and test databases, migrates them and loads the demo data.
+- It's safe to run again, and keeps values you've changed.
+- `pnpm demo` starts the containers itself if they're stopped (after a restart, for example).
+- Sign in with any number; the code is always `123456`. The logins are below and in DEMO.md.
+
+Options (`node scripts/setup-local.mjs --help`):
+
+| Option | When |
+| --- | --- |
+| `--lan` | Testing on a phone with Expo Go on the same Wi-Fi: points the app and photo links at this computer's network address (run again after switching networks) |
+| `--emulator` | Android emulator (Android Studio): the app reaches the API at `10.0.2.2` |
+| `--skip-docker` | You run Postgres 16 and Redis 7 yourself (a native install, a dev container or CI) |
+| `--e2e` | Also download Chromium for the end-to-end scripts |
+| `POSTGRES_PORT` / `REDIS_PORT` | Ports 5432/6379 are taken; e.g. PowerShell `$env:POSTGRES_PORT="5433"` before running. Saved for next time. |
+
+Then `pnpm mobile` starts Expo for the phone app (scan the QR code with Expo Go). `pnpm test` runs the API tests
+against the same containers.
+
+**On Windows, if something goes wrong:**
+- *"pnpm is not available"*: corepack needs an administrator shell once. Run `corepack enable` in PowerShell opened
+  as Administrator, or install pnpm for your user with `npm install -g pnpm@10.28.0`.
+- *"A port is already in use"*: a PostgreSQL (or Redis) installed directly on Windows has 5432 (6379). Stop it in
+  the Services app, or use other ports as above.
+- *"Docker is installed but not running"*: start Docker Desktop and wait for "Engine running". Turn on *Start Docker
+  Desktop when you sign in* so the database is there after a restart.
+- *Missing files or paths too long*: clone to a short folder such as `C:\dev\Alumini` and run
+  `git config --global core.longpaths true` once.
+- *The phone can't reach the API*: run setup with `--lan`, and allow Node.js on private networks when Windows Firewall
+  asks (or add an inbound rule for ports 4000 and 8081).
+- Work from a normal Windows folder, not `\\wsl$\...`. If you also use the dev container, don't share one
+  `node_modules` between the two (native modules differ); clone twice.
+
+Line endings are fixed to LF by `.gitattributes`, whatever your Git `core.autocrlf` setting.
+
+### Manual setup
+
+The script runs these steps; do them by hand if you prefer:
 
 ```bash
 corepack enable                # pnpm 10 is pinned in package.json
 pnpm install
 docker compose up -d           # Postgres (illuminize + illuminize_test) and Redis
-cp apps/api/.env.example apps/api/.env
-pnpm db:migrate && pnpm db:seed
+cp apps/api/.env.example apps/api/.env      # PowerShell: Copy-Item apps/api/.env.example apps/api/.env
+pnpm db:migrate
+pnpm db:seed
 pnpm api                       # http://localhost:4000
 pnpm web                       # http://localhost:5173
 pnpm mobile                    # Expo dev server (set EXPO_PUBLIC_API_URL in apps/mobile/.env)
@@ -288,10 +340,14 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 ```bash
 pnpm lint          # eslint in every package (expo lint for mobile)
 pnpm typecheck     # tsc in every package
-pnpm test          # API unit + integration tests (needs Postgres on localhost, see apps/api/.env.test)
+pnpm test          # API unit + integration tests (needs Postgres + Redis on localhost, see apps/api/.env.test)
 pnpm build         # tsup bundle for the API, Vite build for the web app
 pnpm --filter @illuminize/api db:generate   # new Drizzle migration after editing the schema
 ```
+
+Integration tests skip when the test database is unreachable; set `REQUIRE_DB=1` (and `REQUIRE_REAL_REDIS=1` for the
+BullMQ and Socket.IO adapter tests) to make them fail instead, as CI does. In PowerShell: `$env:REQUIRE_DB="1"`.
+`CLAUDE.md` summarises the conventions for anyone (or any Claude Code session) working on the code.
 
 `e2e/README.md` explains how to run the Playwright smoke scripts that walk the member, admin and platform journeys,
 and how to export the Expo app for the web to exercise the mobile screens in a browser.
@@ -344,6 +400,7 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
   at the API (or proxy `/api` and `/uploads`).
 - CI (`.github/workflows/ci.yml`) runs lint, typecheck, the API test-suite against Postgres + Redis services, and builds.
+  `.github/workflows/windows.yml` runs the one-command setup, lint, typecheck, API tests and builds on Windows.
 
 ## Known gaps / next steps
 

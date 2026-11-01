@@ -1,0 +1,67 @@
+name: Windows
+
+# Checks that a native Windows developer can set up and work on the repo: the one-command setup (with the runner's
+# PostgreSQL instead of Docker, which can't run Linux containers on Windows runners), line endings, lint, typecheck,
+# the API tests and the builds. Redis isn't available here, so the API tests use the in-memory Redis and the BullMQ /
+# Socket.IO adapter tests skip; the Linux CI covers those.
+
+on:
+  push:
+    branches: ["claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Setup, lint, typecheck, test, build (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      # Git for Windows checks out with core.autocrlf=true; .gitattributes must keep the working tree LF.
+      - uses: actions/checkout@v4
+
+      - name: Working tree uses LF line endings
+        shell: pwsh
+        run: |
+          $crlf = git ls-files --eol | Select-String "w/crlf" | Where-Object { $_ -notmatch "\.(cmd|bat|ps1)$" }
+          if ($crlf) { $crlf; throw "Files were checked out with CRLF line endings" }
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: ikalnytskyi/action-setup-postgres@v9
+        with:
+          postgres-version: "16"
+          database: illuminize
+
+      - name: One-command setup (no Docker; uses the runner's PostgreSQL)
+        run: node scripts/setup-local.mjs --skip-docker
+
+      - name: Setup again (must be idempotent)
+        run: node scripts/setup-local.mjs --skip-docker --skip-install
+
+      - name: Lint
+        run: pnpm turbo lint --filter=@illuminize/api --filter=@illuminize/shared --filter=@illuminize/web
+
+      - name: Typecheck
+        run: pnpm turbo typecheck
+
+      - name: API tests
+        working-directory: apps/api
+        env:
+          REQUIRE_DB: "1"
+        run: pnpm test
+
+      - name: Build API and web
+        run: pnpm turbo build --filter=@illuminize/api --filter=@illuminize/web

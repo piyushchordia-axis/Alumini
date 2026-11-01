@@ -1,0 +1,15 @@
+# Build context is the repository root (docker build -f apps/api/Dockerfile .), so this file must live here.
+# Host node_modules must never reach the image: on Windows pnpm creates them as junctions to absolute paths.
+**/node_modules
+**/dist
+**/.turbo
+**/uploads
+**/.expo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+e2e
+apps/web
+apps/mobile
+apps/api/test

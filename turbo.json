@@ -37,7 +37,14 @@
       "dependsOn": [
         "^build"
       ],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "REQUIRE_DB",
+        "REQUIRE_REAL_REDIS",
+        "RATE_LIMIT_IN_TESTS"
+      ]
     },
     "db:migrate": {
       "cache": false

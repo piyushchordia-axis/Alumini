@@ -1,8 +1,10 @@
 import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:8081";
-const SHOTS = process.env.SHOTS ?? new URL("./screenshots/", import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
+const SHOTS = process.env.SHOTS ?? fileURLToPath(new URL("./screenshots/", import.meta.url));
 mkdirSync(SHOTS, { recursive: true });
 const unique = String(Date.now()).slice(-8);
 const PHONE = `7${unique.slice(0, 9).padEnd(9, "3")}`;

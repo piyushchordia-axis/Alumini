@@ -3,6 +3,11 @@
 The quickest way to try Illuminize is a **GitHub Codespace**: a cloud workspace that runs the database, the API and the
 web app for you. You need nothing installed except a browser (and the free **Expo Go** app if you want the phone app).
 
+> **On your own computer instead?** With Git, Node.js 22 and Docker Desktop installed (Windows, macOS or Linux):
+> `git clone -b claude/illuminize-multi-tenant-platform-ho1w6e https://github.com/piyushchordia-axis/Alumini.git`,
+> then in the `Alumini` folder `node scripts/setup-local.mjs` once and `pnpm demo`, and open http://localhost:5173.
+> Everything below (logins, things to try) works the same; README.md → "Run it on your computer" has the details.
+
 ## 1. Start the workspace
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/piyushchordia-axis/Alumini/tree/claude/illuminize-multi-tenant-platform-ho1w6e)
@@ -124,7 +129,8 @@ phone-sized preview in the browser. Port 4000 must still be public.
 
 - **Reset the demo data** with `pnpm db:reset` in a terminal. It wipes everything and reloads the sample institutions,
   members and posts.
-- **Restart the app** with `pnpm demo` if you closed its terminal.
+- **Restart the app** with `pnpm demo` if you closed its terminal (on your own computer, it also starts the database
+  containers if they're stopped).
 - **Stop the codespace when you are done** (github.com/codespaces → … → Stop) so it does not use up your free hours.
   It also stops on its own after 30 minutes without activity, and your data is kept for next time.
 - Making port 4000 public means anyone with that address can reach this demo API while the codespace is running. It
