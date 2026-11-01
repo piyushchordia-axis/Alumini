@@ -8,6 +8,7 @@ import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
+import { AdminFieldAnswers } from "@/components/admin/AdminFieldAnswers";
 import { MemberActionButtons, useMemberActions } from "./AdminMembersPage";
 
 export function AdminMemberDetailPage() {
@@ -70,14 +71,9 @@ export function AdminMemberDetailPage() {
               <dd className="text-slate-900">{v === null || v === undefined || v === "" ? "—" : String(v)}</dd>
             </div>
           ))}
-          {Object.entries(m.extra).map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-slate-500">{k}</dt>
-              <dd className="text-slate-900">{String(v)}</dd>
-            </div>
-          ))}
         </dl>
       </Card>
+      <AdminFieldAnswers member={m} />
       <section>
         <h2 className="mb-2 text-sm font-semibold text-slate-700">Recent activity</h2>
         <AuditTable rows={m.audit} />

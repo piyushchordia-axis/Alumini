@@ -1,4 +1,4 @@
-import { text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { customType, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { moderationStatusEnum } from "./enums";
 import { tenants } from "./tenants";
 import { users } from "./users";
@@ -20,3 +20,15 @@ export const moderationColumns = () => ({
   moderatedAt: timestamp("moderated_at", { withTimezone: true, precision: 3 }),
   moderationNote: text("moderation_note"),
 });
+
+/**
+ * A jsonb column that holds any JSON value, including bare strings. Drizzle's jsonb() re-parses string values it gets
+ * back (so a stored "42" or "true" would come back as a number or boolean); node-postgres has already parsed the
+ * JSON, so this type passes the value through unchanged.
+ */
+export const jsonValue = <T>(name: string) =>
+  customType<{ data: T; driverData: unknown }>({
+    dataType: () => "jsonb",
+    toDriver: (value) => JSON.stringify(value),
+    fromDriver: (value) => value as T,
+  })(name);

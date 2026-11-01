@@ -1,4 +1,4 @@
-import type { AdminMemberDto, AuditDto, MemberCardDto, MemberProfileDto, MembershipDto, NotificationDto } from "@illuminize/shared";
+import type { AdminMemberDto, AuditDto, MemberCardDto, MemberProfileDto, MembershipDto, NotificationDto, ProfileFieldAnswerDto } from "@illuminize/shared";
 import type { AuditRow } from "../repositories/audit.repo";
 import type { NotificationRow } from "../repositories/notifications.repo";
 import type { UserRow } from "../repositories/users.repo";
@@ -6,7 +6,12 @@ import type { MembershipRow } from "../types/request";
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
-export function toMembershipDto(m: MembershipRow): MembershipDto {
+/** The old free-form `extra` shape, rebuilt from members-visible answers so older app versions keep showing them. */
+const legacyExtra = (fields: ProfileFieldAnswerDto[]): Record<string, unknown> =>
+  Object.fromEntries(fields.filter((f) => f.visibility === "MEMBERS").map((f) => [f.label, f.display]));
+
+/** `fields`: the answers this viewer may see (load them with answersFor). */
+export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[] = []): MembershipDto {
   return {
     id: m.id,
     tenantId: m.tenantId,
@@ -29,7 +34,8 @@ export function toMembershipDto(m: MembershipRow): MembershipDto {
     interests: m.interests,
     avatarUrl: m.avatarUrl,
     isPhoneVisible: m.isPhoneVisible,
-    extra: m.extra,
+    fields,
+    extra: legacyExtra(fields),
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
   };
@@ -51,21 +57,22 @@ export function toMemberCardDto(m: MembershipRow, isOpenToWork = false): MemberC
   };
 }
 
-export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE164">, isOpenToWork = false): MemberProfileDto {
+export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE164">, isOpenToWork = false, fields: ProfileFieldAnswerDto[] = []): MemberProfileDto {
   return {
     ...toMemberCardDto(m, isOpenToWork),
     bio: m.bio,
     linkedinUrl: m.linkedinUrl,
     interests: m.interests,
-    extra: m.extra,
+    fields,
+    extra: legacyExtra(fields),
     phone: m.isPhoneVisible ? user.phoneE164 : null,
     memberSince: m.createdAt.toISOString(),
   };
 }
 
-export function toAdminMemberDto(m: MembershipRow, user: UserRow): AdminMemberDto {
+export function toAdminMemberDto(m: MembershipRow, user: UserRow, fields: ProfileFieldAnswerDto[] = []): AdminMemberDto {
   return {
-    ...toMembershipDto(m),
+    ...toMembershipDto(m, fields),
     userId: user.id,
     phone: user.phoneE164,
     lastActiveAt: iso(m.lastActiveAt),

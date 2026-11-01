@@ -54,10 +54,11 @@ export default function MemberProfileScreen() {
           </Row>
         )}
         {m.linkedinUrl && <Button title="LinkedIn ↗" variant="outline" onPress={() => void Linking.openURL(m.linkedinUrl!)} />}
-        {Object.entries(m.extra).map(([k, v]) => (
-          <Muted key={k}>
-            {k}: {String(v)}
-          </Muted>
+        {m.fields.map((f) => (
+          <Text key={f.key} style={{ color: "#334155" }}>
+            <Text style={{ color: "#64748b" }}>{f.label}: </Text>
+            {f.display}
+          </Text>
         ))}
         <Muted>Member since {formatDate(m.memberSince)}</Muted>
       </Card>

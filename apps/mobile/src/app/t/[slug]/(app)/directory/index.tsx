@@ -52,6 +52,10 @@ export default function DirectoryScreen() {
   const [company, setCompany] = useState<string>("");
   const [professionType, setProfessionType] = useState<ProfessionType | "">("");
   const [showFilters, setShowFilters] = useState(false);
+  const [custom, setCustom] = useState<Record<string, string>>({});
+  const field = Object.entries(custom)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}:${v}`);
   const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
   const filters = {
     q: search || undefined,
@@ -60,14 +64,16 @@ export default function DirectoryScreen() {
     country: country || undefined,
     company: company || undefined,
     professionType: professionType || undefined,
+    field: field.length ? field : undefined,
   };
-  const active = [batchYear, city, country, company, professionType].filter(Boolean).length;
+  const active = [batchYear, city, country, company, professionType].filter(Boolean).length + field.length;
   const clear = () => {
     setBatchYear("");
     setCity("");
     setCountry("");
     setCompany("");
     setProfessionType("");
+    setCustom({});
   };
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   return (
@@ -94,6 +100,9 @@ export default function DirectoryScreen() {
             <ChipSelect label="Country" options={(facets.data?.countries ?? []).map((c) => ({ value: c, label: countryName(c) }))} value={country} onChange={setCountry} allowEmpty />
             <ChipSelect label="Company" options={(facets.data?.companies ?? []).map((c) => ({ value: c, label: c }))} value={company} onChange={setCompany} allowEmpty />
             <ChipSelect label="Profession" options={PROFESSION_TYPES.map((p) => ({ value: p, label: PROFESSION_TYPE_LABELS[p] }))} value={professionType} onChange={setProfessionType} allowEmpty />
+            {facets.data?.fields.map((f) => (
+              <ChipSelect key={f.key} label={f.label} options={f.options} value={custom[f.key] ?? ""} onChange={(v) => setCustom((c) => ({ ...c, [f.key]: v }))} allowEmpty />
+            ))}
           </View>
         )}
       </View>

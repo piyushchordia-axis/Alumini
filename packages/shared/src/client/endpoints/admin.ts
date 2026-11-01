@@ -1,6 +1,18 @@
-import type { AdminMembersQuery, AdminReportsQuery, AuditQuery, MembershipProfileUpdate, MembershipRole, ModerationQuery, ReportResolveInput, TenantBrandingUpdate, TenantSettingsUpdate } from "../..";
+import type {
+  AdminMembersQuery,
+  AdminReportsQuery,
+  AuditQuery,
+  MembershipProfileUpdate,
+  MembershipRole,
+  ModerationQuery,
+  ProfileFieldCreateInput,
+  ProfileFieldUpdateInput,
+  ReportResolveInput,
+  TenantBrandingUpdate,
+  TenantSettingsUpdate,
+} from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AuditDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AuditDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -42,6 +54,14 @@ export function adminEndpoints(core: ApiCore) {
       list: (slug: string, query?: Partial<AdminReportsQuery>) => core.request<Page<AdminReportDto>>({ ...p(slug, "/reports"), query: q(query) }),
       resolve: (slug: string, id: string, input: ReportResolveInput) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/resolve`), body: input }),
       dismiss: (slug: string, id: string, note?: string | null) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/dismiss`), body: { note: note ?? null } }),
+    },
+    profileFields: {
+      list: (slug: string, includeArchived = false) => core.data<ProfileFieldDto[]>({ ...p(slug, "/profile-fields"), query: { includeArchived: includeArchived ? "true" : undefined } }),
+      create: (slug: string, input: ProfileFieldCreateInput) => core.data<ProfileFieldDto>({ method: "POST", ...p(slug, "/profile-fields"), body: input }),
+      update: (slug: string, id: string, input: ProfileFieldUpdateInput) => core.data<ProfileFieldDto>({ method: "PATCH", ...p(slug, `/profile-fields/${id}`), body: input }),
+      reorder: (slug: string, ids: string[]) => core.data<ProfileFieldDto[]>({ method: "POST", ...p(slug, "/profile-fields/reorder"), body: { ids } }),
+      archive: (slug: string, id: string) => core.data<ProfileFieldDto>({ method: "POST", ...p(slug, `/profile-fields/${id}/archive`) }),
+      restore: (slug: string, id: string) => core.data<ProfileFieldDto>({ method: "POST", ...p(slug, `/profile-fields/${id}/restore`) }),
     },
     settings: {
       get: (slug: string) => core.data<AdminSettingsDto>(p(slug, "/settings")),

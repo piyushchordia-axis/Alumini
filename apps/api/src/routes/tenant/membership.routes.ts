@@ -1,11 +1,11 @@
 import { membershipProfileSchema, membershipProfileUpdateSchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../../context";
-import { toMembershipDto } from "../../dto/membership.dto";
 import { AppError } from "../../lib/errors";
 import { requireMember } from "../../middleware/tenant";
 import { ok, route } from "../../middleware/validate";
-import { registerMembership, updateMyProfile } from "../../services/membership.service";
+import { getMyMembership, registerMembership, updateMyProfile } from "../../services/membership.service";
+import { getFieldsForMember } from "../../services/profileFields.service";
 
 export function membershipRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
@@ -22,7 +22,15 @@ export function membershipRoutes(ctx: AppContext): Router {
     "/memberships/me",
     route({}, async ({ req, res }) => {
       if (!req.membership) throw AppError.notFound("You are not a member of this institution", "NOT_A_MEMBER");
-      ok(res, toMembershipDto(req.membership));
+      ok(res, await getMyMembership(ctx, req.membership));
+    }),
+  );
+
+  // Signed-in, membership not needed: the registration form shows these questions.
+  router.get(
+    "/profile-fields",
+    route({}, async ({ req, res }) => {
+      ok(res, await getFieldsForMember(ctx, req.tenantCtx!.tenant.id));
     }),
   );
 

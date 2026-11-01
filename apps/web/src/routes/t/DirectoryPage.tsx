@@ -17,7 +17,19 @@ export function DirectoryPage() {
   const [country, setCountry] = useState("");
   const [professionType, setProfessionType] = useState<ProfessionType | "">("");
   const [company, setCompany] = useState("");
-  const filters = { q: q || undefined, batchYear: batchYear ? Number(batchYear) : undefined, city: city || undefined, country: country || undefined, professionType: professionType || undefined, company: company || undefined };
+  const [custom, setCustom] = useState<Record<string, string>>({});
+  const field = Object.entries(custom)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}:${v}`);
+  const filters = {
+    q: q || undefined,
+    batchYear: batchYear ? Number(batchYear) : undefined,
+    city: city || undefined,
+    country: country || undefined,
+    professionType: professionType || undefined,
+    company: company || undefined,
+    field: field.length ? field : undefined,
+  };
   const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   const reset = () => {
@@ -27,6 +39,7 @@ export function DirectoryPage() {
     setCountry("");
     setProfessionType("");
     setCompany("");
+    setCustom({});
   };
   const hasFilters = Object.values(filters).some((v) => v !== undefined);
 
@@ -75,6 +88,16 @@ export function DirectoryPage() {
             </option>
           ))}
         </Select>
+        {facets.data?.fields.map((f) => (
+          <Select key={f.key} aria-label={f.label} value={custom[f.key] ?? ""} onChange={(e) => setCustom((c) => ({ ...c, [f.key]: e.target.value }))}>
+            <option value="">{`Any ${f.label.toLowerCase()}`}</option>
+            {f.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        ))}
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={reset} className="justify-self-start">
             Clear filters

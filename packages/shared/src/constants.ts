@@ -105,6 +105,24 @@ export type PaymentOrderStatus = (typeof PAYMENT_ORDER_STATUSES)[number];
 export const PAYMENT_REFUND_STATUSES = ["PENDING", "PROCESSED", "FAILED"] as const;
 export type PaymentRefundStatus = (typeof PAYMENT_REFUND_STATUSES)[number];
 
+/** Admin-defined profile questions (beyond the built-in profile). */
+export const PROFILE_FIELD_TYPES = ["TEXT", "LONG_TEXT", "NUMBER", "DATE", "SELECT", "MULTI_SELECT", "BOOLEAN"] as const;
+export type ProfileFieldType = (typeof PROFILE_FIELD_TYPES)[number];
+/** MEMBERS: shown on the profile to other members. ADMINS: only the member themself and admins see it. */
+export const PROFILE_FIELD_VISIBILITIES = ["MEMBERS", "ADMINS"] as const;
+export type ProfileFieldVisibility = (typeof PROFILE_FIELD_VISIBILITIES)[number];
+export const MAX_PROFILE_FIELDS = 30;
+export const MAX_PROFILE_FIELD_OPTIONS = 50;
+export const PROFILE_FIELD_TYPE_LABELS: Record<ProfileFieldType, string> = {
+  TEXT: "Short text",
+  LONG_TEXT: "Paragraph",
+  NUMBER: "Number",
+  DATE: "Date",
+  SELECT: "Choose one",
+  MULTI_SELECT: "Choose several",
+  BOOLEAN: "Yes / no",
+};
+
 export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;

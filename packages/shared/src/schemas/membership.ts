@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MARITAL_STATUSES, MEMBERSHIP_ROLES, MEMBERSHIP_STATUSES, MIN_BATCH_YEAR, PROFESSION_TYPES } from "../constants";
 import { dateOnlySchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, pageQuerySchema, trimmedString, uuidSchema } from "./common";
+import { profileFieldAnswersSchema } from "./profileFields";
 
 const currentYear = new Date().getFullYear();
 
@@ -13,11 +14,6 @@ const dateOfBirthSchema = dateOnlySchema.refine((d) => {
 }, "Enter a valid date of birth");
 
 const linkedinSchema = httpUrlSchema.refine((u) => /linkedin\.com\//i.test(u), "Must be a linkedin.com profile URL");
-
-export const extraInfoSchema = z.record(
-  z.string().max(60),
-  z.union([z.string().max(500), z.number(), z.boolean(), z.null()]),
-);
 
 export const membershipProfileSchema = z.object({
   fullName: trimmedString(100, 2),
@@ -35,7 +31,8 @@ export const membershipProfileSchema = z.object({
   interests: z.array(trimmedString(40)).max(20).optional(),
   avatarUrl: httpUrlSchema.nullable().optional(),
   isPhoneVisible: z.boolean().optional(),
-  extra: extraInfoSchema.optional(),
+  /** Answers to the institution's own profile questions, by field key. */
+  fields: profileFieldAnswersSchema.optional(),
 });
 export type MembershipProfileInput = z.infer<typeof membershipProfileSchema>;
 

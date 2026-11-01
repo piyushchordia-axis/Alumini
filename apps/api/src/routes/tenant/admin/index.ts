@@ -5,6 +5,7 @@ import { auditRoutes } from "./audit.routes";
 import { dashboardRoutes } from "./dashboard.routes";
 import { memberRoutes } from "./members.routes";
 import { moderationRoutes } from "./moderation.routes";
+import { profileFieldRoutes } from "./profileFields.routes";
 import { adminReportRoutes } from "./reports.routes";
 import { settingsRoutes } from "./settings.routes";
 
@@ -16,6 +17,7 @@ export function adminRoutes(ctx: AppContext): Router {
   router.use(moderationRoutes(ctx));
   router.use(adminReportRoutes(ctx));
   router.use(settingsRoutes(ctx));
+  router.use(profileFieldRoutes(ctx));
   router.use(auditRoutes(ctx));
   return router;
 }

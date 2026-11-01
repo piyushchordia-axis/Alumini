@@ -6,6 +6,7 @@ import { AuthShell } from "@/components/layout/AuthShell";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ErrorBox, Loading } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
+import { useProfileFields } from "@/hooks/useProfileFields";
 import { useTenant } from "@/hooks/useTenant";
 import { useTenantSlug } from "@/hooks/useTenantSlug";
 import { api } from "@/lib/api";
@@ -17,13 +18,14 @@ export function RegisterPage() {
   const slug = useTenantSlug();
   const tenant = useTenant(slug);
   const membership = useMembershipQuery(slug);
+  const fields = useProfileFields(slug);
   const navigate = useNavigate();
   const qc = useQueryClient();
   useEffect(() => {
     if (tenant.data) applyTenantTheme(tenant.data);
   }, [tenant.data]);
 
-  if (tenant.isLoading || membership.isLoading) return <Loading />;
+  if (tenant.isLoading || membership.isLoading || fields.isLoading) return <Loading />;
   if (tenant.error || !tenant.data) return <ErrorBox error={tenant.error ?? "Not found"} className="m-6" />;
   const existing = membership.data;
   if (existing && existing.status !== "REJECTED") return <Navigate to={existing.status === "APPROVED" ? `/t/${slug}/app` : `/t/${slug}/pending`} replace />;
@@ -39,6 +41,8 @@ export function RegisterPage() {
         <ProfileForm
           tenant={t}
           initial={existing ?? undefined}
+          customFields={fields.data ?? []}
+          mode="register"
           submitLabel={t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "Submit for approval" : "Join the network"}
           onSubmit={async (values) => {
             const m = await api.membership.register(slug, values);

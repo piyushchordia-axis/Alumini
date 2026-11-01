@@ -1,4 +1,15 @@
-import { MARITAL_STATUSES, MARITAL_STATUS_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, membershipProfileSchema, type MembershipDto, type MembershipProfileInput, type TenantPublicDto } from "@illuminize/shared";
+import {
+  MARITAL_STATUSES,
+  MARITAL_STATUS_LABELS,
+  PROFESSION_TYPES,
+  PROFESSION_TYPE_LABELS,
+  membershipProfileSchema,
+  validateProfileFieldValues,
+  type MembershipDto,
+  type MembershipProfileInput,
+  type ProfileFieldDto,
+  type TenantPublicDto,
+} from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -7,6 +18,7 @@ import type { z } from "zod";
 import { CountrySelect } from "@/components/common/CountrySelect";
 import { CommaListInput } from "@/components/common/CommaListInput";
 import { ImageUploader } from "@/components/common/ImageUploader";
+import { CustomFieldInputs, answersToValues, type FieldAnswers } from "@/components/profile/CustomFieldInputs";
 import { Button, Checkbox, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
 export interface ProfileFormProps {
@@ -14,6 +26,10 @@ export interface ProfileFormProps {
   initial?: Partial<MembershipDto>;
   submitLabel: string;
   onSubmit: (values: MembershipProfileInput) => Promise<void>;
+  /** The institution's own questions (from api.membership.profileFields). */
+  customFields?: ProfileFieldDto[];
+  /** Registration asks every required question; later edits only refuse clearing one. */
+  mode?: "register" | "edit";
 }
 
 const toForm = (m?: Partial<MembershipDto>): MembershipProfileInput => ({
@@ -32,11 +48,20 @@ const toForm = (m?: Partial<MembershipDto>): MembershipProfileInput => ({
   interests: m?.interests ?? [],
   avatarUrl: m?.avatarUrl ?? null,
   isPhoneVisible: m?.isPhoneVisible ?? false,
-  extra: (m?.extra as Record<string, string | number | boolean | null>) ?? {},
 });
 
-export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: ProfileFormProps) {
+export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFields = [], mode = "edit" }: ProfileFormProps) {
   const [serverError, setServerError] = useState<unknown>(null);
+  const initialAnswers = answersToValues(initial?.fields);
+  const [answers, setAnswers] = useState<FieldAnswers>(initialAnswers);
+  const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
+  const readOnly = (f: { memberEditable: boolean }) => !f.memberEditable;
+  const required = customFields.filter((f) => f.required && !readOnly(f));
+  const optional = customFields.filter((f) => !f.required || readOnly(f));
+  const setAnswer = (key: string, value: FieldAnswers[string]) => {
+    setAnswers((a) => ({ ...a, [key]: value }));
+    setAnswerErrors((e) => ({ ...e, [key]: "" }));
+  };
   type FormInput = z.input<typeof membershipProfileSchema>;
   const form = useForm<FormInput, unknown, MembershipProfileInput>({ resolver: zodResolver(membershipProfileSchema), defaultValues: toForm(initial) });
   const { register, handleSubmit, control, formState, setError } = form;
@@ -47,12 +72,24 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: ProfileF
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
+    // Only send answers the member can change; check them here first for instant feedback.
+    const editable = Object.fromEntries(customFields.filter((f) => !readOnly(f)).map((f) => [f.key, answers[f.key] ?? null]));
+    const check = validateProfileFieldValues(customFields, editable, { requireAll: mode === "register", previous: initialAnswers, canEdit: (f) => !readOnly(f) });
+    if (Object.keys(check.errors).length) {
+      setAnswerErrors(check.errors);
+      return;
+    }
     try {
-      await onSubmit(values);
+      await onSubmit(customFields.length ? { ...values, fields: editable } : values);
     } catch (err) {
       if (isApiClientError(err)) {
         const fields = err.fieldErrors;
-        for (const [path, message] of Object.entries(fields)) setError(path as keyof FormInput, { message });
+        const fromServer: Record<string, string> = {};
+        for (const [path, message] of Object.entries(fields)) {
+          if (path.startsWith("fields.")) fromServer[path.slice(7)] = message;
+          else setError(path as keyof FormInput, { message });
+        }
+        setAnswerErrors(fromServer);
         if (Object.keys(fields).length === 0) setServerError(err);
       } else setServerError(err);
     }
@@ -100,9 +137,10 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: ProfileF
         <FormField label="Country" error={errors.country?.message}>
           <CountrySelect {...register("country", { setValueAs: (v) => (v ? v : null) })} />
         </FormField>
+        <CustomFieldInputs fields={required} values={answers} errors={answerErrors} onChange={setAnswer} />
       </div>
 
-      <details className="rounded-lg border border-slate-200 p-4" open={!!initial?.bio || !!initial?.linkedinUrl}>
+      <details className="rounded-lg border border-slate-200 p-4" open={!!initial?.bio || !!initial?.linkedinUrl || Object.values(answerErrors).some(Boolean)}>
         <summary className="cursor-pointer text-sm font-medium text-slate-700">More about you (optional)</summary>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <FormField label="Marital status" error={errors.maritalStatus?.message}>
@@ -133,6 +171,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: ProfileF
               <Textarea {...register("bio")} placeholder="Tell your batchmates what you're up to" maxLength={1000} />
             </FormField>
           </div>
+          <CustomFieldInputs fields={optional} values={answers} errors={answerErrors} onChange={setAnswer} readOnly={readOnly} />
           <div className="sm:col-span-2">
             <Checkbox {...register("isPhoneVisible")} label="Show my phone number to other members in the directory" />
           </div>

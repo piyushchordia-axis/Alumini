@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { DirectoryQuery } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
-import { memberships, users } from "../db/schema";
+import { memberFieldValues, memberships, tenantProfileFields, users } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
 import type { MembershipRow } from "../types/request";
 import type { UserRow } from "./users.repo";
@@ -19,6 +19,17 @@ export async function searchDirectory(db: DbClient, tenantId: string, q: Directo
   if (q.country) conds.push(eq(memberships.country, q.country));
   if (q.professionType) conds.push(eq(memberships.professionType, q.professionType));
   if (q.company) conds.push(ilike(memberships.companyName, `%${escapeLike(q.company)}%`));
+  // Custom-field filters: only the institution's active, filterable, members-visible fields match. A choice answer
+  // is a JSON string, several choices a JSON array, yes/no a JSON boolean.
+  for (const f of q.field ?? []) {
+    conds.push(sql`exists (
+      select 1 from ${memberFieldValues} v join ${tenantProfileFields} pf on pf.id = v.field_id
+      where v.membership_id = ${memberships.id} and pf.tenant_id = ${tenantId} and pf.key = ${f.key}
+        and pf.filterable and pf.visibility = 'MEMBERS' and pf.archived_at is null
+        and (v.value = to_jsonb(${f.value}::text) or v.value @> jsonb_build_array(${f.value}::text)
+             or (jsonb_typeof(v.value) = 'boolean' and v.value::text = ${f.value}::text))
+    )`);
+  }
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(memberships.fullName, memberships.id, cursor, "asc", (v) => v);
   if (keyset) conds.push(keyset);

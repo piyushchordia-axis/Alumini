@@ -15,6 +15,8 @@ import {
   MODERATION_STATUSES,
   NOTIFICATION_TYPES,
   PROFESSION_TYPES,
+  PROFILE_FIELD_TYPES,
+  PROFILE_FIELD_VISIBILITIES,
   OUTBOUND_MESSAGE_STATUSES,
   PAYMENT_ORDER_STATUSES,
   PAYMENT_PURPOSES,
@@ -54,3 +56,5 @@ export const outboundMessageStatusEnum = pgEnum("outbound_message_status", OUTBO
 export const paymentPurposeEnum = pgEnum("payment_purpose", PAYMENT_PURPOSES);
 export const paymentOrderStatusEnum = pgEnum("payment_order_status", PAYMENT_ORDER_STATUSES);
 export const paymentRefundStatusEnum = pgEnum("payment_refund_status", PAYMENT_REFUND_STATUSES);
+export const profileFieldTypeEnum = pgEnum("profile_field_type", PROFILE_FIELD_TYPES);
+export const profileFieldVisibilityEnum = pgEnum("profile_field_visibility", PROFILE_FIELD_VISIBILITIES);

@@ -17,4 +17,6 @@ export * from "./schemas/platform";
 export * from "./schemas/payments";
 export * from "./types/dto";
 export * from "./lib/notifications";
+export * from "./lib/profileFields";
+export * from "./schemas/profileFields";
 export * from "./realtime/events";

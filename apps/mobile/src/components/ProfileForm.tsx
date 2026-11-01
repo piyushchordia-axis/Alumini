@@ -1,8 +1,20 @@
-import { MARITAL_STATUSES, MARITAL_STATUS_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, membershipProfileSchema, type MembershipDto, type MembershipProfileInput, type TenantPublicDto } from "@illuminize/shared";
+import {
+  MARITAL_STATUSES,
+  MARITAL_STATUS_LABELS,
+  PROFESSION_TYPES,
+  PROFESSION_TYPE_LABELS,
+  membershipProfileSchema,
+  validateProfileFieldValues,
+  type MembershipDto,
+  type MembershipProfileInput,
+  type ProfileFieldDto,
+  type TenantPublicDto,
+} from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { CountryPicker } from "@/components/CountryPicker";
+import { CustomFieldInputs, answersToValues, type FieldAnswers } from "@/components/CustomFieldInputs";
 import { DateTimeField } from "@/components/DateTimeField";
 import { Avatar, Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
@@ -44,8 +56,32 @@ const fromMembership = (m?: Partial<MembershipDto>): Form => ({
   isPhoneVisible: m?.isPhoneVisible ?? false,
 });
 
-export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant: TenantPublicDto; initial?: Partial<MembershipDto>; submitLabel: string; onSubmit: (v: MembershipProfileInput) => Promise<void> }) {
+export function ProfileForm({
+  tenant,
+  initial,
+  submitLabel,
+  onSubmit,
+  customFields = [],
+  mode = "edit",
+}: {
+  tenant: TenantPublicDto;
+  initial?: Partial<MembershipDto>;
+  submitLabel: string;
+  onSubmit: (v: MembershipProfileInput) => Promise<void>;
+  /** The institution's own questions (api.membership.profileFields). */
+  customFields?: ProfileFieldDto[];
+  mode?: "register" | "edit";
+}) {
   const theme = useTheme();
+  const initialAnswers = answersToValues(initial?.fields);
+  const [answers, setAnswers] = useState<FieldAnswers>(initialAnswers);
+  const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
+  const requiredFields = customFields.filter((x) => x.required && x.memberEditable);
+  const optionalFields = customFields.filter((x) => !x.required || !x.memberEditable);
+  const setAnswer = (key: string, value: FieldAnswers[string]) => {
+    setAnswers((a) => ({ ...a, [key]: value }));
+    setAnswerErrors((e) => ({ ...e, [key]: "" }));
+  };
   const [f, setF] = useState<Form>(fromMembership(initial));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -58,6 +94,13 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
   const submit = async () => {
     setErrors({});
     setServerError(null);
+    const editable = Object.fromEntries(customFields.filter((x) => x.memberEditable).map((x) => [x.key, answers[x.key] ?? null]));
+    const check = validateProfileFieldValues(customFields, editable, { requireAll: mode === "register", previous: initialAnswers, canEdit: (x) => x.memberEditable });
+    setAnswerErrors(check.errors);
+    if (Object.keys(check.errors).length) {
+      if (optionalFields.some((x) => check.errors[x.key])) setMore(true);
+      return;
+    }
     const raw = {
       fullName: f.fullName,
       batchYear: f.batchYear,
@@ -95,10 +138,13 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
     }
     setBusy(true);
     try {
-      await onSubmit(parsed.data);
+      await onSubmit(customFields.length ? { ...parsed.data, fields: editable } : parsed.data);
     } catch (err) {
-      if (isApiClientError(err) && Object.keys(err.fieldErrors).length) setErrors(err.fieldErrors);
-      else setServerError(errorMessage(err));
+      if (isApiClientError(err) && Object.keys(err.fieldErrors).length) {
+        const fe = err.fieldErrors;
+        setErrors(fe);
+        setAnswerErrors(Object.fromEntries(Object.entries(fe).filter(([k]) => k.startsWith("fields.")).map(([k, m]) => [k.slice(7), m])));
+      } else setServerError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -140,6 +186,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
         error={errors.dateOfBirth}
         clearable
       />
+      <CustomFieldInputs fields={requiredFields} values={answers} errors={answerErrors} onChange={setAnswer} />
       <Pressable onPress={() => setMore((m) => !m)} accessibilityRole="button" accessibilityState={{ expanded: more }} hitSlop={8}>
         <Text style={{ color: theme.primary, fontWeight: "600" }}>{more ? "Hide optional details" : "More about you (optional)"}</Text>
       </Pressable>
@@ -150,6 +197,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit }: { tenant
           <Input label="LinkedIn profile" value={f.linkedinUrl} onChangeText={(v) => set("linkedinUrl", v)} placeholder="https://www.linkedin.com/in/…" autoCapitalize="none" error={errors.linkedinUrl} />
           <Input label="Interests" value={f.interests} onChangeText={(v) => set("interests", v)} placeholder="cricket, startups, travel" hint="Comma separated" error={errors.interests} />
           <Input label="Short bio" value={f.bio} onChangeText={(v) => set("bio", v)} multiline maxLength={1000} error={errors.bio} />
+          <CustomFieldInputs fields={optionalFields} values={answers} errors={answerErrors} onChange={setAnswer} />
           <Row style={{ justifyContent: "space-between" }}>
             <Text style={{ color: colors.text, flex: 1 }}>Show my phone number to other members</Text>
             <Switch value={f.isPhoneVisible} onValueChange={(v) => set("isPhoneVisible", v)} trackColor={{ true: theme.primary }} />

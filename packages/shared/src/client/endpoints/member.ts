@@ -12,6 +12,7 @@ import type {
   MembershipDto,
   NotificationDto,
   NotificationPrefsDto,
+  ProfileFieldDto,
   PaymentOrderDto,
   PostDto,
   PostPageDto,
@@ -29,6 +30,8 @@ const q = (v: Q): QueryParams | undefined => v as QueryParams | undefined;
 
 export function membershipEndpoints(core: ApiCore) {
   return {
+    /** The institution's own profile questions (for registration and profile forms). */
+    profileFields: (slug: string) => core.data<ProfileFieldDto[]>({ path: "/profile-fields", tenantSlug: slug }),
     register: (slug: string, input: MembershipProfileInput) => core.data<MembershipDto>({ method: "POST", path: "/memberships", tenantSlug: slug, body: input }),
     me: (slug: string) => core.data<MembershipDto>({ path: "/memberships/me", tenantSlug: slug }),
     updateMe: (slug: string, input: MembershipProfileUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me", tenantSlug: slug, body: input }),
@@ -37,7 +40,8 @@ export function membershipEndpoints(core: ApiCore) {
 
 export function directoryEndpoints(core: ApiCore) {
   return {
-    search: (slug: string, query?: Partial<DirectoryQuery>) => core.request<CursorPage<MemberCardDto>>({ path: "/directory", tenantSlug: slug, query: q(query) }),
+    /** `field`: custom-field filters as "key:value". */
+    search: (slug: string, query?: Partial<Omit<DirectoryQuery, "field">> & { field?: string[] }) => core.request<CursorPage<MemberCardDto>>({ path: "/directory", tenantSlug: slug, query: q(query) }),
     filters: (slug: string) => core.data<DirectoryFiltersDto>({ path: "/directory/filters", tenantSlug: slug }),
     profile: (slug: string, membershipId: string) => core.data<MemberProfileDto>({ path: `/directory/${membershipId}`, tenantSlug: slug }),
   };

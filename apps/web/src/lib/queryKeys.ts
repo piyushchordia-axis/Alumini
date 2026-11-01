@@ -4,6 +4,7 @@ export const qk = {
   me: ["me"] as const,
   myEmail: ["me", "email"] as const,
   membership: (slug: string) => ["membership", slug] as const,
+  profileFields: (slug: string) => ["profile-fields", slug] as const,
   posts: (slug: string, filters?: Record<string, unknown>) => ["posts", slug, filters ?? {}] as const,
   post: (slug: string, id: string) => ["post", slug, id] as const,
   comments: (slug: string, id: string) => ["comments", slug, id] as const,
@@ -30,6 +31,7 @@ export const qk = {
     moderation: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "moderation", filters ?? {}] as const,
     reports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "reports", filters ?? {}] as const,
     settings: (slug: string) => ["admin", slug, "settings"] as const,
+    profileFields: (slug: string) => ["admin", slug, "profile-fields"] as const,
     audit: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "audit", filters ?? {}] as const,
   },
   platform: {

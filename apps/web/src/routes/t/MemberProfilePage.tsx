@@ -78,10 +78,10 @@ export function MemberProfilePage() {
               </dd>
             </div>
           )}
-          {Object.entries(m.extra).map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-slate-500">{k}</dt>
-              <dd>{String(v)}</dd>
+          {m.fields.map((f) => (
+            <div key={f.key}>
+              <dt className="text-slate-500">{f.label}</dt>
+              <dd className="whitespace-pre-line">{f.display}</dd>
             </div>
           ))}
           <div>

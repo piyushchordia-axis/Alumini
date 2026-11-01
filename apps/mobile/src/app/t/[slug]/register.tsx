@@ -5,6 +5,7 @@ import { Alert } from "react-native";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ErrorText, LoadError, Screen, Spinner, Title } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
+import { useProfileFields } from "@/hooks/useProfileFields";
 import { useTenant } from "@/hooks/useTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -19,9 +20,10 @@ export default function RegisterScreen() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const membership = useMembershipQuery(slug);
+  const fields = useProfileFields(authed ? slug : undefined);
   if (!hydrated) return <Spinner />;
   if (!authed) return <Redirect href={`/t/${slug}/login`} />;
-  if (tenant.isLoading || membership.isLoading || !tenant.data) return <Spinner />;
+  if (tenant.isLoading || membership.isLoading || fields.isLoading || !tenant.data) return <Spinner />;
   const existing = membership.data;
   if (existing && existing.status !== "REJECTED") return <Redirect href={existing.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
   if (membership.error && !(isApiClientError(membership.error) && membership.error.status === 404)) return <LoadError error={membership.error} onRetry={() => void membership.refetch()} onBack={() => router.replace("/")} />;
@@ -36,6 +38,8 @@ export default function RegisterScreen() {
         <ProfileForm
           tenant={t}
           initial={existing ?? undefined}
+          customFields={fields.data ?? []}
+          mode="register"
           submitLabel={t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "Submit for approval" : "Join the network"}
           onSubmit={async (values) => {
             const m = await api.membership.register(slug!, values);

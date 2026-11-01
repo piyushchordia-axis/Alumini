@@ -16,6 +16,7 @@ import { AdminDashboardPage } from "@/routes/t/admin/AdminDashboardPage";
 import { AdminMemberDetailPage } from "@/routes/t/admin/AdminMemberDetailPage";
 import { AdminMembersPage } from "@/routes/t/admin/AdminMembersPage";
 import { AdminModerationPage } from "@/routes/t/admin/AdminModerationPage";
+import { AdminProfileFieldsPage } from "@/routes/t/admin/AdminProfileFieldsPage";
 import { AdminReportsPage } from "@/routes/t/admin/AdminReportsPage";
 import { AdminSettingsPage } from "@/routes/t/admin/AdminSettingsPage";
 
@@ -34,6 +35,7 @@ export const adminRoutes: RouteObject = {
         { path: "moderation", element: <AdminModerationPage /> },
         { path: "reports", element: <AdminReportsPage /> },
         { path: "settings", element: <AdminSettingsPage /> },
+        { path: "profile-fields", element: <AdminProfileFieldsPage /> },
         { path: "audit", element: <AdminAuditPage /> },
       ],
     },

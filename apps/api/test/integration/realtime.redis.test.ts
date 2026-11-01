@@ -42,6 +42,7 @@ describe.skipIf(!ready)("live updates across API nodes (real Redis)", () => {
 
   it("a worker's event reaches a socket on any node, and a sign-out on one node closes sockets on the other", async () => {
     const [a, b] = nodes as [(typeof nodes)[0], (typeof nodes)[0]];
+    await a.ctx.truncateAll(); // earlier test files may have left rows (factory slugs restart in every file)
     await createTenant(a.ctx);
     const user = await createUser(a.ctx, { phone: "+919844455566" });
     // Both nodes share the session store only through Redis in production; here node A issues the token and its

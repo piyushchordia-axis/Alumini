@@ -199,9 +199,10 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     const res = await api()
       .patch(`/api/v1/t/${tenant.slug}/memberships/me`)
       .set(member.headers)
+      // Free-form `extra` from older app versions is ignored now (custom profile fields replace it).
       .send({ city: "Pune", bio: "Hello", interests: ["chess"], linkedinUrl: "https://www.linkedin.com/in/test", isPhoneVisible: true, extra: { hobby: "trekking" } });
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ city: "Pune", bio: "Hello", interests: ["chess"], isPhoneVisible: true, extra: { hobby: "trekking" } });
+    expect(res.body.data).toMatchObject({ city: "Pune", bio: "Hello", interests: ["chess"], isPhoneVisible: true, fields: [], extra: {} });
     const bad = await api().patch(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers).send({ linkedinUrl: "https://example.com/x" });
     expect(bad.status).toBe(400);
   });

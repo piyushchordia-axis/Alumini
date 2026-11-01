@@ -5,6 +5,7 @@ export const qk = {
   notificationPrefs: (slug: string) => ["notification-prefs", slug] as const,
   myEmail: ["me", "email"] as const,
   membership: (slug: string) => ["membership", slug] as const,
+  profileFields: (slug: string) => ["profile-fields", slug] as const,
   posts: (slug: string, f?: Record<string, unknown>) => ["posts", slug, f ?? {}] as const,
   post: (slug: string, id: string) => ["post", slug, id] as const,
   comments: (slug: string, id: string) => ["comments", slug, id] as const,

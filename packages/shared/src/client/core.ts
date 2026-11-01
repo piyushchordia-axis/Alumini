@@ -12,7 +12,8 @@ export interface ApiClientOptions {
   headers?: Record<string, string>;
 }
 
-export type QueryParams = Record<string, string | number | boolean | null | undefined>;
+/** Query values; an array repeats the parameter (?field=a&field=b). */
+export type QueryParams = Record<string, string | number | boolean | null | undefined | string[]>;
 
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -29,7 +30,7 @@ export function buildQuery(query?: QueryParams): string {
   const parts: string[] = [];
   for (const [k, v] of Object.entries(query)) {
     if (v === undefined || v === null || v === "") continue;
-    parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+    for (const item of Array.isArray(v) ? v : [v]) parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(item))}`);
   }
   return parts.length ? `?${parts.join("&")}` : "";
 }

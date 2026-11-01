@@ -12,3 +12,4 @@ export * from "./audit";
 export * from "./views";
 export * from "./messages";
 export * from "./payments";
+export * from "./profileFields";

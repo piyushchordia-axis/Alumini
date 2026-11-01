@@ -5,6 +5,7 @@ import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { Avatar, Button, Card, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { useProfileFields } from "@/hooks/useProfileFields";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/authStore";
@@ -18,13 +19,16 @@ export function MyProfilePage() {
   const memberships = useAuthStore((s) => s.memberships);
   const refreshToken = useAuthStore((s) => s.refreshToken);
   const others = memberships.filter((m) => m.tenant.slug !== tenant.slug);
+  const fields = useProfileFields(tenant.slug);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="My profile" subtitle={`Signed in as ${user?.phone ?? ""}`} />
       <Card className="p-5">
         <ProfileForm
+          key={fields.data ? "with-fields" : "loading"}
           tenant={tenant}
           initial={membership}
+          customFields={fields.data ?? []}
           submitLabel="Save profile"
           onSubmit={async (values) => {
             try {

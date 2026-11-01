@@ -17,6 +17,8 @@ import type {
   PaymentOrderStatus,
   PaymentPurpose,
   ProfessionType,
+  ProfileFieldType,
+  ProfileFieldVisibility,
   ReactionType,
   ReportReason,
   ReportStatus,
@@ -27,6 +29,7 @@ import type {
 } from "../constants";
 import type { ErrorCode } from "../errorCodes";
 import type { ResolvedNotificationPrefs } from "../lib/notifications";
+import type { ProfileFieldOption, ProfileFieldValue } from "../lib/profileFields";
 
 export interface ApiErrorBody {
   error: { code: ErrorCode; message: string; details?: unknown };
@@ -162,6 +165,33 @@ export interface TokenPairDto {
   refreshToken: string;
 }
 
+/** An institution's own profile question. */
+export interface ProfileFieldDto {
+  id: string;
+  key: string;
+  label: string;
+  helpText: string | null;
+  type: ProfileFieldType;
+  options: ProfileFieldOption[];
+  required: boolean;
+  visibility: ProfileFieldVisibility;
+  memberEditable: boolean;
+  filterable: boolean;
+  position: number;
+  /** Archived fields are hidden everywhere; their answers are kept. */
+  archivedAt: string | null;
+}
+
+/** One answer on a profile, with the field's label and a ready-to-show text. */
+export interface ProfileFieldAnswerDto {
+  key: string;
+  label: string;
+  type: ProfileFieldType;
+  visibility: ProfileFieldVisibility;
+  value: ProfileFieldValue | null;
+  display: string;
+}
+
 export interface MembershipDto {
   id: string;
   tenantId: string;
@@ -184,6 +214,9 @@ export interface MembershipDto {
   interests: string[];
   avatarUrl: string | null;
   isPhoneVisible: boolean;
+  /** Answers to the institution's questions (the member's own and admins' views include admin-only ones). */
+  fields: ProfileFieldAnswerDto[];
+  /** Deprecated (older app versions): members-visible answers as { label: text }. */
   extra: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -208,6 +241,9 @@ export interface MemberProfileDto extends MemberCardDto {
   bio: string | null;
   linkedinUrl: string | null;
   interests: string[];
+  /** Answers to the institution's questions that members may see. */
+  fields: ProfileFieldAnswerDto[];
+  /** Deprecated (older app versions): the same answers as { label: text }. */
   extra: Record<string, unknown>;
   /** Present only when the member chose to share it. */
   phone: string | null;
@@ -420,6 +456,8 @@ export interface DirectoryFiltersDto {
   cities: string[];
   countries: string[];
   companies: string[];
+  /** The institution's filterable questions (choice and yes/no fields). */
+  fields: Array<{ key: string; label: string; options: ProfileFieldOption[] }>;
 }
 
 export interface UploadResultDto {
