@@ -25,6 +25,11 @@ export function RealtimeBridge() {
       realtime.on("notification:unread", (e) => {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count });
       }),
+      // One notification sent to many members (an announcement): refetch rather than patch.
+      realtime.on("notification:bulk", (e) => {
+        void qc.invalidateQueries({ queryKey: ["notifications", e.tenantSlug] });
+        if (e.type === "ANNOUNCEMENT") void qc.invalidateQueries({ queryKey: ["posts", e.tenantSlug] });
+      }),
       // Catch up on anything missed while disconnected.
       realtime.onReconnect(() => void qc.invalidateQueries({ queryKey: ["notifications"] })),
     ];

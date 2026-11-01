@@ -26,6 +26,7 @@ import type {
   TenantType,
 } from "../constants";
 import type { ErrorCode } from "../errorCodes";
+import type { ResolvedNotificationPrefs } from "../lib/notifications";
 
 export interface ApiErrorBody {
   error: { code: ErrorCode; message: string; details?: unknown };
@@ -93,6 +94,20 @@ export interface OtpRequestResultDto {
   channel: OtpChannel;
   /** Only present when the API runs in development mode. */
   devCode?: string;
+}
+
+/** A member's notification preferences in one institution, with defaults filled in. */
+export interface NotificationPrefsDto extends ResolvedNotificationPrefs {
+  /** Whether the account has a confirmed email (email preferences only apply then). */
+  hasEmail: boolean;
+}
+
+/** What an unsubscribe link turns off. */
+export interface UnsubscribeInfoDto {
+  tenantName: string;
+  scope: "digest" | "announcements";
+  /** Already off. */
+  unsubscribed: boolean;
 }
 
 export interface UserDto {

@@ -1,3 +1,4 @@
+import type { NotificationType } from "../constants";
 import type { ErrorCode } from "../errorCodes";
 import type { NotificationDto } from "../types/dto";
 
@@ -20,8 +21,19 @@ export interface UnreadEvent {
   count: number;
 }
 
+/**
+ * Sent instead of notification:new when one notification goes to many members at once (an announcement): one
+ * broadcast rather than a message per member. Clients refetch their notifications (and the feed for announcements).
+ */
+export interface BulkNotificationEvent {
+  tenantSlug: string;
+  type: NotificationType;
+  postId?: string;
+}
+
 export interface ServerToClientEvents {
   "notification:new": (payload: NotificationEvent) => void;
+  "notification:bulk": (payload: BulkNotificationEvent) => void;
   "notification:unread": (payload: UnreadEvent) => void;
   /** The access token used to connect has expired; the server disconnects right after. Refresh and reconnect. */
   "auth:expired": () => void;

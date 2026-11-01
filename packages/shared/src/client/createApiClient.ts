@@ -13,7 +13,7 @@ import {
   uploadEndpoints,
 } from "./endpoints/member";
 import { platformEndpoints } from "./endpoints/platform";
-import { authEndpoints, meEndpoints, tenantEndpoints } from "./endpoints/public";
+import { authEndpoints, meEndpoints, tenantEndpoints, unsubscribeEndpoints } from "./endpoints/public";
 
 export function createApiClient(options: ApiClientOptions) {
   const core = new ApiCore(options);
@@ -21,6 +21,7 @@ export function createApiClient(options: ApiClientOptions) {
     core,
     tenants: tenantEndpoints(core),
     auth: authEndpoints(core),
+    unsubscribe: unsubscribeEndpoints(core),
     me: meEndpoints(core),
     membership: membershipEndpoints(core),
     directory: directoryEndpoints(core),

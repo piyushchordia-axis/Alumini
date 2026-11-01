@@ -6,7 +6,14 @@ import type { PushMessage } from "../services/notifications/NotificationChannel"
  */
 export interface JobPayloads {
   /** Deliver freshly stored notifications to devices (push now; realtime from B3). */
-  "notifications.dispatch": { tenantId: string; notificationIds: string[] };
+  "notifications.dispatch": {
+    tenantId: string;
+    notificationIds: string[];
+    /** One realtime broadcast for all recipients instead of a message each (announcements). */
+    bulk?: boolean;
+    /** false: realtime only, no push (a merged notification that was already pushed). */
+    push?: boolean;
+  };
   /** One Expo push request (at most 100 messages). */
   "push.send": { messages: PushMessage[] };
   /** Read Expo delivery receipts and drop tokens of uninstalled apps. */

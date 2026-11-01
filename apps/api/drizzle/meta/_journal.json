@@ -64,6 +64,13 @@
       "when": 1793507770356,
       "tag": "0008_wave1_email_timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793508596703,
+      "tag": "0009_wave1_notification_prefs",
+      "breakpoints": true
     }
   ]
 }

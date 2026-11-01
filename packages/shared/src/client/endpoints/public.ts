@@ -1,11 +1,19 @@
 import type { PushTokenInput } from "../../schemas/auth";
-import type { AuthSessionDto, EmailStatusDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto } from "../../types/dto";
+import type { AuthSessionDto, EmailStatusDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto, UnsubscribeInfoDto } from "../../types/dto";
 import type { ApiCore } from "../core";
 
 export function tenantEndpoints(core: ApiCore) {
   return {
     list: (q?: string) => core.data<TenantSummaryDto[]>({ path: "/tenants", query: { q }, auth: false }),
     get: (slug: string) => core.data<TenantPublicDto>({ path: `/tenants/${encodeURIComponent(slug)}`, auth: false }),
+  };
+}
+
+/** Email unsubscribe links (no sign-in: the signed token is the authority). */
+export function unsubscribeEndpoints(core: ApiCore) {
+  return {
+    info: (token: string) => core.data<UnsubscribeInfoDto>({ path: "/unsubscribe", query: { token }, auth: false }),
+    confirm: (token: string) => core.data<UnsubscribeInfoDto>({ method: "POST", path: "/unsubscribe", query: { token }, auth: false }),
   };
 }
 

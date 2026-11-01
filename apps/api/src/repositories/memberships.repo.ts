@@ -24,6 +24,12 @@ export async function findMembership(db: DbClient, tenantId: string, userId: str
   return row;
 }
 
+/** By id alone, for links that carry a membership id but no tenant (unsubscribe). Prefer findMembershipById. */
+export async function findMembershipByIdUnscoped(db: DbClient, id: string): Promise<MembershipRow | undefined> {
+  const [row] = await db.select().from(memberships).where(eq(memberships.id, id)).limit(1);
+  return row;
+}
+
 export async function findMembershipById(db: DbClient, tenantId: string, id: string): Promise<MembershipRow | undefined> {
   const [row] = await db
     .select()

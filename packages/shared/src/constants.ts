@@ -68,6 +68,9 @@ export const NOTIFICATION_TYPES = [
   "CONTENT_PENDING",
   "REPORT_FILED",
   "SYSTEM",
+  "ANNOUNCEMENT",
+  "CELEBRATION",
+  "CELEBRATION_WISH",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

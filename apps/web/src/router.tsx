@@ -6,6 +6,7 @@ import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 import { RouteErrorPage } from "@/routes/RouteErrorPage";
 import { TenantPickerPage } from "@/routes/TenantPickerPage";
+import { UnsubscribePage } from "@/routes/UnsubscribePage";
 import { VerifyEmailPage } from "@/routes/VerifyEmailPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
 import { EventDetailPage } from "@/routes/t/EventDetailPage";
@@ -23,6 +24,7 @@ import { LoginPage } from "@/routes/t/LoginPage";
 import { MemberProfilePage } from "@/routes/t/MemberProfilePage";
 import { MyContentPage } from "@/routes/t/MyContentPage";
 import { MyProfilePage } from "@/routes/t/MyProfilePage";
+import { NotificationSettingsPage } from "@/routes/t/NotificationSettingsPage";
 import { NotificationsPage } from "@/routes/t/NotificationsPage";
 import { PendingApprovalPage } from "@/routes/t/PendingApprovalPage";
 import { PostDetailPage } from "@/routes/t/PostDetailPage";
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <TenantPickerPage /> },
       { path: "/verify-email", element: <VerifyEmailPage /> },
+      { path: "/unsubscribe", element: <UnsubscribePage /> },
       { path: "/t/:slug", element: <LandingPage /> },
       { path: "/t/:slug/login", element: <LoginPage /> },
       {
@@ -95,6 +98,7 @@ export const router = createBrowserRouter([
                   { path: "profile", element: <MyProfilePage /> },
                   { path: "my-content", element: <MyContentPage /> },
                   { path: "notifications", element: <NotificationsPage /> },
+                  { path: "notifications/settings", element: <NotificationSettingsPage /> },
                 ],
               },
             ],

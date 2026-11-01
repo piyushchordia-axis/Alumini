@@ -1,18 +1,23 @@
+import { notificationLevelFor } from "@illuminize/shared";
 import type { JobHandler } from "../../jobs/JobQueue";
 import { PermanentJobError } from "../../jobs/JobQueue";
 import { findMembershipsByIds } from "../../repositories/memberships.repo";
 import { toNotificationDto } from "../../dto/membership.dto";
 import { rooms } from "../../realtime/rooms";
-import { countUnreadByMemberships, findNotificationsByIds } from "../../repositories/notifications.repo";
+import { countUnreadByMemberships, findNotificationPrefsByMemberships, findNotificationsByIds } from "../../repositories/notifications.repo";
 import { findTenantById } from "../../repositories/tenants.repo";
 import { PUSH_BATCH_SIZE } from "./ExpoPushChannel";
 import { PushSendError } from "./NotificationChannel";
 
+/** User rooms per realtime broadcast (each room name rides in the one adapter message). */
+const BROADCAST_ROOMS = 1000;
+
 /**
- * Delivers stored notifications to devices: resolves recipients and push tokens, then queues one push request per
- * 100 messages so each can be retried on its own. Rows deleted in the meantime are simply skipped.
+ * Delivers stored notifications to devices: tells open apps, then (for members whose preferences include push)
+ * resolves push tokens and queues one push request per 100 messages so each can be retried on its own. Rows deleted
+ * in the meantime are simply skipped.
  */
-export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async (ctx, { tenantId, notificationIds }) => {
+export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async (ctx, { tenantId, notificationIds, bulk, push }) => {
   const rows = await findNotificationsByIds(ctx.db, tenantId, notificationIds);
   if (rows.length === 0) return;
   const tenant = await findTenantById(ctx.db, tenantId);
@@ -21,21 +26,35 @@ export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async
 
   // Open apps update the bell straight away.
   const userByMembership = new Map(recipients.map((m) => [m.id, m.userId]));
-  const unread = await countUnreadByMemberships(ctx.db, [...userByMembership.keys()]);
-  for (const row of rows) {
-    const userId = userByMembership.get(row.recipientMembershipId);
-    if (!userId) continue;
-    ctx.realtime.emit(rooms.user(userId), "notification:new", {
-      tenantSlug: tenant.slug,
-      membershipId: row.recipientMembershipId,
-      notification: toNotificationDto(row),
-      unreadCount: unread.get(row.recipientMembershipId) ?? 0,
-    });
+  if (bulk) {
+    // One notification to many members: one broadcast per batch of rooms; apps refetch their own counts.
+    const first = rows[0]!;
+    const postId = typeof first.data.postId === "string" ? first.data.postId : undefined;
+    const userRooms = [...new Set(rows.map((r) => userByMembership.get(r.recipientMembershipId)).filter((u): u is string => !!u))].map((u) => rooms.user(u));
+    for (let i = 0; i < userRooms.length; i += BROADCAST_ROOMS) {
+      ctx.realtime.emit(userRooms.slice(i, i + BROADCAST_ROOMS), "notification:bulk", { tenantSlug: tenant.slug, type: first.type, ...(postId ? { postId } : {}) });
+    }
+  } else {
+    const unread = await countUnreadByMemberships(ctx.db, [...userByMembership.keys()]);
+    for (const row of rows) {
+      const userId = userByMembership.get(row.recipientMembershipId);
+      if (!userId) continue;
+      ctx.realtime.emit(rooms.user(userId), "notification:new", {
+        tenantSlug: tenant.slug,
+        membershipId: row.recipientMembershipId,
+        notification: toNotificationDto(row),
+        unreadCount: unread.get(row.recipientMembershipId) ?? 0,
+      });
+    }
   }
 
-  if (!ctx.push) return;
+  if (!ctx.push || push === false) return;
+  // Preferences are read again here: a member may have turned push off since the notification was stored.
+  const prefs = await findNotificationPrefsByMemberships(ctx.db, [...userByMembership.keys()]);
+  const pushRows = rows.filter((r) => notificationLevelFor(r.type, prefs.get(r.recipientMembershipId)) === "IN_APP_PUSH");
+  if (pushRows.length === 0) return;
   const messages = await ctx.push.prepare(
-    rows,
+    pushRows,
     recipients.map((m) => ({ membershipId: m.id, userId: m.userId })),
     { tenantSlug: tenant.slug },
   );

@@ -26,8 +26,13 @@ export default function NotificationsScreen() {
   const readOne = useMutation({ mutationFn: (id: string) => api.notifications.markRead(slug, id), onSuccess: refresh });
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ padding: spacing.md }}>
-        <Button title="Mark all read" variant="outline" onPress={() => readAll.mutate()} loading={readAll.isPending} />
+      <View style={{ padding: spacing.md, flexDirection: "row", gap: spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <Button title="Mark all read" variant="outline" onPress={() => readAll.mutate()} loading={readAll.isPending} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="⚙️ Settings" variant="ghost" onPress={() => router.push(`/t/${slug}/profile/notification-settings`)} />
+        </View>
       </View>
       <FlatList
         data={list.items}

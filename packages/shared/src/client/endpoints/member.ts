@@ -1,4 +1,4 @@
-import type { AttendeesQuery, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
@@ -11,6 +11,7 @@ import type {
   MemberProfileDto,
   MembershipDto,
   NotificationDto,
+  NotificationPrefsDto,
   PaymentOrderDto,
   PostDto,
   PostPageDto,
@@ -117,6 +118,8 @@ export function notificationEndpoints(core: ApiCore) {
     unreadCount: (slug: string) => core.data<{ count: number }>({ path: "/notifications/unread-count", tenantSlug: slug }),
     markRead: (slug: string, id: string) => core.request<void>({ method: "POST", path: `/notifications/${id}/read`, tenantSlug: slug }),
     markAllRead: (slug: string) => core.request<void>({ method: "POST", path: "/notifications/read-all", tenantSlug: slug }),
+    prefs: (slug: string) => core.data<NotificationPrefsDto>({ path: "/notification-prefs", tenantSlug: slug }),
+    updatePrefs: (slug: string, input: NotificationPrefsUpdate) => core.data<NotificationPrefsDto>({ method: "PATCH", path: "/notification-prefs", tenantSlug: slug, body: input }),
   };
 }
 

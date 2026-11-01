@@ -1,4 +1,4 @@
-import { idParamsSchema, notificationsQuerySchema } from "@illuminize/shared";
+import { idParamsSchema, notificationPrefsUpdateSchema, notificationsQuerySchema } from "@illuminize/shared";
 import { Router, type Request } from "express";
 import { rooms } from "../../realtime/rooms";
 import type { AppContext } from "../../context";
@@ -6,10 +6,26 @@ import { toNotificationDto } from "../../dto/membership.dto";
 import { requireAnyMembership } from "../../middleware/tenant";
 import { noContent, ok, route } from "../../middleware/validate";
 import { countUnread, listNotifications, markAllRead, markRead } from "../../repositories/notifications.repo";
+import { getNotificationPrefs, updateNotificationPrefs } from "../../services/notifications/prefs.service";
 
 export function notificationRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
   router.use("/notifications", requireAnyMembership);
+  router.use("/notification-prefs", requireAnyMembership);
+
+  router.get(
+    "/notification-prefs",
+    route({}, async ({ req, res }) => {
+      ok(res, await getNotificationPrefs(ctx, req.membership!));
+    }),
+  );
+
+  router.patch(
+    "/notification-prefs",
+    route({ body: notificationPrefsUpdateSchema }, async ({ req, res, body }) => {
+      ok(res, await updateNotificationPrefs(ctx, req.membership!, body));
+    }),
+  );
 
   /** Keeps the bell in step on the member's other devices and tabs. */
   const syncUnread = async (req: Request) => {

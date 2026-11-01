@@ -25,6 +25,8 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
       return `${base}/my-content`;
     case "profile":
       return `${base}/profile`;
+    case "celebrations":
+      return `${base}/feed`;
     case "admin":
       if (!isAdmin) return null;
       return t.section === "members" ? `/t/${slug}/admin/members?status=PENDING` : `/t/${slug}/admin/${t.section}`;
@@ -49,9 +51,14 @@ export function NotificationsPage() {
       <PageHeader
         title="Notifications"
         actions={
-          <Button variant="outline" size="sm" onClick={() => readAll.mutate()} loading={readAll.isPending}>
-            Mark all read
-          </Button>
+          <>
+            <Link to={`/t/${slug}/app/notifications/settings`} className="inline-flex h-8 items-center rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100">
+              ⚙️ Settings
+            </Link>
+            <Button variant="outline" size="sm" onClick={() => readAll.mutate()} loading={readAll.isPending}>
+              Mark all read
+            </Button>
+          </>
         }
       />
       {list.isLoading && <Loading />}

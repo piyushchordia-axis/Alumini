@@ -8,6 +8,7 @@ export default function ProfileStack() {
       <Stack.Screen name="my-content" options={{ title: "My posts & listings" }} />
       <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
       <Stack.Screen name="account" options={{ title: "Email & account" }} />
+      <Stack.Screen name="notification-settings" options={{ title: "Notification settings" }} />
     </Stack>
   );
 }

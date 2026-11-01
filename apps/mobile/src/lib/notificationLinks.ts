@@ -17,6 +17,8 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/profile/my-content`;
     case "profile":
       return `${base}/profile`;
+    case "celebrations":
+      return `${base}/feed`;
     default:
       return null;
   }
