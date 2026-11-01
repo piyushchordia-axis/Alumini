@@ -71,6 +71,13 @@
       "when": 1793508596703,
       "tag": "0009_wave1_notification_prefs",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793509179787,
+      "tag": "0010_wave1_plan_channels",
+      "breakpoints": true
     }
   ]
 }

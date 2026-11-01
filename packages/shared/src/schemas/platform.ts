@@ -53,7 +53,15 @@ export type PlatformTenantUpdateInput = z.infer<typeof platformTenantUpdateSchem
 export const assignAdminSchema = initialAdminSchema;
 export type AssignAdminInput = z.infer<typeof assignAdminSchema>;
 
+/** Charge per message by channel, in minor units (paise); fractions allowed (₹0.115 = 11.5). */
+export const messageRatesSchema = z.object(Object.fromEntries(MESSAGE_CHANNELS.map((c) => [c, z.number().min(0).max(100_000)])) as Record<(typeof MESSAGE_CHANNELS)[number], z.ZodNumber>).partial();
+
+/** Channels the subscription includes for admin-initiated sends (invites, announcements). */
+const includedChannelsSchema = z.array(z.enum(MESSAGE_CHANNELS)).max(MESSAGE_CHANNELS.length).transform((v) => [...new Set(v)]);
+
 const planFields = {
+  includedChannels: includedChannelsSchema.default([]),
+  messageRatesMinor: messageRatesSchema.default({}),
   billingCycle: z.enum(BILLING_CYCLES).default("MONTHLY"),
   currency: z.string().trim().toUpperCase().length(3).default("INR"),
   pricePerActiveUserMinor: z.number().int().nonnegative().nullable().optional(),
@@ -83,6 +91,8 @@ export const billingPlanUpdateSchema = z
     flatFeeMinor: z.number().int().nonnegative().nullable(),
     effectiveTo: dateOnlySchema.nullable(),
     notes: optionalTrimmed(1000),
+    includedChannels: includedChannelsSchema,
+    messageRatesMinor: messageRatesSchema,
   })
   .partial();
 export type BillingPlanUpdateInput = z.infer<typeof billingPlanUpdateSchema>;

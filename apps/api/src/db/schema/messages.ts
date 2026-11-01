@@ -57,5 +57,7 @@ export const outboundMessages = pgTable(
     index("outbound_messages_tenant_created_idx").on(t.tenantId, t.createdAt),
     index("outbound_messages_context_idx").on(t.contextType, t.contextId),
     index("outbound_messages_pending_idx").on(t.status, t.updatedAt).where(sql`${t.status} in ('QUEUED', 'SENDING')`),
+    // Billing usage: delivered messages per tenant and period.
+    index("outbound_messages_tenant_sent_idx").on(t.tenantId, t.sentAt).where(sql`${t.status} in ('SENT', 'DELIVERED', 'READ')`),
   ],
 );

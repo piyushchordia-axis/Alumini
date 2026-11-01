@@ -1,4 +1,4 @@
-import type { TenantBrandingUpdate, TenantPublicDto, TenantSettingsDto, TenantSettingsUpdate } from "@illuminize/shared";
+import type { AdminSettingsDto, TenantBrandingUpdate, TenantPublicDto, TenantSettingsDto, TenantSettingsUpdate } from "@illuminize/shared";
 import { DEFAULT_TENANT_FEATURES } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toTenantPublicDto, toTenantSettingsDto } from "../dto/tenant.dto";
@@ -6,6 +6,7 @@ import { AppError } from "../lib/errors";
 import { findSettings, updateSettings, updateTenant } from "../repositories/tenants.repo";
 import type { AuthContext, TenantContext } from "../types/request";
 import { recordAudit } from "./audit.service";
+import { tenantOutboundChannels } from "./billing.service";
 import { invalidateTenantCache } from "./tenant.service";
 
 interface AdminActor extends AuthContext {
@@ -13,9 +14,10 @@ interface AdminActor extends AuthContext {
   ip?: string;
 }
 
-export async function getTenantSettings(ctx: AppContext, tenantCtx: TenantContext): Promise<{ settings: TenantSettingsDto; branding: TenantPublicDto }> {
-  const settings = (await findSettings(ctx.db, tenantCtx.tenant.id)) ?? tenantCtx.settings;
-  return { settings: toTenantSettingsDto(settings), branding: toTenantPublicDto(tenantCtx.tenant, settings) };
+export async function getTenantSettings(ctx: AppContext, tenantCtx: TenantContext): Promise<AdminSettingsDto> {
+  const [settings, outboundChannels] = await Promise.all([findSettings(ctx.db, tenantCtx.tenant.id), tenantOutboundChannels(ctx, tenantCtx.tenant.id)]);
+  const s = settings ?? tenantCtx.settings;
+  return { settings: toTenantSettingsDto(s), branding: toTenantPublicDto(tenantCtx.tenant, s), outboundChannels };
 }
 
 export async function updateTenantSettings(ctx: AppContext, tenantCtx: TenantContext, actor: AdminActor, input: TenantSettingsUpdate): Promise<TenantSettingsDto> {

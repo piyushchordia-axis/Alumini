@@ -1,6 +1,6 @@
 import type { AdminMembersQuery, AdminReportsQuery, AuditQuery, MembershipProfileUpdate, MembershipRole, ModerationQuery, ReportResolveInput, TenantBrandingUpdate, TenantSettingsUpdate } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminMemberDto, AdminReportDto, AuditDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AuditDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -44,7 +44,7 @@ export function adminEndpoints(core: ApiCore) {
       dismiss: (slug: string, id: string, note?: string | null) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/dismiss`), body: { note: note ?? null } }),
     },
     settings: {
-      get: (slug: string) => core.data<{ settings: TenantSettingsDto; branding: TenantPublicDto }>(p(slug, "/settings")),
+      get: (slug: string) => core.data<AdminSettingsDto>(p(slug, "/settings")),
       update: (slug: string, input: TenantSettingsUpdate) => core.data<TenantSettingsDto>({ method: "PATCH", ...p(slug, "/settings"), body: input }),
       updateBranding: (slug: string, input: TenantBrandingUpdate) => core.data<TenantPublicDto>({ method: "PATCH", ...p(slug, "/branding"), body: input }),
     },

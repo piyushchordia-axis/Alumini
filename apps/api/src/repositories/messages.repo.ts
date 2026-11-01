@@ -1,4 +1,5 @@
-import { and, eq, inArray, lt, notInArray, or, type SQL } from "drizzle-orm";
+import type { MessageChannel } from "@illuminize/shared";
+import { and, eq, gte, inArray, isNotNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { outboundMessages } from "../db/schema";
 
@@ -67,4 +68,24 @@ export async function findMessagesByContext(db: DbClient, contextType: string, c
     .select()
     .from(outboundMessages)
     .where(and(eq(outboundMessages.contextType, contextType), inArray(outboundMessages.contextId, contextIds)));
+}
+
+/** Messages sent for a tenant in [from, toExclusive), by the channel that delivered them (sent, delivered or read). */
+export async function countDeliveredMessages(db: DbClient, tenantId: string, period: { from: Date; toExclusive: Date }): Promise<Record<MessageChannel, number>> {
+  const rows = await db
+    .select({ channel: outboundMessages.channel, count: sql<number>`count(*)::int` })
+    .from(outboundMessages)
+    .where(
+      and(
+        eq(outboundMessages.tenantId, tenantId),
+        inArray(outboundMessages.status, ["SENT", "DELIVERED", "READ"]),
+        isNotNull(outboundMessages.channel),
+        gte(outboundMessages.sentAt, period.from),
+        lt(outboundMessages.sentAt, period.toExclusive),
+      ),
+    )
+    .groupBy(outboundMessages.channel);
+  const out: Record<MessageChannel, number> = { WHATSAPP: 0, SMS: 0, EMAIL: 0 };
+  for (const r of rows) if (r.channel) out[r.channel] = r.count;
+  return out;
 }

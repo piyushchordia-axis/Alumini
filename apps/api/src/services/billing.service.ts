@@ -1,10 +1,11 @@
-import type { BillingPlanCreateInput, BillingPlanDto, BillingPlanUpdateInput, BillingSnapshotDto, BillingUsageDto, BillingUsageQuery, SnapshotCreateInput } from "@illuminize/shared";
+import { MESSAGE_CHANNELS, type BillingPlanCreateInput, type BillingPlanDto, type BillingPlanUpdateInput, type BillingSnapshotDto, type BillingUsageDto, type BillingUsageQuery, type MessageChannel, type SnapshotCreateInput } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toBillingPlanDto, toBillingSnapshotDto } from "../dto/platform.dto";
 import { AppError } from "../lib/errors";
 import { runInTransaction } from "../lib/transaction";
 import { closeOpenPlansBefore, findPlanById, findPlanEffectiveOn, insertPlan, insertSnapshot, listPlans, listSnapshots, updatePlan } from "../repositories/billing.repo";
 import { billingCountsForPeriod } from "../repositories/memberships.repo";
+import { countDeliveredMessages } from "../repositories/messages.repo";
 import { findTenantById } from "../repositories/tenants.repo";
 import type { AuthContext } from "../types/request";
 import { recordAudit } from "./audit.service";
@@ -16,16 +17,27 @@ interface PlatformActor extends AuthContext {
 
 const today = (ctx: AppContext) => todayIn(ctx.config.BILLING_TIMEZONE);
 
+/**
+ * WhatsApp/SMS/email channels an institution may use for admin-initiated sends (invites, announcements) on a day:
+ * what its plan in force includes, limited to channels this server can actually send on. No plan: none (in-app and
+ * push only). Called once per page or fan-out job, so not cached.
+ */
+export async function tenantOutboundChannels(ctx: AppContext, tenantId: string, onDay = today(ctx)): Promise<MessageChannel[]> {
+  const plan = await findPlanEffectiveOn(ctx.db, tenantId, onDay);
+  if (!plan) return [];
+  return MESSAGE_CHANNELS.filter((c) => plan.includedChannels.includes(c) && !!ctx.messageSenders[c]);
+}
+
 async function assertTenant(ctx: AppContext, tenantId: string) {
   const tenant = await findTenantById(ctx.db, tenantId);
   if (!tenant) throw AppError.notFound("Institution not found", "TENANT_NOT_FOUND");
   return tenant;
 }
 
-export async function getTenantBilling(ctx: AppContext, tenantId: string): Promise<{ currentPlan: BillingPlanDto | null; plans: BillingPlanDto[]; snapshots: BillingSnapshotDto[] }> {
+export async function getTenantBilling(ctx: AppContext, tenantId: string): Promise<{ currentPlan: BillingPlanDto | null; plans: BillingPlanDto[]; snapshots: BillingSnapshotDto[]; timeZone: string }> {
   await assertTenant(ctx, tenantId);
   const [current, plans, snapshots] = await Promise.all([findPlanEffectiveOn(ctx.db, tenantId, today(ctx)), listPlans(ctx.db, tenantId), listSnapshots(ctx.db, tenantId)]);
-  return { currentPlan: current ? toBillingPlanDto(current) : null, plans: plans.map(toBillingPlanDto), snapshots: snapshots.map(toBillingSnapshotDto) };
+  return { currentPlan: current ? toBillingPlanDto(current) : null, plans: plans.map(toBillingPlanDto), snapshots: snapshots.map(toBillingSnapshotDto), timeZone: ctx.config.BILLING_TIMEZONE };
 }
 
 export async function createBillingPlan(ctx: AppContext, actor: PlatformActor, tenantId: string, input: BillingPlanCreateInput): Promise<BillingPlanDto> {
@@ -42,6 +54,8 @@ export async function createBillingPlan(ctx: AppContext, actor: PlatformActor, t
       effectiveFrom: input.effectiveFrom,
       effectiveTo: input.effectiveTo ?? null,
       notes: input.notes ?? null,
+      includedChannels: input.includedChannels,
+      messageRatesMinor: input.messageRatesMinor,
       createdByUserId: actor.userId,
     });
     await recordAudit(
@@ -77,6 +91,8 @@ export async function updateBillingPlan(ctx: AppContext, actor: PlatformActor, p
     ...(input.flatFeeMinor !== undefined ? { flatFeeMinor: input.flatFeeMinor } : {}),
     ...(input.effectiveTo !== undefined ? { effectiveTo: input.effectiveTo } : {}),
     ...(input.notes !== undefined ? { notes: input.notes } : {}),
+    ...(input.includedChannels !== undefined ? { includedChannels: input.includedChannels } : {}),
+    ...(input.messageRatesMinor !== undefined ? { messageRatesMinor: input.messageRatesMinor } : {}),
   }))!;
   await recordAudit(ctx, {
     tenantId: plan.tenantId,
@@ -90,7 +106,13 @@ export async function updateBillingPlan(ctx: AppContext, actor: PlatformActor, p
   return toBillingPlanDto(row);
 }
 
-/** Estimated charge for the period: the plan's per-cycle price, prorated to the period's length. */
+/** Message charges: delivered messages × the plan's per-message rate for each channel. */
+function messageAmount(plan: BillingPlanDto | null, messages: Record<MessageChannel, number>): number {
+  if (!plan) return 0;
+  return Math.round(MESSAGE_CHANNELS.reduce((sum, c) => sum + (plan.messageRatesMinor[c] ?? 0) * messages[c], 0));
+}
+
+/** Membership charge for the period: the plan's per-cycle price, prorated to the period's length. */
 function estimateAmount(plan: BillingPlanDto | null, activeMembers: number, fraction: number): number {
   if (!plan) return 0;
   switch (plan.billingModel) {
@@ -114,9 +136,15 @@ export async function computeUsage(ctx: AppContext, tenantId: string, query: Bil
   const periodStart = query.from ?? month.fromDay;
   const periodEnd = query.to ?? month.toDay;
   const period = billingPeriod(periodStart, periodEnd, timeZone);
-  const [counts, planRow] = await Promise.all([billingCountsForPeriod(ctx.db, tenantId, period), findPlanEffectiveOn(ctx.db, tenantId, periodEnd)]);
+  const [counts, planRow, messages] = await Promise.all([
+    billingCountsForPeriod(ctx.db, tenantId, period),
+    findPlanEffectiveOn(ctx.db, tenantId, periodEnd),
+    countDeliveredMessages(ctx.db, tenantId, period),
+  ]);
   const plan = planRow ? toBillingPlanDto(planRow) : null;
   const fraction = plan ? cycleFraction(periodStart, periodEnd, plan.billingCycle) : 1;
+  const memberAmountMinor = estimateAmount(plan, counts.active, fraction);
+  const messageAmountMinor = messageAmount(plan, messages);
   return {
     periodStart,
     periodEnd,
@@ -126,7 +154,10 @@ export async function computeUsage(ctx: AppContext, tenantId: string, query: Bil
     newMembers: counts.created,
     plan,
     cycleFraction: Math.round(fraction * 10_000) / 10_000,
-    estimatedAmountMinor: estimateAmount(plan, counts.active, fraction),
+    messages,
+    memberAmountMinor,
+    messageAmountMinor,
+    estimatedAmountMinor: memberAmountMinor + messageAmountMinor,
     currency: plan?.currency ?? "INR",
   };
 }
@@ -141,6 +172,8 @@ export async function createSnapshot(ctx: AppContext, actor: PlatformActor, tena
     approvedMemberCount: usage.approvedMembers,
     activeMemberCount: usage.activeMembers,
     newMemberCount: usage.newMembers,
+    messageCounts: usage.messages,
+    messageAmountMinor: usage.messageAmountMinor,
     amountMinor: usage.estimatedAmountMinor,
     currency: usage.currency,
     notes: input.notes ?? null,

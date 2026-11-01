@@ -33,7 +33,7 @@ export function platformEndpoints(core: ApiCore) {
       },
     },
     billing: {
-      get: (tenantId: string) => core.data<{ currentPlan: BillingPlanDto | null; plans: BillingPlanDto[]; snapshots: BillingSnapshotDto[] }>({ path: path(`/tenants/${tenantId}/billing`) }),
+      get: (tenantId: string) => core.data<{ currentPlan: BillingPlanDto | null; plans: BillingPlanDto[]; snapshots: BillingSnapshotDto[]; timeZone: string }>({ path: path(`/tenants/${tenantId}/billing`) }),
       createPlan: (tenantId: string, input: BillingPlanCreateInput) => core.data<BillingPlanDto>({ method: "POST", path: path(`/tenants/${tenantId}/billing/plans`), body: input }),
       updatePlan: (planId: string, input: BillingPlanUpdateInput) => core.data<BillingPlanDto>({ method: "PATCH", path: path(`/billing/plans/${planId}`), body: input }),
       usage: (tenantId: string, query?: Partial<BillingUsageQuery>) => core.data<BillingUsageDto>({ path: path(`/tenants/${tenantId}/billing/usage`), query: q(query) }),

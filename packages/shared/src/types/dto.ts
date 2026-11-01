@@ -86,6 +86,14 @@ export interface TenantSettingsDto {
   updatedAt: string;
 }
 
+/** The tenant admin settings page: settings, branding, and what the subscription allows. */
+export interface AdminSettingsDto {
+  settings: TenantSettingsDto;
+  branding: TenantPublicDto;
+  /** WhatsApp/SMS/email channels the institution can use for invites and announcements today (plan ∩ configured). */
+  outboundChannels: MessageChannel[];
+}
+
 export type OtpChannel = "whatsapp" | "sms" | "console";
 
 export interface OtpRequestResultDto {
@@ -450,6 +458,10 @@ export interface BillingPlanDto {
   effectiveFrom: string;
   effectiveTo: string | null;
   notes: string | null;
+  /** Channels the institution may use for invites and announcements (in-app and push are always included). */
+  includedChannels: MessageChannel[];
+  /** Charge per delivered message, in minor units (may be fractional). Missing = not charged. */
+  messageRatesMinor: Partial<Record<MessageChannel, number>>;
   createdAt: string;
 }
 
@@ -462,6 +474,10 @@ export interface BillingSnapshotDto {
   approvedMemberCount: number;
   activeMemberCount: number;
   newMemberCount: number;
+  /** Delivered messages per channel in the period. */
+  messageCounts: Partial<Record<MessageChannel, number>>;
+  /** Message charges (included in amountMinor). */
+  messageAmountMinor: number;
   amountMinor: number;
   currency: string;
   notes: string | null;
@@ -482,6 +498,13 @@ export interface BillingUsageDto {
   plan: BillingPlanDto | null;
   /** Share of the plan's billing cycle the period covers (1 = one full cycle); the estimate is prorated by it. */
   cycleFraction: number;
+  /** Delivered WhatsApp, SMS and email messages sent for the institution in the period (sent, delivered or read). */
+  messages: Record<MessageChannel, number>;
+  /** Membership charge (plan price, prorated). */
+  memberAmountMinor: number;
+  /** Messages × the plan's per-message rates. */
+  messageAmountMinor: number;
+  /** memberAmountMinor + messageAmountMinor. */
   estimatedAmountMinor: number;
   currency: string;
 }

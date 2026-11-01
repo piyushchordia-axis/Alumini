@@ -1,4 +1,5 @@
 import { DEFAULT_TENANT_FEATURES, DEFAULT_TENANT_TIMEZONE, type TenantFeatures } from "@illuminize/shared";
+import { sql } from "drizzle-orm";
 import {
   boolean,
   char,
@@ -12,7 +13,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { approvalModeEnum, billingCycleEnum, billingModelEnum, tenantStatusEnum, tenantTypeEnum } from "./enums";
+import type { MessageChannel } from "@illuminize/shared";
+import { approvalModeEnum, billingCycleEnum, billingModelEnum, messageChannelEnum, tenantStatusEnum, tenantTypeEnum } from "./enums";
 import { users } from "./users";
 
 export const tenants = pgTable(
@@ -67,6 +69,10 @@ export const tenantBillingPlans = pgTable(
     currency: char("currency", { length: 3 }).notNull().default("INR"),
     pricePerActiveUserMinor: integer("price_per_active_user_minor"),
     flatFeeMinor: integer("flat_fee_minor"),
+    /** Outbound channels the subscription includes for invites and announcements (in-app and push always are). */
+    includedChannels: messageChannelEnum("included_channels").array().notNull().default(sql`'{}'::message_channel[]`),
+    /** Charge per delivered message by channel, in minor units (fractions allowed). */
+    messageRatesMinor: jsonb("message_rates_minor").$type<Partial<Record<MessageChannel, number>>>().notNull().default({}),
     effectiveFrom: date("effective_from").notNull(),
     effectiveTo: date("effective_to"),
     notes: text("notes"),
@@ -90,6 +96,9 @@ export const tenantBillingSnapshots = pgTable(
     approvedMemberCount: integer("approved_member_count").notNull(),
     activeMemberCount: integer("active_member_count").notNull(),
     newMemberCount: integer("new_member_count").notNull(),
+    messageCounts: jsonb("message_counts").$type<Partial<Record<MessageChannel, number>>>().notNull().default({}),
+    /** Message charges, included in amountMinor. */
+    messageAmountMinor: integer("message_amount_minor").notNull().default(0),
     amountMinor: integer("amount_minor").notNull(),
     currency: char("currency", { length: 3 }).notNull(),
     notes: text("notes"),

@@ -38,12 +38,13 @@ export function timeAgo(iso: string): string {
   return formatDate(iso);
 }
 
-export function formatMoneyMinor(minor: number | null | undefined, currency = "INR"): string {
+/** Money from minor units; `maxFractionDigits` > 0 for small amounts such as per-message rates (₹0.115). */
+export function formatMoneyMinor(minor: number | null | undefined, currency = "INR", maxFractionDigits = 0): string {
   if (minor === null || minor === undefined) return "—";
   try {
-    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);
+    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : undefined, { style: "currency", currency, minimumFractionDigits: 0, maximumFractionDigits: maxFractionDigits }).format(minor / 100);
   } catch {
-    return `${currency} ${(minor / 100).toFixed(0)}`;
+    return `${currency} ${(minor / 100).toFixed(maxFractionDigits)}`;
   }
 }
 

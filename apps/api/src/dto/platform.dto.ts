@@ -32,6 +32,8 @@ export function toBillingPlanDto(p: BillingPlanRow): BillingPlanDto {
     effectiveFrom: p.effectiveFrom,
     effectiveTo: p.effectiveTo,
     notes: p.notes,
+    includedChannels: p.includedChannels,
+    messageRatesMinor: p.messageRatesMinor,
     createdAt: p.createdAt.toISOString(),
   };
 }
@@ -46,6 +48,8 @@ export function toBillingSnapshotDto(s: BillingSnapshotRow): BillingSnapshotDto 
     approvedMemberCount: s.approvedMemberCount,
     activeMemberCount: s.activeMemberCount,
     newMemberCount: s.newMemberCount,
+    messageCounts: s.messageCounts,
+    messageAmountMinor: s.messageAmountMinor,
     amountMinor: s.amountMinor,
     currency: s.currency,
     notes: s.notes,

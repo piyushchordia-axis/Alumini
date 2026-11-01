@@ -1,11 +1,22 @@
-import { BILLING_CYCLES, BILLING_MODELS, BILLING_MODEL_LABELS, type BillingModel, type BillingPlanCreateInput, type BillingPlanDto, type BillingPlanUpdateInput, type TenantStatus } from "@illuminize/shared";
+import {
+  BILLING_CYCLES,
+  BILLING_MODELS,
+  BILLING_MODEL_LABELS,
+  MESSAGE_CHANNELS,
+  type BillingModel,
+  type BillingPlanCreateInput,
+  type BillingPlanDto,
+  type BillingPlanUpdateInput,
+  type MessageChannel,
+  type TenantStatus,
+} from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
-import { Avatar, Badge, Button, Card, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Checkbox, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -178,8 +189,60 @@ function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: A
   );
 }
 
-/** Billing periods are calendar days in the platform's billing time zone (India unless configured otherwise). */
-const BILLING_ZONE = "Asia/Kolkata";
+/** WhatsApp, SMS and email the plan includes, each with an optional charge per delivered message. */
+function ChannelsField({
+  channels,
+  rates,
+  currency,
+  onChange,
+}: {
+  channels: MessageChannel[];
+  rates: Record<MessageChannel, string>;
+  currency: string;
+  onChange: (channels: MessageChannel[], rates: Record<MessageChannel, string>) => void;
+}) {
+  return (
+    <fieldset className="rounded-lg border border-slate-200 p-3">
+      <legend className="px-1 text-sm font-medium text-slate-700">Messaging included</legend>
+      <p className="mb-2 text-xs text-slate-500">Channels admins can use for invites and announcements (in-app and push are always included). Rates are charged per delivered message.</p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {MESSAGE_CHANNELS.map((c) => {
+          const on = channels.includes(c);
+          return (
+            <div key={c} className="space-y-1">
+              <Checkbox label={CHANNEL_LABELS[c]} checked={on} onChange={(e) => onChange(e.target.checked ? [...channels, c] : channels.filter((x) => x !== c), rates)} />
+              {on && (
+                <Input
+                  aria-label={`${CHANNEL_LABELS[c]} rate per message (${currency})`}
+                  type="number"
+                  min={0}
+                  step="0.001"
+                  placeholder={`${currency} per message`}
+                  value={rates[c]}
+                  onChange={(e) => onChange(channels, { ...rates, [c]: e.target.value })}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+const CHANNEL_LABELS: Record<MessageChannel, string> = { WHATSAPP: "WhatsApp", SMS: "SMS", EMAIL: "Email" };
+const ratesToInputs = (r: Partial<Record<MessageChannel, number>>): Record<MessageChannel, string> => ({
+  WHATSAPP: r.WHATSAPP != null ? String(r.WHATSAPP / 100) : "",
+  SMS: r.SMS != null ? String(r.SMS / 100) : "",
+  EMAIL: r.EMAIL != null ? String(r.EMAIL / 100) : "",
+});
+/** Major units typed by staff → minor units (fractions kept: ₹0.115 → 11.5 paise). */
+const inputsToRates = (channels: MessageChannel[], r: Record<MessageChannel, string>): Partial<Record<MessageChannel, number>> =>
+  Object.fromEntries(channels.filter((c) => r[c].trim() !== "").map((c) => [c, Math.round(Number(r[c]) * 100 * 1000) / 1000]));
+const channelSummary = (p: BillingPlanDto) =>
+  p.includedChannels.length
+    ? p.includedChannels.map((c) => `${CHANNEL_LABELS[c]}${p.messageRatesMinor[c] != null ? ` ${formatMoneyMinor(p.messageRatesMinor[c]!, p.currency, 3)}/msg` : ""}`).join(", ")
+    : "in-app and push only";
 
 function currentMonthIn(timeZone: string): { start: string; end: string; today: string } {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -190,13 +253,15 @@ function currentMonthIn(timeZone: string): { start: string; end: string; today: 
 }
 
 /** Edit an existing plan's price, cycle, currency or notes, or end it on a date. Only changed fields are sent. */
-function PlanEditModal({ plan, mode, onClose, onSaved }: { plan: BillingPlanDto; mode: "edit" | "end"; onClose: () => void; onSaved: () => void }) {
+function PlanEditModal({ plan, mode, timeZone, onClose, onSaved }: { plan: BillingPlanDto; mode: "edit" | "end"; timeZone: string; onClose: () => void; onSaved: () => void }) {
   const [cycle, setCycle] = useState(plan.billingCycle);
   const [currency, setCurrency] = useState(plan.currency);
   const [price, setPrice] = useState(plan.pricePerActiveUserMinor != null ? String(plan.pricePerActiveUserMinor / 100) : "");
   const [flat, setFlat] = useState(plan.flatFeeMinor != null ? String(plan.flatFeeMinor / 100) : "");
   const [notes, setNotes] = useState(plan.notes ?? "");
-  const [endOn, setEndOn] = useState(plan.effectiveTo ?? currentMonthIn(BILLING_ZONE).today);
+  const [endOn, setEndOn] = useState(plan.effectiveTo ?? currentMonthIn(timeZone).today);
+  const [channels, setChannels] = useState<MessageChannel[]>(plan.includedChannels);
+  const [rates, setRates] = useState(ratesToInputs(plan.messageRatesMinor));
   const save = useMutation({
     mutationFn: () => {
       const input: BillingPlanUpdateInput = {};
@@ -207,6 +272,8 @@ function PlanEditModal({ plan, mode, onClose, onSaved }: { plan: BillingPlanDto;
         if (plan.billingModel === "PER_ACTIVE_USER") input.pricePerActiveUserMinor = Math.round(Number(price) * 100);
         if (plan.billingModel === "FLAT_FEE") input.flatFeeMinor = Math.round(Number(flat) * 100);
         if (notes !== (plan.notes ?? "")) input.notes = notes || null;
+        input.includedChannels = channels;
+        input.messageRatesMinor = inputsToRates(channels, rates);
       }
       return api.platform.billing.updatePlan(plan.id, input);
     },
@@ -264,6 +331,17 @@ function PlanEditModal({ plan, mode, onClose, onSaved }: { plan: BillingPlanDto;
             </FormField>
           )}
           <div className="sm:col-span-2">
+            <ChannelsField
+              channels={channels}
+              rates={rates}
+              currency={currency}
+              onChange={(c, r) => {
+                setChannels(c);
+                setRates(r);
+              }}
+            />
+          </div>
+          <div className="sm:col-span-2">
             <FormField label="Notes">
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
             </FormField>
@@ -277,7 +355,9 @@ function PlanEditModal({ plan, mode, onClose, onSaved }: { plan: BillingPlanDto;
 function BillingTab({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const billing = useQuery({ queryKey: qk.platform.billing(tenantId), queryFn: () => api.platform.billing.get(tenantId) });
-  const { start: monthStart, end: monthEnd } = currentMonthIn(BILLING_ZONE);
+  // Billing periods are calendar days in the platform's billing time zone (from the API; India by default).
+  const zone = billing.data?.timeZone ?? "Asia/Kolkata";
+  const { start: monthStart, end: monthEnd } = currentMonthIn(zone);
   const [editing, setEditing] = useState<{ plan: BillingPlanDto; mode: "edit" | "end" } | null>(null);
   const [snapshotNotes, setSnapshotNotes] = useState("");
   const [from, setFrom] = useState(monthStart);
@@ -290,6 +370,8 @@ function BillingTab({ tenantId }: { tenantId: string }) {
   const [flat, setFlat] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(monthStart);
   const [notes, setNotes] = useState("");
+  const [channels, setChannels] = useState<MessageChannel[]>([]);
+  const [rates, setRates] = useState(ratesToInputs({}));
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["platform"] });
   };
@@ -303,6 +385,8 @@ function BillingTab({ tenantId }: { tenantId: string }) {
         flatFeeMinor: model === "FLAT_FEE" ? Math.round(Number(flat) * 100) : null,
         effectiveFrom,
         notes: notes || null,
+        includedChannels: channels,
+        messageRatesMinor: inputsToRates(channels, rates),
       };
       return api.platform.billing.createPlan(tenantId, input);
     },
@@ -333,6 +417,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
             {BILLING_MODEL_LABELS[b.currentPlan.billingModel]}
             {b.currentPlan.billingModel === "PER_ACTIVE_USER" && ` · ${formatMoneyMinor(b.currentPlan.pricePerActiveUserMinor, b.currentPlan.currency)} per active member`}
             {b.currentPlan.billingModel === "FLAT_FEE" && ` · ${formatMoneyMinor(b.currentPlan.flatFeeMinor, b.currentPlan.currency)}`} · {b.currentPlan.billingCycle.toLowerCase()} · since {formatDate(b.currentPlan.effectiveFrom)}
+            <span className="block text-xs text-slate-500">Messaging: {channelSummary(b.currentPlan)}</span>
             {b.currentPlan.notes && <span className="block text-xs text-slate-500">{b.currentPlan.notes}</span>}
           </p>
         ) : (
@@ -365,8 +450,17 @@ function BillingTab({ tenantId }: { tenantId: string }) {
               <Stat
                 label="Estimated amount"
                 value={formatMoneyMinor(usage.data.estimatedAmountMinor, usage.data.currency)}
-                hint={usage.data.plan ? `${BILLING_MODEL_LABELS[usage.data.plan.billingModel]} · ${usage.data.cycleFraction === 1 ? "one full" : `${usage.data.cycleFraction} of a`} ${usage.data.plan.billingCycle.toLowerCase()} cycle` : "no plan"}
+                hint={
+                  usage.data.plan
+                    ? `${BILLING_MODEL_LABELS[usage.data.plan.billingModel]} · ${usage.data.cycleFraction === 1 ? "one full" : `${usage.data.cycleFraction} of a`} ${usage.data.plan.billingCycle.toLowerCase()} cycle${usage.data.messageAmountMinor ? ` + ${formatMoneyMinor(usage.data.messageAmountMinor, usage.data.currency)} messages` : ""}`
+                    : "no plan"
+                }
               />
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {MESSAGE_CHANNELS.map((c) => (
+                <Stat key={c} label={`${CHANNEL_LABELS[c]} messages`} value={usage.data!.messages[c]} hint="Delivered in the period" />
+              ))}
             </div>
             <p className="mt-2 text-xs text-slate-500">Days are calendar days in {usage.data.timeZone}. The estimate is prorated when the period is not exactly one billing cycle.</p>
           </>
@@ -420,6 +514,17 @@ function BillingTab({ tenantId }: { tenantId: string }) {
             <Input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
           </FormField>
           <div className="sm:col-span-3">
+            <ChannelsField
+              channels={channels}
+              rates={rates}
+              currency={currency}
+              onChange={(c, r) => {
+                setChannels(c);
+                setRates(r);
+              }}
+            />
+          </div>
+          <div className="sm:col-span-3">
             <FormField label="Notes">
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Who agreed, invoice terms, PO numbers…" />
             </FormField>
@@ -441,6 +546,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
                 {BILLING_MODEL_LABELS[p.billingModel]}
                 {p.pricePerActiveUserMinor != null && ` · ${formatMoneyMinor(p.pricePerActiveUserMinor, p.currency)}/active member`}
                 {p.flatFeeMinor != null && ` · ${formatMoneyMinor(p.flatFeeMinor, p.currency)}`}
+                <span className="block text-xs text-slate-500">Messaging: {channelSummary(p)}</span>
               </span>
               <span className="flex items-center gap-3 text-slate-500">
                 {formatDate(p.effectiveFrom)} → {p.effectiveTo ? formatDate(p.effectiveTo) : "open"}
@@ -467,6 +573,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
             <li key={s.id} className="flex flex-wrap justify-between gap-2 py-2">
               <span>
                 {formatDate(s.periodStart)} – {formatDate(s.periodEnd)} · {s.activeMemberCount} active · {s.approvedMemberCount} approved
+                {s.messageAmountMinor > 0 && ` · messages ${formatMoneyMinor(s.messageAmountMinor, s.currency)}`}
               </span>
               <span className="font-medium text-slate-900">{formatMoneyMinor(s.amountMinor, s.currency)}</span>
               {s.notes && <span className="w-full text-xs text-slate-500">{s.notes}</span>}
@@ -475,7 +582,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
           {b.snapshots.length === 0 && <li className="py-2 text-slate-400">No snapshots yet.</li>}
         </ul>
       </Card>
-      {editing && <PlanEditModal plan={editing.plan} mode={editing.mode} onClose={() => setEditing(null)} onSaved={refresh} />}
+      {editing && <PlanEditModal plan={editing.plan} mode={editing.mode} timeZone={zone} onClose={() => setEditing(null)} onSaved={refresh} />}
     </div>
   );
 }
