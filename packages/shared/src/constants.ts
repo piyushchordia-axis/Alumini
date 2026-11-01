@@ -142,6 +142,7 @@ export const DEFAULT_TENANT_FEATURES: TenantFeatures = {
 };
 
 export const MAX_POST_IMAGES = 4;
+export const MAX_POLL_OPTIONS = 6;
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 export const DEFAULT_PAGE_SIZE = 20;

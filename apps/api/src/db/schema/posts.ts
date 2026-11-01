@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { reactionTypeEnum } from "./enums";
 import { moderationColumns, tenantScoped, timestamps } from "./helpers";
 import { memberships } from "./memberships";
@@ -70,4 +70,48 @@ export const postReactions = pgTable(
     primaryKey({ columns: [t.postId, t.membershipId] }),
     index("post_reactions_tenant_membership_idx").on(t.tenantId, t.membershipId),
   ],
+);
+
+/** A poll on a post (the post's text is the question). */
+export const postPolls = pgTable("post_polls", {
+  postId: uuid("post_id")
+    .primaryKey()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  ...tenantScoped(),
+  allowsMultiple: boolean("allows_multiple").notNull().default(false),
+  closesAt: timestamp("closes_at", { withTimezone: true, precision: 3 }),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+});
+
+export const pollOptions = pgTable(
+  "poll_options",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => postPolls.postId, { onDelete: "cascade" }),
+    ...tenantScoped(),
+    label: text("label").notNull(),
+    position: integer("position").notNull(),
+  },
+  (t) => [uniqueIndex("poll_options_post_position_uq").on(t.postId, t.position)],
+);
+
+/** One row per chosen option; counts are computed when read, so there is no counter to drift. */
+export const pollVotes = pgTable(
+  "poll_votes",
+  {
+    optionId: uuid("option_id")
+      .notNull()
+      .references(() => pollOptions.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => postPolls.postId, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    ...tenantScoped(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.optionId, t.membershipId] }), index("poll_votes_post_member_idx").on(t.postId, t.membershipId)],
 );

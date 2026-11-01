@@ -417,6 +417,17 @@ export interface FundingDto extends ModerationFields {
   updatedAt: string;
 }
 
+export interface PollDto {
+  options: Array<{ id: string; label: string; votes: number }>;
+  /** People who voted (with several choices allowed, one person counts once here). */
+  totalVoters: number;
+  allowsMultiple: boolean;
+  closesAt: string | null;
+  isClosed: boolean;
+  /** The viewer's chosen option ids (empty: not voted). */
+  myVotes: string[];
+}
+
 export interface PostDto extends ModerationFields {
   id: string;
   body: string;
@@ -425,6 +436,8 @@ export interface PostDto extends ModerationFields {
   reactionCount: number;
   myReaction: ReactionType | null;
   isPinned: boolean;
+  /** A poll attached to the post (the body is the question). */
+  poll: PollDto | null;
   author: MemberCardDto;
   isMine: boolean;
   createdAt: string;

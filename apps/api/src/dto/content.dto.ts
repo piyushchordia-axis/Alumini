@@ -1,4 +1,5 @@
 import type {
+  PollDto,
   AdminReportDto,
   CommentDto,
   ContentPreviewDto,
@@ -92,7 +93,7 @@ export function toFundingDto({ listing, author }: FundingWithAuthor, viewer: Vie
   };
 }
 
-export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: Viewer | null): PostDto {
+export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: Viewer | null, poll: PollDto | null = null): PostDto {
   return {
     id: post.id,
     body: post.body,
@@ -101,6 +102,7 @@ export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: 
     reactionCount: post.reactionCount,
     myReaction: myReaction ?? null,
     isPinned: post.isPinned,
+    poll,
     moderationStatus: post.moderationStatus,
     moderationNote: noteFor(post.moderationNote, author.id, viewer),
     moderatedAt: iso(post.moderatedAt),

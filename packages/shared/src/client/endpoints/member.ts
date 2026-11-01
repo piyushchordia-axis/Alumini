@@ -13,6 +13,7 @@ import type {
   NotificationDto,
   MyInvitationDto,
   NotificationPrefsDto,
+  PollDto,
   ProfileFieldDto,
   PaymentOrderDto,
   PostDto,
@@ -85,6 +86,11 @@ export function postEndpoints(core: ApiCore) {
     get: (slug: string, id: string) => core.data<PostDto>({ path: `/posts/${id}`, tenantSlug: slug }),
     update: (slug: string, id: string, input: PostUpdateInput) => core.data<PostDto>({ method: "PATCH", path: `/posts/${id}`, tenantSlug: slug, body: input }),
     remove: (slug: string, id: string) => core.request<void>({ method: "DELETE", path: `/posts/${id}`, tenantSlug: slug }),
+    poll: {
+      /** Replaces the caller's vote with these options. */
+      vote: (slug: string, postId: string, optionIds: string[]) => core.data<PollDto>({ method: "PUT", path: `/posts/${postId}/poll/vote`, tenantSlug: slug, body: { optionIds } }),
+      clear: (slug: string, postId: string) => core.data<PollDto>({ method: "DELETE", path: `/posts/${postId}/poll/vote`, tenantSlug: slug }),
+    },
     comments: {
       list: (slug: string, postId: string, query?: Partial<CursorQuery>) => core.request<CursorPage<CommentDto>>({ path: `/posts/${postId}/comments`, tenantSlug: slug, query: q(query) }),
       create: (slug: string, postId: string, input: CommentCreateInput) => core.data<CommentDto>({ method: "POST", path: `/posts/${postId}/comments`, tenantSlug: slug, body: input }),

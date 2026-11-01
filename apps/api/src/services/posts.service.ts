@@ -7,6 +7,7 @@ import type {
   PostListQuery,
   PostPageDto,
   PostUpdateInput,
+  PollDto,
   ReactionEntryDto,
   ReactionSummaryDto,
   ReactionType,
@@ -33,32 +34,51 @@ import {
   upsertReaction,
 } from "../repositories/posts.repo";
 import type { TenantContext } from "../types/request";
+import { runInTransaction } from "../lib/transaction";
+import { insertPoll, loadPolls, lockPoll, replaceVotes } from "../repositories/polls.repo";
+import type { PostWithAuthor } from "../repositories/posts.repo";
 import { afterContentWrite, assertAuthor, assertAuthorOrAdmin, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerFlags, viewerOf } from "./content.common";
 import { notify } from "./notifications/notification.service";
+
+/** Post DTOs for a set of rows, with their polls loaded in one go. */
+async function toPostDtos(ctx: AppContext, actor: ContentActor, rows: PostWithAuthor[]): Promise<PostDto[]> {
+  const polls = await loadPolls(
+    ctx.db,
+    rows.map((r) => r.post.id),
+    actor.membership.id,
+  );
+  return rows.map((r) => toPostDto(r, viewerOf(actor), polls.get(r.post.id) ?? null));
+}
+
+const toOnePostDto = async (ctx: AppContext, actor: ContentActor, row: PostWithAuthor) => (await toPostDtos(ctx, actor, [row]))[0]!;
 
 export async function listTenantPosts(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: PostListQuery): Promise<PostPageDto> {
   const tenantId = tenantCtx.tenant.id;
   const page = await listPosts(ctx.db, tenantId, query, actor.membership.id);
-  const result: PostPageDto = { data: page.data.map((r) => toPostDto(r, viewerOf(actor))), nextCursor: page.nextCursor };
+  const result: PostPageDto = { data: await toPostDtos(ctx, actor, page.data), nextCursor: page.nextCursor };
   if (!query.cursor && !query.mine) {
     const pinned = await listPinnedPosts(ctx.db, tenantId, actor.membership.id);
-    result.pinned = pinned.map((r) => toPostDto(r, viewerOf(actor)));
+    result.pinned = await toPostDtos(ctx, actor, pinned);
   }
   return result;
 }
 
 export async function createPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: PostCreateInput): Promise<PostDto> {
   const status = initialStatusFor(tenantCtx, actor, "POST");
-  const row = await insertPost(ctx.db, {
-    tenantId: tenantCtx.tenant.id,
-    authorMembershipId: actor.membership.id,
-    body: input.body,
-    imageUrls: input.imageUrls ?? [],
-    moderationStatus: status,
-    moderatedAt: status === "APPROVED" ? new Date() : null,
+  const row = await runInTransaction(ctx, async (tx) => {
+    const post = await insertPost(tx, {
+      tenantId: tenantCtx.tenant.id,
+      authorMembershipId: actor.membership.id,
+      body: input.body,
+      imageUrls: input.imageUrls ?? [],
+      moderationStatus: status,
+      moderatedAt: status === "APPROVED" ? new Date() : null,
+    });
+    if (input.poll) await insertPoll(tx, tenantCtx.tenant.id, post.id, input.poll);
+    return post;
   });
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "POST", id: row.id, title: row.body, status, action: "create" });
-  return toPostDto({ post: row, author: actor.membership, myReaction: null }, viewerOf(actor));
+  return toOnePostDto(ctx, actor, { post: row, author: actor.membership, myReaction: null });
 }
 
 async function loadPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string) {
@@ -70,11 +90,11 @@ async function loadPost(ctx: AppContext, tenantCtx: TenantContext, actor: Conten
 export async function getPost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<PostDto> {
   const found = await loadPost(ctx, tenantCtx, actor, id);
   assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post", found.author.status);
-  return toPostDto(found, viewerOf(actor));
+  return toOnePostDto(ctx, actor, found);
 }
 
 export async function getPostForAdmin(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<PostDto> {
-  return toPostDto(await loadPost(ctx, tenantCtx, actor, id), viewerOf(actor));
+  return toOnePostDto(ctx, actor, await loadPost(ctx, tenantCtx, actor, id));
 }
 
 export async function updatePostBody(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, input: PostUpdateInput): Promise<PostDto> {
@@ -88,7 +108,29 @@ export async function updatePostBody(ctx: AppContext, tenantCtx: TenantContext, 
     moderationNote: status === found.post.moderationStatus ? found.post.moderationNote : null,
   }))!;
   await afterContentWrite(ctx, tenantCtx, actor, { contentType: "POST", id, title: row.body, status, action: "update" });
-  return toPostDto({ post: row, author: found.author, myReaction: found.myReaction }, viewerOf(actor));
+  return toOnePostDto(ctx, actor, { post: row, author: found.author, myReaction: found.myReaction });
+}
+
+// ---- polls ----
+
+/**
+ * Replaces the caller's vote on a post's poll (one option, or several when allowed). Votes are only taken on
+ * published posts and open polls; the poll row is locked so two quick taps can't leave two single-choice votes.
+ */
+export async function votePoll(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, postId: string, optionIds: string[] | null): Promise<PollDto> {
+  const found = await loadPost(ctx, tenantCtx, actor, postId);
+  assertCanView(actor, found.post.moderationStatus, found.post.authorMembershipId, "Post", found.author.status);
+  if (found.post.moderationStatus !== "APPROVED") throw AppError.forbidden("You can only vote on published posts");
+  await runInTransaction(ctx, async (tx) => {
+    const locked = await lockPoll(tx, postId);
+    if (!locked) throw AppError.notFound("This post has no poll");
+    if (locked.poll.closesAt && locked.poll.closesAt <= new Date()) throw AppError.forbidden("This poll has closed");
+    const chosen = [...new Set(optionIds ?? [])];
+    if (chosen.some((id) => !locked.optionIds.includes(id))) throw AppError.badRequest("Unknown poll option");
+    if (!locked.poll.allowsMultiple && chosen.length > 1) throw AppError.badRequest("Choose one option");
+    await replaceVotes(tx, tenantCtx.tenant.id, postId, actor.membership.id, chosen);
+  });
+  return (await loadPolls(ctx.db, [postId], actor.membership.id)).get(postId)!;
 }
 
 export async function removePost(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<void> {

@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Alert, Image, Pressable, Text, View } from "react-native";
+import { PollView } from "@/components/PollView";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
@@ -46,6 +47,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
       <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} disabled={detail} accessibilityRole={detail ? undefined : "link"}>
         <Body>{post.body}</Body>
       </Pressable>
+      {post.poll && <PollView slug={slug} postId={post.id} poll={post.poll} canVote={post.moderationStatus === "APPROVED"} />}
       {post.imageUrls.length > 0 && (
         <View style={{ gap: 6 }}>
           {post.imageUrls.map((u) => (

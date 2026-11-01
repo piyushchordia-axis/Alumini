@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { MemberLink } from "@/components/common/MemberLink";
+import { PollView } from "@/components/feed/PollView";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { Badge, Button, Card, Textarea } from "@/components/ui";
@@ -80,6 +81,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
       ) : (
         <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{post.body}</p>
       )}
+      {post.poll && <PollView slug={slug} postId={post.id} poll={post.poll} canVote={post.moderationStatus === "APPROVED"} />}
       {!editing && post.imageUrls.length > 0 && (
         <div className={`mt-3 grid gap-2 ${post.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
           {post.imageUrls.map((u) => (
