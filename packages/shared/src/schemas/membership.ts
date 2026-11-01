@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MARITAL_STATUSES, MEMBERSHIP_ROLES, MEMBERSHIP_STATUSES, MIN_BATCH_YEAR, PROFESSION_TYPES } from "../constants";
+import { CELEBRATION_KINDS, MARITAL_STATUSES, MEMBERSHIP_ROLES, MEMBERSHIP_STATUSES, MIN_BATCH_YEAR, PROFESSION_TYPES } from "../constants";
 import { dateOnlySchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, pageQuerySchema, trimmedString, uuidSchema } from "./common";
 import { profileFieldAnswersSchema } from "./profileFields";
 
@@ -31,6 +31,10 @@ export const membershipProfileSchema = z.object({
   interests: z.array(trimmedString(40)).max(20).optional(),
   avatarUrl: httpUrlSchema.nullable().optional(),
   isPhoneVisible: z.boolean().optional(),
+  /** Show my birthday (day and month only) on the feed on the day. */
+  celebrateBirthday: z.boolean().optional(),
+  /** Show my membership anniversary on the feed. */
+  celebrateAnniversary: z.boolean().optional(),
   /** Answers to the institution's own profile questions, by field key. */
   fields: profileFieldAnswersSchema.optional(),
 });
@@ -54,3 +58,6 @@ export const adminMembersQuerySchema = pageQuerySchema.extend({
   q: z.string().trim().max(80).optional(),
 });
 export type AdminMembersQuery = z.infer<typeof adminMembersQuerySchema>;
+
+export const celebrationWishSchema = z.object({ kind: z.enum(CELEBRATION_KINDS) });
+export type CelebrationWishInput = z.infer<typeof celebrationWishSchema>;

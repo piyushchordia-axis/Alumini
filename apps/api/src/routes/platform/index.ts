@@ -3,6 +3,7 @@ import type { AppContext } from "../../context";
 import { requireAuth, requirePlatformAdmin } from "../../middleware/auth";
 import { platformAuditRoutes } from "./audit.routes";
 import { platformBillingRoutes } from "./billing.routes";
+import { platformJobRoutes } from "./jobs.routes";
 import { platformMessageRoutes } from "./messages.routes";
 import { platformStatsRoutes } from "./stats.routes";
 import { platformTenantRoutes } from "./tenants.routes";
@@ -18,5 +19,6 @@ export function platformRouter(ctx: AppContext): Router {
   router.use(platformUserRoutes(ctx));
   router.use(platformAuditRoutes(ctx));
   router.use(platformMessageRoutes(ctx));
+  router.use(platformJobRoutes(ctx));
   return router;
 }

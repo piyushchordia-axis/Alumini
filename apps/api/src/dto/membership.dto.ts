@@ -34,6 +34,8 @@ export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[
     interests: m.interests,
     avatarUrl: m.avatarUrl,
     isPhoneVisible: m.isPhoneVisible,
+    celebrateBirthday: m.celebrateBirthday,
+    celebrateAnniversary: m.celebrateAnniversary,
     fields,
     extra: legacyExtra(fields),
     createdAt: m.createdAt.toISOString(),

@@ -141,6 +141,9 @@ export const DEFAULT_TENANT_FEATURES: TenantFeatures = {
   directory: true,
 };
 
+export const CELEBRATION_KINDS = ["BIRTHDAY", "ANNIVERSARY"] as const;
+export type CelebrationKind = (typeof CELEBRATION_KINDS)[number];
+
 /** ANNOUNCEMENT: an admin's notice, pinned by default and sent to every member. */
 export const POST_KINDS = ["POST", "ANNOUNCEMENT"] as const;
 export type PostKind = (typeof POST_KINDS)[number];

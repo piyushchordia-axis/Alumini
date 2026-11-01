@@ -24,7 +24,8 @@
     "demo": "bash scripts/demo.sh",
     "e2e:web": "node e2e/web-member.mjs",
     "e2e:admin": "node e2e/web-admin.mjs",
-    "e2e:mobile-web": "node e2e/mobile-web.mjs"
+    "e2e:mobile-web": "node e2e/mobile-web.mjs",
+    "jobs:run": "pnpm --filter @illuminize/api jobs:run"
   },
   "devDependencies": {
     "turbo": "^2.11.10",

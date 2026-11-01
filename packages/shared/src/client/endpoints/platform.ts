@@ -1,3 +1,4 @@
+import type { PlatformJobRunInput } from "../../schemas/platform";
 import type {
   AssignAdminInput,
   AuditQuery,
@@ -46,6 +47,9 @@ export function platformEndpoints(core: ApiCore) {
     },
     audit: {
       list: (query?: Partial<AuditQuery>) => core.request<Page<AuditDto>>({ path: path("/audit"), query: q(query) }),
+    },
+    jobs: {
+      run: (input: PlatformJobRunInput) => core.data<{ queued: boolean; period: string }>({ method: "POST", path: path("/jobs/run"), body: input }),
     },
     messages: {
       /** Sends the platform test message (checks WhatsApp/SMS/email configuration). */

@@ -36,6 +36,8 @@ type Form = {
   interests: string;
   avatarUrl: string | null;
   isPhoneVisible: boolean;
+  celebrateBirthday: boolean;
+  celebrateAnniversary: boolean;
 };
 
 const fromMembership = (m?: Partial<MembershipDto>): Form => ({
@@ -54,6 +56,8 @@ const fromMembership = (m?: Partial<MembershipDto>): Form => ({
   interests: (m?.interests ?? []).join(", "),
   avatarUrl: m?.avatarUrl ?? null,
   isPhoneVisible: m?.isPhoneVisible ?? false,
+  celebrateBirthday: m?.celebrateBirthday ?? true,
+  celebrateAnniversary: m?.celebrateAnniversary ?? true,
 });
 
 export function ProfileForm({
@@ -121,6 +125,8 @@ export function ProfileForm({
         .slice(0, 20),
       avatarUrl: f.avatarUrl,
       isPhoneVisible: f.isPhoneVisible,
+      celebrateBirthday: f.celebrateBirthday,
+      celebrateAnniversary: f.celebrateAnniversary,
     };
     const parsed = membershipProfileSchema.safeParse(raw);
     if (!parsed.success) {
@@ -201,6 +207,14 @@ export function ProfileForm({
           <Row style={{ justifyContent: "space-between" }}>
             <Text style={{ color: colors.text, flex: 1 }}>Show my phone number to other members</Text>
             <Switch value={f.isPhoneVisible} onValueChange={(v) => set("isPhoneVisible", v)} trackColor={{ true: theme.primary }} />
+          </Row>
+          <Row style={{ justifyContent: "space-between" }}>
+            <Text style={{ color: colors.text, flex: 1 }}>Show my birthday on the feed on the day (day and month only)</Text>
+            <Switch accessibilityLabel="Show my birthday on the feed" value={f.celebrateBirthday} onValueChange={(v) => set("celebrateBirthday", v)} trackColor={{ true: theme.primary }} />
+          </Row>
+          <Row style={{ justifyContent: "space-between" }}>
+            <Text style={{ color: colors.text, flex: 1 }}>Show my membership anniversary on the feed</Text>
+            <Switch accessibilityLabel="Show my membership anniversary on the feed" value={f.celebrateAnniversary} onValueChange={(v) => set("celebrateAnniversary", v)} trackColor={{ true: theme.primary }} />
           </Row>
         </View>
       )}

@@ -48,6 +48,8 @@ const toForm = (m?: Partial<MembershipDto>): MembershipProfileInput => ({
   interests: m?.interests ?? [],
   avatarUrl: m?.avatarUrl ?? null,
   isPhoneVisible: m?.isPhoneVisible ?? false,
+  celebrateBirthday: m?.celebrateBirthday ?? true,
+  celebrateAnniversary: m?.celebrateAnniversary ?? true,
 });
 
 export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFields = [], mode = "edit" }: ProfileFormProps) {
@@ -174,6 +176,10 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
           <CustomFieldInputs fields={optional} values={answers} errors={answerErrors} onChange={setAnswer} readOnly={readOnly} />
           <div className="sm:col-span-2">
             <Checkbox {...register("isPhoneVisible")} label="Show my phone number to other members in the directory" />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Checkbox {...register("celebrateBirthday")} label="Show my birthday on the feed on the day so classmates can send wishes (day and month only, never the year)" />
+            <Checkbox {...register("celebrateAnniversary")} label="Show my membership anniversary on the feed" />
           </div>
         </div>
       </details>

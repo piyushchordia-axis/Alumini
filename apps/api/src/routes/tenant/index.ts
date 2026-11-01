@@ -1,3 +1,4 @@
+import { celebrationRoutes } from "./celebrations.routes";
 import { Router } from "express";
 import type { AppContext } from "../../context";
 import { requireAuth } from "../../middleware/auth";
@@ -26,6 +27,7 @@ export function tenantRouter(ctx: AppContext): Router {
   router.use(jobRoutes(ctx));
   router.use(fundingRoutes(ctx));
   router.use(postRoutes(ctx));
+  router.use(celebrationRoutes(ctx));
   router.use(eventRoutes(ctx));
   router.use(reportRoutes(ctx));
   router.use(paymentRoutes(ctx));

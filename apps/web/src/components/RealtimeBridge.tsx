@@ -21,6 +21,7 @@ export function RealtimeBridge() {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.unreadCount });
         void qc.invalidateQueries({ queryKey: qk.notifications(e.tenantSlug), predicate: (q) => q.queryKey.length === 2 });
         if (ADMIN_TYPES.has(e.notification.type)) void qc.invalidateQueries({ queryKey: ["admin", e.tenantSlug] });
+        if (e.notification.type === "CELEBRATION_WISH") void qc.invalidateQueries({ queryKey: ["celebrations", e.tenantSlug] });
       }),
       realtime.on("notification:unread", (e) => {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count });

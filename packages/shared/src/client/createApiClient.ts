@@ -9,6 +9,7 @@ import {
   notificationEndpoints,
   paymentEndpoints,
   postEndpoints,
+  celebrationEndpoints,
   reportEndpoints,
   uploadEndpoints,
 } from "./endpoints/member";
@@ -28,6 +29,7 @@ export function createApiClient(options: ApiClientOptions) {
     jobs: jobEndpoints(core),
     funding: fundingEndpoints(core),
     posts: postEndpoints(core),
+    celebrations: celebrationEndpoints(core),
     events: eventEndpoints(core),
     reports: reportEndpoints(core),
     notifications: notificationEndpoints(core),

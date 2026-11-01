@@ -28,6 +28,10 @@ export interface JobPayloads {
   "invitations.send": { tenantId: string; invitationIds: string[] };
   /** Deliver an announcement to one page of members (each page queues the next). */
   "announcements.fanout": { tenantId: string; postId: string; afterMembershipId?: string | null };
+  /** Every 15 minutes: queue per-institution scheduled work whose local time has come (celebrations, digest). */
+  "engagement.tick": { at?: string };
+  /** Birthday and anniversary greetings in one institution for one local day. */
+  "celebrations.tenant": { tenantId: string; day: string };
 }
 
 export type JobName = keyof JobPayloads;
@@ -53,4 +57,6 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "payments.webhook": { queue: "jobs", attempts: 8, backoff: { type: "exponential", delayMs: 10_000 } },
   "invitations.send": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 10_000 } },
   "announcements.fanout": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
+  "engagement.tick": { queue: "jobs", attempts: 1 },
+  "celebrations.tenant": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 30_000 } },
 };

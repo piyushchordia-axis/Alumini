@@ -42,6 +42,8 @@ function profileColumns(input: MembershipProfileInput | MembershipProfileUpdate)
   if (input.interests !== undefined) out.interests = input.interests;
   if (input.avatarUrl !== undefined) out.avatarUrl = input.avatarUrl;
   if (input.isPhoneVisible !== undefined) out.isPhoneVisible = input.isPhoneVisible;
+  if (input.celebrateBirthday !== undefined) out.celebrateBirthday = input.celebrateBirthday;
+  if (input.celebrateAnniversary !== undefined) out.celebrateAnniversary = input.celebrateAnniversary;
   return out;
 }
 

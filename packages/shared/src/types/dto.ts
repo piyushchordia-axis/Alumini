@@ -2,6 +2,7 @@ import type {
   ApprovalMode,
   BillingCycle,
   BillingModel,
+  CelebrationKind,
   ContentType,
   EventKind,
   FundingKind,
@@ -284,6 +285,8 @@ export interface MembershipDto {
   interests: string[];
   avatarUrl: string | null;
   isPhoneVisible: boolean;
+  celebrateBirthday: boolean;
+  celebrateAnniversary: boolean;
   /** Answers to the institution's questions (the member's own and admins' views include admin-only ones). */
   fields: ProfileFieldAnswerDto[];
   /** Deprecated (older app versions): members-visible answers as { label: text }. */
@@ -428,6 +431,30 @@ export interface AnnouncementAudienceDto {
   withPhone: number;
   /** Channels your plan lets you also send announcements by. */
   channels: MessageChannel[];
+}
+
+/** Someone celebrating today. Never includes a birth year or age. */
+export interface CelebrationDto {
+  membershipId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  batchYear: number;
+  kind: CelebrationKind;
+  /** Anniversaries: whole years since joining. */
+  years: number | null;
+  isMe: boolean;
+  wishedByMe: boolean;
+  wishCount: number;
+}
+
+export interface CelebrationsTodayDto {
+  /** Today in the institution's time zone (YYYY-MM-DD). */
+  date: string;
+  items: CelebrationDto[];
+  /** Celebrating today beyond the ones listed. */
+  more: number;
+  /** Show the one-time "your birthday appears here on the day" notice. */
+  showNotice: boolean;
 }
 
 export interface PollDto {

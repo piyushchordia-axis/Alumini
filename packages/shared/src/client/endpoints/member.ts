@@ -13,6 +13,7 @@ import type {
   NotificationDto,
   MyInvitationDto,
   NotificationPrefsDto,
+  CelebrationsTodayDto,
   PollDto,
   ProfileFieldDto,
   PaymentOrderDto,
@@ -24,7 +25,7 @@ import type {
   RsvpSummaryDto,
   UploadResultDto,
 } from "../../types/dto";
-import type { ReactionType, RsvpStatus } from "../../constants";
+import type { CelebrationKind, ReactionType, RsvpStatus } from "../../constants";
 import type { ApiCore, QueryParams } from "../core";
 
 type Q = Record<string, unknown> | undefined;
@@ -76,6 +77,13 @@ export function fundingEndpoints(core: ApiCore) {
     update: (slug: string, id: string, input: FundingUpdateInput) => core.data<FundingDto>({ method: "PATCH", path: `/funding/${id}`, tenantSlug: slug, body: input }),
     remove: (slug: string, id: string) => core.request<void>({ method: "DELETE", path: `/funding/${id}`, tenantSlug: slug }),
     close: (slug: string, id: string) => core.data<FundingDto>({ method: "POST", path: `/funding/${id}/close`, tenantSlug: slug }),
+  };
+}
+
+export function celebrationEndpoints(core: ApiCore) {
+  return {
+    today: (slug: string) => core.data<CelebrationsTodayDto>({ path: "/celebrations/today", tenantSlug: slug }),
+    wish: (slug: string, membershipId: string, kind: CelebrationKind) => core.data<{ wishCount: number }>({ method: "POST", path: `/celebrations/${membershipId}/wishes`, tenantSlug: slug, body: { kind } }),
   };
 }
 

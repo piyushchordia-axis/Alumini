@@ -3,6 +3,7 @@ import { processMessage, sweepMessages } from "../services/messages/message.serv
 import { processPaymentWebhook } from "../services/payments/payment.service";
 import { sendInvitationBatch } from "../services/invitations.service";
 import { fanoutAnnouncement } from "../services/announcements.service";
+import { engagementTick, runCelebrations } from "../services/celebrations.service";
 import type { JobHandlers } from "./JobQueue";
 
 /** The one registry of job handlers; every name in JobPayloads must have one (the type enforces it). */
@@ -17,4 +18,6 @@ export const jobHandlers: JobHandlers = {
   "payments.webhook": (ctx, { webhookEventId }) => processPaymentWebhook(ctx, webhookEventId),
   "invitations.send": sendInvitationBatch,
   "announcements.fanout": fanoutAnnouncement,
+  "engagement.tick": engagementTick,
+  "celebrations.tenant": runCelebrations,
 };

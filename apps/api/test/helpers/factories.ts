@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { tenantSettings, tenants, users } from "../../src/db/schema";
 import type { TestContext } from "./testContext";
 import type { ApprovalMode } from "@illuminize/shared";
@@ -79,6 +80,8 @@ export interface MembershipFactoryOptions {
   country?: string;
   companyName?: string;
   professionType?: MembershipRow["professionType"];
+  dateOfBirth?: string | null;
+  approvedAt?: Date;
 }
 
 export async function createMembership(ctx: TestContext, tenantId: string, userId: string, opts: MembershipFactoryOptions = {}) {
@@ -96,9 +99,14 @@ export async function createMembership(ctx: TestContext, tenantId: string, userI
       companyName: opts.companyName ?? null,
       city: opts.city ?? "Mumbai",
       country: opts.country ?? "IN",
+      dateOfBirth: opts.dateOfBirth ?? null,
       statusChangedAt: new Date(),
     })
     .returning();
+  if (opts.approvedAt) {
+    const [updated] = await ctx.db.update(memberships).set({ approvedAt: opts.approvedAt }).where(eq(memberships.id, row!.id)).returning();
+    return updated!;
+  }
   return row!;
 }
 

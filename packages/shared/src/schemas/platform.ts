@@ -124,3 +124,13 @@ export const platformTestMessageSchema = z
   })
   .refine((v) => v.phone || v.email, { message: "Give a phone number or an email address", path: ["phone"] });
 export type PlatformTestMessageInput = z.infer<typeof platformTestMessageSchema>;
+
+/** Platform staff: run an institution's scheduled work now (demos, support), instead of waiting for its local time. */
+export const PLATFORM_RUNNABLE_JOBS = ["celebrations"] as const;
+export const platformJobRunSchema = z.object({
+  job: z.enum(PLATFORM_RUNNABLE_JOBS),
+  tenantId: uuidSchema,
+  /** Run again even if today's (this week's) run already happened. Members never get the same item twice. */
+  force: z.boolean().default(false),
+});
+export type PlatformJobRunInput = z.infer<typeof platformJobRunSchema>;
