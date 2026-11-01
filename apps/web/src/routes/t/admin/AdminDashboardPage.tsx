@@ -14,7 +14,15 @@ export function AdminDashboardPage() {
   const d = q.data;
   return (
     <div className="space-y-5">
-      <PageHeader title="Dashboard" subtitle={`${tenant.name} at a glance`} />
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${tenant.name} at a glance`}
+        actions={
+          <Link to={`${base}/analytics`} className="text-sm font-medium text-primary hover:underline">
+            Growth and activity charts →
+          </Link>
+        }
+      />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link to={`${base}/members?status=PENDING`}>
           <Stat label="Pending members" value={d.pendingMembers} hint="Awaiting your approval" />

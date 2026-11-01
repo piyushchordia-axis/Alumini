@@ -433,6 +433,75 @@ export interface AnnouncementAudienceDto {
   channels: MessageChannel[];
 }
 
+export interface CountRow {
+  label: string;
+  count: number;
+}
+
+/** Tenant admin analytics for the last N weeks. */
+export interface TenantAnalyticsDto {
+  timeZone: string;
+  /** Monday of each week, oldest first; every series has one value per week. */
+  weeks: string[];
+  kpis: {
+    /** Approved members now. */
+    members: number;
+    /** Approved during the range, and during the same-length range before it. */
+    newMembers: number;
+    newMembersPrev: number;
+    /** Members who used the app on at least one day of the range (the billing definition). */
+    activeMembers: number;
+    activeMembersPrev: number;
+    posts: number;
+    postsPrev: number;
+  };
+  series: {
+    /** Approvals per week. */
+    joined: number[];
+    /** Sign-ups per week (any outcome). */
+    registered: number[];
+    /** Members active at least one day that week. */
+    active: number[];
+    posts: number[];
+    comments: number[];
+    jobs: number[];
+    events: number[];
+  };
+  coverage: {
+    batches: CountRow[];
+    cities: CountRow[];
+    countries: CountRow[];
+    professions: CountRow[];
+    /** Approved members, and how many have filled each part of their profile. */
+    completeness: { total: number; photo: number; city: number; company: number; birthday: number; linkedin: number; email: number };
+    /** Answer counts for the institution's choice and yes/no fields. */
+    fields: Array<{ key: string; label: string; options: CountRow[] }>;
+  };
+  invites: { total: number; sent: number; accepted: number };
+}
+
+export interface PlatformComparisonRowDto {
+  tenant: TenantSummaryDto & { status: TenantStatus };
+  /** Approved at the end of the period (billing definition). */
+  approvedMembers: number;
+  newMembers: number;
+  activeMembers: number;
+  /** activeMembers / approvedMembers (0-1). */
+  activityRate: number;
+  content: { posts: number; jobs: number; events: number };
+  messages: Record<MessageChannel, number>;
+  plan: { billingModel: BillingModel; billingCycle: BillingCycle; currency: string } | null;
+  estimatedAmountMinor: number;
+  currency: string;
+}
+
+export interface PlatformComparisonDto {
+  periodStart: string;
+  periodEnd: string;
+  timeZone: string;
+  rows: PlatformComparisonRowDto[];
+}
+
 /** The weekly digest: what happened in the institution in the past week (content still published when read). */
 export interface DigestDto {
   /** Monday of the digest's week, in the institution's time zone. */

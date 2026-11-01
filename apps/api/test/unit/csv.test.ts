@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("CSV", () => {
   it("parses quotes, embedded delimiters and newlines, CRLF and a BOM", () => {
-    const text = '﻿Phone,Name,Batch Year\r\n+919876543210,"Rao, Asha",2012\r\n9876500000,"Said ""hi""\nthen left",\r\n\r\n';
+    const text = '\uFEFFPhone,Name,Batch Year\r\n+919876543210,"Rao, Asha",2012\r\n9876500000,"Said ""hi""\nthen left",\r\n\r\n';
     const parsed = parseCsv(text);
     expect(parsed.headers).toEqual(["phone", "name", "batch_year"]);
     expect(parsed.rows).toEqual([

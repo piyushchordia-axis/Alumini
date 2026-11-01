@@ -17,7 +17,13 @@ function pgError(err: unknown): { code?: string; constraint?: string } | null {
 
 export function errorHandler(logger: Logger): ErrorRequestHandler {
   return (err: unknown, req, res, _next) => {
-    if (res.headersSent) return;
+    // A streamed response (a CSV export) failed midway: the status is already sent, so cut the connection rather than
+    // leave the client waiting on a body that will never finish.
+    if (res.headersSent) {
+      logger.error({ err, path: req.path }, "Error after the response started");
+      res.destroy(err instanceof Error ? err : undefined);
+      return;
+    }
 
     if (err instanceof AppError) {
       if (err.status === 429 && err.details && typeof err.details === "object" && "retryAfterSec" in err.details) {

@@ -134,3 +134,6 @@ export const platformJobRunSchema = z.object({
   force: z.boolean().default(false),
 });
 export type PlatformJobRunInput = z.infer<typeof platformJobRunSchema>;
+
+/** Cross-institution comparison for a period of calendar days in the billing time zone (default: this month). */
+export const platformComparisonQuerySchema = billingUsageQuerySchema;

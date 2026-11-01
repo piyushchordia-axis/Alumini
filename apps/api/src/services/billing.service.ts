@@ -107,13 +107,13 @@ export async function updateBillingPlan(ctx: AppContext, actor: PlatformActor, p
 }
 
 /** Message charges: delivered messages × the plan's per-message rate for each channel. */
-function messageAmount(plan: BillingPlanDto | null, messages: Record<MessageChannel, number>): number {
+export function messageAmount(plan: BillingPlanDto | null, messages: Record<MessageChannel, number>): number {
   if (!plan) return 0;
   return Math.round(MESSAGE_CHANNELS.reduce((sum, c) => sum + (plan.messageRatesMinor[c] ?? 0) * messages[c], 0));
 }
 
 /** Membership charge for the period: the plan's per-cycle price, prorated to the period's length. */
-function estimateAmount(plan: BillingPlanDto | null, activeMembers: number, fraction: number): number {
+export function estimateAmount(plan: BillingPlanDto | null, activeMembers: number, fraction: number): number {
   if (!plan) return 0;
   switch (plan.billingModel) {
     case "PER_ACTIVE_USER":

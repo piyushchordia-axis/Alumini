@@ -62,7 +62,7 @@ function toImportRows(rows: Record<string, string>[], headers: string[], fields:
 function downloadTemplate(fields: ProfileFieldDto[]) {
   const headers = ["phone", "name", "batch", "email", ...fields.map((f) => f.key)];
   const example = ["+919876543210", "Asha Rao", "2012", "asha@example.com", ...fields.map((f) => (f.options[0]?.value ?? ""))];
-  const blob = new Blob(["﻿" + csvLine(headers) + csvLine(example).replace(/^'/, "")], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF" + csvLine(headers) + csvLine(example).replace(/^'/, "")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: "invitations-template.csv" });
   a.click();

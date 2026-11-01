@@ -15,6 +15,7 @@ export function AdminLayout() {
   const d = dashboard.data;
   const items = [
     { to: `${base}/dashboard`, label: "Dashboard", icon: "📊" },
+    { to: `${base}/analytics`, label: "Analytics", icon: "📈" },
     { to: `${base}/members`, label: "Members", icon: "👥", count: d?.pendingMembers },
     { to: `${base}/moderation`, label: "Moderation", icon: "🛡️", count: d?.pendingContent },
     { to: `${base}/reports`, label: "Reports", icon: "🚩", count: d?.openReports },

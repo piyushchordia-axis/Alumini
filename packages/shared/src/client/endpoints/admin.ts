@@ -14,7 +14,7 @@ import type {
   TenantSettingsUpdate,
 } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -56,6 +56,12 @@ export function adminEndpoints(core: ApiCore) {
       list: (slug: string, query?: Partial<AdminReportsQuery>) => core.request<Page<AdminReportDto>>({ ...p(slug, "/reports"), query: q(query) }),
       resolve: (slug: string, id: string, input: ReportResolveInput) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/resolve`), body: input }),
       dismiss: (slug: string, id: string, note?: string | null) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/dismiss`), body: { note: note ?? null } }),
+    },
+    analytics: (slug: string, weeks = 12) => core.data<TenantAnalyticsDto>({ ...p(slug, "/analytics"), query: { weeks } }),
+    /** CSV downloads (streamed by the server; saved by the caller). */
+    exports: {
+      members: (slug: string) => core.download(p(slug, "/exports/members.csv")),
+      activity: (slug: string, weeks = 12) => core.download({ ...p(slug, "/exports/activity.csv"), query: { weeks } }),
     },
     announcements: {
       audience: (slug: string) => core.data<AnnouncementAudienceDto>(p(slug, "/announcements/audience")),

@@ -1,4 +1,5 @@
 import type { PlatformJobRunInput } from "../../schemas/platform";
+import type { PlatformComparisonDto } from "../../types/dto";
 import type {
   AssignAdminInput,
   AuditQuery,
@@ -48,6 +49,8 @@ export function platformEndpoints(core: ApiCore) {
     audit: {
       list: (query?: Partial<AuditQuery>) => core.request<Page<AuditDto>>({ path: path("/audit"), query: q(query) }),
     },
+    comparison: (query?: Partial<BillingUsageQuery>) => core.data<PlatformComparisonDto>({ path: path("/analytics/comparison"), query: q(query) }),
+    comparisonCsv: (query?: Partial<BillingUsageQuery>) => core.download({ path: path("/exports/comparison.csv"), query: q(query) }),
     jobs: {
       run: (input: PlatformJobRunInput) => core.data<{ queued: boolean; period: string }>({ method: "POST", path: path("/jobs/run"), body: input }),
     },

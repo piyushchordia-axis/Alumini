@@ -52,9 +52,12 @@ export class ApiCore {
     return `${this.baseUrl}${prefix}${opts.path}${buildQuery(opts.query)}`;
   }
 
-  /** Performs a request and returns the parsed JSON body (the full envelope). */
-  async request<T>(opts: RequestOptions, isRetry = false): Promise<T> {
-    const headers: Record<string, string> = { Accept: "application/json", ...(this.opts.headers ?? {}) };
+  /**
+   * Sends a request with the access token, refreshing it once on TOKEN_EXPIRED, and returns the successful Response
+   * (its body unread). Error responses become ApiClientError. Shared by JSON requests and downloads.
+   */
+  private async send(opts: RequestOptions, accept: string, isRetry = false): Promise<Response> {
+    const headers: Record<string, string> = { Accept: accept, ...(this.opts.headers ?? {}) };
     if (opts.body !== undefined && !opts.formData) headers["Content-Type"] = "application/json";
     const useAuth = opts.auth ?? true;
     if (useAuth) {
@@ -72,8 +75,7 @@ export class ApiCore {
     } catch (err) {
       throw new ApiClientError(0, "NETWORK_ERROR", "Could not reach the server. Check your connection.", err);
     }
-
-    if (res.status === 204) return undefined as T;
+    if (res.ok) return res;
 
     let json: unknown = null;
     const text = await res.text();
@@ -84,16 +86,13 @@ export class ApiCore {
         json = null;
       }
     }
-
-    if (res.ok) return json as T;
-
     const errBody = (json as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error;
     const code = (errBody?.code ?? "INTERNAL") as ApiClientError["code"];
     const message = errBody?.message ?? `Request failed (${res.status})`;
 
     if (res.status === 401 && useAuth && !isRetry && code === "TOKEN_EXPIRED") {
       const refreshed = await this.refresh();
-      if (refreshed) return this.request<T>(opts, true);
+      if (refreshed) return this.send(opts, accept, true);
     }
     if (res.status === 401 && useAuth && (code === "SESSION_REVOKED" || code === "TOKEN_EXPIRED" || code === "UNAUTHENTICATED")) {
       const hadToken = !!(await this.opts.storage.getAccessToken());
@@ -103,6 +102,27 @@ export class ApiCore {
       }
     }
     throw new ApiClientError(res.status, code, message, errBody?.details);
+  }
+
+  /** Performs a request and returns the parsed JSON body (the full envelope). */
+  async request<T>(opts: RequestOptions): Promise<T> {
+    const res = await this.send(opts, "application/json");
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    if (!text) return null as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return null as T;
+    }
+  }
+
+  /** Fetches a file (a CSV export) with the same sign-in and refresh handling; the file name comes from the server. */
+  async download(opts: RequestOptions): Promise<{ blob: Blob; filename: string | null }> {
+    const res = await this.send(opts, "*/*");
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? null;
+    return { blob: await res.blob(), filename };
   }
 
   async data<T>(opts: RequestOptions): Promise<T> {

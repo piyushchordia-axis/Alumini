@@ -22,7 +22,7 @@ export function createApp(ctx: AppContext): Express {
       origin: config.corsOrigins === "*" ? true : config.corsOrigins,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
-      exposedHeaders: ["X-Request-Id", "Retry-After"],
+      exposedHeaders: ["X-Request-Id", "Retry-After", "Content-Disposition"],
     }),
   );
   if (!config.isTest) {

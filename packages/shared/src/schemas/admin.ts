@@ -24,3 +24,7 @@ export const contentRefParamsSchema = z.object({
   id: uuidSchema,
 });
 export type ContentRefParams = z.infer<typeof contentRefParamsSchema>;
+
+/** Admin analytics: the last N weeks (Monday-start, in the institution's time zone), including the current week. */
+export const analyticsQuerySchema = z.object({ weeks: z.coerce.number().int().min(4).max(104).default(12) });
+export type AnalyticsQuery = z.infer<typeof analyticsQuerySchema>;

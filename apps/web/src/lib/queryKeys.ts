@@ -29,6 +29,7 @@ export const qk = {
   myReports: (slug: string) => ["reports", slug, "mine"] as const,
   admin: {
     dashboard: (slug: string) => ["admin", slug, "dashboard"] as const,
+    analytics: (slug: string, weeks: number) => ["admin", slug, "analytics", weeks] as const,
     members: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "members", filters ?? {}] as const,
     member: (slug: string, id: string) => ["admin", slug, "member", id] as const,
     moderation: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "moderation", filters ?? {}] as const,
@@ -45,6 +46,7 @@ export const qk = {
     billing: (id: string) => ["platform", "billing", id] as const,
     usage: (id: string, filters?: Record<string, unknown>) => ["platform", "usage", id, filters ?? {}] as const,
     stats: ["platform", "stats"] as const,
+    comparison: (filters?: Record<string, unknown>) => ["platform", "comparison", filters ?? {}] as const,
     users: (filters?: Record<string, unknown>) => ["platform", "users", filters ?? {}] as const,
     audit: (filters?: Record<string, unknown>) => ["platform", "audit", filters ?? {}] as const,
   },

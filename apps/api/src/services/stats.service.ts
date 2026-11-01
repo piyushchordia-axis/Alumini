@@ -49,7 +49,7 @@ export async function getPlatformStats(ctx: AppContext): Promise<PlatformStatsDt
     countFunding(ctx.db),
     countEvents(ctx.db),
     countActiveMembersGlobal(ctx.db, new Date(Date.now() - 30 * DAY)),
-    listTenantsForPlatform(ctx.db, { page: 1, pageSize: 100 }),
+    allTenantsForPlatform(ctx),
   ]);
   return {
     tenants: { total: Object.values(tenantsByStatus).reduce((a, b) => a + b, 0), byStatus: tenantsByStatus },
@@ -57,6 +57,16 @@ export async function getPlatformStats(ctx: AppContext): Promise<PlatformStatsDt
     memberships: membershipsByStatus,
     content: { posts, jobs, funding, events },
     activeMembers30d: active30d,
-    perTenant: perTenant.rows.map((r) => toPlatformTenantRowDto(r.tenant, r)),
+    perTenant: perTenant.map((r) => toPlatformTenantRowDto(r.tenant, r)),
   };
+}
+
+/** Every institution with its counts (page by page, so the platform view isn't cut off at the first page). */
+async function allTenantsForPlatform(ctx: AppContext) {
+  const out: Awaited<ReturnType<typeof listTenantsForPlatform>>["rows"] = [];
+  for (let page = 1; ; page++) {
+    const { rows, total } = await listTenantsForPlatform(ctx.db, { page, pageSize: 100 });
+    out.push(...rows);
+    if (rows.length === 0 || out.length >= total) return out;
+  }
 }
