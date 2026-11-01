@@ -10,6 +10,7 @@ import { NoopRealtimePublisher, RedisEmitterPublisher } from "./realtime/publish
 import { createRedis } from "./redis/client";
 import { createMessageSenders } from "./services/messages";
 import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
+import { createPaymentProvider, paymentPurposeHandlers } from "./services/payments";
 import { createOtpSender } from "./services/otp";
 import { createStorage } from "./services/storage";
 
@@ -43,6 +44,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
     push: new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN),
     messageSenders: createMessageSenders(config, logger),
     realtime: emitterRedis ? new RedisEmitterPublisher(new Emitter(emitterRedis)) : new NoopRealtimePublisher(),
+    payments: { provider: createPaymentProvider(config, logger), purposes: paymentPurposeHandlers },
   };
 
   return {

@@ -88,6 +88,17 @@ export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
 export const OUTBOUND_MESSAGE_STATUSES = ["QUEUED", "SENDING", "SENT", "DELIVERED", "READ", "FAILED"] as const;
 export type OutboundMessageStatus = (typeof OUTBOUND_MESSAGE_STATUSES)[number];
 
+/** What a payment is for; each purpose has a handler that prices it and acts when it is paid (Wave 3). */
+export const PAYMENT_PURPOSES = ["EVENT_TICKET", "DONATION"] as const;
+export type PaymentPurpose = (typeof PAYMENT_PURPOSES)[number];
+
+/** ATTEMPTED: authorised but not yet captured. PAID is final unless refunded. */
+export const PAYMENT_ORDER_STATUSES = ["CREATED", "ATTEMPTED", "PAID", "FAILED", "PARTIALLY_REFUNDED", "REFUNDED", "EXPIRED"] as const;
+export type PaymentOrderStatus = (typeof PAYMENT_ORDER_STATUSES)[number];
+
+export const PAYMENT_REFUND_STATUSES = ["PENDING", "PROCESSED", "FAILED"] as const;
+export type PaymentRefundStatus = (typeof PAYMENT_REFUND_STATUSES)[number];
+
 export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;

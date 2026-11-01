@@ -14,6 +14,7 @@ export * from "./schemas/posts";
 export * from "./schemas/events";
 export * from "./schemas/reports";
 export * from "./schemas/platform";
+export * from "./schemas/payments";
 export * from "./types/dto";
 export * from "./lib/notifications";
 export * from "./realtime/events";

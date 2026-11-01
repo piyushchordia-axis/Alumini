@@ -6,6 +6,7 @@ import type { AppContext } from "./context";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { requestId } from "./middleware/requestId";
 import { apiRouter } from "./routes";
+import { webhookRoutes } from "./routes/webhooks.routes";
 
 export function createApp(ctx: AppContext): Express {
   const app = express();
@@ -24,8 +25,6 @@ export function createApp(ctx: AppContext): Express {
       exposedHeaders: ["X-Request-Id", "Retry-After"],
     }),
   );
-  app.use(express.json({ limit: "1mb" }));
-
   if (!config.isTest) {
     app.use(
       pinoHttp({
@@ -44,6 +43,10 @@ export function createApp(ctx: AppContext): Express {
       }),
     );
   }
+
+  // Webhooks read their raw body (signature checks), so they come before the JSON parser.
+  app.use("/api/v1/webhooks", webhookRoutes(ctx));
+  app.use(express.json({ limit: "1mb" }));
 
   app.use("/uploads", express.static(config.uploadDirAbsolute, { maxAge: "7d", immutable: true, fallthrough: true }));
   app.use("/api/v1", apiRouter(ctx));

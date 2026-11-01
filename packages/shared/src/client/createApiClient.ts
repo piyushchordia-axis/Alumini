@@ -7,6 +7,7 @@ import {
   jobEndpoints,
   membershipEndpoints,
   notificationEndpoints,
+  paymentEndpoints,
   postEndpoints,
   reportEndpoints,
   uploadEndpoints,
@@ -30,6 +31,7 @@ export function createApiClient(options: ApiClientOptions) {
     reports: reportEndpoints(core),
     notifications: notificationEndpoints(core),
     uploads: uploadEndpoints(core),
+    payments: paymentEndpoints(core),
     admin: adminEndpoints(core),
     platform: platformEndpoints(core),
   };

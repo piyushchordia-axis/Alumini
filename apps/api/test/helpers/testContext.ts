@@ -9,6 +9,7 @@ import { runMigrations } from "../../src/db/migrate";
 import { MemoryJobQueue } from "../../src/jobs/MemoryJobQueue";
 import { createJwtSigner } from "../../src/lib/jwt";
 import { NoopRealtimePublisher } from "../../src/realtime/publisher";
+import { MockPaymentProvider } from "../../src/services/payments";
 import { createLogger } from "../../src/lib/logger";
 import type { RedisClient } from "../../src/redis/client";
 import type { OtpSender, OtpSendResult } from "../../src/services/otp";
@@ -63,7 +64,7 @@ export async function isDatabaseAvailable(): Promise<boolean> {
 }
 
 /** Providers a test can swap in (fakes with injectable fetch, capturing senders, …). */
-export type TestProviders = Partial<Pick<AppContext, "push" | "storage" | "messageSenders" | "realtime">>;
+export type TestProviders = Partial<Pick<AppContext, "push" | "storage" | "messageSenders" | "realtime" | "payments">>;
 
 /** Console senders for every channel, so message flows run in tests without providers. */
 export function consoleMessageSenders(logger: AppContext["logger"]): MessageSenders {
@@ -92,6 +93,7 @@ export async function createTestContext(overrides: Record<string, string | undef
     push: providers.push,
     messageSenders: providers.messageSenders ?? consoleMessageSenders(logger),
     realtime: providers.realtime ?? new NoopRealtimePublisher(),
+    payments: providers.payments ?? { provider: new MockPaymentProvider(), purposes: {} },
     otpCapture,
     pool,
   } as unknown as TestContext;

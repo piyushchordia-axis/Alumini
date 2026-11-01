@@ -21,6 +21,7 @@ export function createUnitContext(overrides: Record<string, string | undefined> 
     storage: createStorage(config),
     messageSenders: {},
     realtime: new NoopRealtimePublisher(),
+    payments: { provider: null, purposes: {} },
     otpCapture,
   } as unknown as AppContext & { otpCapture: CapturingOtpSender; jobs: MemoryJobQueue };
   ctx.jobs = new MemoryJobQueue(() => ctx);

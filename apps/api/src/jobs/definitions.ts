@@ -15,6 +15,8 @@ export interface JobPayloads {
   "messages.send": { messageId: string };
   /** Re-queue outbound messages a crash left behind. */
   "messages.sweep": Record<string, never>;
+  /** Apply one stored payment webhook (payment_webhook_events row). */
+  "payments.webhook": { webhookEventId: string };
 }
 
 export type JobName = keyof JobPayloads;
@@ -37,4 +39,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   // Retries at roughly 30s, 1m, 2m and 4m before the message is marked FAILED.
   "messages.send": { queue: "messages", attempts: 5, backoff: { type: "exponential", delayMs: 30_000 } },
   "messages.sweep": { queue: "jobs", attempts: 1 },
+  "payments.webhook": { queue: "jobs", attempts: 8, backoff: { type: "exponential", delayMs: 10_000 } },
 };

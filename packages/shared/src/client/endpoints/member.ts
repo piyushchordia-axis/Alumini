@@ -1,4 +1,4 @@
-import type { AttendeesQuery, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationsQuery, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
@@ -11,6 +11,7 @@ import type {
   MemberProfileDto,
   MembershipDto,
   NotificationDto,
+  PaymentOrderDto,
   PostDto,
   PostPageDto,
   ReactionEntryDto,
@@ -133,5 +134,15 @@ export function uploadEndpoints(core: ApiCore) {
       else formData.append("file", file as unknown as Blob);
       return core.data<UploadResultDto>({ method: "POST", path: "/uploads", tenantSlug: slug, formData });
     },
+  };
+}
+
+export function paymentEndpoints(core: ApiCore) {
+  return {
+    get: (slug: string, id: string) => core.data<PaymentOrderDto>({ path: `/payments/${id}`, tenantSlug: slug }),
+    /** After the provider's checkout succeeds: the server verifies the payment and marks the order paid. */
+    confirm: (slug: string, id: string, input: PaymentConfirmInput) => core.data<PaymentOrderDto>({ method: "POST", path: `/payments/${id}/confirm`, tenantSlug: slug, body: input }),
+    /** Development only (mock provider): simulates a successful checkout and returns what to confirm with. */
+    mockCheckout: (slug: string, id: string) => core.data<PaymentConfirmInput>({ method: "POST", path: `/payments/${id}/mock-checkout`, tenantSlug: slug }),
   };
 }

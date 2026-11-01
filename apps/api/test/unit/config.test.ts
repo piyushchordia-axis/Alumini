@@ -35,4 +35,14 @@ describe("config", () => {
     const c = loadConfig({ ...dev, MSG91_FLOW_TEMPLATE_IDS: " PLATFORM_TEST=65ab , INVITE=65cd,broken" });
     expect(c.msg91FlowTemplateIds).toEqual({ PLATFORM_TEST: "65ab", INVITE: "65cd" });
   });
+
+  it("defaults payments to the mock outside production, refuses it in production, and needs all Razorpay secrets", () => {
+    const dev = { NODE_ENV: "development", DATABASE_URL: "postgres://x", JWT_SECRET: "x".repeat(40), OTP_PEPPER: "p".repeat(20) };
+    expect(loadConfig(dev).paymentsProvider).toBe("mock");
+    const prod = { ...production, OTP_PROVIDER: "sms", MSG91_AUTH_KEY: "k", MSG91_TEMPLATE_ID: "t" };
+    expect(loadConfig(prod).paymentsProvider).toBe("disabled");
+    expect(() => loadConfig({ ...prod, PAYMENTS_PROVIDER: "mock" })).toThrow(/not allowed in production/);
+    expect(() => loadConfig({ ...dev, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_test_1" })).toThrow(/RAZORPAY_KEY_SECRET/);
+    expect(loadConfig({ ...prod, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_live_1", RAZORPAY_KEY_SECRET: "s", RAZORPAY_WEBHOOK_SECRET: "w" }).paymentsProvider).toBe("razorpay");
+  });
 });

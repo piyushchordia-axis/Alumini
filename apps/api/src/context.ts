@@ -6,6 +6,8 @@ import type { RedisClient } from "./redis/client";
 import type { JobQueue } from "./jobs/JobQueue";
 import type { RealtimePublisher } from "./realtime/publisher";
 import type { MessageSenders } from "./services/messages/types";
+import type { PaymentProvider } from "./services/payments/PaymentProvider";
+import type { PaymentPurposeRegistry } from "./services/payments/purposes";
 import type { PushChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
 import type { StorageProvider } from "./services/storage";
@@ -26,4 +28,6 @@ export interface AppContext {
   messageSenders: MessageSenders;
   /** Live events to connected apps (Socket.IO); a no-op until the server is attached. */
   realtime: RealtimePublisher;
+  /** Online payments: the provider (null when disabled) and what each payment purpose does. */
+  payments: { provider: PaymentProvider | null; purposes: PaymentPurposeRegistry };
 }

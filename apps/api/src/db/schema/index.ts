@@ -11,3 +11,4 @@ export * from "./notifications";
 export * from "./audit";
 export * from "./views";
 export * from "./messages";
+export * from "./payments";

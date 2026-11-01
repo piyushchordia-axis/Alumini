@@ -16,6 +16,9 @@ import {
   NOTIFICATION_TYPES,
   PROFESSION_TYPES,
   OUTBOUND_MESSAGE_STATUSES,
+  PAYMENT_ORDER_STATUSES,
+  PAYMENT_PURPOSES,
+  PAYMENT_REFUND_STATUSES,
   PUSH_PLATFORMS,
   REACTION_TYPES,
   REPORT_REASONS,
@@ -48,3 +51,6 @@ export const billingCycleEnum = pgEnum("billing_cycle", BILLING_CYCLES);
 export const pushPlatformEnum = pgEnum("push_platform", PUSH_PLATFORMS);
 export const messageChannelEnum = pgEnum("message_channel", MESSAGE_CHANNELS);
 export const outboundMessageStatusEnum = pgEnum("outbound_message_status", OUTBOUND_MESSAGE_STATUSES);
+export const paymentPurposeEnum = pgEnum("payment_purpose", PAYMENT_PURPOSES);
+export const paymentOrderStatusEnum = pgEnum("payment_order_status", PAYMENT_ORDER_STATUSES);
+export const paymentRefundStatusEnum = pgEnum("payment_refund_status", PAYMENT_REFUND_STATUSES);

@@ -143,6 +143,24 @@ expires (the shared client in `packages/shared/src/realtime` refreshes and recon
 - The web app reaches it through the Vite proxy in development; in production serve `/socket.io` from the API origin
   (or proxy it with WebSocket upgrade). Browser origins must be in `CORS_ORIGINS`; native apps send no origin.
 
+### Online payments (Razorpay)
+
+Event tickets and donations (Wave 3) take payments through a provider-neutral layer (`apps/api/src/services/payments`):
+
+1. The feature creates a payment order. Its *purpose handler* prices it inside a transaction, then the provider order
+   is created and the app gets the checkout parameters.
+2. The app opens Razorpay Checkout and sends the returned payment id and signature to
+   `POST /t/:slug/payments/:id/confirm`. The server verifies the signature, fetches the payment from Razorpay and checks
+   it matches the order. Only a *captured* payment marks the order paid; the purpose's `onPaid` runs exactly once.
+3. Razorpay webhooks (`POST /api/v1/webhooks/razorpay`, signature checked over the raw body, each event id processed
+   once in the background) cover payments the app never confirmed, failures and refunds.
+
+`PAYMENTS_PROVIDER=mock` (the default outside production) fakes the checkout so features can be built and tested without
+keys: `POST /t/:slug/payments/:id/mock-checkout` returns what to confirm with. Production defaults to `disabled` and
+refuses `mock`. For real payments set `PAYMENTS_PROVIDER=razorpay` with `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and
+`RAZORPAY_WEBHOOK_SECRET`, enable auto-capture, and add the webhook in the dashboard with the payment, order and refund
+events (see `apps/api/.env.example`).
+
 ### Multi-tenancy
 
 One Postgres database; every tenant-scoped table carries `tenant_id` and every repository function takes the tenant
@@ -175,12 +193,12 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 
 | Area | Endpoints |
 | --- | --- |
-| Public | `GET /tenants`, `GET /tenants/:slug`, `GET /health` |
+| Public | `GET /tenants`, `GET /tenants/:slug`, `GET /health`, `POST /webhooks/razorpay` |
 | Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` |
 | Me | `GET /me`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
-| Tenant `/t/:slug` | `memberships` (register, me, update), `uploads`, `directory`, `jobs` (+ `seekers`), `funding`, `posts` (+ comments, reactions), `events` (+ rsvp, attendees, cancel), `reports`, `notifications` |
+| Tenant `/t/:slug` | `memberships` (register, me, update), `uploads`, `directory`, `jobs` (+ `seekers`), `funding`, `posts` (+ comments, reactions), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `payments` (get, confirm) |
 | Tenant admin `/t/:slug/admin` | `dashboard`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `settings`, `branding`, `audit` |
-| Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `users` (platform-admin toggle), `audit` |
+| Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `users` (platform-admin toggle), `audit`, `messages` (test send, status) |
 
 ## Development
 

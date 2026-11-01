@@ -14,6 +14,8 @@ import type {
   ModerationStatus,
   NotificationType,
   OutboundMessageStatus,
+  PaymentOrderStatus,
+  PaymentPurpose,
   ProfessionType,
   ReactionType,
   ReportReason,
@@ -496,4 +498,32 @@ export interface OutboundMessageDto {
   sentAt: string | null;
   failedAt: string | null;
   createdAt: string;
+}
+
+/** What the app needs to open the provider's checkout (Razorpay Checkout options, or the mock). */
+export interface PaymentCheckoutDto {
+  provider: "razorpay" | "mock";
+  /** Razorpay key id (public). */
+  keyId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  notes: Record<string, string>;
+}
+
+export interface PaymentOrderDto {
+  id: string;
+  purpose: PaymentPurpose;
+  referenceId: string;
+  amountMinor: number;
+  currency: string;
+  status: PaymentOrderStatus;
+  amountRefundedMinor: number;
+  description: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  /** Present while the order can still be paid. */
+  checkout: PaymentCheckoutDto | null;
 }

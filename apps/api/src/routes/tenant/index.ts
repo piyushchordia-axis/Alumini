@@ -9,6 +9,7 @@ import { fundingRoutes } from "./funding.routes";
 import { jobRoutes } from "./jobs.routes";
 import { membershipRoutes } from "./membership.routes";
 import { notificationRoutes } from "./notifications.routes";
+import { paymentRoutes } from "./payments.routes";
 import { postRoutes } from "./posts.routes";
 import { reportRoutes } from "./reports.routes";
 import { uploadRoutes } from "./uploads.routes";
@@ -27,6 +28,7 @@ export function tenantRouter(ctx: AppContext): Router {
   router.use(postRoutes(ctx));
   router.use(eventRoutes(ctx));
   router.use(reportRoutes(ctx));
+  router.use(paymentRoutes(ctx));
   router.use("/admin", adminRoutes(ctx));
   return router;
 }

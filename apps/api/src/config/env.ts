@@ -79,6 +79,12 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   /** Public URL prefix of the bucket or its CDN; image URLs are this plus the object key. */
   S3_PUBLIC_BASE_URL: z.string().optional(),
+  /** Online payments: razorpay, mock (fake checkout for development) or disabled. Default: mock outside production. */
+  PAYMENTS_PROVIDER: z.enum(["disabled", "mock", "razorpay"]).optional(),
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  /** The secret set on the webhook in the Razorpay dashboard. */
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   /** Outbound email over SMTP, e.g. smtps://user:pass@smtp.zoho.in:465 or smtp://…:587 (STARTTLS). */
   SMTP_URL: z.string().optional(),
   /** Sender, e.g. "Illuminize <no-reply@illuminize.app>"; the domain needs SPF/DKIM for the SMTP provider. */
@@ -95,6 +101,8 @@ export type Config = z.infer<typeof envSchema> & {
   platformAdminPhones: string[];
   corsOrigins: string[] | "*";
   uploadDirAbsolute: string;
+  /** Resolved PAYMENTS_PROVIDER. */
+  paymentsProvider: "disabled" | "mock" | "razorpay";
   /** Parsed MSG91_FLOW_TEMPLATE_IDS. */
   msg91FlowTemplateIds: Record<string, string>;
   /** Resolved WORKER_MODE: inline outside production unless set. */
@@ -129,6 +137,7 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     isDevelopment: c.NODE_ENV === "development",
     isTest: c.NODE_ENV === "test",
     workerMode: c.WORKER_MODE ?? (c.NODE_ENV === "production" ? "separate" : "inline"),
+    paymentsProvider: c.PAYMENTS_PROVIDER ?? (c.NODE_ENV === "production" ? "disabled" : "mock"),
     msg91FlowTemplateIds: Object.fromEntries(
       c.MSG91_FLOW_TEMPLATE_IDS.split(",")
         .map((pair) => pair.split("=").map((x) => x.trim()) as [string, string | undefined])
@@ -139,6 +148,12 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),
   };
 
+  if (config.isProduction && config.paymentsProvider === "mock") {
+    throw new Error("PAYMENTS_PROVIDER=mock is not allowed in production (it accepts fake payments). Use razorpay or disabled.");
+  }
+  if (config.paymentsProvider === "razorpay" && !(config.RAZORPAY_KEY_ID && config.RAZORPAY_KEY_SECRET && config.RAZORPAY_WEBHOOK_SECRET)) {
+    throw new Error("PAYMENTS_PROVIDER=razorpay needs RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET");
+  }
   if (config.STORAGE_PROVIDER === "s3") {
     if (!config.S3_BUCKET || !config.S3_PUBLIC_BASE_URL) throw new Error("STORAGE_PROVIDER=s3 needs S3_BUCKET and S3_PUBLIC_BASE_URL");
     if (!!config.S3_ACCESS_KEY_ID !== !!config.S3_SECRET_ACCESS_KEY) throw new Error("Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither (default AWS credentials)");
