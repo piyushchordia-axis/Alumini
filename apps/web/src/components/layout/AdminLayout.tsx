@@ -18,6 +18,7 @@ export function AdminLayout() {
     { to: `${base}/members`, label: "Members", icon: "👥", count: d?.pendingMembers },
     { to: `${base}/moderation`, label: "Moderation", icon: "🛡️", count: d?.pendingContent },
     { to: `${base}/reports`, label: "Reports", icon: "🚩", count: d?.openReports },
+    { to: `${base}/invitations`, label: "Invitations", icon: "✉️" },
     { to: `${base}/profile-fields`, label: "Profile fields", icon: "🧩" },
     { to: `${base}/settings`, label: "Settings", icon: "⚙️" },
     { to: `${base}/audit`, label: "Audit log", icon: "📜" },

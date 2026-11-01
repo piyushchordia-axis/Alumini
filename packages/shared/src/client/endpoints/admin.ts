@@ -2,6 +2,8 @@ import type {
   AdminMembersQuery,
   AdminReportsQuery,
   AuditQuery,
+  InvitationImportInput,
+  InvitationsQuery,
   MembershipProfileUpdate,
   MembershipRole,
   ModerationQuery,
@@ -12,7 +14,7 @@ import type {
   TenantSettingsUpdate,
 } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AuditDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AuditDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -54,6 +56,14 @@ export function adminEndpoints(core: ApiCore) {
       list: (slug: string, query?: Partial<AdminReportsQuery>) => core.request<Page<AdminReportDto>>({ ...p(slug, "/reports"), query: q(query) }),
       resolve: (slug: string, id: string, input: ReportResolveInput) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/resolve`), body: input }),
       dismiss: (slug: string, id: string, note?: string | null) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/dismiss`), body: { note: note ?? null } }),
+    },
+    invitations: {
+      list: (slug: string, query?: Partial<InvitationsQuery>) => core.request<Page<InvitationDto>>({ ...p(slug, "/invitations"), query: q(query) }),
+      summary: (slug: string) => core.data<InvitationSummaryDto>(p(slug, "/invitations/summary")),
+      import: (slug: string, input: InvitationImportInput) => core.data<InvitationImportResultDto>({ method: "POST", ...p(slug, "/invitations/import"), body: input }),
+      send: (slug: string, ids: string[]) => core.data<{ queued: number; skipped: number }>({ method: "POST", ...p(slug, "/invitations/send"), body: { ids } }),
+      sendPending: (slug: string) => core.data<{ queued: number; skipped: number }>({ method: "POST", ...p(slug, "/invitations/send-pending") }),
+      revoke: (slug: string, id: string) => core.data<InvitationDto>({ method: "POST", ...p(slug, `/invitations/${id}/revoke`) }),
     },
     profileFields: {
       list: (slug: string, includeArchived = false) => core.data<ProfileFieldDto[]>({ ...p(slug, "/profile-fields"), query: { includeArchived: includeArchived ? "true" : undefined } }),

@@ -2,6 +2,7 @@ import {
   MAX_PROFILE_FIELDS,
   formatProfileFieldValue,
   profileFieldConsistencyIssues,
+  validateProfileFieldValue,
   validateProfileFieldValues,
   type ProfileFieldAnswerDto,
   type ProfileFieldCreateInput,
@@ -151,6 +152,23 @@ export async function saveAnswers(
   }
   await upsertAnswers(db, set);
   await deleteAnswers(db, membershipId, clear);
+}
+
+/**
+ * Applies answers an admin imported with an invitation, when the member accepts it: only valid answers to active
+ * fields, and never over an answer the member just gave. Invalid or stale ones are skipped, not errors.
+ */
+export async function applyInvitationAnswers(ctx: AppContext, db: DbClient, tenantId: string, membershipId: string, prefill: Record<string, ProfileFieldValue>, answeredKeys: string[]): Promise<void> {
+  const fields = await getActiveFields(ctx, tenantId);
+  const byKey = new Map(fields.map((f) => [f.key, f]));
+  const rows: Array<{ tenantId: string; membershipId: string; fieldId: string; value: ProfileFieldValue }> = [];
+  for (const [key, raw] of Object.entries(prefill)) {
+    const def = byKey.get(key);
+    if (!def || answeredKeys.includes(key)) continue;
+    const r = validateProfileFieldValue(def, raw);
+    if (r.ok && r.value !== null) rows.push({ tenantId, membershipId, fieldId: def.id, value: r.value });
+  }
+  await upsertAnswers(db, rows);
 }
 
 // --- Admin -------------------------------------------------------------------------------------------------------

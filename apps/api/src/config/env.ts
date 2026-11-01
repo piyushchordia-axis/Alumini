@@ -99,6 +99,13 @@ const envSchema = z.object({
   EMAIL_REPLY_TO: z.string().optional(),
   /** MSG91 flow (DLT) template id per message type: "PLATFORM_TEST=65ab…,INVITE=65cd…". */
   MSG91_FLOW_TEMPLATE_IDS: z.string().default(""),
+  /**
+   * Approved WhatsApp template per message type, as name:language: "INVITE=illuminize_invite:en,ANNOUNCEMENT=…".
+   * A type without one skips WhatsApp (falls back to SMS/email).
+   */
+  WHATSAPP_TEMPLATES: z.string().default(""),
+  /** Invitations one institution may send per day (WhatsApp/SMS/email cost money; also limits abuse). */
+  INVITES_DAILY_LIMIT: z.coerce.number().int().positive().default(1000),
 });
 
 export type Config = z.infer<typeof envSchema> & {
@@ -112,6 +119,8 @@ export type Config = z.infer<typeof envSchema> & {
   paymentsProvider: "disabled" | "mock" | "razorpay";
   /** Parsed MSG91_FLOW_TEMPLATE_IDS. */
   msg91FlowTemplateIds: Record<string, string>;
+  /** Parsed WHATSAPP_TEMPLATES. */
+  whatsappTemplates: Record<string, { name: string; language: string }>;
   /** Resolved WORKER_MODE: inline outside production unless set. */
   workerMode: "inline" | "separate";
   /** WEB_APP_URL without a trailing slash, or null in production when it is not set. */
@@ -153,6 +162,15 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
         .filter((pair): pair is [string, string] => !!pair[0] && !!pair[1]),
     ),
     webAppUrl: (c.WEB_APP_URL ?? (c.NODE_ENV === "production" ? null : "http://localhost:5173"))?.replace(/\/+$/, "") ?? null,
+    whatsappTemplates: Object.fromEntries(
+      c.WHATSAPP_TEMPLATES.split(",")
+        .map((pair) => pair.split("=").map((x) => x.trim()))
+        .filter((pair): pair is [string, string] => !!pair[0] && !!pair[1])
+        .map(([type, spec]) => {
+          const [name, language] = spec.split(":").map((x) => x.trim());
+          return [type, { name: name!, language: language || "en" }];
+        }),
+    ),
     platformAdminPhones,
     corsOrigins,
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),

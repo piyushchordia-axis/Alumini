@@ -6,6 +6,7 @@ import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 import { RouteErrorPage } from "@/routes/RouteErrorPage";
 import { TenantPickerPage } from "@/routes/TenantPickerPage";
+import { InvitePage } from "@/routes/InvitePage";
 import { UnsubscribePage } from "@/routes/UnsubscribePage";
 import { VerifyEmailPage } from "@/routes/VerifyEmailPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <TenantPickerPage /> },
       { path: "/verify-email", element: <VerifyEmailPage /> },
       { path: "/unsubscribe", element: <UnsubscribePage /> },
+      { path: "/i/:token", element: <InvitePage /> },
       { path: "/t/:slug", element: <LandingPage /> },
       { path: "/t/:slug/login", element: <LoginPage /> },
       {

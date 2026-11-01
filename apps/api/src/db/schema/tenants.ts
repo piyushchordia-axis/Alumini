@@ -53,6 +53,8 @@ export const tenantSettings = pgTable("tenant_settings", {
   minBatchYear: integer("min_batch_year").notNull().default(1950),
   maxBatchYear: integer("max_batch_year").notNull().default(2032),
   features: jsonb("features").$type<TenantFeatures>().notNull().default(DEFAULT_TENANT_FEATURES),
+  /** Invited members (matched by their verified phone) are approved straight away. */
+  inviteAutoApprove: boolean("invite_auto_approve").notNull().default(true),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
 });

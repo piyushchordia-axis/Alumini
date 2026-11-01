@@ -24,6 +24,8 @@ export interface JobPayloads {
   "messages.sweep": Record<string, never>;
   /** Apply one stored payment webhook (payment_webhook_events row). */
   "payments.webhook": { webhookEventId: string };
+  /** Send (or resend) a batch of invitations over the channels the institution's plan allows. */
+  "invitations.send": { tenantId: string; invitationIds: string[] };
 }
 
 export type JobName = keyof JobPayloads;
@@ -47,4 +49,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "messages.send": { queue: "messages", attempts: 5, backoff: { type: "exponential", delayMs: 30_000 } },
   "messages.sweep": { queue: "jobs", attempts: 1 },
   "payments.webhook": { queue: "jobs", attempts: 8, backoff: { type: "exponential", delayMs: 10_000 } },
+  "invitations.send": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 10_000 } },
 };

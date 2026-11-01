@@ -7,6 +7,7 @@ import {
   EVENT_KINDS,
   FUNDING_KINDS,
   FUNDING_STAGES,
+  INVITATION_STATUSES,
   JOB_TYPES,
   MARITAL_STATUSES,
   MEMBERSHIP_ROLES,
@@ -58,3 +59,4 @@ export const paymentOrderStatusEnum = pgEnum("payment_order_status", PAYMENT_ORD
 export const paymentRefundStatusEnum = pgEnum("payment_refund_status", PAYMENT_REFUND_STATUSES);
 export const profileFieldTypeEnum = pgEnum("profile_field_type", PROFILE_FIELD_TYPES);
 export const profileFieldVisibilityEnum = pgEnum("profile_field_visibility", PROFILE_FIELD_VISIBILITIES);
+export const invitationStatusEnum = pgEnum("invitation_status", INVITATION_STATUSES);

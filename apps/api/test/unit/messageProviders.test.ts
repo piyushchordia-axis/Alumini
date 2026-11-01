@@ -102,25 +102,25 @@ describe("SMTP email sender", () => {
 
 describe("message templates", () => {
   it("renders the email confirmation with no member-supplied text and escapes the link", () => {
-    const r = renderForChannel("EMAIL_VERIFY", "EMAIL", { verificationId: "v1", link: 'https://app.test/verify-email?token=a"b' }, { phone: null, email: "a@b.c", name: "<b>Eve</b>" }, {});
+    const r = renderForChannel("EMAIL_VERIFY", "EMAIL", { verificationId: "v1", link: 'https://app.test/verify-email?token=a"b' }, { phone: null, email: "a@b.c", name: "<b>Eve</b>" }, { msg91FlowTemplateIds: {}, whatsappTemplates: {} });
     expect("message" in r && r.message.channel === "EMAIL").toBe(true);
     if (!("message" in r) || r.message.channel !== "EMAIL") return;
     expect(r.message.subject).toBe("Confirm your email address");
     expect(r.message.text).toContain('https://app.test/verify-email?token=a"b');
     expect(r.message.html).toContain("token=a&quot;b");
     expect(r.message.html).not.toContain("Eve");
-    expect(renderForChannel("EMAIL_VERIFY", "WHATSAPP", { verificationId: "v1", link: "x" }, { phone: "+91", email: null, name: null }, {})).toEqual({ skip: "no WhatsApp template" });
+    expect(renderForChannel("EMAIL_VERIFY", "WHATSAPP", { verificationId: "v1", link: "x" }, { phone: "+91", email: null, name: null }, { msg91FlowTemplateIds: {}, whatsappTemplates: {} })).toEqual({ skip: "no WhatsApp template" });
   });
   const to = { phone: "+919876543210", email: "asha@example.com", name: "Asha" };
   it("renders each channel of the platform test message", () => {
-    expect(renderForChannel("PLATFORM_TEST", "WHATSAPP", { sentBy: "Staff" }, to, {})).toEqual({ message: { channel: "WHATSAPP", to: to.phone, template: { name: "hello_world", language: "en_US", components: [] } } });
-    const email = renderForChannel("PLATFORM_TEST", "EMAIL", { sentBy: "Staff <x>", recipientName: "Asha" }, to, {});
+    expect(renderForChannel("PLATFORM_TEST", "WHATSAPP", { sentBy: "Staff" }, to, { msg91FlowTemplateIds: {}, whatsappTemplates: {} })).toEqual({ message: { channel: "WHATSAPP", to: to.phone, template: { name: "hello_world", language: "en_US", components: [] } } });
+    const email = renderForChannel("PLATFORM_TEST", "EMAIL", { sentBy: "Staff <x>", recipientName: "Asha" }, to, { msg91FlowTemplateIds: {}, whatsappTemplates: {} });
     expect(email).toMatchObject({ message: { channel: "EMAIL", to: to.email, subject: "Illuminize test message" } });
     expect("message" in email && email.message.channel === "EMAIL" && email.message.html).toContain("Staff &lt;x&gt;");
   });
   it("skips channels without an address or an SMS flow id", () => {
-    expect(renderForChannel("PLATFORM_TEST", "SMS", { sentBy: "S" }, to, {})).toEqual({ skip: "no MSG91 flow template id for PLATFORM_TEST" });
-    expect(renderForChannel("PLATFORM_TEST", "SMS", { sentBy: "S" }, to, { PLATFORM_TEST: "flow-9" })).toMatchObject({ message: { flowTemplateId: "flow-9", vars: { name: "there" } } });
-    expect(renderForChannel("PLATFORM_TEST", "EMAIL", { sentBy: "S" }, { ...to, email: null }, {})).toEqual({ skip: "no email address" });
+    expect(renderForChannel("PLATFORM_TEST", "SMS", { sentBy: "S" }, to, { msg91FlowTemplateIds: {}, whatsappTemplates: {} })).toEqual({ skip: "no MSG91 flow template id for PLATFORM_TEST" });
+    expect(renderForChannel("PLATFORM_TEST", "SMS", { sentBy: "S" }, to, { msg91FlowTemplateIds: { PLATFORM_TEST: "flow-9" }, whatsappTemplates: {} })).toMatchObject({ message: { flowTemplateId: "flow-9", vars: { name: "there" } } });
+    expect(renderForChannel("PLATFORM_TEST", "EMAIL", { sentBy: "S" }, { ...to, email: null }, { msg91FlowTemplateIds: {}, whatsappTemplates: {} })).toEqual({ skip: "no email address" });
   });
 });

@@ -1,6 +1,7 @@
 import { EMAIL_VERIFICATION_TTL_SECONDS, type MessageChannel } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import { findEmailVerification } from "../../repositories/emailVerifications.repo";
+import { findInvitationById } from "../../repositories/invitations.repo";
 import { emailButton, emailLayout, escapeHtml, textToHtml } from "./emailLayout";
 import type { RenderedMessage, WhatsAppTemplateSpec } from "./types";
 
@@ -13,6 +14,8 @@ export interface MessagePayloads {
   PLATFORM_TEST: { sentBy: string; recipientName?: string | null };
   /** Confirms a member's email address. */
   EMAIL_VERIFY: { verificationId: string; link: string };
+  /** An invitation to join an institution (from an admin's import). */
+  INVITE: { invitationId: string; tenantName: string; color: string; recipientName: string | null; link: string; token: string };
 }
 export type MessageType = keyof MessagePayloads;
 
@@ -60,8 +63,11 @@ export interface MessageTemplate<T extends MessageType> {
    * a verified address, content not removed). Throwing retries the message later.
    */
   load?: (ctx: AppContext, payload: MessagePayloads[T], message: LoadContext) => Promise<LoadResult<T>>;
-  /** WhatsApp: an approved template in the WhatsApp Business account. */
-  whatsapp?: (p: RenderPayload<T>) => WhatsAppTemplateSpec;
+  /**
+   * WhatsApp: an approved template in the WhatsApp Business account. `configured` is the template named for this type
+   * in WHATSAPP_TEMPLATES; return null to skip WhatsApp (e.g. none configured).
+   */
+  whatsapp?: (p: RenderPayload<T>, configured: { name: string; language: string } | undefined) => WhatsAppTemplateSpec | null;
   /** SMS: MSG91 flow variables; the flow template id comes from MSG91_FLOW_TEMPLATE_IDS (DLT-registered text). */
   sms?: (p: RenderPayload<T>) => Record<string, string>;
   email?: (p: RenderPayload<T>) => RenderedEmail;
@@ -111,6 +117,45 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
       return { subject: "Confirm your email address", text, html };
     },
   },
+
+  INVITE: {
+    channels: ["WHATSAPP", "SMS", "EMAIL"],
+    priority: 5,
+    bulk: true,
+    // Revoked, accepted or expired since it was queued: don't send.
+    load: async (ctx, p) => {
+      const inv = await findInvitationById(ctx.db, p.invitationId);
+      if (!inv || (inv.status !== "PENDING" && inv.status !== "SENT") || inv.expiresAt.getTime() <= Date.now()) return { cancel: "invitation no longer open" };
+      return { payload: p };
+    },
+    // Template body: "Hi {{1}}, you're invited to join the {{2}} alumni network on Illuminize." with a URL button
+    // whose base is <WEB_APP_URL>/i/ and whose variable part is the token.
+    whatsapp: (p, configured) =>
+      configured
+        ? {
+            name: configured.name,
+            language: configured.language,
+            components: [
+              { type: "body", parameters: [{ type: "text", text: p.recipientName ?? "there" }, { type: "text", text: p.tenantName }] },
+              { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: p.token }] },
+            ],
+          }
+        : null,
+    sms: (p) => ({ name: p.recipientName ?? "there", institution: p.tenantName, link: p.link }),
+    email: (p) => {
+      const greeting = `Hello ${p.recipientName ?? "there"},`;
+      const intro = `You're invited to join the ${p.tenantName} alumni network on Illuminize: find batchmates, jobs, events and more.`;
+      const text = [greeting, intro, `Join here: ${p.link}`, "Sign in with this phone number to accept the invitation."].join("\n\n");
+      const html = emailLayout({
+        title: `Join ${p.tenantName} on Illuminize`,
+        color: p.color,
+        preheader: intro,
+        bodyHtml: [textToHtml(`${greeting}\n\n${intro}`), emailButton(p.link, `Join ${p.tenantName}`, p.color), textToHtml("Sign in with the phone number this invitation was sent to and you'll be taken straight in.")].join(""),
+        footerHtml: `You received this because ${escapeHtml(p.tenantName)} invited you. If you don't want to join, you can ignore this email.`,
+      });
+      return { subject: `You're invited to join ${p.tenantName} on Illuminize`, text, html };
+    },
+  },
 };
 
 export function isMessageType(type: string): type is MessageType {
@@ -124,24 +169,32 @@ export const BULK_MESSAGE_TYPES: MessageType[] = (Object.keys(messageTemplates) 
  * Renders one message for one channel, or returns why it cannot go that way (no address for the channel, no template
  * for it, or no MSG91 flow id configured).
  */
+export interface TemplateConfig {
+  msg91FlowTemplateIds: Record<string, string>;
+  whatsappTemplates: Record<string, { name: string; language: string }>;
+}
+
 export function renderForChannel(
   type: MessageType,
   channel: MessageChannel,
   payload: unknown,
   to: { phone: string | null; email: string | null; name: string | null },
-  msg91FlowTemplateIds: Record<string, string>,
+  config: TemplateConfig,
 ): { message: RenderedMessage } | { skip: string } {
   const template = messageTemplates[type] as unknown as MessageTemplate<MessageType>;
   const p = payload as never;
   switch (channel) {
-    case "WHATSAPP":
+    case "WHATSAPP": {
       if (!to.phone) return { skip: "no phone number" };
       if (!template.whatsapp) return { skip: "no WhatsApp template" };
-      return { message: { channel, to: to.phone, template: template.whatsapp(p) } };
+      const spec = template.whatsapp(p, config.whatsappTemplates[type]);
+      if (!spec) return { skip: `no WhatsApp template configured for ${type} (WHATSAPP_TEMPLATES)` };
+      return { message: { channel, to: to.phone, template: spec } };
+    }
     case "SMS": {
       if (!to.phone) return { skip: "no phone number" };
       if (!template.sms) return { skip: "no SMS template" };
-      const flowTemplateId = msg91FlowTemplateIds[type];
+      const flowTemplateId = config.msg91FlowTemplateIds[type];
       if (!flowTemplateId) return { skip: `no MSG91 flow template id for ${type}` };
       return { message: { channel, to: to.phone, flowTemplateId, vars: template.sms(p) } };
     }

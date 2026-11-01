@@ -1,9 +1,10 @@
-import { tenantListQuerySchema, tenantSlugParamsSchema, unsubscribeQuerySchema } from "@illuminize/shared";
+import { inviteTokenParamsSchema, tenantListQuerySchema, tenantSlugParamsSchema, unsubscribeQuerySchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../context";
 import { byIp, rateLimit } from "../middleware/rateLimit";
 import { ok, route } from "../middleware/validate";
 import { getUnsubscribeInfo, unsubscribe } from "../services/notifications/prefs.service";
+import { getInvitePublic } from "../services/invitations.service";
 import { getPublicTenant, listPublicTenants } from "../services/tenant.service";
 
 export function publicRoutes(ctx: AppContext): Router {
@@ -20,6 +21,16 @@ export function publicRoutes(ctx: AppContext): Router {
     "/tenants/:slug",
     route({ params: tenantSlugParamsSchema }, async ({ res, params }) => {
       ok(res, await getPublicTenant(ctx, params.slug));
+    }),
+  );
+
+  // Invite links (/i/:token on the web) look up what they're for before sign-in. Rate-limited so tokens can't be
+  // guessed in bulk; the answer holds only the institution, a first name and a masked phone.
+  router.get(
+    "/invites/:token",
+    rateLimit(ctx, { bucket: "invite-lookup-ip", limit: 60, windowSec: 900, keyFn: byIp }),
+    route({ params: inviteTokenParamsSchema }, async ({ res, params }) => {
+      ok(res, await getInvitePublic(ctx, params.token));
     }),
   );
 

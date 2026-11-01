@@ -142,7 +142,7 @@ export async function processMessage(ctx: AppContext, messageId: string, meta: J
       note(channel, "none", "channel not configured", false);
       continue;
     }
-    const rendered = renderForChannel(row.type, channel, payload, to, ctx.config.msg91FlowTemplateIds);
+    const rendered = renderForChannel(row.type, channel, payload, to, ctx.config);
     if ("skip" in rendered) {
       note(channel, sender.provider, rendered.skip, false);
       continue;

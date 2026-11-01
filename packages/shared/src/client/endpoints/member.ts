@@ -11,6 +11,7 @@ import type {
   MemberProfileDto,
   MembershipDto,
   NotificationDto,
+  MyInvitationDto,
   NotificationPrefsDto,
   ProfileFieldDto,
   PaymentOrderDto,
@@ -30,6 +31,8 @@ const q = (v: Q): QueryParams | undefined => v as QueryParams | undefined;
 
 export function membershipEndpoints(core: ApiCore) {
   return {
+    /** An open invitation for the signed-in person's phone (prefills registration), or null. */
+    invitation: (slug: string) => core.data<MyInvitationDto | null>({ path: "/memberships/invitation", tenantSlug: slug }),
     /** The institution's own profile questions (for registration and profile forms). */
     profileFields: (slug: string) => core.data<ProfileFieldDto[]>({ path: "/profile-fields", tenantSlug: slug }),
     register: (slug: string, input: MembershipProfileInput) => core.data<MembershipDto>({ method: "POST", path: "/memberships", tenantSlug: slug, body: input }),

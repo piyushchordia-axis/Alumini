@@ -1,6 +1,7 @@
 import { checkPushReceipts, dispatchNotifications, sendPushBatch } from "../services/notifications/dispatch";
 import { processMessage, sweepMessages } from "../services/messages/message.service";
 import { processPaymentWebhook } from "../services/payments/payment.service";
+import { sendInvitationBatch } from "../services/invitations.service";
 import type { JobHandlers } from "./JobQueue";
 
 /** The one registry of job handlers; every name in JobPayloads must have one (the type enforces it). */
@@ -13,4 +14,5 @@ export const jobHandlers: JobHandlers = {
     await sweepMessages(ctx);
   },
   "payments.webhook": (ctx, { webhookEventId }) => processPaymentWebhook(ctx, webhookEventId),
+  "invitations.send": sendInvitationBatch,
 };

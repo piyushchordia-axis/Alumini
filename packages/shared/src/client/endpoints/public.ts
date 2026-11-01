@@ -1,11 +1,13 @@
 import type { PushTokenInput } from "../../schemas/auth";
-import type { AuthSessionDto, EmailStatusDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto, UnsubscribeInfoDto } from "../../types/dto";
+import type { AuthSessionDto, EmailStatusDto, InvitePublicDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto, UnsubscribeInfoDto } from "../../types/dto";
 import type { ApiCore } from "../core";
 
 export function tenantEndpoints(core: ApiCore) {
   return {
     list: (q?: string) => core.data<TenantSummaryDto[]>({ path: "/tenants", query: { q }, auth: false }),
     get: (slug: string) => core.data<TenantPublicDto>({ path: `/tenants/${encodeURIComponent(slug)}`, auth: false }),
+    /** What an invite link is for (before sign-in). */
+    invite: (token: string) => core.data<InvitePublicDto>({ path: `/invites/${encodeURIComponent(token)}`, auth: false }),
   };
 }
 

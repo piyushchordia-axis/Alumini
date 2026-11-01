@@ -22,6 +22,8 @@ export const tenantSettingsUpdateSchema = z
     minBatchYear: z.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10),
     maxBatchYear: z.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10),
     features: featuresSchema.partial(),
+    /** Invited members (matched by their verified phone) are approved straight away. */
+    inviteAutoApprove: z.boolean(),
   })
   .partial()
   .refine((v) => v.minBatchYear === undefined || v.maxBatchYear === undefined || v.minBatchYear <= v.maxBatchYear, {

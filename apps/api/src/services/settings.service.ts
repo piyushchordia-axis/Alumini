@@ -32,6 +32,7 @@ export async function updateTenantSettings(ctx: AppContext, tenantCtx: TenantCon
     minBatchYear,
     maxBatchYear,
     ...(input.features ? { features: { ...DEFAULT_TENANT_FEATURES, ...current.features, ...input.features } } : {}),
+    ...(input.inviteAutoApprove !== undefined ? { inviteAutoApprove: input.inviteAutoApprove } : {}),
     updatedByUserId: actor.userId,
   });
   if (!row) throw AppError.notFound("Settings not found");

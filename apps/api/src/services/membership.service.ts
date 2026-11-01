@@ -11,9 +11,10 @@ import {
   listMembersForAdmin,
   updateMembership,
 } from "../repositories/memberships.repo";
-import { updateUser } from "../repositories/users.repo";
+import { findUserById, updateUser } from "../repositories/users.repo";
+import { claimInvitation, findOpenInvitationByPhone } from "../repositories/invitations.repo";
 import { runInTransaction } from "../lib/transaction";
-import { answersFor, answersForOne, saveAnswers } from "./profileFields.service";
+import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "./profileFields.service";
 import type { AuthContext, MembershipRow, TenantContext } from "../types/request";
 import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit } from "./audit.service";
@@ -54,14 +55,22 @@ function assertBatchYear(tenantCtx: TenantContext, batchYear: number | undefined
   }
 }
 
+/**
+ * Joins (or re-applies to) an institution. An open invitation for the person's OTP-verified phone lets them in even
+ * when self-registration is closed, approves them straight away when the institution auto-approves invitees, and is
+ * marked accepted in the same transaction. An invitation never lifts a suspension.
+ */
 export async function registerMembership(ctx: AppContext, tenantCtx: TenantContext, actor: Actor, input: MembershipProfileInput): Promise<MembershipDto> {
   const { tenant, settings } = tenantCtx;
-  if (!settings.allowSelfRegistration && !actor.isPlatformAdmin) {
+  const user = await findUserById(ctx.db, actor.userId);
+  const invite = user ? await findOpenInvitationByPhone(ctx.db, tenant.id, user.phoneE164) : undefined;
+  if (!settings.allowSelfRegistration && !actor.isPlatformAdmin && !invite) {
     throw AppError.forbidden("This institution is not accepting new registrations", "REGISTRATION_CLOSED");
   }
   assertBatchYear(tenantCtx, input.batchYear);
 
-  const status = initialMembershipStatus(settings.memberApprovalMode);
+  const approveNow = !!invite && settings.inviteAutoApprove;
+  const status = approveNow ? "APPROVED" : initialMembershipStatus(settings.memberApprovalMode);
   const row = await runInTransaction(ctx, async (tx) => {
     const existing = await findMembership(tx, tenant.id, actor.userId);
     let row: MembershipRow;
@@ -77,7 +86,7 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
               : "You are already a member of this institution";
         throw AppError.conflict(msg);
       }
-      const next = transitionMembership(existing.status, "reapply", settings.memberApprovalMode);
+      const next = approveNow ? "APPROVED" : transitionMembership(existing.status, "reapply", settings.memberApprovalMode);
       row = (await updateMembership(tx, tenant.id, existing.id, {
         ...profileColumns(input),
         status: next,
@@ -102,6 +111,8 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
     }
 
     await saveAnswers(ctx, tx, tenant.id, row.id, input.fields, "register");
+    const accepted = invite ? await claimInvitation(tx, invite.id, row.id) : undefined;
+    if (accepted) await applyInvitationAnswers(ctx, tx, tenant.id, row.id, accepted.fieldValues, Object.keys(input.fields ?? {}));
     await updateUser(tx, actor.userId, { displayName: input.fullName });
     await recordAudit(
       ctx,
@@ -112,7 +123,7 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
         action,
         targetType: "membership",
         targetId: row.id,
-        metadata: { status: row.status },
+        metadata: { status: row.status, ...(accepted ? { invitationId: accepted.id } : {}) },
         ip: actor.ip,
       },
       tx,

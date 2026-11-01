@@ -85,6 +85,13 @@
       "when": 1793509614131,
       "tag": "0011_wave1_profile_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793510652725,
+      "tag": "0012_wave1_invitations",
+      "breakpoints": true
     }
   ]
 }

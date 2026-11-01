@@ -6,6 +6,7 @@ import type {
   EventKind,
   FundingKind,
   FundingStage,
+  InvitationStatus,
   JobType,
   MaritalStatus,
   MembershipRole,
@@ -86,6 +87,7 @@ export interface TenantSettingsDto {
   minBatchYear: number;
   maxBatchYear: number;
   features: TenantFeatures;
+  inviteAutoApprove: boolean;
   updatedAt: string;
 }
 
@@ -190,6 +192,73 @@ export interface ProfileFieldAnswerDto {
   visibility: ProfileFieldVisibility;
   value: ProfileFieldValue | null;
   display: string;
+}
+
+export interface InvitationDeliveryDto {
+  status: OutboundMessageStatus;
+  /** The channel that delivered (or was last tried). */
+  channel: MessageChannel | null;
+  lastError: string | null;
+  at: string;
+}
+
+export interface InvitationDto {
+  id: string;
+  phone: string;
+  email: string | null;
+  fullName: string | null;
+  batchYear: number | null;
+  status: InvitationStatus;
+  /** Past expires_at and not accepted or revoked. */
+  expired: boolean;
+  expiresAt: string;
+  sendCount: number;
+  lastSentAt: string | null;
+  acceptedAt: string | null;
+  acceptedMembershipId: string | null;
+  createdAt: string;
+  /** The link to share (null when the server has no WEB_APP_URL). */
+  link: string | null;
+  /** The latest message sent for this invitation. */
+  delivery: InvitationDeliveryDto | null;
+}
+
+export interface InvitationImportResultDto {
+  created: number;
+  updated: number;
+  skipped: number;
+  /** How many were queued for sending. */
+  queued: number;
+  results: Array<{ row: number; phone: string; status: "created" | "updated" | "member" | "invalid"; message?: string; invitationId?: string }>;
+}
+
+export interface InvitationSummaryDto {
+  pending: number;
+  sent: number;
+  accepted: number;
+  revoked: number;
+  expired: number;
+  /** Channels the institution's plan allows for invites (empty: share links yourself). */
+  channels: MessageChannel[];
+  /** Invites that can still be sent today (daily limit). */
+  sendableToday: number;
+}
+
+/** What a public invite link shows before sign-in. */
+export interface InvitePublicDto {
+  tenant: TenantSummaryDto;
+  firstName: string | null;
+  /** e.g. +91******210 */
+  maskedPhone: string;
+}
+
+/** The signed-in person's open invitation to an institution, to prefill registration. */
+export interface MyInvitationDto {
+  fullName: string | null;
+  batchYear: number | null;
+  fields: Record<string, ProfileFieldValue>;
+  /** Accepting approves the membership straight away. */
+  autoApprove: boolean;
 }
 
 export interface MembershipDto {

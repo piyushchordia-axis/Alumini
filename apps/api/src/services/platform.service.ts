@@ -95,6 +95,7 @@ function settingsColumns(input: TenantSettingsUpdate | undefined, currentFeature
     ...(input.minBatchYear !== undefined ? { minBatchYear: input.minBatchYear } : {}),
     ...(input.maxBatchYear !== undefined ? { maxBatchYear: input.maxBatchYear } : {}),
     ...(input.features ? { features: { ...DEFAULT_TENANT_FEATURES, ...currentFeatures, ...input.features } } : {}),
+    ...(input.inviteAutoApprove !== undefined ? { inviteAutoApprove: input.inviteAutoApprove } : {}),
   };
 }
 

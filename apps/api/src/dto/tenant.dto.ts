@@ -23,6 +23,7 @@ export function toTenantSettingsDto(s: TenantSettingsRow): TenantSettingsDto {
     minBatchYear: s.minBatchYear,
     maxBatchYear: s.maxBatchYear,
     features: s.features,
+    inviteAutoApprove: s.inviteAutoApprove,
     updatedAt: s.updatedAt.toISOString(),
   };
 }

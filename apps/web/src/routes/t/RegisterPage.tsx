@@ -1,5 +1,6 @@
 import { isApiClientError } from "@illuminize/shared/client";
-import { useQueryClient } from "@tanstack/react-query";
+import type { MembershipDto } from "@illuminize/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AuthShell } from "@/components/layout/AuthShell";
@@ -19,13 +20,15 @@ export function RegisterPage() {
   const tenant = useTenant(slug);
   const membership = useMembershipQuery(slug);
   const fields = useProfileFields(slug);
+  // An invitation for my (verified) phone: prefill, and allowed in even when registration is closed.
+  const invitation = useQuery({ queryKey: qk.myInvitation(slug), queryFn: () => api.membership.invitation(slug), staleTime: 60_000 });
   const navigate = useNavigate();
   const qc = useQueryClient();
   useEffect(() => {
     if (tenant.data) applyTenantTheme(tenant.data);
   }, [tenant.data]);
 
-  if (tenant.isLoading || membership.isLoading || fields.isLoading) return <Loading />;
+  if (tenant.isLoading || membership.isLoading || fields.isLoading || invitation.isLoading) return <Loading />;
   if (tenant.error || !tenant.data) return <ErrorBox error={tenant.error ?? "Not found"} className="m-6" />;
   const existing = membership.data;
   if (existing && existing.status !== "REJECTED") return <Navigate to={existing.status === "APPROVED" ? `/t/${slug}/app` : `/t/${slug}/pending`} replace />;
@@ -33,17 +36,24 @@ export function RegisterPage() {
 
   const t = tenant.data;
   const reapplying = existing?.status === "REJECTED";
+  const inv = invitation.data ?? null;
+  const prefill = inv && !existing ? { fullName: inv.fullName ?? undefined, batchYear: inv.batchYear ?? undefined, fields: Object.entries(inv.fields).map(([key, value]) => ({ key, value })) } : undefined;
   return (
     <AuthShell tenant={t} title={reapplying ? "Re-apply to join" : "Create your profile"} subtitle={reapplying ? `Previous reason: ${existing?.statusReason ?? "not given"}` : "Tell your batchmates who you are"} wide>
-      {!t.settings.allowSelfRegistration ? (
+      {inv && (
+        <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
+          🎉 You were invited to {t.name}. {inv.autoApprove ? "You'll be in as soon as you save your profile." : "Save your profile and an admin will approve it."}
+        </p>
+      )}
+      {!t.settings.allowSelfRegistration && !inv ? (
         <ErrorBox error="This institution is not accepting new registrations right now. Contact your alumni office." />
       ) : (
         <ProfileForm
           tenant={t}
-          initial={existing ?? undefined}
+          initial={existing ?? (prefill as Partial<MembershipDto> | undefined)}
           customFields={fields.data ?? []}
           mode="register"
-          submitLabel={t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "Submit for approval" : "Join the network"}
+          submitLabel={(inv ? inv.autoApprove : t.settings.memberApprovalMode === "AUTO_APPROVE") ? "Join the network" : "Submit for approval"}
           onSubmit={async (values) => {
             const m = await api.membership.register(slug, values);
             qc.setQueryData(qk.membership(slug), m);

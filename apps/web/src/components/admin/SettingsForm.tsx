@@ -14,6 +14,7 @@ export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto
   const [minBatchYear, setMinBatchYear] = useState(String(initial.minBatchYear));
   const [maxBatchYear, setMaxBatchYear] = useState(String(initial.maxBatchYear));
   const [features, setFeatures] = useState(initial.features);
+  const [inviteAutoApprove, setInviteAutoApprove] = useState(initial.inviteAutoApprove);
   const [busy, setBusy] = useState(false);
   return (
     <form
@@ -22,7 +23,7 @@ export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto
         e.preventDefault();
         setBusy(true);
         try {
-          await onSubmit({ memberApprovalMode, contentModerationMode, allowSelfRegistration, minBatchYear: Number(minBatchYear), maxBatchYear: Number(maxBatchYear), features });
+          await onSubmit({ memberApprovalMode, contentModerationMode, allowSelfRegistration, minBatchYear: Number(minBatchYear), maxBatchYear: Number(maxBatchYear), features, inviteAutoApprove });
           toast.success("Settings saved");
         } catch (err) {
           toast.error(errorMessage(err));
@@ -52,6 +53,11 @@ export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto
         </FormField>
       </div>
       <Checkbox checked={allowSelfRegistration} onChange={(e) => setAllowSelfRegistration(e.target.checked)} label="Allow alumni to register themselves (turn off to onboard members manually only)" />
+      <Checkbox
+        checked={inviteAutoApprove}
+        onChange={(e) => setInviteAutoApprove(e.target.checked)}
+        label="Approve invited alumni straight away (they sign in with the phone number you invited, even when self-registration is off)"
+      />
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-slate-700">Enabled features</legend>
         <div className="grid gap-2 sm:grid-cols-2">

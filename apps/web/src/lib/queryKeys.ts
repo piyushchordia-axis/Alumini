@@ -5,6 +5,7 @@ export const qk = {
   myEmail: ["me", "email"] as const,
   membership: (slug: string) => ["membership", slug] as const,
   profileFields: (slug: string) => ["profile-fields", slug] as const,
+  myInvitation: (slug: string) => ["membership", slug, "invitation"] as const,
   posts: (slug: string, filters?: Record<string, unknown>) => ["posts", slug, filters ?? {}] as const,
   post: (slug: string, id: string) => ["post", slug, id] as const,
   comments: (slug: string, id: string) => ["comments", slug, id] as const,
@@ -32,6 +33,8 @@ export const qk = {
     reports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "reports", filters ?? {}] as const,
     settings: (slug: string) => ["admin", slug, "settings"] as const,
     profileFields: (slug: string) => ["admin", slug, "profile-fields"] as const,
+    invitations: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "invitations", filters ?? {}] as const,
+    invitationSummary: (slug: string) => ["admin", slug, "invitations", "summary"] as const,
     audit: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "audit", filters ?? {}] as const,
   },
   platform: {

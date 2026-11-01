@@ -123,6 +123,13 @@ export const PROFILE_FIELD_TYPE_LABELS: Record<ProfileFieldType, string> = {
   BOOLEAN: "Yes / no",
 };
 
+/** PENDING: imported, not sent yet. SENT: sent at least once. Expiry is computed from expires_at. */
+export const INVITATION_STATUSES = ["PENDING", "SENT", "ACCEPTED", "REVOKED"] as const;
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+/** Rows per import request (the browser sends a large CSV in chunks). */
+export const MAX_INVITE_IMPORT_ROWS = 500;
+export const INVITE_TTL_DAYS = 90;
+
 export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;

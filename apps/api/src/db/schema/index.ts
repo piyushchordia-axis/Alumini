@@ -13,3 +13,4 @@ export * from "./views";
 export * from "./messages";
 export * from "./payments";
 export * from "./profileFields";
+export * from "./invitations";

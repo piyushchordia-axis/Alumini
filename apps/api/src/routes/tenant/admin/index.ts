@@ -4,6 +4,7 @@ import { requireTenantAdmin } from "../../../middleware/tenant";
 import { auditRoutes } from "./audit.routes";
 import { dashboardRoutes } from "./dashboard.routes";
 import { memberRoutes } from "./members.routes";
+import { invitationRoutes } from "./invitations.routes";
 import { moderationRoutes } from "./moderation.routes";
 import { profileFieldRoutes } from "./profileFields.routes";
 import { adminReportRoutes } from "./reports.routes";
@@ -18,6 +19,7 @@ export function adminRoutes(ctx: AppContext): Router {
   router.use(adminReportRoutes(ctx));
   router.use(settingsRoutes(ctx));
   router.use(profileFieldRoutes(ctx));
+  router.use(invitationRoutes(ctx));
   router.use(auditRoutes(ctx));
   return router;
 }

@@ -213,3 +213,14 @@ export async function billingCountsForPeriod(
     .where(and(eq(memberActivityDays.tenantId, tenantId), gte(memberActivityDays.day, period.fromDay), lte(memberActivityDays.day, period.toDay)));
   return { approved: counts?.approved ?? 0, created: counts?.created ?? 0, active: active?.active ?? 0 };
 }
+
+/** Membership status in one institution for each phone that has an account there. */
+export async function membershipStatusByPhones(db: DbClient, tenantId: string, phones: string[]): Promise<Map<string, MembershipRow["status"]>> {
+  if (phones.length === 0) return new Map();
+  const rows = await db
+    .select({ phone: users.phoneE164, status: memberships.status })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), inArray(users.phoneE164, phones)));
+  return new Map(rows.map((r) => [r.phone, r.status]));
+}
