@@ -7,7 +7,7 @@ import { Alert, Image, Pressable, Text, View } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Avatar, Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner, toggleState } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -82,7 +82,8 @@ export default function EventDetailScreen() {
                   disabled={disabled || (o.value === "YES" && full)}
                   onPress={() => rsvp.mutate(active ? null : o.value)}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active, disabled: disabled || (o.value === "YES" && full) }}
+                  {...toggleState(active)}
+                  aria-disabled={disabled || (o.value === "YES" && full)}
                   style={{ paddingHorizontal: 14, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: active ? o.color : "#fff", borderWidth: 1, borderColor: active ? o.color : colors.border, opacity: disabled ? 0.5 : 1 }}>
                   <Text style={{ color: active ? "#fff" : colors.text, fontWeight: "600" }}>
                     {active ? "✓ " : ""}

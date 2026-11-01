@@ -48,7 +48,8 @@ export function Button({ title, variant = "primary", loading, disabled, style, .
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
+      aria-disabled={!!(disabled || loading)}
+      aria-busy={!!loading}
       style={({ pressed }) => [styles.button, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
       {...rest}
     >
@@ -83,11 +84,17 @@ export function ChipSelect<T extends string>({ label, options, value, onChange, 
   );
 }
 
+/**
+ * On/off state for a toggle button. aria-selected is what React Native maps to accessibilityState on devices, but it
+ * isn't valid on role="button" in a browser, so the web build also needs aria-pressed. React Native's types omit it.
+ */
+export const toggleState = (on: boolean) => ({ "aria-selected": on, "aria-pressed": on }) as { "aria-selected": boolean };
+
 export function Chip({ label, active, onPress, color }: { label: string; active?: boolean; onPress?: () => void; color?: string }) {
   const theme = useTheme();
   const c = color ?? theme.primary;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!active }} style={[styles.chip, active ? { backgroundColor: c, borderColor: c } : null]}>
+    <Pressable onPress={onPress} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, active ? { backgroundColor: c, borderColor: c } : null]}>
       <Text style={[styles.chipText, active ? { color: "#fff" } : null]}>{label}</Text>
     </Pressable>
   );
@@ -97,7 +104,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
       {tabs.map((t) => (
-        <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" accessibilityState={{ selected: value === t.value }} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
+        <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
           <Text style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>{t.label}</Text>
         </Pressable>
       ))}

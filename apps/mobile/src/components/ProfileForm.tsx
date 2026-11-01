@@ -193,7 +193,7 @@ export function ProfileForm({
         clearable
       />
       <CustomFieldInputs fields={requiredFields} values={answers} errors={answerErrors} onChange={setAnswer} />
-      <Pressable onPress={() => setMore((m) => !m)} accessibilityRole="button" accessibilityState={{ expanded: more }} hitSlop={8}>
+      <Pressable onPress={() => setMore((m) => !m)} accessibilityRole="button" aria-expanded={more} hitSlop={8}>
         <Text style={{ color: theme.primary, fontWeight: "600" }}>{more ? "Hide optional details" : "More about you (optional)"}</Text>
       </Pressable>
       {more && (

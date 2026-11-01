@@ -157,13 +157,27 @@ try {
     await page.click('nav >> text=Jobs');
     await page.waitForSelector("text=Backend Engineer (Node.js)");
     await page.click("text=+ Post a job");
-    await page.fill('input[name="title"]', "Smoke Test Engineer");
+    await page.fill('input[name="title"]', `Smoke Test Engineer ${unique}`);
     await page.fill('input[name="companyName"]', "Smoke Labs");
     await page.fill('textarea[name="description"]', "Keep the smoke tests green. Remote within India.");
     await page.click('button:has-text("Post job")');
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+$/);
     await page.waitForSelector("h1:has-text('Smoke Test Engineer')");
     await shot("06-job-detail");
+  });
+
+  await step("delete your own job through the confirm dialog", async () => {
+    await page.click('button:has-text("Delete")');
+    const dialog = page.locator('[role="dialog"]', { hasText: "Delete this job?" });
+    await dialog.waitFor();
+    await dialog.locator('button:has-text("Cancel")').click();
+    await dialog.waitFor({ state: "detached" });
+    await page.waitForSelector("h1:has-text('Smoke Test Engineer')");
+    await page.click('button:has-text("Delete")');
+    await dialog.locator('button:has-text("Delete job")').click();
+    await page.waitForURL(/\/app\/jobs$/);
+    await page.waitForSelector("text=Backend Engineer (Node.js)");
+    await page.locator(`text=Smoke Test Engineer ${unique}`).waitFor({ state: "detached" });
   });
 
   await step("RSVP to a seeded event", async () => {

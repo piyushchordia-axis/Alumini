@@ -404,8 +404,6 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 ## Known gaps / next steps
 
 - Event reminders and chat are not included yet; they build on the background jobs described above.
-- On the mobile web export, controls that still use `accessibilityState` (reactions, tabs, chips) don't expose their
-  selected state, because react-native-web only emits the `aria-*` props; the Wave 1 screens use `aria-checked`.
 - WhatsApp delivery needs a verified Meta business account and an approved authentication template before it can be
   tested; the console sender covers development.
 - Postgres enum additions need hand-written `ALTER TYPE` migrations. Migration 0005 adds a trigger that stamps

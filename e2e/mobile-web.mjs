@@ -111,6 +111,12 @@ try {
   await step("jobs tab lists seeded openings", async () => {
     await tap("Jobs");
     await page.getByText("Backend Engineer (Node.js)").waitFor();
+    // Selected state must reach the DOM: react-native-web ignores accessibilityState and only emits aria-* props.
+    const tab = (name, selected) => page.locator(`[role="tab"][aria-selected="${selected}"]`).getByText(name, { exact: true }).locator("visible=true").first();
+    await tab("Openings", true).waitFor();
+    await tab("Looking for work", false).click();
+    await tab("Looking for work", true).waitFor();
+    await tab("Openings", false).click();
     await shot("m05-jobs");
   });
 

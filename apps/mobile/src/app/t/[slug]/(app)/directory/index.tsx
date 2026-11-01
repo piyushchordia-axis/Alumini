@@ -81,7 +81,7 @@ export default function DirectoryScreen() {
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
         <Input accessibilityLabel="Search members" placeholder="Name, company, role" value={q} onChangeText={setQ} autoCorrect={false} />
         <Row style={{ justifyContent: "space-between" }}>
-          <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showFilters }} hitSlop={8}>
+          <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" aria-expanded={showFilters} hitSlop={8}>
             <Text style={{ color: theme.primary, fontWeight: "600" }}>
               {showFilters ? "Hide filters" : "Filters"}
               {active ? ` (${active})` : ""}

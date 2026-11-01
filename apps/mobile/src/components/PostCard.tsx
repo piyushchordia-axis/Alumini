@@ -7,7 +7,7 @@ import { PollView } from "@/components/PollView";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Badge, Body, Card, Muted, Row } from "@/components/ui";
+import { Badge, Body, Card, Muted, Row, toggleState } from "@/components/ui";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { colors, useTheme } from "@/theme";
@@ -65,7 +65,8 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
               onPress={() => react.mutate(post.myReaction === t ? null : t)}
               accessibilityRole="button"
               accessibilityLabel={LABEL[t]}
-              accessibilityState={{ selected: post.myReaction === t, disabled: post.moderationStatus !== "APPROVED" }}
+              {...toggleState(post.myReaction === t)}
+              aria-disabled={post.moderationStatus !== "APPROVED"}
               hitSlop={4}
               style={{ padding: 6, borderRadius: 999, backgroundColor: post.myReaction === t ? theme.primarySoft : "transparent" }}>
               <Text style={{ fontSize: 16 }}>{EMOJI[t]}</Text>

@@ -2,7 +2,9 @@ import { JOB_TYPE_LABELS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import { Alert, Linking, Text } from "react-native";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
@@ -19,13 +21,14 @@ export default function JobDetailScreen() {
   const { jobId = "" } = useLocalSearchParams<{ jobId: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const job = useQuery({ queryKey: qk.job(slug, jobId), queryFn: () => api.jobs.get(slug, jobId) });
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["jobs", slug] });
     void qc.invalidateQueries({ queryKey: qk.job(slug, jobId) });
   };
   const close = useMutation({ mutationFn: () => api.jobs.close(slug, jobId), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
-  const remove = useMutation({ mutationFn: () => api.jobs.remove(slug, jobId), onSuccess: () => { invalidate(); router.back(); }, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
+  const remove = useMutation({ mutationFn: () => api.jobs.remove(slug, jobId), onSuccess: () => { setConfirmingDelete(false); invalidate(); router.back(); } });
   if (job.isLoading) return <Spinner />;
   if (job.error || !job.data) return <LoadError error={job.error ?? "Not found"} onRetry={() => void job.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const j = job.data;
@@ -58,7 +61,8 @@ export default function JobDetailScreen() {
           <Row>
             <Button title="Edit" variant="outline" onPress={() => router.push(`/t/${slug}/jobs/edit/${j.id}`)} />
             {!j.isClosed && <Button title="Mark closed" variant="outline" onPress={() => close.mutate()} loading={close.isPending} />}
-            <Button title="Delete" variant="ghost" onPress={() => Alert.alert("Delete this job?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} />
+            <Button title="Delete" variant="ghost" onPress={() => setConfirmingDelete(true)} />
+            <ConfirmSheet open={confirmingDelete} title="Delete this job?" confirmLabel="Delete job" destructive busy={remove.isPending} error={remove.error} onConfirm={() => remove.mutate()} onCancel={() => { remove.reset(); setConfirmingDelete(false); }} />
           </Row>
         )}
       </Card>

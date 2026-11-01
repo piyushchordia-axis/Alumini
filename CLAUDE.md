@@ -90,7 +90,6 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Wave 3:** event upgrades (tickets, reminders) and giving campaigns, on the payments layer
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
-  - older mobile controls (reactions, tabs, chips) still use `accessibilityState`;
   - the admin Members page scrolls sideways (~98px) on phones;
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes.

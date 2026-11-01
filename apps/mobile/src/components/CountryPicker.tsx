@@ -2,6 +2,7 @@ import { countriesPopularFirst, countryByCode, flagEmoji, POPULAR_COUNTRY_CODES,
 import { useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { toggleState } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
 const ALL = countriesPopularFirst();
@@ -90,7 +91,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
                   <Pressable
                     onPress={() => pick(item)}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
+                    {...toggleState(active)}
                     style={({ pressed }) => ({
                       flexDirection: "row",
                       alignItems: "center",

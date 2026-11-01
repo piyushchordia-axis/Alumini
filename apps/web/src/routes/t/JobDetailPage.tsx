@@ -1,7 +1,9 @@
 import { JOB_TYPE_LABELS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { MemberLink } from "@/components/common/MemberLink";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
@@ -18,6 +20,7 @@ export function JobDetailPage() {
   const { jobId = "" } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const job = useQuery({ queryKey: qk.job(slug, jobId), queryFn: () => api.jobs.get(slug, jobId) });
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["jobs", slug] });
@@ -83,9 +86,10 @@ export function JobDetailPage() {
                     Mark closed
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={() => confirm("Delete this job?") && remove.mutate()}>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>
                   Delete
                 </Button>
+                <ConfirmDialog open={confirmingDelete} title="Delete this job?" confirmLabel="Delete job" destructive busy={remove.isPending} onConfirm={() => remove.mutate()} onCancel={() => setConfirmingDelete(false)} />
               </>
             ) : (
               <ReportButton slug={slug} contentType="JOB" contentId={j.id} />
