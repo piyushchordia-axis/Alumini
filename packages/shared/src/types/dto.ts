@@ -433,6 +433,18 @@ export interface AnnouncementAudienceDto {
   channels: MessageChannel[];
 }
 
+/** The weekly digest: what happened in the institution in the past week (content still published when read). */
+export interface DigestDto {
+  /** Monday of the digest's week, in the institution's time zone. */
+  weekStart: string;
+  createdAt: string;
+  posts: Array<{ id: string; excerpt: string; authorName: string; reactionCount: number; commentCount: number }>;
+  jobs: Array<{ id: string; title: string; companyName: string; location: string | null; isRemote: boolean }>;
+  events: Array<{ id: string; title: string; startAt: string; timezone: string; city: string }>;
+  /** Members who joined that week. */
+  newMembers: number;
+}
+
 /** Someone celebrating today. Never includes a birth year or age. */
 export interface CelebrationDto {
   membershipId: string;

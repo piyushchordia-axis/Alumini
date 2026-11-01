@@ -8,6 +8,7 @@ export default function FeedStack() {
       <Stack>
         <Stack.Screen name="index" options={appHeader} />
         <Stack.Screen name="[postId]" options={{ ...detailHeader, title: "Post" }} />
+        <Stack.Screen name="digest" options={{ ...detailHeader, title: "This week" }} />
         <Stack.Screen name="new" options={{ ...detailHeader, title: "New post", presentation: "modal" }} />
         <Stack.Screen name="edit/[postId]" options={{ ...detailHeader, title: "Edit post", presentation: "modal" }} />
       </Stack>

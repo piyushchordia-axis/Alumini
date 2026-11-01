@@ -1,4 +1,5 @@
 import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
+import { DigestBanner } from "@/components/feed/DigestBanner";
 import { PostCard } from "@/components/feed/PostCard";
 import { PostComposer } from "@/components/feed/PostComposer";
 import { EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
@@ -15,6 +16,7 @@ export function FeedPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Community" subtitle={`What's happening at ${tenant.shortName ?? tenant.name}`} />
+      <DigestBanner slug={slug} />
       <CelebrationsCard slug={slug} />
       <PostComposer />
       {list.isLoading && <Loading />}

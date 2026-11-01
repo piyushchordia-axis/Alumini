@@ -126,7 +126,7 @@ export const platformTestMessageSchema = z
 export type PlatformTestMessageInput = z.infer<typeof platformTestMessageSchema>;
 
 /** Platform staff: run an institution's scheduled work now (demos, support), instead of waiting for its local time. */
-export const PLATFORM_RUNNABLE_JOBS = ["celebrations"] as const;
+export const PLATFORM_RUNNABLE_JOBS = ["celebrations", "digest"] as const;
 export const platformJobRunSchema = z.object({
   job: z.enum(PLATFORM_RUNNABLE_JOBS),
   tenantId: uuidSchema,

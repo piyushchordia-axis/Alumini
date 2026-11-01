@@ -25,6 +25,7 @@ export const qk = {
   unread: (slug: string) => ["notifications", slug, "unread"] as const,
   notificationPrefs: (slug: string) => ["notification-prefs", slug] as const,
   celebrations: (slug: string) => ["celebrations", slug] as const,
+  digest: (slug: string) => ["digest", slug] as const,
   myReports: (slug: string) => ["reports", slug, "mine"] as const,
   admin: {
     dashboard: (slug: string) => ["admin", slug, "dashboard"] as const,

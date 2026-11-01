@@ -4,6 +4,7 @@ import { processPaymentWebhook } from "../services/payments/payment.service";
 import { sendInvitationBatch } from "../services/invitations.service";
 import { fanoutAnnouncement } from "../services/announcements.service";
 import { engagementTick, runCelebrations } from "../services/celebrations.service";
+import { runDigest, sendDigestBatch } from "../services/digest.service";
 import type { JobHandlers } from "./JobQueue";
 
 /** The one registry of job handlers; every name in JobPayloads must have one (the type enforces it). */
@@ -20,4 +21,6 @@ export const jobHandlers: JobHandlers = {
   "announcements.fanout": fanoutAnnouncement,
   "engagement.tick": engagementTick,
   "celebrations.tenant": runCelebrations,
+  "digest.tenant": runDigest,
+  "digest.batch": sendDigestBatch,
 };

@@ -14,6 +14,7 @@ import type {
   MyInvitationDto,
   NotificationPrefsDto,
   CelebrationsTodayDto,
+  DigestDto,
   PollDto,
   ProfileFieldDto,
   PaymentOrderDto,
@@ -83,6 +84,8 @@ export function fundingEndpoints(core: ApiCore) {
 export function celebrationEndpoints(core: ApiCore) {
   return {
     today: (slug: string) => core.data<CelebrationsTodayDto>({ path: "/celebrations/today", tenantSlug: slug }),
+    /** The latest weekly digest, or null before the first one. */
+    digest: (slug: string) => core.data<DigestDto | null>({ path: "/digest/latest", tenantSlug: slug }),
     wish: (slug: string, membershipId: string, kind: CelebrationKind) => core.data<{ wishCount: number }>({ method: "POST", path: `/celebrations/${membershipId}/wishes`, tenantSlug: slug, body: { kind } }),
   };
 }

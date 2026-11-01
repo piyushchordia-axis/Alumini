@@ -10,6 +10,7 @@ import { InvitePage } from "@/routes/InvitePage";
 import { UnsubscribePage } from "@/routes/UnsubscribePage";
 import { VerifyEmailPage } from "@/routes/VerifyEmailPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
+import { DigestPage } from "@/routes/t/DigestPage";
 import { EventDetailPage } from "@/routes/t/EventDetailPage";
 import { EventFormPage } from "@/routes/t/EventFormPage";
 import { EventsPage } from "@/routes/t/EventsPage";
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
                     children: [
                       { path: "feed", element: <FeedPage /> },
                       { path: "feed/:postId", element: <PostDetailPage /> },
+                      { path: "digest", element: <DigestPage /> },
                     ],
                   },
                   {

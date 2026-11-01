@@ -4,6 +4,7 @@ export const qk = {
   me: ["me"] as const,
   notificationPrefs: (slug: string) => ["notification-prefs", slug] as const,
   celebrations: (slug: string) => ["celebrations", slug] as const,
+  digest: (slug: string) => ["digest", slug] as const,
   myEmail: ["me", "email"] as const,
   membership: (slug: string) => ["membership", slug] as const,
   profileFields: (slug: string) => ["profile-fields", slug] as const,

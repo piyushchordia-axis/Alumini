@@ -5,10 +5,18 @@ import { byMembership, rateLimit } from "../../middleware/rateLimit";
 import { requireMember } from "../../middleware/tenant";
 import { ok, route } from "../../middleware/validate";
 import { getCelebrationsToday, sendWish } from "../../services/celebrations.service";
+import { getLatestDigest } from "../../services/digest.service";
 
 export function celebrationRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
   router.use("/celebrations", requireMember);
+  router.use("/digest", requireMember);
+  router.get(
+    "/digest/latest",
+    route({}, async ({ req, res }) => {
+      ok(res, await getLatestDigest(ctx, req.tenantCtx!.tenant.id));
+    }),
+  );
   router.get(
     "/celebrations/today",
     route({}, async ({ req, res }) => {

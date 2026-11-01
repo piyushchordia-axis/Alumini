@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
+import { DigestBanner } from "@/components/DigestBanner";
 import { PostCard } from "@/components/PostCard";
 import { EmptyState, ListEmpty, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -31,7 +32,12 @@ export default function FeedScreen() {
             <EmptyState icon="💬" title="No posts yet" description="Be the first to say hello to your batchmates." />
           </ListEmpty>
         }
-        ListHeaderComponent={<CelebrationsCard slug={slug} />}
+        ListHeaderComponent={
+          <View style={{ gap: spacing.md }}>
+            <DigestBanner slug={slug} />
+            <CelebrationsCard slug={slug} />
+          </View>
+        }
         ListFooterComponent={list.isFetchingNextPage ? <Spinner /> : undefined}
         renderItem={({ item }) => <PostCard slug={slug} post={item} />}
       />

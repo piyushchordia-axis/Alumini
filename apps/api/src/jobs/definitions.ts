@@ -32,6 +32,10 @@ export interface JobPayloads {
   "engagement.tick": { at?: string };
   /** Birthday and anniversary greetings in one institution for one local day. */
   "celebrations.tenant": { tenantId: string; day: string };
+  /** Build one institution's weekly digest (Monday of the week, local) and start emailing it. */
+  "digest.tenant": { tenantId: string; weekStart: string; at?: string };
+  /** Email the digest to one page of members (each page queues the next). */
+  "digest.batch": { tenantId: string; weekStart: string; afterMembershipId?: string | null };
 }
 
 export type JobName = keyof JobPayloads;
@@ -59,4 +63,6 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "announcements.fanout": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
   "engagement.tick": { queue: "jobs", attempts: 1 },
   "celebrations.tenant": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 30_000 } },
+  "digest.tenant": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 30_000 } },
+  "digest.batch": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
 };

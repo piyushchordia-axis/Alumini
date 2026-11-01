@@ -5,6 +5,8 @@ import { findInvitationById } from "../../repositories/invitations.repo";
 import { findMembershipByIdUnscoped } from "../../repositories/memberships.repo";
 import { findNotificationPrefs } from "../../repositories/notifications.repo";
 import { findPostById } from "../../repositories/posts.repo";
+import { digestDetails, findDigest } from "../../repositories/digest.repo";
+import { findTenantById } from "../../repositories/tenants.repo";
 import { findUserById } from "../../repositories/users.repo";
 import { unsubscribeLinks } from "../../lib/unsubscribe";
 import { resolveNotificationPrefs } from "@illuminize/shared";
@@ -22,6 +24,8 @@ export interface MessagePayloads {
   EMAIL_VERIFY: { verificationId: string; link: string };
   /** An admin's announcement, sent by email/WhatsApp/SMS when the admin chose to (and the plan allows). */
   ANNOUNCEMENT: { postId: string; membershipId: string; tenantName: string; color: string; excerpt: string; link: string; path: string };
+  /** The weekly digest email; the content is read from the stored digest when it is sent. */
+  DIGEST: { tenantId: string; weekStart: string; membershipId: string };
   /** An invitation to join an institution (from an admin's import). */
   INVITE: { invitationId: string; tenantName: string; color: string; recipientName: string | null; link: string; token: string };
 }
@@ -33,6 +37,17 @@ export type MessageType = keyof MessagePayloads;
  */
 export interface LoadedPayloads {
   ANNOUNCEMENT: MessagePayloads["ANNOUNCEMENT"] & { unsubscribePage: string; unsubscribeHeaders: Record<string, string> };
+  DIGEST: {
+    tenantName: string;
+    color: string;
+    appLink: string;
+    posts: Array<{ excerpt: string; authorName: string; link: string; reactions: number; comments: number }>;
+    jobs: Array<{ title: string; meta: string; link: string }>;
+    events: Array<{ title: string; meta: string; link: string }>;
+    newMembers: number;
+    unsubscribePage: string;
+    unsubscribeHeaders: Record<string, string>;
+  };
 }
 export type RenderPayload<T extends MessageType> = T extends keyof LoadedPayloads ? LoadedPayloads[T] : MessagePayloads[T];
 
@@ -169,6 +184,64 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
     },
   },
 
+  DIGEST: {
+    channels: ["EMAIL"],
+    priority: 20,
+    bulk: true,
+    load: async (ctx, p) => {
+      const [m, digest, tenant] = await Promise.all([findMembershipByIdUnscoped(ctx.db, p.membershipId), findDigest(ctx.db, p.tenantId, p.weekStart), findTenantById(ctx.db, p.tenantId)]);
+      if (!m || m.status !== "APPROVED" || !digest || !tenant || !ctx.config.webAppUrl) return { cancel: "digest no longer applies" };
+      const [prefs, user, d] = await Promise.all([findNotificationPrefs(ctx.db, m.id), findUserById(ctx.db, m.userId), digestDetails(ctx.db, p.tenantId, digest.content)]);
+      if (!resolveNotificationPrefs(prefs).digestEmail) return { cancel: "unsubscribed from the digest" };
+      if (!user?.email) return { cancel: "no confirmed email" };
+      if (d.posts.length + d.jobs.length + d.events.length === 0) return { cancel: "nothing left to show" };
+      const app = `${ctx.config.webAppUrl}/t/${tenant.slug}/app`;
+      const links = unsubscribeLinks(ctx.config, m.id, "digest");
+      const when = (at: Date, tz: string) => at.toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: tz });
+      return {
+        to: { email: user.email },
+        payload: {
+          tenantName: tenant.name,
+          color: tenant.primaryColor,
+          appLink: `${app}/digest`,
+          posts: d.posts.map((x) => ({ excerpt: x.body.replace(/\s+/g, " ").trim().slice(0, 160), authorName: x.authorName, link: `${app}/feed/${x.id}`, reactions: x.reactionCount, comments: x.commentCount })),
+          jobs: d.jobs.map((x) => ({ title: x.title, meta: [x.companyName, x.isRemote ? "Remote" : x.location].filter(Boolean).join(" · "), link: `${app}/jobs/${x.id}` })),
+          events: d.events.map((x) => ({ title: x.title, meta: `${when(x.startAt, x.timezone)} · ${x.city}`, link: `${app}/events/${x.id}` })),
+          newMembers: digest.content.newMembers,
+          unsubscribePage: links.page,
+          unsubscribeHeaders: links.headers,
+        },
+      };
+    },
+    email: (p) => {
+      const section = (title: string, items: string[]) => (items.length ? `<h2 style="margin:20px 0 8px;font-size:16px">${escapeHtml(title)}</h2><ul style="margin:0;padding-left:18px">${items.join("")}</ul>` : "");
+      const li = (href: string, text: string, meta: string) =>
+        `<li style="margin:0 0 10px"><a href="${escapeHtml(href)}" style="color:${escapeHtml(p.color)};text-decoration:none;font-weight:600">${escapeHtml(text)}</a>${meta ? `<br><span style="color:#64748b;font-size:13px">${escapeHtml(meta)}</span>` : ""}</li>`;
+      const html = emailLayout({
+        title: `This week at ${p.tenantName}`,
+        color: p.color,
+        preheader: [p.posts.length && `${p.posts.length} popular posts`, p.jobs.length && `${p.jobs.length} new jobs`, p.events.length && `${p.events.length} upcoming events`].filter(Boolean).join(", "),
+        bodyHtml: [
+          section("Popular posts", p.posts.map((x) => li(x.link, x.excerpt, `${x.authorName} · ${x.reactions} reactions · ${x.comments} comments`))),
+          section("New jobs", p.jobs.map((x) => li(x.link, x.title, x.meta))),
+          section("Coming up", p.events.map((x) => li(x.link, x.title, x.meta))),
+          p.newMembers ? textToHtml(`${p.newMembers} new member${p.newMembers === 1 ? "" : "s"} joined this week.`) : "",
+          emailButton(p.appLink, `Open ${p.tenantName}`, p.color),
+        ].join(""),
+        footerHtml: `You get this weekly digest as a member of ${escapeHtml(p.tenantName)}. <a href="${escapeHtml(p.unsubscribePage)}" style="color:#64748b">Unsubscribe from the digest</a>.`,
+      });
+      const lines = [
+        `This week at ${p.tenantName}`,
+        ...(p.posts.length ? ["", "Popular posts:", ...p.posts.map((x) => `- ${x.excerpt} (${x.authorName}) ${x.link}`)] : []),
+        ...(p.jobs.length ? ["", "New jobs:", ...p.jobs.map((x) => `- ${x.title}, ${x.meta} ${x.link}`)] : []),
+        ...(p.events.length ? ["", "Coming up:", ...p.events.map((x) => `- ${x.title}, ${x.meta} ${x.link}`)] : []),
+        ...(p.newMembers ? ["", `${p.newMembers} new member(s) joined this week.`] : []),
+        "",
+        `Unsubscribe from the digest: ${p.unsubscribePage}`,
+      ];
+      return { subject: `This week at ${p.tenantName}`, text: lines.join("\n"), html, headers: p.unsubscribeHeaders };
+    },
+  },
   INVITE: {
     channels: ["WHATSAPP", "SMS", "EMAIL"],
     priority: 5,

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { date, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { tenantScoped } from "./helpers";
 import { memberships } from "./memberships";
 import { tenants } from "./tenants";
@@ -46,4 +46,22 @@ export const tenantJobRuns = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true, precision: 3 }),
   },
   (t) => [primaryKey({ columns: [t.job, t.tenantId, t.periodKey] }), index("tenant_job_runs_done_idx").on(t.job, t.periodKey).where(sql`${t.status} = 'DONE'`)],
+);
+
+/**
+ * One digest per institution and week. Holds only ids and counts; details are read when the digest is shown or sent,
+ * so anything removed since never appears.
+ */
+export const tenantDigests = pgTable(
+  "tenant_digests",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    /** Monday of the week, in the institution's time zone. */
+    weekStart: date("week_start").notNull(),
+    content: jsonb("content").$type<{ postIds: string[]; jobIds: string[]; eventIds: string[]; newMembers: number }>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.weekStart] })],
 );
