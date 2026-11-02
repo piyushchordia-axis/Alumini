@@ -28,6 +28,11 @@ export async function createReport(ctx: AppContext, tenantCtx: TenantContext, ac
     details: input.details ?? null,
   });
   if (!row) throw AppError.conflict("You have already reported this content");
+  // A delete only closes the reports it can see, and the content may have gone since the check above.
+  if (!(await findModerationItem(ctx.db, tenantId, input.contentType, input.contentId))) {
+    await updateReport(ctx.db, tenantId, row.id, { status: "RESOLVED", resolvedAt: new Date(), resolutionNote: "auto: author deleted" });
+    throw AppError.notFound(`${contentLabel(input.contentType)} not found`);
+  }
   await recordAudit(ctx, {
     tenantId,
     actorUserId: actor.userId,

@@ -14,7 +14,7 @@ export const keys = {
   userSessions: (userId: string) => `user:sessions:${userId}`,
   cacheTenantsList: () => `cache:tenants:list`,
   /** Versioned: bump when the cached tenant/settings row shape changes, so old entries are not revived. */
-  cacheTenant: (slug: string) => `cache:tenant:v3:${slug}`,
+  cacheTenant: (slug: string) => `cache:tenant:v4:${slug}`,
   cacheDirectoryFilters: (tenantId: string) => `cache:directory:filters:v2:${tenantId}`,
   /** An institution's active profile fields (definitions only). */
   cacheProfileFields: (tenantId: string) => `cache:profile-fields:v1:${tenantId}`,

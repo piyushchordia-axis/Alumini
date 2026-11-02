@@ -1,10 +1,12 @@
-import type { ContentDto, ContentType, ModerationItemDto, ModerationQuery, PostDto } from "@illuminize/shared";
+import { MAX_BUSINESS_LISTINGS, type ContentDto, type ContentType, type ModerationItemDto, type ModerationQuery, type PostDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
 import { toModerationItemDto } from "../dto/content.dto";
 import { AppError } from "../lib/errors";
 import { buildPage, type Page } from "../lib/pagination";
+import { runInTransaction } from "../lib/transaction";
 import type { ModerationPatch } from "../repositories/content.common";
+import { findBusinessById, setBusinessModeration } from "../repositories/businesses.repo";
 import { findEventById, setEventModeration } from "../repositories/events.repo";
 import { findFundingById, setFundingModeration } from "../repositories/funding.repo";
 import { findJobById, setJobModeration } from "../repositories/jobs.repo";
@@ -13,6 +15,7 @@ import { adjustCommentCount, findCommentWithAuthor, findPostById, setCommentMode
 import { resolveOpenReportsForContent } from "../repositories/reports.repo";
 import type { AuthContext, TenantContext } from "../types/request";
 import { recordAudit } from "./audit.service";
+import { getBusinessForAdmin, hasRoomForBusiness } from "./businesses.service";
 import { contentLabel, type ContentActor } from "./content.common";
 import { getEventForAdmin } from "./events.service";
 import { getFundingForAdmin } from "./funding.service";
@@ -32,7 +35,9 @@ interface ModeratableRow {
 interface ModeratableRepo {
   find(db: DbClient, tenantId: string, id: string): Promise<ModeratableRow | undefined>;
   set(db: DbClient, tenantId: string, id: string, patch: ModerationPatch): Promise<void>;
-  afterTransition?(db: DbClient, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
+  /** Throws if the row can't come back from REMOVED. Shares a transaction with the write. */
+  beforeRestore?(db: DbClient, tenantId: string, row: ModeratableRow): Promise<void>;
+  afterTransition?(ctx: AppContext, db: DbClient, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
 }
 
 const REGISTRY: Record<ContentType, ModeratableRepo> = {
@@ -49,7 +54,7 @@ const REGISTRY: Record<ContentType, ModeratableRepo> = {
       return r && { id: r.comment.id, authorMembershipId: r.comment.authorMembershipId, moderationStatus: r.comment.moderationStatus, title: r.comment.body.slice(0, 80), postId: r.comment.postId };
     },
     set: setCommentModeration,
-    afterTransition: async (db, row, from, to) => {
+    afterTransition: async (_ctx, db, row, from, to) => {
       if (!row.postId) return;
       if (from === "APPROVED" && to === "REMOVED") await adjustCommentCount(db, row.postId, -1);
       if (from === "REMOVED" && to === "APPROVED") await adjustCommentCount(db, row.postId, 1);
@@ -75,6 +80,19 @@ const REGISTRY: Record<ContentType, ModeratableRepo> = {
       return r && { id: r.id, authorMembershipId: r.authorMembershipId, moderationStatus: r.moderationStatus, title: r.title };
     },
     set: setEventModeration,
+  },
+  BUSINESS: {
+    find: async (db, t, id) => {
+      const r = await findBusinessById(db, t, id);
+      return r && { id: r.id, authorMembershipId: r.authorMembershipId, moderationStatus: r.moderationStatus, title: r.name };
+    },
+    set: setBusinessModeration,
+    // A removed listing frees a place under the member's cap, which may have been taken since.
+    beforeRestore: async (db, t, row) => {
+      if (!(await hasRoomForBusiness(db, t, row.authorMembershipId))) {
+        throw AppError.conflict(`This member already has ${MAX_BUSINESS_LISTINGS} business listings. One has to go before this one can be restored.`);
+      }
+    },
   },
 };
 
@@ -113,13 +131,19 @@ export async function moderateContent(
   const row = await repo.find(db, tenantId, id);
   if (!row) throw AppError.notFound(`${contentLabel(contentType)} not found`);
   const to = transitionContent(row.moderationStatus, action);
-  await repo.set(db, tenantId, id, {
-    moderationStatus: to,
-    moderatedByUserId: actor.userId,
-    moderatedAt: new Date(),
-    moderationNote: note ?? null,
-  });
-  await repo.afterTransition?.(db, row, row.moderationStatus, to);
+  const write = async (tx: DbClient) => {
+    if (action === "restore") await repo.beforeRestore?.(tx, tenantId, row);
+    await repo.set(tx, tenantId, id, {
+      moderationStatus: to,
+      moderatedByUserId: actor.userId,
+      moderatedAt: new Date(),
+      moderationNote: note ?? null,
+    });
+  };
+  // A check needs its write in the same transaction, or two restores could both find the one free place.
+  if (action === "restore" && repo.beforeRestore && !opts.db) await runInTransaction(ctx, write);
+  else await write(db);
+  await repo.afterTransition?.(ctx, db, row, row.moderationStatus, to);
   await recordAudit(
     ctx,
     {
@@ -178,6 +202,8 @@ export async function getContentForAdmin(ctx: AppContext, tenantCtx: TenantConte
       return getFundingForAdmin(ctx, tenantCtx, actor, id);
     case "EVENT":
       return getEventForAdmin(ctx, tenantCtx, actor, id);
+    case "BUSINESS":
+      return getBusinessForAdmin(ctx, tenantCtx, actor, id);
   }
 }
 

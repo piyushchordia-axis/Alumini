@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { reconnect, runJob, scriptFeatures, scriptMembership, scriptTenant } from "./lib.mjs";
+import { reconnect, runJob, scriptBusiness, scriptFeatures, scriptMembership, scriptTenant } from "./lib.mjs";
 
 const BASE = "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -22,6 +22,7 @@ const PHONE_A = `9${unique.slice(0, 9).padEnd(9, "1")}`; // 10 digits starting w
 const PHONE_B = `8${unique.slice(0, 9).padEnd(9, "2")}`;
 const PHONE_C = `7${unique.slice(0, 9).padEnd(9, "3")}`;
 const PHONE_D = `6${unique.slice(0, 9).padEnd(9, "4")}`;
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -201,6 +202,111 @@ try {
     await shot("08-member");
   });
 
+  await step("businesses: search and filter, with contact details only on a listing's own page", async () => {
+    await page.click('nav >> text=Businesses');
+    await page.waitForURL(/\/app\/businesses$/);
+    const zylo = page.locator("h3", { hasText: "Zylo Labs" });
+    const singh = page.locator("h3", { hasText: "Singh Textiles" });
+    await zylo.waitFor();
+    await singh.waitFor();
+    if (await page.locator("text=hello@zylolabs.example").count()) throw new Error("the list shows a contact email");
+    if (await page.locator("text=5550 0101").count()) throw new Error("the list shows a contact phone");
+    await shot("08-businesses");
+
+    const search = page.getByLabel("Search businesses");
+    await search.fill("lending software");
+    await singh.waitFor({ state: "detached" });
+    await zylo.waitFor();
+    await search.fill("");
+    await singh.waitFor();
+
+    const category = page.getByLabel("Category", { exact: true });
+    await category.selectOption("MANUFACTURING");
+    await zylo.waitFor({ state: "detached" });
+    await singh.waitFor();
+    await category.selectOption("");
+    await zylo.waitFor();
+
+    const city = page.getByLabel("City", { exact: true });
+    await city.fill("surat");
+    await zylo.waitFor({ state: "detached" });
+    await singh.waitFor();
+    await city.fill("nowhere at all");
+    await page.waitForSelector("text=No businesses match");
+    await city.fill("");
+    await zylo.waitFor();
+
+    await zylo.click();
+    await page.waitForURL(/\/app\/businesses\/[0-9a-f-]+$/);
+    await page.waitForSelector("h1:has-text('Zylo Labs')");
+    await page.waitForSelector('a[href="mailto:hello@zylolabs.example"]');
+    await page.waitForSelector('a[href^="tel:"]:has-text("5550 0101")');
+    await page.waitForSelector('button:has-text("Report")');
+    await shot("08-business-detail");
+  });
+
+  await step("businesses: add a listing, edit it, find it in My posts and delete it through the confirm dialog", async () => {
+    const name = `Smoke Bakery ${unique}`;
+    const contact = `bakery${unique}@example.com`;
+    await page.goto(BASE + "/t/demo-university/app/businesses");
+    await page.click('a:has-text("Add a business")');
+    await page.waitForURL(/\/app\/businesses\/new$/);
+    // The name mobile-web.mjs finds the same control by, as with the logo's remove button below.
+    await page.getByLabel("Business name *", { exact: true }).fill(name);
+    await page.selectOption('select[name="category"]', "FOOD_BEVERAGE");
+    await page.fill('input[name="city"]', "Mumbai");
+    await page.fill('textarea[name="description"]', "Sourdough baked for the smoke tests every morning.");
+    await page.setInputFiles('input[type="file"]', { name: "logo.png", mimeType: "image/png", buffer: PNG });
+    await page.locator('img[src*="/uploads/"]').waitFor();
+    await page.getByRole("button", { name: "Remove logo", exact: true }).waitFor();
+    await page.fill('input[name="contactEmail"]', contact);
+    await page.fill('input[name="contactPhone"]', "+91 22 5550 0199");
+
+    // A javascript: link must not reach an href.
+    await page.fill('input[name="websiteUrl"]', "javascript:alert(1)");
+    await page.click('button:has-text("Publish listing")');
+    await page.locator('label:has-text("Website") [role="alert"]').waitFor();
+    if (!page.url().endsWith("/businesses/new")) throw new Error("a javascript: website was accepted");
+    await page.fill('input[name="websiteUrl"]', "https://example.com/smoke-bakery");
+
+    await page.click('button:has-text("Publish listing")');
+    await page.waitForURL(/\/app\/businesses\/[0-9a-f-]+$/);
+    await page.waitForSelector(`h1:has-text("${name}")`);
+    await page.waitForSelector(`a[href="mailto:${contact}"]`);
+    await page.waitForSelector('a[href="https://example.com/smoke-bakery"]');
+    if (await page.locator('button:text-is("Report")').count()) throw new Error("your own listing offers to report it");
+
+    await page.click('a[href$="/edit"]');
+    await page.waitForURL(/\/edit$/);
+    if ((await page.inputValue('input[name="contactEmail"]')) !== contact) throw new Error("the edit form lost the contact email");
+    await page.fill('input[name="name"]', `${name} and Sons`);
+    // A background refetch failing must not replace the form and lose what was typed.
+    const editing = await scriptBusiness(page, "demo-university", /\/businesses\/([0-9a-f-]+)\/edit$/.exec(page.url())[1]);
+    editing.answer(503, "INTERNAL");
+    await editing.refetch();
+    if ((await page.inputValue('input[name="name"]')) !== `${name} and Sons`) throw new Error("a failed refetch lost what was typed on the edit form");
+    await editing.stop();
+    await page.click('button:has-text("Save changes")');
+    await page.waitForSelector(`h1:has-text("${name} and Sons")`);
+
+    await page.goto(BASE + "/t/demo-university/app/my-content");
+    await page.click('[role="tab"]:has-text("Businesses")');
+    await page.locator("h3", { hasText: `${name} and Sons` }).click();
+    await page.waitForURL(/\/app\/businesses\/[0-9a-f-]+$/);
+
+    await page.click('button:has-text("Delete")');
+    const dialog = page.locator('[role="dialog"]', { hasText: "Delete this listing?" });
+    await dialog.waitFor();
+    await dialog.locator('button:has-text("Cancel")').click();
+    await dialog.waitFor({ state: "detached" });
+    await page.waitForSelector(`h1:has-text("${name} and Sons")`);
+    await page.click('button:has-text("Delete")');
+    await dialog.locator('button:has-text("Delete listing")').click();
+    await page.waitForURL(/\/app\/businesses$/);
+    await page.locator("h3", { hasText: "Zylo Labs" }).waitFor();
+    await page.locator(`text=${name} and Sons`).waitFor({ state: "detached" });
+  });
+
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
   const expectMoreActive = async (active, where) => {
     const current = (await moreButton.getAttribute("aria-current")) === "true";
@@ -243,6 +349,12 @@ try {
     await page.keyboard.press("Escape");
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
     await expectMoreActive(true, "Funding after closing the sheet");
+
+    await moreButton.click();
+    await page.click('[role="dialog"] a:has-text("Businesses")');
+    await page.waitForURL(/\/app\/businesses$/);
+    await page.locator("h3", { hasText: "Zylo Labs" }).waitFor();
+    await expectMoreActive(true, "Businesses");
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
@@ -284,11 +396,18 @@ try {
     await expectBar("Feed", "Jobs", "Directory", "Events");
     await moreButton.click();
     await page.waitForSelector('[role="dialog"] >> text=Switch institution');
-    if (await page.locator('[role="dialog"] a:has-text("Funding")').count()) throw new Error("the sheet lists a section that is switched off");
+    for (const section of ["Funding", "Businesses"]) {
+      if (await page.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`the sheet lists ${section}, which is switched off`);
+    }
     await page.keyboard.press("Escape");
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
     await page.click('a:has-text("Go to the app")');
     await page.waitForURL(/\/app\/feed$/);
+    await page.goto(app + "/businesses");
+    await page.waitForSelector("text=Businesses is turned off");
+    await page.goto(app + "/my-content");
+    await page.locator('[role="tab"]:has-text("Posts")').waitFor();
+    if (await page.locator('[role="tab"]:has-text("Businesses")').count()) throw new Error("My posts has a tab for a section that is switched off");
 
     // Everything off: the profile is home, and More stands in for it on the bar.
     features.only();

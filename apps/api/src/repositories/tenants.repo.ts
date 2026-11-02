@@ -2,6 +2,7 @@ import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { tenantSettings, tenants } from "../db/schema";
 import type { TenantRow, TenantSettingsRow } from "../types/request";
+import { escapeLike } from "./content.common";
 
 export type TenantInsert = typeof tenants.$inferInsert;
 export type TenantSettingsInsert = typeof tenantSettings.$inferInsert;
@@ -45,7 +46,7 @@ export async function findTenantWithSettingsById(
 export async function listActiveTenants(db: DbClient, q?: string): Promise<TenantRow[]> {
   const conditions = [eq(tenants.status, "ACTIVE")];
   if (q) {
-    const pattern = `%${q.replace(/[%_]/g, "\\$&")}%`;
+    const pattern = `%${escapeLike(q)}%`;
     conditions.push(or(ilike(tenants.name, pattern), ilike(tenants.shortName, pattern), ilike(tenants.city, pattern))!);
   }
   return db
@@ -137,7 +138,7 @@ export async function listTenantsForPlatform(
   const conds = [] as ReturnType<typeof eq>[];
   if (f.status) conds.push(eq(tenants.status, f.status));
   if (f.q) {
-    const pattern = `%${f.q.replace(/[%_]/g, "\\$&")}%`;
+    const pattern = `%${escapeLike(f.q)}%`;
     conds.push(or(ilike(tenants.name, pattern), ilike(tenants.slug, pattern), ilike(tenants.city, pattern))!);
   }
   const where = conds.length ? and(...conds) : undefined;

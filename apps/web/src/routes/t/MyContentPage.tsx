@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BusinessCard } from "@/components/businesses/BusinessCard";
 import { EventCard } from "@/components/events/EventCard";
 import { PostCard } from "@/components/feed/PostCard";
 import { FundingCard } from "@/components/funding/FundingCard";
@@ -9,7 +10,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
-type Tab = "posts" | "jobs" | "funding" | "events" | "pastEvents";
+type Tab = "posts" | "jobs" | "funding" | "businesses" | "events" | "pastEvents";
 
 export function MyContentPage() {
   const { tenant } = useMembership();
@@ -20,6 +21,7 @@ export function MyContentPage() {
       { value: "posts", label: "Posts", on: f.feed },
       { value: "jobs", label: "Jobs", on: f.jobs },
       { value: "funding", label: "Funding", on: f.funding },
+      { value: "businesses", label: "Businesses", on: f.businesses },
       { value: "events", label: "Upcoming events", on: f.events },
       { value: "pastEvents", label: "Past events", on: f.events },
     ] satisfies Array<{ value: Tab; label: string; on: boolean }>
@@ -29,10 +31,11 @@ export function MyContentPage() {
   const posts = useInfiniteList(qk.posts(slug, { mine: true }), (cursor) => api.posts.list(slug, { mine: true, cursor, limit: 20 }), tab === "posts");
   const jobs = useInfiniteList(qk.jobs(slug, { mine: true }), (cursor) => api.jobs.list(slug, { mine: true, cursor, limit: 20 }), tab === "jobs");
   const funding = useInfiniteList(qk.funding(slug, { mine: true }), (cursor) => api.funding.list(slug, { mine: true, cursor, limit: 20 }), tab === "funding");
+  const businesses = useInfiniteList(qk.businesses(slug, { mine: true }), (cursor) => api.businesses.list(slug, { mine: true, cursor, limit: 20 }), tab === "businesses");
   const events = useInfiniteList(qk.events(slug, { mine: true, scope: "upcoming" }), (cursor) => api.events.list(slug, { mine: true, scope: "upcoming", cursor, limit: 20 }), tab === "events");
   const pastEvents = useInfiniteList(qk.events(slug, { mine: true, scope: "past" }), (cursor) => api.events.list(slug, { mine: true, scope: "past", cursor, limit: 20 }), tab === "pastEvents");
-  const active = { posts, jobs, funding, events, pastEvents }[tab];
-  if (tabs.length === 0) return <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding and events." />;
+  const active = { posts, jobs, funding, businesses, events, pastEvents }[tab];
+  if (tabs.length === 0) return <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding, businesses and events." />;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="My posts & listings" subtitle="Everything you've shared, including items awaiting approval" />
@@ -43,6 +46,7 @@ export function MyContentPage() {
         {tab === "posts" && posts.items.map((p) => <PostCard key={p.id} slug={slug} post={p} />)}
         {tab === "jobs" && jobs.items.map((j) => <JobCard key={j.id} slug={slug} job={j} />)}
         {tab === "funding" && funding.items.map((f) => <FundingCard key={f.id} slug={slug} item={f} />)}
+        {tab === "businesses" && businesses.items.map((b) => <BusinessCard key={b.id} slug={slug} item={b} />)}
         {tab === "events" && events.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
         {tab === "pastEvents" && pastEvents.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
       </div>

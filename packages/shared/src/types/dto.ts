@@ -5,6 +5,7 @@ import type {
   CelebrationKind,
   ContentType,
   EventKind,
+  BusinessCategory,
   FundingKind,
   FundingStage,
   InvitationStatus,
@@ -417,6 +418,27 @@ export interface FundingDto extends ModerationFields {
   updatedAt: string;
 }
 
+/** A listing as lists show it. No email or phone, so one page of a list isn't a contact scrape. */
+export interface BusinessCardDto extends ModerationFields {
+  id: string;
+  name: string;
+  category: BusinessCategory;
+  description: string;
+  logoUrl: string | null;
+  city: string | null;
+  websiteUrl: string | null;
+  author: MemberCardDto;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A listing on its own page, the only place its contact details appear. */
+export interface BusinessDto extends BusinessCardDto {
+  contactEmail: string | null;
+  contactPhone: string | null;
+}
+
 /** Who an announcement would reach, for the confirmation before posting. */
 export interface AnnouncementAudienceDto {
   /** Approved members (besides you): all get it in the app. */
@@ -629,7 +651,7 @@ export interface ContentPreviewDto {
   title: string | null;
   excerpt: string | null;
   moderationStatus: ModerationStatus;
-  authorMembershipId: string;
+  authorMembershipId: string | null;
 }
 
 export interface AdminReportDto extends ReportDto {
@@ -642,7 +664,8 @@ export interface ModerationItemDto {
   id: string;
   title: string | null;
   excerpt: string | null;
-  author: MemberCardDto;
+  /** Null when the author no longer exists. */
+  author: MemberCardDto | null;
   moderationStatus: ModerationStatus;
   moderatedAt: string | null;
   createdAt: string;
@@ -670,7 +693,7 @@ export interface PostPageDto extends CursorPage<PostDto> {
   pinned?: PostDto[];
 }
 
-export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto;
+export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto | BusinessDto;
 
 export interface TenantCountsDto {
   approvedMembers: number;

@@ -3,6 +3,7 @@ import {
   APPROVAL_MODES,
   BILLING_CYCLES,
   BILLING_MODELS,
+  BUSINESS_CATEGORIES,
   CONTENT_TYPES,
   EVENT_KINDS,
   FUNDING_KINDS,
@@ -43,6 +44,7 @@ export const moderationStatusEnum = pgEnum("moderation_status", MODERATION_STATU
 export const jobTypeEnum = pgEnum("job_type", JOB_TYPES);
 export const fundingKindEnum = pgEnum("funding_kind", FUNDING_KINDS);
 export const fundingStageEnum = pgEnum("funding_stage", FUNDING_STAGES);
+export const businessCategoryEnum = pgEnum("business_category", BUSINESS_CATEGORIES);
 export const eventKindEnum = pgEnum("event_kind", EVENT_KINDS);
 export const rsvpStatusEnum = pgEnum("rsvp_status", RSVP_STATUSES);
 export const reactionTypeEnum = pgEnum("reaction_type", REACTION_TYPES);

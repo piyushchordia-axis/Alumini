@@ -49,7 +49,7 @@ export function statusAfterEdit(tenantCtx: TenantContext, actor: ContentActor, c
   return statusAfterAuthorEdit(current, tenantCtx.settings.contentModerationMode, actor.membership);
 }
 
-const LABELS: Record<ContentType, string> = { POST: "post", COMMENT: "comment", JOB: "job", FUNDING: "funding listing", EVENT: "event" };
+const LABELS: Record<ContentType, string> = { POST: "post", COMMENT: "comment", JOB: "job", FUNDING: "funding listing", EVENT: "event", BUSINESS: "business listing" };
 
 /** Audit + admin notification after content is created or edited into PENDING. */
 export async function afterContentWrite(

@@ -7,4 +7,5 @@ export interface ModerationPatch {
   moderationNote: string | null;
 }
 
-export const escapeLike = (s: string) => s.replace(/[%_]/g, "\\$&");
+/** Backslash too: it is ILIKE's escape character, so one left bare would change what follows it, or fail at the end of a pattern. */
+export const escapeLike = (s: string) => s.replace(/[\\%_]/g, "\\$&");

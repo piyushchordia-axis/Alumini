@@ -6,7 +6,7 @@ import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createDb, type Db } from "./client";
 import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
-import { contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
+import { businessListings, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -211,14 +211,16 @@ const inDays = (d: number, hour = 18) => {
   return t;
 };
 
+const seededMember = (m: Record<string, string>) => (slug: string, phone: string) => {
+  const id = m[`${slug}:${phone}`];
+  if (!id) throw new Error(`missing seeded membership ${slug}:${phone}`);
+  return id;
+};
+
 /** Seeds demo content once per tenant (skipped when the tenant already has posts). */
 export async function seedContent(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<number> {
   let created = 0;
-  const mid = (slug: string, phone: string) => {
-    const id = m[`${slug}:${phone}`];
-    if (!id) throw new Error(`missing seeded membership ${slug}:${phone}`);
-    return id;
-  };
+  const mid = seededMember(m);
   const hasContent = async (tenantId: string) => {
     const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(posts).where(sql`${posts.tenantId} = ${tenantId}`);
     return (row?.count ?? 0) > 0;
@@ -368,12 +370,57 @@ export async function seedBilling(db: Db, tenantIds: Record<string, string>, cre
   }
 }
 
+/** Business listings, skipped for an institution that already has some. The report goes in with its listing, so the same check covers it. */
+async function seedBusinessListings(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<void> {
+  const mid = seededMember(m);
+  const isEmpty = async (tenantId: string) => {
+    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(businessListings).where(eq(businessListings.tenantId, tenantId));
+    return (row?.count ?? 0) === 0;
+  };
+  const daysAgo = (d: number) => new Date(Date.now() - d * DAY);
+  const approved = (d: number) => ({ moderationStatus: "APPROVED" as const, moderatedAt: daysAgo(d), createdAt: daysAgo(d) });
+
+  const uni = tenantIds["demo-university"];
+  if (uni && (await isEmpty(uni))) {
+    const member = (phone: string) => mid("demo-university", phone);
+    await db.insert(businessListings).values([
+      { tenantId: uni, authorMembershipId: member("+919100000001"), name: "Zylo Labs", category: "TECHNOLOGY", city: "Mumbai", description: "Lending software for small marketplaces, built by DemoU alumni. Free onboarding for alumni-run shops.", websiteUrl: "https://example.com/zylo", contactEmail: "hello@zylolabs.example", contactPhone: "+91 22 5550 0101", ...approved(40) },
+      { tenantId: uni, authorMembershipId: member("+919100000003"), name: "Singh Textiles", category: "MANUFACTURING", city: "Surat", description: "Cotton and blended fabrics for export, third generation in the trade. Bulk orders welcome.", contactPhone: "+91 261 555 0102", ...approved(32) },
+      { tenantId: uni, authorMembershipId: member("+919100000002"), name: "Second Chapter Books", category: "RETAIL", city: "London", description: "A small independent bookshop in Bloomsbury. Ten percent off for anyone from DemoU.", websiteUrl: "https://example.com/second-chapter", contactEmail: "shop@secondchapter.example", ...approved(25) },
+      { tenantId: uni, authorMembershipId: member("+919100000006"), name: "Cascade Code Academy", category: "EDUCATION", city: "Seattle", description: "Evening courses in distributed systems for working engineers, taught online.", websiteUrl: "https://example.com/cascade", contactEmail: "learn@cascadecode.example", ...approved(18) },
+      { tenantId: uni, authorMembershipId: member("+919100000004"), name: "Gulf Career Partners", category: "CONSULTING", city: "Dubai", description: "Career and relocation advice for professionals moving to the Gulf.", contactEmail: "advice@gulfcareer.example", contactPhone: "+971 4 555 0103", ...approved(10) },
+    ]);
+    const [reported] = await db
+      .insert(businessListings)
+      .values({ tenantId: uni, authorMembershipId: member("+919100000005"), name: "Instant Visa Desk", category: "TRAVEL_HOSPITALITY", city: "Ahmedabad", description: "Guaranteed visas in 24 hours for any country. Pay in advance, no questions asked.", contactPhone: "+91 79 5550 0104", ...approved(3) })
+      .returning({ id: businessListings.id });
+    await db.insert(contentReports).values({ tenantId: uni, reporterMembershipId: member("+919100000004"), contentType: "BUSINESS", contentId: reported!.id, reason: "SPAM", details: "Promises guaranteed visas and asks for money up front." });
+  }
+
+  // No reports here: the admin e2e expects this institution to end on "No open reports".
+  const col = tenantIds["demo-college"];
+  if (col && (await isEmpty(col))) {
+    const member = (phone: string) => mid("demo-college", phone);
+    await db.insert(businessListings).values([
+      { tenantId: col, authorMembershipId: member("+919100000012"), name: "Sharma Architects", category: "REAL_ESTATE", city: "Hyderabad", description: "Residential and small commercial design across Telangana. Free first consultation for DCE alumni.", websiteUrl: "https://example.com/sharma-architects", contactEmail: "studio@sharmaarchitects.example", ...approved(21) },
+      { tenantId: col, authorMembershipId: member("+919100000013"), name: "Maple Immigration Advisors", category: "CONSULTING", city: "Toronto", description: "Licensed advice for engineers moving to Canada, from study permits to permanent residence.", contactEmail: "hello@mapleadvisors.example", contactPhone: "+1 416 555 0105", ...approved(12) },
+      { tenantId: col, authorMembershipId: member("+919100000011"), name: "Joshi Automation Services", category: "LOGISTICS", city: "Pune", description: "Installation and upkeep of warehouse conveyors for third-party logistics firms around Pune.", contactEmail: "service@joshiautomation.example", moderationStatus: "PENDING", createdAt: daysAgo(1) },
+    ]);
+  }
+}
+
+/** The Wave 2 connections data. Runs after everything else, and each part guards itself, so an existing database gets it from the next seed. */
+export async function seedConnections(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<void> {
+  await seedBusinessListings(db, tenantIds, m);
+}
+
 export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number; history: DemoHistoryResult }> {
   const core = await seedCore(db, platformAdminPhones);
   const membershipIds = await seedMembers(db, core.tenantIds);
   const tenantsWithContent = await seedContent(db, core.tenantIds, membershipIds);
   await seedBilling(db, core.tenantIds, core.platformAdminUserId);
   const history = await seedDemoHistory(db, core.tenantIds, membershipIds);
+  await seedConnections(db, core.tenantIds, membershipIds);
   return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent, history };
 }
 

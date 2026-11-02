@@ -1,4 +1,4 @@
-import { CONTENT_TYPES, CONTENT_TYPE_LABELS, MODERATION_STATUSES, MODERATION_STATUS_LABELS, type ContentDto, type ContentType, type ModerationItemDto, type ModerationStatus } from "@illuminize/shared";
+import { BUSINESS_CATEGORY_LABELS, CONTENT_TYPES, CONTENT_TYPE_LABELS, MODERATION_STATUSES, MODERATION_STATUS_LABELS, type ContentDto, type ContentType, type ModerationItemDto, type ModerationStatus } from "@illuminize/shared";
 import { errorMessage, type ModerationAction } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -12,7 +12,8 @@ import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-function contentLink(slug: string, item: ModerationItemDto): string {
+/** Where to see the item in the app. No default: a content type added without an answer here is a compile error. */
+function contentLink(slug: string, item: ModerationItemDto): string | null {
   const base = `/t/${slug}/app`;
   switch (item.contentType) {
     case "POST":
@@ -23,12 +24,30 @@ function contentLink(slug: string, item: ModerationItemDto): string {
       return `${base}/funding/${item.id}`;
     case "EVENT":
       return `${base}/events/${item.id}`;
-    default:
-      return `${base}/feed`;
+    case "BUSINESS":
+      return `${base}/businesses/${item.id}`;
+    case "COMMENT":
+      return null;
   }
 }
 
 function ContentPreview({ content }: { content: ContentDto }) {
+  // Before the description check below: a business has one too, and an admin also needs what the list doesn't show.
+  if ("category" in content) {
+    return (
+      <div className="space-y-1 text-sm text-slate-800">
+        {content.logoUrl && <img src={content.logoUrl} alt="" className="h-16 w-16 rounded object-cover" />}
+        <p className="font-medium">{content.name}</p>
+        <p className="text-slate-500">{[BUSINESS_CATEGORY_LABELS[content.category], content.city].filter(Boolean).join(" · ")}</p>
+        <p className="whitespace-pre-line">{content.description}</p>
+        {[content.websiteUrl, content.contactEmail, content.contactPhone].filter(Boolean).map((v) => (
+          <p key={v} className="text-slate-500">
+            {v}
+          </p>
+        ))}
+      </div>
+    );
+  }
   if ("body" in content && "imageUrls" in content) {
     return (
       <div>
@@ -75,6 +94,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   });
   const isPinned = item.isPinned;
   const s = item.moderationStatus;
+  const link = contentLink(slug, item);
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-start gap-3">
@@ -84,7 +104,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
             {item.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
             {item.reportCount > 0 && <Badge tone="danger">🚩 {item.reportCount} report(s)</Badge>}
             <span className="text-xs text-slate-500">
-              by {item.author.fullName} (batch of {item.author.batchYear}) · {timeAgo(item.createdAt)}
+              {item.author ? `by ${item.author.fullName} (batch of ${item.author.batchYear})` : "by a deleted member"} · {timeAgo(item.createdAt)}
             </span>
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-slate-800">{item.title ?? item.excerpt}</p>
@@ -92,8 +112,8 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
             <button className="text-primary underline" onClick={() => setExpanded((e) => !e)}>
               {expanded ? "Hide" : "View full content"}
             </button>
-            {item.contentType !== "COMMENT" && (
-              <Link to={contentLink(slug, item)} className="text-slate-500 underline" target="_blank">
+            {link && (
+              <Link to={link} className="text-slate-500 underline" target="_blank">
                 Open in app ↗
               </Link>
             )}

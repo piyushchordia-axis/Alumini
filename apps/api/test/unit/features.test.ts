@@ -24,6 +24,25 @@ describe("defaultFeaturesFor", () => {
   });
 });
 
+describe("the businesses key", () => {
+  it("starts on for every type, schools included", () => {
+    for (const type of TENANT_TYPES) expect(defaultFeaturesFor(type).businesses, type).toBe(true);
+    expect(SCHOOL_OFF_FEATURES).not.toContain("businesses");
+  });
+
+  it("reads on for a row stored before the key existed, and off once an admin turns it off", () => {
+    for (const type of TENANT_TYPES) expect(resolveFeatures(type, { feed: true }).businesses, type).toBe(true);
+    expect(resolveFeatures("SCHOOL", { businesses: false }).businesses).toBe(false);
+    expect(applyFeatureChange("SCHOOL", { feed: true }, { businesses: false }).features.businesses).toBe(false);
+  });
+
+  it("isn't forced off by retyping to a school", () => {
+    const { features, forcedOff } = retypeToSchool("COLLEGE", { businesses: true });
+    expect(features.businesses).toBe(true);
+    expect(forcedOff).not.toContain("businesses");
+  });
+});
+
 describe("resolveFeatures", () => {
   it("fills missing keys, lets stored keys win and drops keys that no longer exist", () => {
     expect(resolveFeatures("COLLEGE", {})).toEqual(allOn());

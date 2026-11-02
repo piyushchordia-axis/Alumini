@@ -10,6 +10,12 @@ describe("notificationTarget", () => {
     expect(notificationTarget("CONTENT_REMOVED", { contentType: "COMMENT", contentId: "c1", postId: "p2" })).toEqual({ kind: "post", id: "p2" });
   });
 
+  it("opens a business listing, including from a stored SYSTEM notice", () => {
+    expect(notificationTarget("CONTENT_APPROVED", { contentType: "BUSINESS", contentId: "b1" })).toEqual({ kind: "business", id: "b1" });
+    expect(notificationTarget("CONTENT_REJECTED", { contentType: "BUSINESS", contentId: "b1" })).toEqual({ kind: "business", id: "b1" });
+    expect(notificationTarget("SYSTEM", { contentType: "BUSINESS", contentId: "b1" })).toEqual({ kind: "business", id: "b1" });
+  });
+
   it("falls back sensibly", () => {
     expect(notificationTarget("CONTENT_REMOVED", {})).toEqual({ kind: "myContent" });
     expect(notificationTarget("MEMBERSHIP_APPROVED", null)).toEqual({ kind: "profile" });
@@ -25,7 +31,7 @@ describe("notificationTarget", () => {
   });
 
   it("sends a removed item to My posts, because its page 404s for the author", () => {
-    for (const contentType of ["POST", "JOB", "FUNDING", "EVENT"]) {
+    for (const contentType of ["POST", "JOB", "FUNDING", "EVENT", "BUSINESS"]) {
       expect(notificationTarget("CONTENT_REMOVED", { contentType, contentId: "x1", status: "REMOVED" })).toEqual({ kind: "myContent" });
     }
     expect(notificationTarget("CONTENT_REMOVED", { contentType: "COMMENT", contentId: "c1" })).toEqual({ kind: "myContent" });

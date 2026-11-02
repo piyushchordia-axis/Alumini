@@ -1,8 +1,9 @@
 import { notificationTarget } from "@illuminize/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { events } from "../../src/db/schema";
+import { events, memberships } from "../../src/db/schema";
+import { runInTransaction } from "../../src/lib/transaction";
 import { createTenant, loginAs, memberSession, auth } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -100,20 +101,22 @@ describe.skipIf(!dbAvailable)("content moderation (ADMIN_APPROVAL)", () => {
     const job = await api().post(`${base}/jobs`).set(member.headers).send({ title: "Role", companyName: "Co", jobType: "FULL_TIME", description: "Ten chars plus" });
     const funding = await api().post(`${base}/funding`).set(member.headers).send({ kind: "OFFERING", title: "Cheques", pitch: "Investing in alumni." });
     const event = await api().post(`${base}/events`).set(member.headers).send({ title: "Meet", description: "d", kind: "CASUAL_MEETUP", city: "Pune", startAt: future, timezone: "Asia/Kolkata" });
-    for (const r of [job, funding, event]) expect(r.body.data.moderationStatus).toBe("PENDING");
+    const business = await api().post(`${base}/businesses`).set(member.headers).send({ name: "Shop", category: "RETAIL", description: "Ten chars plus" });
+    for (const r of [job, funding, event, business]) expect(r.body.data.moderationStatus).toBe("PENDING");
     expect((await api().get(`${base}/jobs`).set(admin.headers)).body.data).toHaveLength(0);
 
     const queue = await api().get(`${base}/admin/moderation?pageSize=10`).set(admin.headers);
-    expect(queue.body.data.map((i: { contentType: string }) => i.contentType).sort()).toEqual(["EVENT", "FUNDING", "JOB"]);
+    expect(queue.body.data.map((i: { contentType: string }) => i.contentType).sort()).toEqual(["BUSINESS", "EVENT", "FUNDING", "JOB"]);
     expect((await api().get(`${base}/admin/moderation?contentType=JOB`).set(admin.headers)).body.total).toBe(1);
 
-    for (const [type, id] of [["JOB", job.body.data.id], ["FUNDING", funding.body.data.id], ["EVENT", event.body.data.id]] as const) {
+    for (const [type, id] of [["JOB", job.body.data.id], ["FUNDING", funding.body.data.id], ["EVENT", event.body.data.id], ["BUSINESS", business.body.data.id]] as const) {
       const res = await api().post(`${base}/admin/moderation/${type}/${id}/approve`).set(admin.headers).send({});
       expect(res.status).toBe(200);
     }
     expect((await api().get(`${base}/jobs`).set(admin.headers)).body.data).toHaveLength(1);
     expect((await api().get(`${base}/funding`).set(admin.headers)).body.data).toHaveLength(1);
     expect((await api().get(`${base}/events`).set(admin.headers)).body.data).toHaveLength(1);
+    expect((await api().get(`${base}/businesses`).set(admin.headers)).body.data).toHaveLength(1);
 
     // comments are never pre-moderated but can be removed; counts follow
     const post = await api().post(`${base}/posts`).set(admin.headers).send({ body: "Admin post" });
@@ -142,6 +145,7 @@ describe.skipIf(!dbAvailable)("content moderation (ADMIN_APPROVAL)", () => {
       ["JOB", "job", "jobs", { title: "Role", companyName: "Co", jobType: "FULL_TIME", description: "Ten chars plus" }],
       ["FUNDING", "funding", "funding", { kind: "OFFERING", title: "Cheques", pitch: "Investing in alumni." }],
       ["EVENT", "event", "events", { title: "Meet", description: "d", kind: "CASUAL_MEETUP", city: "Pune", startAt: future, timezone: "Asia/Kolkata" }],
+      ["BUSINESS", "business", "businesses", { name: "Shop", category: "RETAIL", description: "Ten chars plus" }],
     ] as const;
     const latestTarget = async () => {
       const [n] = (await api().get(`${base}/notifications`).set(author.headers)).body.data;
@@ -174,6 +178,48 @@ describe.skipIf(!dbAvailable)("content moderation (ADMIN_APPROVAL)", () => {
     await api().post(`${base}/admin/moderation/COMMENT/${comment.body.data.id}/remove`).set(admin.headers).send({}).expect(200);
     expect(await latestTarget()).toEqual({ type: "CONTENT_REMOVED", target: { kind: "post", id: post.body.data.id } });
     expect((await api().get(`${base}/posts/${post.body.data.id}`).set(author.headers)).status).toBe(200);
+  });
+
+  describe("an item whose author no longer exists", () => {
+    /** No content type can lose its author yet, because each one cascades, so get past the foreign keys to break the link. */
+    const orphan = (membershipId: string) =>
+      runInTransaction(ctx, async (tx) => {
+        await tx.execute(sql`set local session_replication_role = replica`);
+        await tx.delete(memberships).where(eq(memberships.id, membershipId));
+      });
+
+    it("stays in the queue, so its rows and total agree", async () => {
+      const { tenant } = await createTenant(ctx, { contentModerationMode: "ADMIN_APPROVAL" });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const gone = await memberSession(ctx, tenant.id);
+      const here = await memberSession(ctx, tenant.id, { fullName: "Still Here" });
+      const listing = { name: "Orphaned Shop", category: "RETAIL", description: "Ten chars plus" };
+      const orphaned = await api().post(`${base}/businesses`).set(gone.headers).send(listing).expect(201);
+      const kept = await api().post(`${base}/businesses`).set(here.headers).send({ ...listing, name: "Kept Shop" }).expect(201);
+      await orphan(gone.membership.id);
+
+      const queue = await api().get(`${base}/admin/moderation?contentType=BUSINESS`).set(admin.headers);
+      expect(queue.status).toBe(200);
+      expect(queue.body.total).toBe(2);
+      expect(queue.body.data).toHaveLength(2);
+      const byId = new Map(queue.body.data.map((i: { id: string }) => [i.id, i]));
+      expect(byId.get(orphaned.body.data.id)).toMatchObject({ title: "Orphaned Shop", author: null });
+      expect(byId.get(kept.body.data.id)).toMatchObject({ title: "Kept Shop", author: { fullName: "Still Here" } });
+    });
+
+    it("can still be reported", async () => {
+      const { tenant } = await createTenant(ctx);
+      const base = `/api/v1/t/${tenant.slug}`;
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const gone = await memberSession(ctx, tenant.id);
+      const reporter = await memberSession(ctx, tenant.id);
+      const orphaned = await api().post(`${base}/businesses`).set(gone.headers).send({ name: "Orphaned Shop", category: "RETAIL", description: "Ten chars plus" }).expect(201);
+      await orphan(gone.membership.id);
+      await api().post(`${base}/reports`).set(reporter.headers).send({ contentType: "BUSINESS", contentId: orphaned.body.data.id, reason: "SPAM" }).expect(201);
+      const reports = await api().get(`${base}/admin/reports`).set(admin.headers);
+      expect(reports.body.data[0].content).toMatchObject({ title: "Orphaned Shop" });
+    });
   });
 
   it("keeps a removed event findable in My posts once its date has passed", async () => {

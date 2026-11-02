@@ -93,6 +93,7 @@ export type NotificationTarget =
   | { kind: "event"; id: string }
   | { kind: "job"; id: string }
   | { kind: "funding"; id: string }
+  | { kind: "business"; id: string }
   | { kind: "myContent" }
   | { kind: "profile" }
   | { kind: "admin"; section: "members" | "moderation" | "reports" };
@@ -115,6 +116,8 @@ function contentTarget(d: NotificationData): NotificationTarget | null {
       return { kind: "funding", id: d.contentId };
     case "EVENT":
       return { kind: "event", id: d.contentId };
+    case "BUSINESS":
+      return { kind: "business", id: d.contentId };
     case "COMMENT":
       return d.postId ? { kind: "post", id: d.postId } : null;
     default:

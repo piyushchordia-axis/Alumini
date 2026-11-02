@@ -17,7 +17,7 @@ export async function listModerationItems(
   db: DbClient,
   tenantId: string,
   f: ModerationQueueFilters,
-): Promise<{ rows: Array<{ item: ModerationItemRow; author: MembershipRow; reportCount: number }>; total: number }> {
+): Promise<{ rows: Array<{ item: ModerationItemRow; author: MembershipRow | null; reportCount: number }>; total: number }> {
   const conds: SQL[] = [eq(moderationItems.tenantId, tenantId), eq(moderationItems.moderationStatus, f.status)];
   if (f.contentType) conds.push(eq(moderationItems.contentType, f.contentType));
   const where = and(...conds);
@@ -25,7 +25,8 @@ export async function listModerationItems(
     db
       .select({ item: getViewSelectedFields(moderationItems), author: memberships })
       .from(moderationItems)
-      .innerJoin(memberships, eq(memberships.id, moderationItems.authorMembershipId))
+      // A left join: an inner one would drop rows with no author, which the count below still includes.
+      .leftJoin(memberships, eq(memberships.id, moderationItems.authorMembershipId))
       .where(where)
       .orderBy(desc(moderationItems.createdAt))
       .limit(f.pageSize)

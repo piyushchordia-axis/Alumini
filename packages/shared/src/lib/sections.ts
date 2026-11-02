@@ -8,6 +8,7 @@ const SECTION_RULES = {
   jobs: (f) => f.jobs,
   directory: (f) => f.directory,
   events: (f) => f.events,
+  businesses: (f) => f.businesses,
   funding: (f) => f.funding,
 } satisfies Record<string, SectionRule>;
 

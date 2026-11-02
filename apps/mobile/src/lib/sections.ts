@@ -12,6 +12,7 @@ export const SECTION_TABS: Record<MemberSection, SectionTab> = {
   jobs: { path: "jobs", label: "Jobs", icon: "💼" },
   directory: { path: "directory", label: "Directory", icon: "🎓" },
   events: { path: "events", label: "Events", icon: "📅" },
+  businesses: { path: "businesses", label: "Businesses", icon: "🏪" },
   funding: { path: "funding", label: "Funding", icon: "🚀" },
 };
 

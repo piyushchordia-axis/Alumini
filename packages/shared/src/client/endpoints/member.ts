@@ -1,9 +1,11 @@
-import type { AttendeesQuery, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
   DirectoryFiltersDto,
   EventDto,
+  BusinessCardDto,
+  BusinessDto,
   FundingDto,
   JobDto,
   JobSeekerDto,
@@ -78,6 +80,16 @@ export function fundingEndpoints(core: ApiCore) {
     update: (slug: string, id: string, input: FundingUpdateInput) => core.data<FundingDto>({ method: "PATCH", path: `/funding/${id}`, tenantSlug: slug, body: input }),
     remove: (slug: string, id: string) => core.request<void>({ method: "DELETE", path: `/funding/${id}`, tenantSlug: slug }),
     close: (slug: string, id: string) => core.data<FundingDto>({ method: "POST", path: `/funding/${id}/close`, tenantSlug: slug }),
+  };
+}
+
+export function businessEndpoints(core: ApiCore) {
+  return {
+    list: (slug: string, query?: Partial<BusinessListQuery>) => core.request<CursorPage<BusinessCardDto>>({ path: "/businesses", tenantSlug: slug, query: q(query) }),
+    create: (slug: string, input: BusinessCreateInput) => core.data<BusinessDto>({ method: "POST", path: "/businesses", tenantSlug: slug, body: input }),
+    get: (slug: string, id: string) => core.data<BusinessDto>({ path: `/businesses/${id}`, tenantSlug: slug }),
+    update: (slug: string, id: string, input: BusinessUpdateInput) => core.data<BusinessDto>({ method: "PATCH", path: `/businesses/${id}`, tenantSlug: slug, body: input }),
+    remove: (slug: string, id: string) => core.request<void>({ method: "DELETE", path: `/businesses/${id}`, tenantSlug: slug }),
   };
 }
 

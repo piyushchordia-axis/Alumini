@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { jobSeekers, memberActivityDays, memberships, tenants, users } from "../db/schema";
+import { escapeLike } from "./content.common";
 import type { UserRow } from "./users.repo";
 import type { MembershipRow, TenantRow } from "../types/request";
 
@@ -37,6 +38,15 @@ export async function findMembershipById(db: DbClient, tenantId: string, id: str
     .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
     .limit(1);
   return row;
+}
+
+/** Holds the member's row until the transaction ends, so a count and the insert it allows can't interleave with another request of theirs. No key: rows that reference the member can still be written. */
+export async function lockMembership(db: DbClient, tenantId: string, id: string): Promise<void> {
+  await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .for("no key update");
 }
 
 export async function findMembershipWithUser(
@@ -113,7 +123,7 @@ export async function listMembersForAdmin(
   if (f.role) conditions.push(eq(memberships.role, f.role));
   if (f.batchYear) conditions.push(eq(memberships.batchYear, f.batchYear));
   if (f.q) {
-    const pattern = `%${f.q.replace(/[%_]/g, "\\$&")}%`;
+    const pattern = `%${escapeLike(f.q)}%`;
     conditions.push(or(ilike(memberships.fullName, pattern), ilike(memberships.companyName, pattern), ilike(users.phoneE164, pattern))!);
   }
   const where = and(...conditions);

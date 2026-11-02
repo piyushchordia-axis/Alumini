@@ -33,6 +33,27 @@ export type FundingKind = (typeof FUNDING_KINDS)[number];
 export const FUNDING_STAGES = ["IDEA", "PRE_SEED", "SEED", "SERIES_A", "SERIES_B_PLUS", "GROWTH", "OTHER"] as const;
 export type FundingStage = (typeof FUNDING_STAGES)[number];
 
+/** A fixed list, because free text would make the filter useless. */
+export const BUSINESS_CATEGORIES = [
+  "RETAIL",
+  "FOOD_BEVERAGE",
+  "HEALTHCARE",
+  "EDUCATION",
+  "TECHNOLOGY",
+  "FINANCE_LEGAL",
+  "CONSULTING",
+  "MANUFACTURING",
+  "REAL_ESTATE",
+  "MEDIA_DESIGN",
+  "TRAVEL_HOSPITALITY",
+  "AGRICULTURE",
+  "LOGISTICS",
+  "OTHER",
+] as const;
+export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number];
+/** Listings one member may have, counting everything an admin hasn't removed. */
+export const MAX_BUSINESS_LISTINGS = 5;
+
 export const EVENT_KINDS = ["CASUAL_MEETUP", "ORGANISED_EVENT"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
@@ -42,7 +63,7 @@ export type RsvpStatus = (typeof RSVP_STATUSES)[number];
 export const REACTION_TYPES = ["LIKE", "LOVE", "CELEBRATE", "INSIGHTFUL"] as const;
 export type ReactionType = (typeof REACTION_TYPES)[number];
 
-export const CONTENT_TYPES = ["POST", "COMMENT", "JOB", "FUNDING", "EVENT"] as const;
+export const CONTENT_TYPES = ["POST", "COMMENT", "JOB", "FUNDING", "EVENT", "BUSINESS"] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
 export const REPORT_REASONS = ["SPAM", "HARASSMENT", "INAPPROPRIATE", "MISINFORMATION", "OTHER"] as const;
@@ -130,7 +151,7 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const MAX_INVITE_IMPORT_ROWS = 500;
 export const INVITE_TTL_DAYS = 90;
 
-export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
+export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
 
@@ -187,6 +208,23 @@ export const FUNDING_STAGE_LABELS: Record<FundingStage, string> = {
   OTHER: "Other",
 };
 
+export const BUSINESS_CATEGORY_LABELS: Record<BusinessCategory, string> = {
+  RETAIL: "Retail",
+  FOOD_BEVERAGE: "Food & beverage",
+  HEALTHCARE: "Healthcare",
+  EDUCATION: "Education",
+  TECHNOLOGY: "Technology",
+  FINANCE_LEGAL: "Finance & legal",
+  CONSULTING: "Consulting",
+  MANUFACTURING: "Manufacturing",
+  REAL_ESTATE: "Real estate",
+  MEDIA_DESIGN: "Media & design",
+  TRAVEL_HOSPITALITY: "Travel & hospitality",
+  AGRICULTURE: "Agriculture",
+  LOGISTICS: "Logistics",
+  OTHER: "Other",
+};
+
 export const EVENT_KIND_LABELS: Record<EventKind, string> = {
   CASUAL_MEETUP: "Casual meetup",
   ORGANISED_EVENT: "Organised event",
@@ -220,6 +258,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   JOB: "Job",
   FUNDING: "Funding listing",
   EVENT: "Event",
+  BUSINESS: "Business listing",
 };
 
 export const TENANT_TYPE_LABELS: Record<TenantType, string> = {

@@ -6,13 +6,22 @@ const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map(
 
 describe("MEMBER_SECTIONS", () => {
   it("is in priority order, which isn't the order of the feature keys", () => {
-    expect(MEMBER_SECTIONS).toEqual(["feed", "jobs", "directory", "events", "funding"]);
+    expect(MEMBER_SECTIONS).toEqual(["feed", "jobs", "directory", "events", "businesses", "funding"]);
   });
 });
 
 describe("splitSections", () => {
   it("shows four and overflows the fifth, with exactly five enabled", () => {
     expect(splitSections(only("feed", "jobs", "directory", "events", "funding"))).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["funding"] });
+    expect(splitSections(only("feed", "jobs", "directory", "events", "businesses"))).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["businesses"] });
+  });
+
+  it("overflows Businesses and then Funding, with all six enabled", () => {
+    expect(splitSections(only(...TENANT_FEATURES))).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["businesses", "funding"] });
+  });
+
+  it("brings Businesses onto the bar ahead of Funding when a section above it is off", () => {
+    expect(splitSections(only("jobs", "directory", "events", "businesses", "funding"))).toEqual({ bar: ["jobs", "directory", "events", "businesses"], overflow: ["funding"] });
   });
 
   it("shows all of them with four enabled, whichever four, in priority order", () => {
@@ -33,6 +42,7 @@ describe("splitSections", () => {
     ["jobs", "jobs"],
     ["directory", "directory"],
     ["events", "events"],
+    ["businesses", "businesses"],
     ["funding", "funding"],
   ])("shows %s when %s is on, and no other section", (section, feature) => {
     expect(splitSections(only(feature)).bar).toEqual([section]);

@@ -4,6 +4,7 @@ import type { AppContext } from "../../context";
 import { requireAuth } from "../../middleware/auth";
 import { loadMembership, resolveTenant, touchActivity } from "../../middleware/tenant";
 import { adminRoutes } from "./admin";
+import { businessRoutes } from "./businesses.routes";
 import { directoryRoutes } from "./directory.routes";
 import { eventRoutes } from "./events.routes";
 import { fundingRoutes } from "./funding.routes";
@@ -26,6 +27,7 @@ export function tenantRouter(ctx: AppContext): Router {
   router.use(directoryRoutes(ctx));
   router.use(jobRoutes(ctx));
   router.use(fundingRoutes(ctx));
+  router.use(businessRoutes(ctx));
   router.use(postRoutes(ctx));
   router.use(celebrationRoutes(ctx));
   router.use(eventRoutes(ctx));

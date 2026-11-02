@@ -4,9 +4,8 @@ import type { DbClient } from "../db/client";
 import { memberFieldValues, memberships, tenantProfileFields, users } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
 import type { MembershipRow } from "../types/request";
+import { escapeLike } from "./content.common";
 import type { UserRow } from "./users.repo";
-
-const escapeLike = (s: string) => s.replace(/[%_]/g, "\\$&");
 
 export async function searchDirectory(db: DbClient, tenantId: string, q: DirectoryQuery): Promise<CursorPage<MembershipRow>> {
   const conds: SQL[] = [eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED")];

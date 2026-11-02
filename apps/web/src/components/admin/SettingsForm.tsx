@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
-const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory" };
+const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory", businesses: "Business directory" };
 
 export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
   const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
@@ -48,7 +48,7 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
             <option value="ADMIN_APPROVAL">Admin must approve members</option>
           </Select>
         </FormField>
-        <FormField label="Content moderation" hint="Applies to posts, jobs, funding and events. Comments are never held.">
+        <FormField label="Content moderation" hint="Applies to posts, jobs, funding, events and businesses. Comments are never held.">
           <Select value={contentModerationMode} onChange={(e) => setContentModerationMode(e.target.value as (typeof APPROVAL_MODES)[number])}>
             <option value="AUTO_APPROVE">Publish immediately</option>
             <option value="ADMIN_APPROVAL">Admin must approve before publishing</option>

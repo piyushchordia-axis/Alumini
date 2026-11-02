@@ -12,6 +12,9 @@ import { VerifyEmailPage } from "@/routes/VerifyEmailPage";
 import { DirectoryPage } from "@/routes/t/DirectoryPage";
 import { DigestPage } from "@/routes/t/DigestPage";
 import { EventDetailPage } from "@/routes/t/EventDetailPage";
+import { BusinessDetailPage } from "@/routes/t/BusinessDetailPage";
+import { BusinessesPage } from "@/routes/t/BusinessesPage";
+import { BusinessFormPage } from "@/routes/t/BusinessFormPage";
 import { EventFormPage } from "@/routes/t/EventFormPage";
 import { EventsPage } from "@/routes/t/EventsPage";
 import { FeedPage } from "@/routes/t/FeedPage";
@@ -81,6 +84,15 @@ export const router = createBrowserRouter([
                       { path: "funding/new", element: <FundingFormPage /> },
                       { path: "funding/:id", element: <FundingDetailPage /> },
                       { path: "funding/:id/edit", element: <FundingFormPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireFeature feature="businesses" />,
+                    children: [
+                      { path: "businesses", element: <BusinessesPage /> },
+                      { path: "businesses/new", element: <BusinessFormPage /> },
+                      { path: "businesses/:id", element: <BusinessDetailPage /> },
+                      { path: "businesses/:id/edit", element: <BusinessFormPage /> },
                     ],
                   },
                   {

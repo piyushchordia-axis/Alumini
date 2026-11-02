@@ -28,6 +28,7 @@ export function LandingPage() {
         {t.settings.features.jobs && <li>💼 Jobs &amp; referrals</li>}
         {t.settings.features.funding && <li>🚀 Funding &amp; investors</li>}
         {t.settings.features.events && <li>📅 Meetups &amp; events</li>}
+        {t.settings.features.businesses && <li>🏪 Alumni businesses</li>}
         {t.settings.features.directory && <li>🎓 Batch directory</li>}
       </ul>
       <div className="mt-6 space-y-2">

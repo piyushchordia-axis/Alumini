@@ -79,6 +79,9 @@ export const scriptMembership = (page, slug) => scriptGet(page, `/t/${slug}/memb
 /** The institution: stale after 5 minutes, and a 5xx is tried three times, about 3 seconds in all. */
 export const scriptTenant = (page, slug) => scriptGet(page, `/tenants/${slug}`, { staleMs: 301_000, triesOn5xx: 3 });
 
+/** A business listing: stale after 30 seconds, and a 5xx is tried three times, about 3 seconds in all. */
+export const scriptBusiness = (page, slug, id) => scriptGet(page, `/t/${slug}/businesses/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
+
 /**
  * Serves the institution with only some sections on. No demo institution has one off, and this needs no admin sign-in.
  * Only the app sees this: the API still has everything on. It takes effect on the next page load.

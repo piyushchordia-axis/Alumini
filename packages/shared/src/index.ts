@@ -12,6 +12,7 @@ export * from "./schemas/admin";
 export * from "./schemas/directory";
 export * from "./schemas/jobs";
 export * from "./schemas/funding";
+export * from "./schemas/businesses";
 export * from "./schemas/posts";
 export * from "./schemas/events";
 export * from "./schemas/reports";

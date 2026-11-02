@@ -3,6 +3,7 @@ import { adminEndpoints } from "./endpoints/admin";
 import {
   directoryEndpoints,
   eventEndpoints,
+  businessEndpoints,
   fundingEndpoints,
   jobEndpoints,
   membershipEndpoints,
@@ -28,6 +29,7 @@ export function createApiClient(options: ApiClientOptions) {
     directory: directoryEndpoints(core),
     jobs: jobEndpoints(core),
     funding: fundingEndpoints(core),
+    businesses: businessEndpoints(core),
     posts: postEndpoints(core),
     celebrations: celebrationEndpoints(core),
     events: eventEndpoints(core),

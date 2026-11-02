@@ -15,6 +15,8 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/jobs/${t.id}`;
     case "funding":
       return `${base}/funding/${t.id}`;
+    case "business":
+      return `${base}/businesses/${t.id}`;
     case "myContent":
       return `${base}/profile/my-content`;
     case "profile":

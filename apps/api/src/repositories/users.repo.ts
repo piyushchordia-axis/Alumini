@@ -1,6 +1,7 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { pushTokens, users } from "../db/schema";
+import { escapeLike } from "./content.common";
 
 export type UserRow = typeof users.$inferSelect;
 export type PushTokenRow = typeof pushTokens.$inferSelect;
@@ -93,7 +94,7 @@ export async function searchUsers(
   db: DbClient,
   opts: { phone?: string; page: number; pageSize: number },
 ): Promise<{ rows: UserRow[]; total: number }> {
-  const where = opts.phone ? ilike(users.phoneE164, `%${opts.phone.replace(/[%_]/g, "\\$&")}%`) : undefined;
+  const where = opts.phone ? ilike(users.phoneE164, `%${escapeLike(opts.phone)}%`) : undefined;
   const [rows, [count]] = await Promise.all([
     db
       .select()

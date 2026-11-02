@@ -28,7 +28,7 @@ export function AdminDashboardPage() {
           <Stat label="Pending members" value={d.pendingMembers} hint="Awaiting your approval" />
         </Link>
         <Link to={`${base}/moderation`}>
-          <Stat label="Content to review" value={d.pendingContent} hint="Posts, jobs, funding, events" />
+          <Stat label="Content to review" value={d.pendingContent} hint="Posts, jobs, funding, events, businesses" />
         </Link>
         <Link to={`${base}/reports`}>
           <Stat label="Open reports" value={d.openReports} hint="Flagged by members" />
@@ -46,7 +46,7 @@ export function AdminDashboardPage() {
             New members are <strong>{tenant.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "held until you approve them" : "approved automatically"}</strong>.
           </li>
           <li>
-            Posts, jobs, funding and events are <strong>{/* moderation mode is not public; the settings page shows it */ "moderated per your settings"}</strong>. Your own posts are always published immediately.
+            Posts, jobs, funding, events and businesses are <strong>{/* moderation mode is not public; the settings page shows it */ "moderated per your settings"}</strong>. Your own posts are always published immediately.
           </li>
           <li>
             Change either behaviour under <Link to={`${base}/settings`} className="text-primary underline">Settings</Link>.

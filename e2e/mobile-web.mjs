@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { reconnect, scriptFeatures, scriptMembership, scriptNotification, scriptTenant } from "./lib.mjs";
+import { reconnect, scriptBusiness, scriptFeatures, scriptMembership, scriptNotification, scriptTenant } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -214,6 +214,136 @@ try {
     await shot("m07-member");
   });
 
+  // Screens underneath stay mounted on the web export, so a label can match twice: the screen on top is the last one.
+  const visible = (locator) => locator.locator("visible=true").last();
+
+  await step("businesses behind More: search and filter, with contact details only on a listing's own page", async () => {
+    await openSection("Businesses");
+    await page.waitForURL("**/t/demo-university/businesses");
+    await selectedBarTab("More").waitFor();
+    // By description: Zylo Labs is also a funding listing, on a screen that is still mounted.
+    const zylo = visible(page.getByText("Lending software for small marketplaces", { exact: false }));
+    const singh = visible(page.getByText("Cotton and blended fabrics", { exact: false }));
+    await zylo.waitFor();
+    await singh.waitFor();
+    if (await page.getByText("hello@zylolabs.example", { exact: false }).locator("visible=true").count()) throw new Error("the list shows a contact email");
+    if (await page.getByText("5550 0101", { exact: false }).locator("visible=true").count()) throw new Error("the list shows a contact phone");
+    await shot("m07a-businesses");
+
+    const search = visible(page.getByLabel("Search businesses"));
+    await search.fill("lending software");
+    await singh.waitFor({ state: "hidden" });
+    await zylo.waitFor();
+    await search.fill("");
+    await singh.waitFor();
+
+    const chip = (label) => visible(page.getByRole("button", { name: label, exact: true }));
+    await chip("Manufacturing").click();
+    await zylo.waitFor({ state: "hidden" });
+    await singh.waitFor();
+    await chip("Any").click();
+    await zylo.waitFor();
+
+    const city = visible(page.getByLabel("City", { exact: true }));
+    await city.fill("surat");
+    await zylo.waitFor({ state: "hidden" });
+    await singh.waitFor();
+    await city.fill("nowhere at all");
+    await visible(page.getByText("No businesses match", { exact: true })).waitFor();
+    await city.fill("");
+    await zylo.waitFor();
+
+    await zylo.dispatchEvent("click");
+    await page.waitForURL(/\/t\/demo-university\/businesses\/[0-9a-f-]+$/);
+    await visible(page.getByText("hello@zylolabs.example", { exact: false })).waitFor();
+    await visible(page.getByText("5550 0101", { exact: false })).waitFor();
+    await visible(page.getByRole("button", { name: "Report this content" })).waitFor();
+    await shot("m07a-business-detail");
+  });
+
+  await step("businesses: add a listing, edit it, find it in My posts and delete it through the confirm sheet", async () => {
+    const name = `Mobile Bakery ${unique}`;
+    const field = (label) => visible(page.getByLabel(label, { exact: true }));
+    await page.goto(BASE + "/t/demo-university/businesses");
+    await visible(page.getByRole("button", { name: "Add a business" })).click();
+    await page.waitForURL("**/t/demo-university/businesses/new");
+    // The names web-member.mjs finds the same controls by.
+    await field("Business name *").fill(name);
+    await visible(page.getByRole("button", { name: "Food & beverage", exact: true })).click();
+    await field("City").fill("Mumbai");
+    await field("Description *").fill("Sourdough baked for the smoke tests every morning.");
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    const chooser = page.waitForEvent("filechooser");
+    await visible(page.getByRole("button", { name: "📷 Add logo" })).click();
+    await (await chooser).setFiles({ name: "logo.png", mimeType: "image/png", buffer: png });
+    await visible(page.getByRole("button", { name: "Change logo" })).waitFor();
+    await visible(page.getByRole("button", { name: "Remove logo", exact: true })).waitFor();
+    await field("Contact email").fill(`mobile${unique}@example.com`);
+    await field("Contact phone").fill("+91 22 5550 0198");
+
+    // A javascript: link must not reach Linking.openURL.
+    await field("Website").fill("javascript:alert(1)");
+    await visible(page.getByRole("button", { name: "Publish listing" })).click();
+    await visible(page.getByText("URL must start with", { exact: false })).waitFor();
+    if (!page.url().endsWith("/businesses/new")) throw new Error("a javascript: website was accepted");
+    await field("Website").fill("https://example.com/mobile-bakery");
+    await visible(page.getByRole("button", { name: "Publish listing" })).click();
+    await page.waitForURL(/\/t\/demo-university\/businesses\/[0-9a-f-]+$/);
+    const detail = page.url();
+    await visible(page.getByText(name, { exact: true })).waitFor();
+    await visible(page.getByText(`mobile${unique}@example.com`, { exact: false })).waitFor();
+    if (await page.getByRole("button", { name: "Report this content" }).locator("visible=true").count()) throw new Error("your own listing offers to report it");
+
+    await visible(page.getByRole("button", { name: "Edit", exact: true })).click();
+    await page.waitForURL("**/businesses/edit/*");
+    await field("Business name *").waitFor();
+    if ((await field("Contact email").inputValue()) !== `mobile${unique}@example.com`) throw new Error("the edit form lost the contact email");
+    await field("Business name *").fill(`${name} and Sons`);
+    // A background refetch failing must not replace the form and lose what was typed.
+    const editing = await scriptBusiness(page, "demo-university", detail.split("/").pop());
+    editing.answer(503, "INTERNAL");
+    await editing.refetch();
+    if ((await field("Business name *").inputValue()) !== `${name} and Sons`) throw new Error("a failed refetch lost what was typed on the edit form");
+    await editing.stop();
+    await visible(page.getByRole("button", { name: "Save changes" })).click();
+    await page.waitForURL(detail);
+    await visible(page.getByText(`${name} and Sons`, { exact: true })).waitFor();
+
+    await barTab("More").click();
+    await hubRow("My posts").click();
+    await page.waitForURL("**/t/demo-university/profile/my-content");
+    await visible(page.locator('[role="tab"]').getByText("Businesses", { exact: true })).click();
+    const mine = visible(page.getByText(`${name} and Sons`, { exact: true }));
+    await mine.waitFor();
+    await mine.dispatchEvent("click");
+    await page.waitForURL(detail);
+
+    const sheet = page.getByRole("alertdialog", { name: "Delete this listing?" });
+    await visible(page.getByRole("button", { name: "Delete", exact: true })).click();
+    await sheet.waitFor();
+    await sheet.getByRole("button", { name: "Cancel" }).click();
+    await sheet.waitFor({ state: "hidden" });
+    await visible(page.getByText(`${name} and Sons`, { exact: true })).waitFor();
+
+    // Opened from a link, with nothing behind them to go back to: saving and deleting still have to leave the screen.
+    await page.goto(`${BASE}/t/demo-university/businesses/edit/${detail.split("/").pop()}`);
+    await field("City").fill("Pune");
+    await visible(page.getByRole("button", { name: "Save changes" })).click();
+    await page.waitForURL(detail);
+    await visible(page.getByText("Pune", { exact: true })).waitFor();
+
+    await page.goto(detail);
+    await visible(page.getByRole("button", { name: "Delete", exact: true })).click();
+    await shot("m07a-business-delete");
+    await sheet.getByRole("button", { name: "Delete listing" }).click();
+    await sheet.waitFor({ state: "hidden" });
+    await page.waitForURL("**/t/demo-university/businesses");
+    await visible(page.getByText("Lending software for small marketplaces", { exact: false })).waitFor();
+    if (await page.getByText(`${name} and Sons`, { exact: true }).count()) throw new Error("a deleted listing is still in the list");
+    // The next step takes the first bell on the page, which has to be the feed's rather than this screen's underneath it.
+    await page.goto(BASE + "/t/demo-university/feed");
+  });
+
   await step("notification settings persist", async () => {
     const group = () => page.locator('[role="radiogroup"][aria-label="Birthdays and anniversaries"]').locator("visible=true").first();
     const openSettings = async () => {
@@ -292,9 +422,16 @@ try {
     await expectBar("Feed", "Jobs", "Directory", "Events", "More");
     await barTab("More").click();
     await hubRow("My posts").waitFor();
-    if (await page.getByRole("link", { name: "Funding", exact: true }).locator("visible=true").count()) throw new Error("the hub lists a section that is switched off");
+    for (const section of ["Funding", "Businesses"]) {
+      if (await page.getByRole("link", { name: section, exact: true }).locator("visible=true").count()) throw new Error(`the hub lists ${section}, which is switched off`);
+    }
     await open("/funding");
     await page.waitForURL("**/t/demo-university/feed");
+    await open("/businesses");
+    await page.waitForURL("**/t/demo-university/feed");
+    await open("/profile/my-content");
+    await page.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
+    if (await page.locator('[role="tab"]').getByText("Businesses", { exact: true }).locator("visible=true").count()) throw new Error("My posts has a tab for a section that is switched off");
 
     // Everything off: the profile is home, and More stands in for it on the bar.
     features.only();

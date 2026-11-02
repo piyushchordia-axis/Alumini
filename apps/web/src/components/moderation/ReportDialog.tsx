@@ -24,7 +24,7 @@ export function ReportButton({ slug, contentType, contentId, className }: { slug
   };
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className ?? "text-xs text-slate-400 hover:text-red-600"}>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Report this content" className={className ?? "text-xs text-slate-400 hover:text-red-600"}>
         Report
       </button>
       <Modal

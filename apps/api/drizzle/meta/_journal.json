@@ -134,6 +134,13 @@
       "when": 1793563160113,
       "tag": "0018_wave2_features_no_default",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793602344343,
+      "tag": "0019_wave2_businesses",
+      "breakpoints": true
     }
   ]
 }

@@ -38,7 +38,17 @@ function ReportRow({ slug, report }: { slug: string; report: AdminReportDto }) {
             </span>
           </div>
           {report.details && <p className="mt-1 text-sm text-slate-700">“{report.details}”</p>}
-          <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-800">{report.content ? (report.content.excerpt ?? report.content.title) : <em className="text-slate-400">Content no longer exists</em>}</div>
+          <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-800">
+            {report.content ? (
+              <>
+                {/* A post's title is only the start of its body, but a listing's name is its own text and may be what was reported. */}
+                {report.content.excerpt && report.content.title && !report.content.excerpt.startsWith(report.content.title) && <p className="font-medium">{report.content.title}</p>}
+                {report.content.excerpt ?? report.content.title}
+              </>
+            ) : (
+              <em className="text-slate-400">Content no longer exists</em>
+            )}
+          </div>
           {report.resolutionNote && <p className="mt-1 text-xs text-slate-500">Resolution: {report.resolutionNote}</p>}
         </div>
         {report.status === "OPEN" && (

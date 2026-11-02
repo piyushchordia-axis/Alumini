@@ -1,6 +1,8 @@
 import type {
   PollDto,
   AdminReportDto,
+  BusinessCardDto,
+  BusinessDto,
   CommentDto,
   ContentPreviewDto,
   EventDto,
@@ -12,6 +14,7 @@ import type {
   ReactionEntryDto,
   ReportDto,
 } from "@illuminize/shared";
+import type { BusinessWithAuthor } from "../repositories/businesses.repo";
 import type { EventWithAuthor, RsvpRow } from "../repositories/events.repo";
 import type { FundingWithAuthor } from "../repositories/funding.repo";
 import type { JobSeekerRow, JobWithAuthor } from "../repositories/jobs.repo";
@@ -91,6 +94,30 @@ export function toFundingDto({ listing, author }: FundingWithAuthor, viewer: Vie
     createdAt: listing.createdAt.toISOString(),
     updatedAt: listing.updatedAt.toISOString(),
   };
+}
+
+/** For lists, so no email or phone: built field by field, and the detail adds them below. */
+export function toBusinessCardDto({ listing, author }: BusinessWithAuthor, viewer: Viewer | null): BusinessCardDto {
+  return {
+    id: listing.id,
+    name: listing.name,
+    category: listing.category,
+    description: listing.description,
+    logoUrl: listing.logoUrl,
+    city: listing.city,
+    websiteUrl: listing.websiteUrl,
+    moderationStatus: listing.moderationStatus,
+    moderationNote: noteFor(listing.moderationNote, author.id, viewer),
+    moderatedAt: iso(listing.moderatedAt),
+    author: toMemberCardDto(author),
+    isMine: author.id === viewer?.membershipId,
+    createdAt: listing.createdAt.toISOString(),
+    updatedAt: listing.updatedAt.toISOString(),
+  };
+}
+
+export function toBusinessDto(row: BusinessWithAuthor, viewer: Viewer | null): BusinessDto {
+  return { ...toBusinessCardDto(row, viewer), contactEmail: row.listing.contactEmail, contactPhone: row.listing.contactPhone };
 }
 
 export function toPostDto({ post, author, myReaction }: PostWithAuthor, viewer: Viewer | null, poll: PollDto | null = null): PostDto {
@@ -191,13 +218,13 @@ export function toAdminReportDto(r: ReportRow, reporter: MembershipRow, content:
   return { ...toReportDto(r), reporter: toMemberCardDto(reporter), content: toContentPreviewDto(content) };
 }
 
-export function toModerationItemDto(item: ModerationItemRow, author: MembershipRow, reportCount: number): ModerationItemDto {
+export function toModerationItemDto(item: ModerationItemRow, author: MembershipRow | null, reportCount: number): ModerationItemDto {
   return {
     contentType: item.contentType,
     id: item.id,
     title: item.title,
     excerpt: item.excerpt ? item.excerpt.slice(0, 300) : null,
-    author: toMemberCardDto(author),
+    author: author ? toMemberCardDto(author) : null,
     moderationStatus: item.moderationStatus,
     moderatedAt: iso(item.moderatedAt),
     createdAt: item.createdAt.toISOString(),

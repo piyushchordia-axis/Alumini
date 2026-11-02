@@ -23,6 +23,8 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
       return `${base}/jobs/${t.id}`;
     case "funding":
       return `${base}/funding/${t.id}`;
+    case "business":
+      return `${base}/businesses/${t.id}`;
     case "myContent":
       return `${base}/my-content`;
     case "profile":

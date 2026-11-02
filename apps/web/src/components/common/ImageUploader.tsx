@@ -5,7 +5,7 @@ import { Button } from "@/components/ui";
 import { api } from "@/lib/api";
 import { toast } from "@/stores/uiStore";
 
-export function ImageUploader({ slug, urls, onChange, max = 1, label = "Add image" }: { slug: string; urls: string[]; onChange: (urls: string[]) => void; max?: number; label?: string }) {
+export function ImageUploader({ slug, urls, onChange, max = 1, label = "Add image", removeLabel = "Remove image" }: { slug: string; urls: string[]; onChange: (urls: string[]) => void; max?: number; label?: string; removeLabel?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +29,7 @@ export function ImageUploader({ slug, urls, onChange, max = 1, label = "Add imag
       {urls.map((u) => (
         <div key={u} className="relative">
           <img src={u} alt="" className="h-20 w-20 rounded-lg object-cover" />
-          <button type="button" onClick={() => onChange(urls.filter((x) => x !== u))} className="absolute -right-1 -top-1 rounded-full bg-slate-900 px-1.5 text-xs text-white" aria-label="Remove image">
+          <button type="button" onClick={() => onChange(urls.filter((x) => x !== u))} className="absolute -right-1 -top-1 rounded-full bg-slate-900 px-1.5 text-xs text-white" aria-label={removeLabel}>
             ✕
           </button>
         </div>

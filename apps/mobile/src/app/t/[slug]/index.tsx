@@ -45,6 +45,7 @@ export default function TenantLandingScreen() {
           {f.jobs && <Text style={{ color: colors.muted }}>💼 Jobs</Text>}
           {f.funding && <Text style={{ color: colors.muted }}>🚀 Funding</Text>}
           {f.events && <Text style={{ color: colors.muted }}>📅 Events</Text>}
+          {f.businesses && <Text style={{ color: colors.muted }}>🏪 Businesses</Text>}
           {f.directory && <Text style={{ color: colors.muted }}>🎓 Directory</Text>}
         </View>
         <Button title="Sign in / Join with mobile number" onPress={() => router.push(`/t/${slug}/login`)} />

@@ -2,6 +2,7 @@ import type { InvitationsQuery } from "@illuminize/shared";
 import { and, count, desc, eq, gt, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { invitations } from "../db/schema";
+import { escapeLike } from "./content.common";
 
 export type InvitationRow = typeof invitations.$inferSelect;
 export type InvitationInsert = typeof invitations.$inferInsert;
@@ -75,7 +76,7 @@ function listConditions(tenantId: string, q: Pick<InvitationsQuery, "status" | "
   else if (q.status === "PENDING" || q.status === "SENT") conds.push(eq(invitations.status, q.status), gt(invitations.expiresAt, now));
   else if (q.status) conds.push(eq(invitations.status, q.status));
   if (q.q) {
-    const p = `%${q.q.replace(/[%_]/g, "\\$&")}%`;
+    const p = `%${escapeLike(q.q)}%`;
     conds.push(or(ilike(invitations.fullName, p), ilike(invitations.phoneE164, p), ilike(invitations.email, p))!);
   }
   return conds;

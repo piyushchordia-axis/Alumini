@@ -4,6 +4,7 @@ export * from "./tenants";
 export * from "./memberships";
 export * from "./jobs";
 export * from "./funding";
+export * from "./businesses";
 export * from "./posts";
 export * from "./events";
 export * from "./reports";

@@ -3,6 +3,8 @@ import type { AppContext } from "../context";
 import { toMembershipSummaryDto, toUserDto } from "../dto/user.dto";
 import { AppError } from "../lib/errors";
 import { normalizePhone } from "../lib/phone";
+import { runInTransaction } from "../lib/transaction";
+import { resolveOpenReportsOnListingsOfUser } from "../repositories/businesses.repo";
 import { listMembershipsForUser } from "../repositories/memberships.repo";
 import { deleteUser, findUserById, upsertUserOnLogin } from "../repositories/users.repo";
 import { recordAudit } from "./audit.service";
@@ -38,5 +40,8 @@ export async function deleteAccount(ctx: AppContext, userId: string, ip?: string
   if (!user) return;
   await recordAudit(ctx, { actorUserId: userId, action: "auth.account_deleted", ip, metadata: { phone: user.phoneE164 } });
   await revokeAllSessions(ctx, userId);
-  await deleteUser(ctx.db, userId);
+  await runInTransaction(ctx, async (tx) => {
+    await resolveOpenReportsOnListingsOfUser(tx, userId, "auto: author deleted");
+    await deleteUser(tx, userId);
+  });
 }

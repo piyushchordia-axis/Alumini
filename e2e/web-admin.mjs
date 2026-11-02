@@ -83,6 +83,20 @@ try {
     await shot("a03-moderation");
   });
 
+  await step("approve a pending business listing, seeing its contact details first", async () => {
+    await page.goto(`${BASE}/t/demo-college/admin/moderation?type=BUSINESS`);
+    const row = page.locator("li", { hasText: "Joshi Automation Services" }).first();
+    await row.waitFor();
+    if (await row.locator("text=service@joshiautomation.example").count()) throw new Error("the queue shows contact details before opening the listing");
+    await row.locator('button:has-text("View full content")').click();
+    await row.locator("text=service@joshiautomation.example").waitFor();
+    await row.locator('a:has-text("Open in app")').waitFor();
+    await row.locator('button:has-text("Approve")').click();
+    await page.waitForSelector("text=Business listing approved");
+    await row.waitFor({ state: "detached" });
+    await shot("a03b-moderation-business");
+  });
+
   await step("resolve the spam report by removing content", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/reports`);
     await page.waitForSelector("text=Earn $5000/week");
@@ -109,9 +123,11 @@ try {
       if (JSON.stringify(body.features) !== JSON.stringify(expected)) throw new Error(`settings save sent features ${JSON.stringify(body.features)}, expected ${JSON.stringify(expected)}`);
     };
     const directory = page.locator('label:has-text("Member directory") input');
+    const businesses = page.locator('label:has-text("Business directory") input');
 
     // Only what was toggled goes out, so a stale tab can't undo another admin's change.
     await open();
+    if (!(await businesses.isChecked())) throw new Error("the Business directory switch should start on");
     sentFeatures(await save(), undefined);
     await page.waitForSelector("text=Settings saved");
 
@@ -187,6 +203,17 @@ try {
     await page.waitForSelector("text=Announcement posted");
     await page.locator("article", { hasText: text }).first().locator("text=📣 Announcement").waitFor();
     await shot("a08-announcement");
+  });
+
+  await step("the reported business listing is in the university's reports", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/reports`);
+    const row = page.locator("li", { hasText: "Promises guaranteed visas" }).first();
+    await row.waitFor();
+    await row.locator("text=Business listing").waitFor();
+    await row.locator("text=Instant Visa Desk").waitFor();
+    await row.locator("text=Guaranteed visas in 24 hours").waitFor();
+    await row.locator('button:has-text("Remove content")').waitFor();
+    await shot("a08b-reports-business");
   });
 
   await step("analytics charts render and the members CSV downloads", async () => {
