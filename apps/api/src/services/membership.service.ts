@@ -1,7 +1,8 @@
 import type { AdminMemberDto, AdminMembersQuery, MembershipDto, MembershipProfileInput, MembershipProfileUpdate, MembershipRole } from "@illuminize/shared";
 import type { AppContext } from "../context";
+import type { DbClient } from "../db/client";
 import { toAdminMemberDto, toMembershipDto } from "../dto/membership.dto";
-import { AppError } from "../lib/errors";
+import { AppError, isAppError } from "../lib/errors";
 import { buildPage, type Page } from "../lib/pagination";
 import {
   approveAllPending as approveAllPendingRepo,
@@ -12,12 +13,13 @@ import {
   updateMembership,
 } from "../repositories/memberships.repo";
 import { findUserById, updateUser } from "../repositories/users.repo";
+import { hasOpenReportAbout } from "../repositories/chatReports.repo";
 import { claimInvitation, findOpenInvitationByPhone } from "../repositories/invitations.repo";
 import { runInTransaction } from "../lib/transaction";
 import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "./profileFields.service";
 import type { AuthContext, MembershipRow, TenantContext } from "../types/request";
 import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
-import { recordAudit } from "./audit.service";
+import { recordAudit, recordAuditStrict } from "./audit.service";
 import { notify, notifyTenantAdmins } from "./notifications/notification.service";
 
 interface Actor extends AuthContext {
@@ -116,20 +118,16 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
     const accepted = invite ? await claimInvitation(tx, invite.id, row.id) : undefined;
     if (accepted) await applyInvitationAnswers(ctx, tx, tenant.id, row.id, accepted.fieldValues, Object.keys(input.fields ?? {}));
     await updateUser(tx, actor.userId, { displayName: input.fullName });
-    await recordAudit(
-      ctx,
-      {
-        tenantId: tenant.id,
-        actorUserId: actor.userId,
-        actorMembershipId: row.id,
-        action,
-        targetType: "membership",
-        targetId: row.id,
-        metadata: { status: row.status, ...(accepted ? { invitationId: accepted.id } : {}) },
-        ip: actor.ip,
-      },
-      tx,
-    );
+    await recordAuditStrict(tx, {
+      tenantId: tenant.id,
+      actorUserId: actor.userId,
+      actorMembershipId: row.id,
+      action,
+      targetType: "membership",
+      targetId: row.id,
+      metadata: { status: row.status, ...(accepted ? { invitationId: accepted.id } : {}) },
+      ip: actor.ip,
+    });
 
     if (row.status === "PENDING") {
       await notifyTenantAdmins(
@@ -171,10 +169,47 @@ export async function updateMyProfile(
   return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
 }
 
-async function loadTarget(ctx: AppContext, tenantId: string, membershipId: string) {
-  const target = await findMembershipWithUser(ctx.db, tenantId, membershipId);
+async function loadTarget(db: DbClient, tenantId: string, membershipId: string) {
+  const target = await findMembershipWithUser(db, tenantId, membershipId);
   if (!target) throw AppError.notFound("Member not found");
   return target;
+}
+
+/**
+ * While a chat report about them is open, a tenant admin can't use what they could get back at the reporter with: suspending
+ * anyone, changing a role, restoring a suspended admin who could then close the report, or editing a profile, which can
+ * publish a phone number or, at a school, turn someone into a current pupil and so cut them off from chat. Refuses before
+ * looking at who is targeted, so the answer is the same for everyone and doesn't point at the reporter. Illuminize staff
+ * aren't restricted, even if a report is about them. Goes inside the transaction of the change it guards.
+ */
+async function assertNoOpenReportAboutActor(db: DbClient, tenantId: string, actor: Actor): Promise<void> {
+  if (actor.isPlatformAdmin || !actor.membershipId) return;
+  if (await hasOpenReportAbout(db, tenantId, actor.membershipId)) throw AppError.forbidden("This needs another admin or Illuminize staff", "NEEDS_ANOTHER_ADMIN");
+}
+
+/**
+ * Runs a change the rule above guards, and keeps a record if the rule refuses it, so that other admins and staff can see an
+ * attempt to get back at someone or to find out when a report opens. The transaction has rolled back by then and nothing
+ * changed, so a row that can't be written isn't worth turning the refusal into an error. Says nothing of any report.
+ */
+async function recordingRefusal<T>(ctx: AppContext, tenantId: string, actor: Actor, attempted: string, membershipId: string, change: () => Promise<T>): Promise<T> {
+  try {
+    return await change();
+  } catch (err) {
+    if (isAppError(err) && err.code === "NEEDS_ANOTHER_ADMIN") {
+      await recordAudit(ctx, {
+        tenantId,
+        actorUserId: actor.userId,
+        actorMembershipId: actor.membershipId ?? null,
+        action: "membership.action_refused",
+        targetType: "membership",
+        targetId: membershipId,
+        metadata: { attempted },
+        ip: actor.ip,
+      });
+    }
+    throw err;
+  }
 }
 
 const MEMBER_NOTIFICATIONS: Partial<
@@ -210,15 +245,23 @@ export async function adminTransition(
   reason?: string,
 ): Promise<AdminMemberDto> {
   const { tenant } = tenantCtx;
-  const { membership: target, user } = await loadTarget(ctx, tenant.id, membershipId);
-  if (target.userId === actor.userId) throw AppError.forbidden("You cannot change your own membership");
-  const next = transitionMembership(target.status, action);
-  const row = (await updateMembership(ctx.db, tenant.id, target.id, {
-    status: next,
-    statusReason: reason ?? null,
-    statusChangedAt: new Date(),
-    statusChangedByUserId: actor.userId,
-  }))!;
+  const { target, user, next, row } = await recordingRefusal(ctx, tenant.id, actor, `membership.${action}`, membershipId, () =>
+    runInTransaction(ctx, async (tx) => {
+      if (action === "suspend") await assertNoOpenReportAboutActor(tx, tenant.id, actor);
+      const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
+      if (target.userId === actor.userId) throw AppError.forbidden("You cannot change your own membership");
+      const next = transitionMembership(target.status, action);
+      // The role survives a suspension, so this gives back admin access just as a role change would.
+      if (next === "APPROVED" && target.role === "TENANT_ADMIN") await assertNoOpenReportAboutActor(tx, tenant.id, actor);
+      const row = (await updateMembership(tx, tenant.id, target.id, {
+        status: next,
+        statusReason: reason ?? null,
+        statusChangedAt: new Date(),
+        statusChangedByUserId: actor.userId,
+      }))!;
+      return { target, user, next, row };
+    }),
+  );
   await recordAudit(ctx, {
     tenantId: tenant.id,
     actorUserId: actor.userId,
@@ -266,11 +309,17 @@ export async function approveAllPending(ctx: AppContext, tenantCtx: TenantContex
 
 export async function changeRole(ctx: AppContext, tenantCtx: TenantContext, actor: Actor, membershipId: string, role: MembershipRole): Promise<AdminMemberDto> {
   const { tenant } = tenantCtx;
-  const { membership: target, user } = await loadTarget(ctx, tenant.id, membershipId);
-  if (target.userId === actor.userId) throw AppError.forbidden("You cannot change your own role");
-  if (target.status !== "APPROVED") throw AppError.invalidTransition("Only approved members can be given a role");
-  if (target.role === role) return toAdminMemberDto(target, user, await answersForOne(ctx, tenant.id, target.id, "admin"));
-  const row = (await updateMembership(ctx.db, tenant.id, target.id, { role }))!;
+  const { target, user, row } = await recordingRefusal(ctx, tenant.id, actor, "membership.role_change", membershipId, () =>
+    runInTransaction(ctx, async (tx) => {
+      await assertNoOpenReportAboutActor(tx, tenant.id, actor);
+      const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
+      if (target.userId === actor.userId) throw AppError.forbidden("You cannot change your own role");
+      if (target.status !== "APPROVED") throw AppError.invalidTransition("Only approved members can be given a role");
+      const row = target.role === role ? null : (await updateMembership(tx, tenant.id, target.id, { role }))!;
+      return { target, user, row };
+    }),
+  );
+  if (!row) return toAdminMemberDto(target, user, await answersForOne(ctx, tenant.id, target.id, "admin"));
   await recordAudit(ctx, {
     tenantId: tenant.id,
     actorUserId: actor.userId,
@@ -302,13 +351,16 @@ export async function adminUpdateProfile(
   input: MembershipProfileUpdate,
 ): Promise<AdminMemberDto> {
   const { tenant } = tenantCtx;
-  const { user } = await loadTarget(ctx, tenant.id, membershipId);
-  assertBatchYear(tenantCtx, input.batchYear);
-  const row = await runInTransaction(ctx, async (tx) => {
-    const updated = (await updateMembership(tx, tenant.id, membershipId, profileColumns(input)))!;
-    if (input.fields) await saveAnswers(ctx, tx, tenant.id, membershipId, input.fields, "admin");
-    return updated;
-  });
+  const { user, row } = await recordingRefusal(ctx, tenant.id, actor, "membership.admin_profile_update", membershipId, () =>
+    runInTransaction(ctx, async (tx) => {
+      await assertNoOpenReportAboutActor(tx, tenant.id, actor);
+      const { user } = await loadTarget(tx, tenant.id, membershipId);
+      assertBatchYear(tenantCtx, input.batchYear);
+      const row = (await updateMembership(tx, tenant.id, membershipId, profileColumns(input)))!;
+      if (input.fields) await saveAnswers(ctx, tx, tenant.id, membershipId, input.fields, "admin");
+      return { user, row };
+    }),
+  );
   await recordAudit(ctx, {
     tenantId: tenant.id,
     actorUserId: actor.userId,
@@ -339,6 +391,6 @@ export async function listMembers(ctx: AppContext, tenantId: string, query: Admi
 }
 
 export async function getMemberForAdmin(ctx: AppContext, tenantId: string, membershipId: string): Promise<AdminMemberDto> {
-  const { membership, user } = await loadTarget(ctx, tenantId, membershipId);
+  const { membership, user } = await loadTarget(ctx.db, tenantId, membershipId);
   return toAdminMemberDto(membership, user, await answersForOne(ctx, tenantId, membershipId, "admin"));
 }

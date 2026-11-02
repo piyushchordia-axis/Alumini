@@ -4,17 +4,21 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { auditLog, chatBlocks, chatConversations, chatMessages, chatParticipants, chatReports, contentReports, memberships, notifications, outboundMessages, tenantSettings, tenants } from "../../src/db/schema";
 import { SEEDED_REPORTED_CHAT_BODY, seedConnections, seedCore, seedMembers } from "../../src/db/seed";
+import { createApp } from "../../src/app";
 import { runInTransaction } from "../../src/lib/transaction";
 import { lockPair } from "../../src/repositories/chat.repo";
 import { chatRecipientOf, chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
+import { capturingLogger } from "../helpers/capturingLogger";
 import { acceptedThread, ageRequest, chatApi, conversationRow, openRequest, participantRow, type Session } from "../helpers/chat";
-import { createTenant, memberSession } from "../helpers/factories";
+import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
+
+const SECRET_TAG = "demo-chat-report-7Q4X";
 
 describe.skipIf(!dbAvailable)("chat safety", () => {
   let ctx: TestContext;
@@ -991,7 +995,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       await chat(a).report(body.data.id);
       await ctx.jobs.drain();
       const base = `/api/v1/t/${tenant.slug}/admin`;
-      for (const path of ["/moderation", "/reports", "/audit", "/dashboard", "/members", "/analytics"]) {
+      for (const path of ["/moderation", "/reports", "/chat-reports", "/audit", "/dashboard", "/members", "/analytics"]) {
         const res = await request(ctx.app).get(`${base}${path}`).set(admin.headers);
         expect(JSON.stringify(res.body), path).not.toContain(secret);
       }
@@ -1041,6 +1045,43 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       await seed();
       const everywhere = JSON.stringify([await ctx.db.select().from(notifications), await ctx.db.select().from(auditLog), await ctx.db.select().from(contentReports), (await ctx.db.execute(sql`select * from moderation_items`)).rows, ctx.jobs.history]);
       expect(everywhere).not.toContain(SEEDED_REPORTED_CHAT_BODY);
+    });
+
+    it("only the audited view reads the reported body: not moderation, the reports or chat queues, or the logs of a view that fails", async () => {
+      await seed();
+      const admin = auth((await loginAs(ctx, "+919000000001")).accessToken);
+      const staff = auth((await loginAs(ctx, "+919999999999")).accessToken);
+      const base = "/api/v1/t/demo-university/admin";
+      const [report] = await ctx.db.select().from(chatReports);
+      expect(report!.details).toBeTruthy();
+
+      expect(JSON.stringify((await ctx.db.execute(sql`select * from moderation_items`)).rows)).not.toContain(SECRET_TAG);
+      for (const path of ["/moderation", "/reports", "/chat-reports", "/audit", "/dashboard"]) {
+        const res = await request(ctx.app).get(`${base}${path}`).set(admin);
+        expect(res.status, path).toBe(200);
+        expect(JSON.stringify(res.body), path).not.toContain(SECRET_TAG);
+      }
+      const queue = await request(ctx.app).get(`${base}/chat-reports`).set(admin);
+      expect(queue.body.total).toBe(1);
+      expect(JSON.stringify(queue.body)).not.toContain(report!.details!);
+      // It names no admin and the university has admins left, so staff get nothing of it.
+      expect((await request(ctx.app).get("/api/v1/platform/chat-reports").set(staff)).body.total).toBe(0);
+
+      const { logger, text } = capturingLogger();
+      await ctx.db.execute(sql`alter table audit_log add constraint test_refuse_seeded_view check (action <> 'chat_report.view') not valid`);
+      try {
+        const failed = await request(createApp({ ...ctx, logger })).post(`${base}/chat-reports/${report!.id}/view`).set(admin).send();
+        expect(failed.status).toBe(500);
+        expect(JSON.stringify(failed.body)).not.toContain(SECRET_TAG);
+      } finally {
+        await ctx.db.execute(sql`alter table audit_log drop constraint test_refuse_seeded_view`);
+      }
+      expect(text()).toContain("Unhandled error");
+      expect(text()).not.toContain(SECRET_TAG);
+
+      const viewed = await request(ctx.app).post(`${base}/chat-reports/${report!.id}/view`).set(admin).send();
+      expect(viewed.body.data.messages.find((m: { isTarget: boolean }) => m.isTarget).body).toBe(SEEDED_REPORTED_CHAT_BODY);
+      expect(viewed.body.data.messages.find((m: { isTarget: boolean }) => m.isTarget).sender.fullName).toBeTruthy();
     });
 
     it("adds no content report to the college, whose admin e2e expects none", async () => {

@@ -5,6 +5,7 @@ import { RequireTenantAdmin } from "@/components/guards/RequireTenantAdmin";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PlatformLayout } from "@/components/layout/PlatformLayout";
 import { PlatformAuditPage } from "@/routes/platform/PlatformAuditPage";
+import { PlatformChatReportsPage } from "@/routes/platform/PlatformChatReportsPage";
 import { PlatformComparePage } from "@/routes/platform/PlatformComparePage";
 import { PlatformLoginPage } from "@/routes/platform/PlatformLoginPage";
 import { PlatformStatsPage } from "@/routes/platform/PlatformStatsPage";
@@ -14,6 +15,7 @@ import { PlatformTenantsPage } from "@/routes/platform/PlatformTenantsPage";
 import { PlatformUsersPage } from "@/routes/platform/PlatformUsersPage";
 import { AdminAnalyticsPage } from "@/routes/t/admin/AdminAnalyticsPage";
 import { AdminAuditPage } from "@/routes/t/admin/AdminAuditPage";
+import { AdminChatReportsPage } from "@/routes/t/admin/AdminChatReportsPage";
 import { AdminDashboardPage } from "@/routes/t/admin/AdminDashboardPage";
 import { AdminMemberDetailPage } from "@/routes/t/admin/AdminMemberDetailPage";
 import { AdminMembersPage } from "@/routes/t/admin/AdminMembersPage";
@@ -38,6 +40,7 @@ export const adminRoutes: RouteObject = {
         { path: "members/:membershipId", element: <AdminMemberDetailPage /> },
         { path: "moderation", element: <AdminModerationPage /> },
         { path: "reports", element: <AdminReportsPage /> },
+        { path: "chat-reports", element: <AdminChatReportsPage /> },
         { path: "settings", element: <AdminSettingsPage /> },
         { path: "profile-fields", element: <AdminProfileFieldsPage /> },
         { path: "invitations", element: <AdminInvitationsPage /> },
@@ -67,6 +70,7 @@ export const platformRoutes: RouteObject[] = [
               { path: "users", element: <PlatformUsersPage /> },
               { path: "stats", element: <PlatformStatsPage /> },
               { path: "compare", element: <PlatformComparePage /> },
+              { path: "chat-reports", element: <PlatformChatReportsPage /> },
               { path: "audit", element: <PlatformAuditPage /> },
             ],
           },

@@ -123,6 +123,7 @@ export const NOTIFICATION_TYPES = [
   "CELEBRATION",
   "CELEBRATION_WISH",
   "CHAT_REPORT_FILED",
+  "CHAT_MESSAGE_REMOVED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -267,6 +268,12 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   INAPPROPRIATE: "Inappropriate content",
   MISINFORMATION: "Misinformation",
   OTHER: "Other",
+};
+
+export const CHAT_REPORT_TARGET_KIND_LABELS: Record<ChatReportTargetKind, string> = {
+  MESSAGE: "Message",
+  MENTORSHIP_NOTE: "Mentorship request",
+  REFERRAL_NOTE: "Referral request",
 };
 
 export const MEMBERSHIP_STATUS_LABELS: Record<MembershipStatus, string> = {

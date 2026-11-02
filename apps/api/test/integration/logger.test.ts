@@ -1,28 +1,16 @@
-import { Writable } from "node:stream";
 import { sql } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import pino from "pino";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app";
-import { createLogger, errSerializer } from "../../src/lib/logger";
+import { errSerializer } from "../../src/lib/logger";
+import { capturingLogger } from "../helpers/capturingLogger";
 import { acceptedThread, chatApi } from "../helpers/chat";
 import { createTenant, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
-
-/** A logger writing to a string a test can read. */
-function capturingLogger() {
-  const lines: string[] = [];
-  const stream = new Writable({
-    write(chunk, _encoding, done) {
-      lines.push(String(chunk));
-      done();
-    },
-  });
-  return { logger: createLogger("info", false, stream), text: () => lines.join("") };
-}
 
 const SECRET = "the-private-message-body-7Q4X";
 

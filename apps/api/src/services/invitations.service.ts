@@ -41,7 +41,7 @@ import { findMessagesByContext, type OutboundMessageRow } from "../repositories/
 import { findTenantById } from "../repositories/tenants.repo";
 import { findUserById } from "../repositories/users.repo";
 import type { AuthContext, TenantContext } from "../types/request";
-import { recordAudit } from "./audit.service";
+import { recordAudit, recordAuditStrict } from "./audit.service";
 import { todayIn } from "./billing.periods";
 import { tenantOutboundChannels } from "./billing.service";
 import { queueMessages } from "./messages/message.service";
@@ -181,7 +181,7 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
       }
     }
     const counts = { created: results.filter((r) => r.status === "created").length, updated: results.filter((r) => r.status === "updated").length };
-    await recordAudit(ctx, { tenantId: tenant.id, actorUserId: actor.userId, actorMembershipId: actor.membershipId ?? null, action: "invitation.import", metadata: { rows: input.rows.length, ...counts }, ip: actor.ip }, tx);
+    await recordAuditStrict(tx, { tenantId: tenant.id, actorUserId: actor.userId, actorMembershipId: actor.membershipId ?? null, action: "invitation.import", metadata: { rows: input.rows.length, ...counts }, ip: actor.ip });
   });
 
   let queued = 0;

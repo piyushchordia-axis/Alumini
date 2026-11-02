@@ -11,7 +11,7 @@ export function auditRoutes(ctx: AppContext): Router {
   router.get(
     "/audit",
     route({ query: auditQuerySchema }, async ({ req, res, query }) => {
-      const { rows, total } = await listAudit(ctx.db, { ...query, tenantId: req.tenantCtx!.tenant.id });
+      const { rows, total } = await listAudit(ctx.db, { ...query, tenantId: req.tenantCtx!.tenant.id, viewerUserId: req.auth!.userId });
       res.json(buildPage(rows.map((r) => toAuditDto(r.entry, r.actorName)), query.page, query.pageSize, total));
     }),
   );

@@ -217,6 +217,104 @@ try {
     await shot("a08b-reports-business");
   });
 
+  await step("the dashboard shows a tile and a nav entry for open chat reports", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/dashboard`);
+    const tile = page.locator('a[href$="/admin/chat-reports"]', { hasText: "Open chat reports" });
+    await tile.waitFor();
+    if ((await tile.locator(".text-2xl").textContent()).trim() !== "1") throw new Error("the tile should count the seeded chat report");
+    await page.locator('nav[aria-label="Admin sections"] a', { hasText: "Chat reports" }).waitFor();
+    // Exact, because "Reports" alone would match "Chat reports" as well.
+    await page.locator('nav[aria-label="Admin sections"] a span:text-is("Reports")').waitFor();
+    await shot("a08c-chat-report-tile");
+  });
+
+  const SEEDED_BODY = "demo-chat-report-7Q4X";
+  await step("a chat report hides the message until an admin chooses to view it", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/chat-reports`);
+    const row = page.locator("li", { hasText: "Arjun" }).first();
+    await row.waitFor();
+    await row.locator("text=Harassment").waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the chat reports queue shows a message before anyone asked to see it");
+    if (await row.locator("text=Reported message").count()) throw new Error("the chat reports queue shows a message before anyone asked to see it");
+    await row.locator("text=recorded in the audit log").waitFor();
+    await shot("a08d-chat-reports-queue");
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    await row.locator("text=Reported message").waitFor();
+    await shot("a08e-chat-report-view");
+    await row.locator('button:text-is("Hide")').click();
+    await row.locator('button:has-text("View messages")').waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("hiding the messages left them on the page");
+  });
+
+  await step("viewing a chat report writes an audit row", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/audit`);
+    await page.locator("tr", { hasText: "chat_report.view" }).first().locator("text=Ananya").waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the audit log shows the reported message");
+  });
+
+  await step("leaving the chat reports page discards the messages", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/chat-reports`);
+    const row = page.locator("li", { hasText: "Arjun" }).first();
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    // By the app's own links, because a page load would wipe the client's memory whether or not the page discards anything.
+    const nav = page.locator('nav[aria-label="Admin sections"]');
+    await nav.locator("a", { hasText: "Audit log" }).click();
+    await page.waitForURL(/\/admin\/audit$/);
+    await nav.locator("a", { hasText: "Chat reports" }).click();
+    await page.waitForURL(/\/admin\/chat-reports$/);
+    await row.locator('button:has-text("View messages")').waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the message came back without being asked for");
+  });
+
+  await step("a report another admin just handled closes the dialog and refreshes the list", async () => {
+    const row = page.locator("li", { hasText: "Arjun" }).first();
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    // Answered as the API answers the second admin, which leaves the seeded report open for the next step.
+    const resolveUrl = "**/admin/chat-reports/*/resolve";
+    await page.route(resolveUrl, (r) => r.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: { code: "INVALID_TRANSITION", message: "This report has already been handled" } }) }));
+    await row.locator('button:has-text("Remove message")').click();
+    const refetched = page.waitForResponse((r) => r.request().method() === "GET" && /\/admin\/chat-reports\?/.test(r.url()));
+    await page.click('div[role="dialog"] button:has-text("Remove")');
+    await page.waitForSelector("text=This report has already been handled");
+    await refetched;
+    await page.locator('div[role="dialog"]').waitFor({ state: "detached" });
+    await row.locator('button:has-text("View messages")').waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the message stayed on the page after the report was handled elsewhere");
+    await page.unroute(resolveUrl);
+  });
+
+  await step("removing a reported message resolves its report", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/chat-reports`);
+    const row = page.locator("li", { hasText: "Arjun" }).first();
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    await row.locator('button:has-text("Remove message")').click();
+    await page.fill('div[role="dialog"] textarea', "Threatening another member");
+    await page.click('div[role="dialog"] button:has-text("Remove")');
+    await page.waitForSelector("text=Report resolved");
+    await page.waitForSelector("text=No open chat reports");
+    await page.click('[role="tab"]:has-text("Resolved")');
+    const closed = page.locator("li", { hasText: "Arjun" }).first();
+    await closed.locator("text=Message removed").waitFor();
+    if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the resolved tab shows the removed message");
+    await shot("a08f-chat-report-resolved");
+  });
+
+  await step("chat reports fit a phone with no sideways scrolling, messages open", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/t/demo-university/admin/chat-reports?status=RESOLVED`);
+    const row = page.locator("li", { hasText: "Arjun" }).first();
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`the chat reports page scrolls sideways by ${overflow}px on a phone`);
+    await shot("a08g-chat-reports-phone");
+    await page.setViewportSize({ width: 1280, height: 900 });
+  });
+
   await step("analytics charts render and the members CSV downloads", async () => {
     await page.goto(`${BASE}/t/demo-university/admin/dashboard`);
     await page.click("text=Growth and activity charts");
@@ -297,6 +395,30 @@ try {
     const csv = await download(() => page.click('button:has-text("Download CSV")'));
     if (!/^institutions-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
     if (!csv.text.includes("Demo University,demo-university,ACTIVE")) throw new Error("comparison CSV is missing Demo University");
+  });
+
+  await step("the platform console lists only escalated chat reports, and a row fits a phone", async () => {
+    await page.goto(`${BASE}/platform/chat-reports`);
+    await page.waitForSelector("h1:has-text('Chat reports')");
+    await page.waitForSelector("text=No open escalated reports");
+    // The seeded report sits on this tab now and isn't escalated, so only the filter can keep it off.
+    await page.click('[role="tab"]:has-text("Resolved")');
+    await page.waitForSelector("text=No resolved escalated reports");
+
+    // The seed has no escalated report, so this row is answered here, to measure one and to follow where it links.
+    const listUrl = "**/api/v1/platform/chat-reports*";
+    const member = (fullName) => ({ id: "00000000-0000-4000-8000-000000000001", fullName, avatarUrl: null });
+    const report = { id: "00000000-0000-4000-8000-000000000002", targetKind: "MESSAGE", reason: "HARASSMENT", status: "OPEN", reporter: member("Venkataraghavan Subramaniam Iyer"), reported: member("Anantharamakrishnan Chandrasekaran"), resolutionAction: null, resolvedAt: null, createdAt: new Date().toISOString(), tenant: { slug: "demo-university", name: "Demo University of Science and Technology" } };
+    await page.route(listUrl, (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [report], page: 1, pageSize: 25, total: 1 }) }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/platform/chat-reports`);
+    const link = page.locator('main a[href="/t/demo-university/admin/chat-reports?status=OPEN"]');
+    await link.waitFor();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`the platform chat reports page scrolls sideways by ${overflow}px on a phone`);
+    await shot("p01b-platform-chat-reports");
+    await page.unroute(listUrl);
+    await page.setViewportSize({ width: 1280, height: 900 });
   });
 
   await step("platform admin opens an institution's admin console without being a member", async () => {

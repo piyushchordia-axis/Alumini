@@ -3,7 +3,7 @@ import type { ChatInbox } from "../constants";
 import { CHAT_INBOXES } from "../constants";
 import type { RealtimeClient } from "../realtime/client";
 import type { ChatBadgeDto, ChatConversationDto, ChatMessageDto, CursorPage } from "../types/dto";
-import { addToOutbox, highestSeq, keepNewestPage, markMessageRemoved, markOutboxFailed, removeFromOutbox, upsertLiveMessage, type ChatMessagePages, type OutboxEntry } from "./cache";
+import { addToOutbox, highestSeq, keepNewestPage, markLastMessageRemoved, markMessageRemoved, markOutboxFailed, removeFromOutbox, upsertLiveMessage, type ChatMessagePages, type OutboxEntry } from "./cache";
 import { chatKeys } from "./keys";
 
 type QueryKey = readonly unknown[];
@@ -74,6 +74,8 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
   const fillAgain = new Map<string, number>();
   const lastRun = new Map<string, number>();
   const waiting = new Set<string>();
+  // Removals heard of while running. A gap fill read before one can land after it, when the message wasn't loaded to patch.
+  const removedIds = new Set<string>();
 
   const later = (fn: () => void, ms: number) => {
     const timer = setTimeout(() => {
@@ -112,8 +114,9 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
   };
 
   /** Puts a message in the thread and settles its outbox entry, in whichever order the response and the socket echo land. */
-  const settle = (slug: string, id: string, message: ChatMessageDto) => {
+  const settle = (slug: string, id: string, incoming: ChatMessageDto) => {
     const key = chatKeys.messages(slug, id);
+    const message = removedIds.has(incoming.id) ? { ...incoming, body: null, removed: true } : incoming;
     qc.setQueryData(key, (old: ChatMessagePages | undefined) => upsertLiveMessage(old, message));
     if (message.clientKey) qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => removeFromOutbox(old, message.clientKey));
     // With nothing loaded there was nothing to patch.
@@ -177,6 +180,8 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
     void qc.invalidateQueries({ queryKey: chatKeys.threads(slug), refetchType: "none" });
     if (!conversationId) return;
     void qc.invalidateQueries({ queryKey: chatKeys.conversation(slug, conversationId) });
+    // A removal missed while away is of a message already held, which a fill won't read again because it starts after those.
+    void qc.invalidateQueries({ queryKey: chatKeys.messages(slug, conversationId) });
     void fillGap(slug, conversationId);
     later(() => {
       const now = opts.getActive();
@@ -214,10 +219,14 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
           refetchIfFetching(key);
           refreshLists(slug);
         }),
-        realtime.on("chat:removed", ({ tenantSlug: slug, conversationId: id, messageId }) => {
+        realtime.on("chat:removed", ({ tenantSlug: slug, conversationId: id, messageId, seq }) => {
+          removedIds.add(messageId);
           const key = chatKeys.messages(slug, id);
           qc.setQueryData(key, (old: ChatMessagePages | undefined) => markMessageRemoved(old, messageId));
           refetchIfFetching(key);
+          const conversationKey = chatKeys.conversation(slug, id);
+          qc.setQueryData(conversationKey, (old: ChatConversationDto | undefined) => markLastMessageRemoved(old, seq));
+          refetchIfFetching(conversationKey);
           refreshLists(slug);
         }),
         realtime.on("chat:changed", ({ tenantSlug: slug, conversationId: id }) => {

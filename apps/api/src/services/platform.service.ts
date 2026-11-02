@@ -40,7 +40,7 @@ import {
 } from "../repositories/tenants.repo";
 import { findOrCreateUserByPhone, findUserById, searchUsers, updateUser } from "../repositories/users.repo";
 import type { AuthContext, MembershipRow, TenantRow } from "../types/request";
-import { recordAudit } from "./audit.service";
+import { recordAudit, recordAuditStrict } from "./audit.service";
 import { featuresToStore, invalidateTenantCache } from "./tenant.service";
 
 interface PlatformActor extends AuthContext {
@@ -174,19 +174,15 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
     if (input.initialAdmin) {
       await ensureAdminMembership(tx, tenant, input.initialAdmin, actor.userId, fallbackAdminBatchYear(tenant, settings));
     }
-    await recordAudit(
-      ctx,
-      {
-        tenantId: tenant.id,
-        actorUserId: actor.userId,
-        action: "platform.tenant.create",
-        targetType: "tenant",
-        targetId: tenant.id,
-        metadata: { slug: tenant.slug, initialAdmin: input.initialAdmin ? normalizePhone(input.initialAdmin.phone).e164 : null },
-        ip: actor.ip,
-      },
-      tx,
-    );
+    await recordAuditStrict(tx, {
+      tenantId: tenant.id,
+      actorUserId: actor.userId,
+      action: "platform.tenant.create",
+      targetType: "tenant",
+      targetId: tenant.id,
+      metadata: { slug: tenant.slug, initialAdmin: input.initialAdmin ? normalizePhone(input.initialAdmin.phone).e164 : null },
+      ip: actor.ip,
+    });
     return tenant.id;
   });
   await invalidateTenantCache(ctx, input.slug);
@@ -194,7 +190,7 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
 }
 
 export async function updatePlatformTenant(ctx: AppContext, actor: PlatformActor, tenantId: string, input: PlatformTenantUpdateInput): Promise<PlatformTenantDto> {
-  const { tenant, retype } = await runInTransaction(ctx, async (tx) => {
+  const tenant = await runInTransaction(ctx, async (tx) => {
     // Takes the settings lock before reading the type or features, so a features save or another retype can't overlap this one.
     const settings = await findSettings(tx, tenantId, true);
     const current = await findTenantById(tx, tenantId);
@@ -202,19 +198,18 @@ export async function updatePlatformTenant(ctx: AppContext, actor: PlatformActor
     const forced = input.type === "SCHOOL" && current.type !== "SCHOOL" ? retypeToSchool(current.type, settings.features) : null;
     await updateTenant(tx, tenantId, input);
     if (forced?.forcedOff.length) await updateSettings(tx, tenantId, { features: forced.features, updatedByUserId: actor.userId });
-    return { tenant: current, retype: forced };
+    await recordAuditStrict(tx, {
+      tenantId,
+      actorUserId: actor.userId,
+      action: "platform.tenant.update",
+      targetType: "tenant",
+      targetId: tenantId,
+      metadata: { fields: Object.keys(input), status: input.status ?? null, ...(forced ? { forcedOff: forced.forcedOff } : {}) },
+      ip: actor.ip,
+    });
+    return current;
   });
   await invalidateTenantCache(ctx, tenant.slug);
-  // After the commit: recordAudit swallows errors, and a failed insert inside the transaction would silently roll the update back.
-  await recordAudit(ctx, {
-    tenantId,
-    actorUserId: actor.userId,
-    action: "platform.tenant.update",
-    targetType: "tenant",
-    targetId: tenantId,
-    metadata: { fields: Object.keys(input), status: input.status ?? null, ...(retype ? { forcedOff: retype.forcedOff } : {}) },
-    ip: actor.ip,
-  });
   return getPlatformTenant(ctx, tenantId);
 }
 

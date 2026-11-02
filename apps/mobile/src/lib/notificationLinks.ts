@@ -17,6 +17,9 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/funding/${t.id}`;
     case "business":
       return `${base}/businesses/${t.id}`;
+    case "chat":
+      // Nothing to open until the chat screens exist.
+      return null;
     case "myContent":
       return `${base}/profile/my-content`;
     case "profile":

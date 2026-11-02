@@ -23,6 +23,9 @@ interface ExpoStatus {
   details?: { error?: string };
 }
 
+/** An admin's note travels in the body of these, and a note may be quoted on a lock screen, so they push their fixed title alone. */
+const BODY_STAYS_IN_APP: ReadonlySet<NotificationRow["type"]> = new Set(["CHAT_MESSAGE_REMOVED"]);
+
 const isExpoToken = (t: string) => t.startsWith("ExponentPushToken[") || t.startsWith("ExpoPushToken[");
 
 /**
@@ -68,7 +71,7 @@ export class ExpoPushChannel implements PushChannel {
         messages.push({
           to: token,
           title: row.title,
-          body: row.body ?? undefined,
+          body: BODY_STAYS_IN_APP.has(row.type) ? undefined : (row.body ?? undefined),
           data: { ...row.data, notificationId: row.id, type: row.type, tenantSlug: context.tenantSlug },
           sound: "default",
           channelId: "default",

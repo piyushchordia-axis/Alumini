@@ -18,6 +18,7 @@ export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategor
   CONTENT_REJECTED: "ACCOUNT",
   CONTENT_REMOVED: "ACCOUNT",
   SYSTEM: "ACCOUNT",
+  CHAT_MESSAGE_REMOVED: "ACCOUNT",
   POST_COMMENT: "ACTIVITY",
   POST_REACTION: "ACTIVITY",
   EVENT_RSVP: "EVENTS",
@@ -95,6 +96,7 @@ export type NotificationTarget =
   | { kind: "job"; id: string }
   | { kind: "funding"; id: string }
   | { kind: "business"; id: string }
+  | { kind: "chat"; conversationId: string }
   | { kind: "myContent" }
   | { kind: "profile" }
   | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
@@ -104,6 +106,7 @@ interface NotificationData {
   eventId?: string;
   contentType?: string;
   contentId?: string;
+  conversationId?: string;
 }
 
 function contentTarget(d: NotificationData): NotificationTarget | null {
@@ -153,6 +156,7 @@ const TARGETS: Record<NotificationType, TargetFor> = {
   CONTENT_PENDING: () => ({ kind: "admin", section: "moderation" }),
   REPORT_FILED: () => ({ kind: "admin", section: "reports" }),
   CHAT_REPORT_FILED: () => ({ kind: "admin", section: "chat-reports" }),
+  CHAT_MESSAGE_REMOVED: (d) => (d.conversationId ? { kind: "chat", conversationId: d.conversationId } : null),
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_type" ADD VALUE 'CHAT_MESSAGE_REMOVED';

@@ -5,7 +5,7 @@ import { realtime } from "@/lib/realtime";
 import { useIsAuthenticated } from "@/stores/authStore";
 
 /** Notifications that tell an admin there is something to review. */
-const ADMIN_TYPES = new Set(["NEW_MEMBER_PENDING", "CONTENT_PENDING", "REPORT_FILED"]);
+const ADMIN_TYPES = new Set(["NEW_MEMBER_PENDING", "CONTENT_PENDING", "REPORT_FILED", "CHAT_REPORT_FILED"]);
 
 /**
  * Keeps the live connection open while signed in and turns live events into cache updates: the bell count changes

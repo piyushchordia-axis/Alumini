@@ -1,6 +1,6 @@
-import type { ChatBlockDto, ChatLastMessageDto, ChatMemberDto, ChatMessageDto, ChatReportDto } from "@illuminize/shared";
-import type { ChatBlockRow, ChatMessageRow, ChatSender } from "../repositories/chat.repo";
-import type { ChatReportRow } from "../repositories/chatReports.repo";
+import type { AdminChatReportDto, AdminChatReportViewDto, ChatBlockDto, ChatLastMessageDto, ChatMemberDto, ChatMessageDto, ChatReportDto, PlatformChatReportDto } from "@illuminize/shared";
+import type { ChatBlockRow, ChatMessageRow, ChatSender, MessageWithSender } from "../repositories/chat.repo";
+import type { ChatReportQueueRow, ChatReportRow, FoundChatReport } from "../repositories/chatReports.repo";
 
 export const toChatMemberDto = (m: ChatSender): ChatMemberDto => ({ id: m.id, fullName: m.fullName, avatarUrl: m.avatarUrl });
 
@@ -33,4 +33,46 @@ export function toChatBlockDto(block: ChatBlockRow, member: ChatSender): ChatBlo
 
 export function toChatReportDto(r: ChatReportRow): ChatReportDto {
   return { id: r.id, targetKind: r.targetKind, targetId: r.targetId, reason: r.reason, status: r.status, createdAt: r.createdAt.toISOString() };
+}
+
+export function toAdminChatReportDto({ report, reporter, reported }: ChatReportQueueRow): AdminChatReportDto {
+  return {
+    id: report.id,
+    targetKind: report.targetKind,
+    reason: report.reason,
+    status: report.status,
+    reporter: reporter && toChatMemberDto(reporter),
+    reported: reported && toChatMemberDto(reported),
+    resolutionAction: report.resolutionAction,
+    resolvedAt: report.resolvedAt?.toISOString() ?? null,
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
+export function toPlatformChatReportDto(row: ChatReportQueueRow & { tenant: { slug: string; name: string } }): PlatformChatReportDto {
+  return { ...toAdminChatReportDto(row), tenant: row.tenant };
+}
+
+/**
+ * Field by field, so the row's removal note, who removed it, its client key and whether it was withheld can't come along.
+ * Nor can its seq, whose size tells an admin how long the thread is and whose gaps show messages withheld from it. The
+ * order of the array is the order of the thread.
+ */
+export function toAdminChatReportViewDto(found: FoundChatReport, messages: MessageWithSender[]): AdminChatReportViewDto {
+  const { report } = found;
+  return {
+    ...toAdminChatReportDto(found),
+    details: report.details,
+    noteSnapshot: report.noteSnapshot,
+    resolutionNote: report.resolutionNote,
+    messages: messages.map(({ message, sender }) => ({
+      id: message.id,
+      kind: message.kind,
+      sender: sender && toChatMemberDto(sender),
+      body: message.body,
+      removed: !!message.removedAt,
+      isTarget: message.id === report.targetId,
+      createdAt: message.createdAt.toISOString(),
+    })),
+  };
 }

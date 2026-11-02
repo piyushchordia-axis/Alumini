@@ -19,6 +19,7 @@ export function PlatformLayout() {
     { to: "/platform/users", label: "Users", icon: "👤" },
     { to: "/platform/stats", label: "Stats", icon: "📈" },
     { to: "/platform/compare", label: "Compare", icon: "⚖️" },
+    { to: "/platform/chat-reports", label: "Chat reports", icon: "💬" },
     { to: "/platform/audit", label: "Audit log", icon: "📜" },
   ];
   const linkClass = ({ isActive }: { isActive: boolean }) =>

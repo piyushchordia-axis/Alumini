@@ -11,7 +11,7 @@ import {
   insertEmailVerification,
 } from "../repositories/emailVerifications.repo";
 import { findUserById, updateUser } from "../repositories/users.repo";
-import { recordAudit } from "./audit.service";
+import { recordAuditStrict } from "./audit.service";
 import { queueMessage } from "./messages/message.service";
 
 /** Confirmation emails one address may receive per day. */
@@ -71,7 +71,7 @@ export async function requestEmailChange(ctx: AppContext, userId: string, email:
       expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_SECONDS * 1000),
     });
     await queueMessage(ctx, { type: "EMAIL_VERIFY", to: { email, userId }, payload: { verificationId: v.id, link }, context: { type: "email_verification", id: v.id } }, tx);
-    await recordAudit(ctx, { actorUserId: userId, action: "user.email.requested", targetType: "user", targetId: userId, metadata: { verificationId: v.id }, ip }, tx);
+    await recordAuditStrict(tx, { actorUserId: userId, action: "user.email.requested", targetType: "user", targetId: userId, metadata: { verificationId: v.id }, ip });
   });
   return getEmailStatus(ctx, userId);
 }
@@ -83,7 +83,7 @@ export async function confirmEmail(ctx: AppContext, token: string, ip?: string):
     if (!v) throw new AppError(400, "EMAIL_TOKEN_INVALID", "This link has expired or was already used. Request a new one from your profile.");
     await updateUser(tx, v.userId, { email: v.email, emailVerifiedAt: new Date() });
     await closeEmailVerifications(tx, v.userId);
-    await recordAudit(ctx, { actorUserId: v.userId, action: "user.email.verified", targetType: "user", targetId: v.userId, metadata: { verificationId: v.id }, ip }, tx);
+    await recordAuditStrict(tx, { actorUserId: v.userId, action: "user.email.verified", targetType: "user", targetId: v.userId, metadata: { verificationId: v.id }, ip });
     return { email: v.email };
   });
 }
@@ -93,7 +93,7 @@ export async function removeEmail(ctx: AppContext, userId: string, ip?: string):
   await runInTransaction(ctx, async (tx) => {
     await updateUser(tx, userId, { email: null, emailVerifiedAt: null });
     await closeEmailVerifications(tx, userId);
-    await recordAudit(ctx, { actorUserId: userId, action: "user.email.removed", targetType: "user", targetId: userId, ip }, tx);
+    await recordAuditStrict(tx, { actorUserId: userId, action: "user.email.removed", targetType: "user", targetId: userId, ip });
   });
   return getEmailStatus(ctx, userId);
 }

@@ -7,7 +7,7 @@ import { runInTransaction } from "../../lib/transaction";
 import { findBlockedByMember, findMessageInTenant, findParticipant, reportContextIds, type ConversationRow } from "../../repositories/chat.repo";
 import { insertChatReport } from "../../repositories/chatReports.repo";
 import type { TenantContext } from "../../types/request";
-import { recordAudit } from "../audit.service";
+import { recordAuditStrict } from "../audit.service";
 import { notifyTenantAdmins } from "../notifications/notification.service";
 import type { ChatActor } from "./chat.service";
 
@@ -52,7 +52,7 @@ export async function reportMessage(ctx: AppContext, tenantCtx: TenantContext, a
     });
     if (!report) throw AppError.conflict("You have already reported this message");
 
-    await recordAudit(ctx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } }, tx);
+    await recordAuditStrict(tx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } });
     await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A chat message was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, message.senderMembershipId] }, tx);
     return report;
   });

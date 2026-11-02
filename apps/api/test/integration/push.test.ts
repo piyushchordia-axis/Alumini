@@ -9,6 +9,8 @@ const dbAvailable = await isDatabaseAvailable();
 
 interface SentMessage {
   to: string;
+  title?: string;
+  body?: string;
   data: Record<string, unknown>;
 }
 
@@ -58,8 +60,24 @@ describe.skipIf(!dbAvailable)("Expo push channel", () => {
     await upsertPushToken(ctx.db, { userId: user.id, token: GONE, platform: "IOS" });
     const [row] = await insertNotifications(ctx.db, [{ tenantId: tenant.id, recipientMembershipId: membership.id, type: "POST_COMMENT", title: "New comment", body: "Hi", data: { postId: "p1" } }]);
     const recipients = [{ membershipId: membership.id, userId: user.id }];
-    return { user, row: row!, recipients };
+    return { user, row: row!, recipients, membership, tenantId: tenant.id };
   }
+
+  it("keeps an admin's note on a removed message in the app: the push carries the fixed title and no body", async () => {
+    const { row, recipients, membership, tenantId } = await setup();
+    const [removed] = await insertNotifications(ctx.db, [{ tenantId, recipientMembershipId: membership.id, type: "CHAT_MESSAGE_REMOVED", title: "A message you sent was removed", body: "An admin's note", data: { conversationId: "c1", messageId: "m1" } }]);
+    const expo = fakeExpo({ ticket: (t) => ({ status: "ok", id: `t:${t}` }) });
+    const channel = new ExpoPushChannel(ctx.db, ctx.redis, ctx.logger, undefined, expo.impl);
+
+    await channel.deliver([removed!, row], recipients, { tenantSlug: "push-college" });
+    const sent = expo.sends.flat();
+    const push = sent.find((m) => m.data.type === "CHAT_MESSAGE_REMOVED")!;
+    expect(push.title).toBe("A message you sent was removed");
+    expect(push.body).toBeUndefined();
+    expect(JSON.stringify(sent)).not.toContain("An admin's note");
+    // Everything else keeps its body.
+    expect(sent.find((m) => m.data.type === "POST_COMMENT")!.body).toBe("Hi");
+  });
 
   it("sends the institution slug for tap routing and drops tokens Expo rejects at send time", async () => {
     const { user, row, recipients } = await setup();

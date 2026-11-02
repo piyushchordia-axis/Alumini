@@ -282,14 +282,16 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
     const retype = (tenantId: string, type: string) => api().patch(`/api/v1/platform/tenants/${tenantId}`).set(platform).send({ type });
     const audits = (tenantId: string) => ctx.db.select().from(auditLog).where(and(eq(auditLog.tenantId, tenantId), eq(auditLog.action, "platform.tenant.update")));
 
-    it("stands when its audit row can't be written, rather than reporting success for an update that rolled back", async () => {
+    it("fails and leaves nothing behind when its audit row can't be written, so it can't lose the record of what it forced off", async () => {
       const { tenant } = await createTenant(ctx);
+      const before = await storedFeatures(tenant.id);
       await ctx.db.execute(sql`alter table audit_log add constraint test_refuse_tenant_update check (action <> 'platform.tenant.update') not valid`);
       try {
         const res = await api().patch(`/api/v1/platform/tenants/${tenant.id}`).set(platform).send({ type: "SCHOOL", status: "SUSPENDED" });
-        expect(res.status).toBe(200);
-        expect(res.body.data.tenant).toMatchObject({ type: "SCHOOL", status: "SUSPENDED" });
-        expect((await storedFeatures(tenant.id)).funding).toBe(false);
+        expect(res.status).toBe(500);
+        expect(res.body.error.code).toBe("INTERNAL");
+        expect((await api().get(`/api/v1/platform/tenants/${tenant.id}`).set(platform)).body.data.tenant).toMatchObject({ type: "COLLEGE", status: "ACTIVE" });
+        expect(await storedFeatures(tenant.id)).toEqual(before);
         expect(await audits(tenant.id)).toEqual([]);
       } finally {
         await ctx.db.execute(sql`alter table audit_log drop constraint test_refuse_tenant_update`);

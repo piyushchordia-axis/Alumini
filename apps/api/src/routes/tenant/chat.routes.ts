@@ -1,6 +1,7 @@
 import { chatBlockCreateSchema, chatConversationsQuerySchema, chatDirectCreateSchema, chatMessageCreateSchema, chatMessagesQuerySchema, chatMuteSchema, chatReadSchema, chatReportCreateSchema, cursorQuerySchema, idParamsSchema, membershipIdParamsSchema } from "@illuminize/shared";
-import { Router, type Request, type RequestHandler } from "express";
+import { Router, type Request } from "express";
 import type { AppContext } from "../../context";
+import { noStore } from "../../middleware/noStore";
 import { byMembership, rateLimit } from "../../middleware/rateLimit";
 import { requireChatEligible, requireFeature, requireMember } from "../../middleware/tenant";
 import { noContent, ok, route } from "../../middleware/validate";
@@ -9,12 +10,6 @@ import { acceptRequest, declineRequest, getBadge, getConversation, listConversat
 import { reportMessage } from "../../services/chat/reports.service";
 
 const actorOf = (req: Request): ChatActor => ({ userId: req.auth!.userId, membership: req.membership! });
-
-// Private messages must never sit in a browser or proxy cache, and that holds for error responses too.
-const noStore: RequestHandler = (_req, res, next) => {
-  res.setHeader("Cache-Control", "no-store");
-  next();
-};
 
 export function chatRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });

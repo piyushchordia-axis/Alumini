@@ -6,6 +6,7 @@ import type {
   ChatConversationKind,
   ChatMessageKind,
   ChatOrigin,
+  ChatReportAction,
   ChatReportTargetKind,
   ContentType,
   EventKind,
@@ -419,6 +420,48 @@ export interface ChatReportDto {
   createdAt: string;
 }
 
+/**
+ * A chat report in a queue, which holds no words anyone wrote: no message, no `details` and no notes, because a reporter's
+ * or an admin's words may quote the message. A null member deleted their account.
+ */
+export interface AdminChatReportDto {
+  id: string;
+  targetKind: ChatReportTargetKind;
+  reason: ReportReason;
+  status: ReportStatus;
+  reporter: ChatMemberDto | null;
+  reported: ChatMemberDto | null;
+  resolutionAction: ChatReportAction | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlatformChatReportDto extends AdminChatReportDto {
+  tenant: { slug: string; name: string };
+}
+
+export interface AdminChatReportMessageDto {
+  id: string;
+  kind: ChatMessageKind;
+  /** Null if they deleted their account, and on a system message. */
+  sender: ChatMemberDto | null;
+  body: string;
+  removed: boolean;
+  /** The message that was reported, which the rest are shown around. */
+  isTarget: boolean;
+  createdAt: string;
+}
+
+/** What an audited view returns. Never cache this or fetch it without an explicit click, because every fetch writes an audit row. */
+export interface AdminChatReportViewDto extends AdminChatReportDto {
+  details: string | null;
+  /** What a reported request said, for a report on a request rather than a message. */
+  noteSnapshot: string | null;
+  resolutionNote: string | null;
+  /** Oldest first. */
+  messages: AdminChatReportMessageDto[];
+}
+
 export interface NotificationDto {
   id: string;
   type: NotificationType;
@@ -451,6 +494,8 @@ export interface DashboardDto {
   activeMembersLast30d: number;
   pendingContent: number;
   openReports: number;
+  /** Those this viewer may act on: none naming them, and for Illuminize staff only the escalated ones. */
+  openChatReports: number;
   upcomingEvents: number;
   postsLast7d: number;
 }

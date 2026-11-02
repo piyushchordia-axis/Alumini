@@ -8,6 +8,7 @@ import {
   createChatSync,
   highestSeq,
   keepNewestPage,
+  markLastMessageRemoved,
   markMessageRemoved,
   markOutboxFailed,
   newClientKey,
@@ -111,6 +112,27 @@ describe("upsertLiveMessage", () => {
     const out = upsertLiveMessage(data, message(6))!;
     expect(data).toEqual(copy);
     expect(out.pages[1]).toBe(data.pages[1]);
+  });
+
+  it("won't let a copy read before a removal bring the words back, and takes a removal over a live copy", () => {
+    const removed = markMessageRemoved(pages([[2, 1]]), "id-1")!;
+    expect(upsertLiveMessage(removed, message(1))).toBe(removed);
+    expect(upsertLiveMessage(pages([[2, 1]]), message(1, { body: null, removed: true }))!.pages[0]!.data[1]).toMatchObject({ body: null, removed: true });
+  });
+});
+
+describe("markLastMessageRemoved", () => {
+  const conversation = { id: CONVERSATION, lastMessage: { seq: 5, body: "The words", mine: false, createdAt: "2026-01-01T00:00:00.000Z" } } as ChatConversationDto;
+
+  it("clears the preview when it's of the removed message", () => {
+    expect(markLastMessageRemoved(conversation, 5)!.lastMessage).toEqual({ ...conversation.lastMessage, body: null });
+  });
+
+  it("leaves a preview of any other message, and what isn't there", () => {
+    expect(markLastMessageRemoved(conversation, 4)).toBe(conversation);
+    const empty = { id: CONVERSATION, lastMessage: null } as ChatConversationDto;
+    expect(markLastMessageRemoved(empty, 5)).toBe(empty);
+    expect(markLastMessageRemoved(undefined, 5)).toBeUndefined();
   });
 });
 
@@ -489,6 +511,26 @@ describe("createChatSync", () => {
       expect(s.api.messages).toHaveBeenCalledTimes(1);
     });
 
+    it("reads the open thread's pages again, because a removal missed while away is of a message already held", async () => {
+      const s = setup();
+      s.load(pages([[2, 1]]));
+      const fetched = vi.fn(async () => ({ data: [message(2), message(1, { body: null, removed: true })], nextCursor: null }));
+      const observer = new InfiniteQueryObserver(s.qc, {
+        queryKey: s.key,
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (last: CursorPage<ChatMessageDto>) => last.nextCursor ?? undefined,
+        queryFn: fetched,
+        staleTime: Infinity,
+      });
+      const unsubscribe = observer.subscribe(() => undefined);
+      expect(fetched).not.toHaveBeenCalled();
+
+      s.realtime.reconnect();
+      await vi.waitFor(() => expect(s.data()!.pages[0]!.data[1]).toMatchObject({ body: null, removed: true }));
+      expect(fetched).toHaveBeenCalled();
+      unsubscribe();
+    });
+
     it("only touches lists when no thread is open, and nothing when no institution is", async () => {
       const onLists = setup({ active: { slug: SLUG, conversationId: null } });
       onLists.load(pages([[1]]));
@@ -556,6 +598,57 @@ describe("createChatSync", () => {
       s.load(pages([[2, 1]]));
       s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-1", seq: 1 });
       expect(s.invalidated(s.key)).toBe(false);
+    });
+
+    it("chat:removed takes the words out of the thread's preview at once, leaving a preview of a later message", () => {
+      const s = setup();
+      const key = chatKeys.conversation(SLUG, CONVERSATION);
+      const preview = (seq: number) => ({ id: CONVERSATION, lastMessage: { seq, body: "The words", mine: false, createdAt: "2026-01-01T00:00:00.000Z" } }) as ChatConversationDto;
+      s.qc.setQueryData(key, preview(1));
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-1", seq: 1 });
+      expect(s.qc.getQueryData<ChatConversationDto>(key)!.lastMessage!.body).toBeNull();
+
+      s.qc.setQueryData(key, preview(2));
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-1", seq: 1 });
+      expect(s.qc.getQueryData<ChatConversationDto>(key)!.lastMessage!.body).toBe("The words");
+    });
+
+    it("chat:removed refetches the thread's preview when a fetch is in flight, because the fetch would bring the words back", async () => {
+      const s = setup();
+      const key = chatKeys.conversation(SLUG, CONVERSATION);
+      const preview = (body: string | null) => ({ id: CONVERSATION, lastMessage: { seq: 1, body, mine: false, createdAt: "2026-01-01T00:00:00.000Z" } }) as ChatConversationDto;
+      s.qc.setQueryData(key, preview("The words"));
+      const responses: Array<(dto: ChatConversationDto) => void> = [];
+      const observer = new QueryObserver(s.qc, { queryKey: key, queryFn: () => new Promise<ChatConversationDto>((resolve) => responses.push(resolve)) });
+      const unsubscribe = observer.subscribe(() => undefined);
+      await vi.waitFor(() => expect(responses.length).toBe(1));
+
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-1", seq: 1 });
+      await vi.waitFor(() => expect(responses.length).toBe(2));
+      responses[0]!(preview("The words"));
+      responses[1]!(preview(null));
+      await vi.waitFor(() => expect(s.qc.getQueryState(key)?.fetchStatus).toBe("idle"));
+      expect(s.qc.getQueryData<ChatConversationDto>(key)!.lastMessage!.body).toBeNull();
+      unsubscribe();
+    });
+
+    it("a gap fill read before a removal and landing after it can't bring the words back, even for a message that wasn't loaded", async () => {
+      let answer!: (page: CursorPage<ChatMessageDto>) => void;
+      const s = setup({ api: { messages: vi.fn(() => new Promise<CursorPage<ChatMessageDto>>((resolve) => (answer = resolve))) } });
+      s.load(pages([[2, 1]]));
+      const filling = s.sync.fillGap(SLUG, CONVERSATION);
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-3", seq: 3 });
+      answer({ data: [message(3)], nextCursor: null });
+      await filling;
+      expect(s.data()!.pages[0]!.data[0]).toMatchObject({ id: "id-3", body: null, removed: true });
+    });
+
+    it("a live copy arriving after its removal doesn't bring the words back either", () => {
+      const s = setup();
+      s.load(pages([[2]]));
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-3", seq: 3 });
+      s.live(message(3));
+      expect(s.data()!.pages[0]!.data[0]).toMatchObject({ id: "id-3", body: null, removed: true });
     });
 
     it("chat:read refetches when a fetch of the thread is in flight, because the fetch would undo it", async () => {

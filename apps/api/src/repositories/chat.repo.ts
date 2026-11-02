@@ -14,7 +14,7 @@ export type ChatMessageInsert = typeof chatMessages.$inferInsert;
 export type ChatBlockRow = typeof chatBlocks.$inferSelect;
 export type ChatSender = Pick<MembershipRow, "id" | "fullName" | "avatarUrl">;
 
-const senderColumns = { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl };
+export const senderColumns = { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl };
 
 /** Who sees a message: its sender, and otherwise anyone it wasn't withheld from. */
 const visibleTo = (viewerMembershipId: string) => or(eq(chatMessages.withheld, false), eq(chatMessages.senderMembershipId, viewerMembershipId))!;
@@ -357,6 +357,16 @@ export async function findMessageInTenant(db: DbClient, tenantId: string, id: st
     .innerJoin(chatConversations, eq(chatConversations.id, chatMessages.conversationId))
     .where(and(eq(chatMessages.tenantId, tenantId), eq(chatMessages.id, id)))
     .limit(1);
+  return row;
+}
+
+/** Undefined if it was removed already or is gone, so two removals can't both believe they did it. */
+export async function markMessageRemoved(db: DbClient, tenantId: string, id: string, values: { removedByUserId: string; removalNote: string | null }): Promise<ChatMessageRow | undefined> {
+  const [row] = await db
+    .update(chatMessages)
+    .set({ removedAt: new Date(), ...values })
+    .where(and(eq(chatMessages.tenantId, tenantId), eq(chatMessages.id, id), isNull(chatMessages.removedAt)))
+    .returning();
   return row;
 }
 

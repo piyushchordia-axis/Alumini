@@ -1,7 +1,9 @@
 import type {
+  AdminChatReportsQuery,
   AdminMembersQuery,
   AdminReportsQuery,
   AuditQuery,
+  ChatReportResolveInput,
   InvitationImportInput,
   InvitationsQuery,
   MembershipProfileUpdate,
@@ -14,7 +16,7 @@ import type {
   TenantSettingsUpdate,
 } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminMemberDto, AdminReportDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDto, AdminReportDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -56,6 +58,13 @@ export function adminEndpoints(core: ApiCore) {
       list: (slug: string, query?: Partial<AdminReportsQuery>) => core.request<Page<AdminReportDto>>({ ...p(slug, "/reports"), query: q(query) }),
       resolve: (slug: string, id: string, input: ReportResolveInput) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/resolve`), body: input }),
       dismiss: (slug: string, id: string, note?: string | null) => core.data<ReportDto>({ method: "POST", ...p(slug, `/reports/${id}/dismiss`), body: { note: note ?? null } }),
+    },
+    chatReports: {
+      list: (slug: string, query?: Partial<AdminChatReportsQuery>) => core.request<Page<AdminChatReportDto>>({ ...p(slug, "/chat-reports"), query: q(query) }),
+      /** Writes an audit row each time, so call it only when someone asks to see the messages. Keep the result out of the query cache. */
+      view: (slug: string, id: string) => core.data<AdminChatReportViewDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/view`) }),
+      resolve: (slug: string, id: string, input: ChatReportResolveInput) => core.data<AdminChatReportDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/resolve`), body: input }),
+      dismiss: (slug: string, id: string, note?: string | null) => core.data<AdminChatReportDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/dismiss`), body: { note: note ?? null } }),
     },
     analytics: (slug: string, weeks = 12) => core.data<TenantAnalyticsDto>({ ...p(slug, "/analytics"), query: { weeks } }),
     /** CSV downloads (streamed by the server; saved by the caller). */

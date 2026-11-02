@@ -1,4 +1,4 @@
-import type { ChatMessageDto, CursorPage } from "../types/dto";
+import type { ChatConversationDto, ChatMessageDto, CursorPage } from "../types/dto";
 
 /** A thread's loaded pages, the shape of an infinite query: pages[0] is the newest, and rows run newest first within a page. */
 export interface ChatMessagePages {
@@ -36,16 +36,18 @@ function withPage<T extends ChatMessagePages>(data: T, index: number, rows: Chat
 }
 
 /**
- * Patches one live message into a thread. Replaces it by id if it's loaded. Drops it if it's older than everything loaded
- * while there's more to load, because paging back will bring it. Otherwise inserts it in `seq` order. Nothing loaded means
- * nothing to patch, because a partial list must never be seeded. `nextCursor` and `pageParams` are never touched.
+ * Patches one live message into a thread. Replaces it by id if it's loaded, unless that would bring back what a removal took
+ * away: nothing restores a removed message, so a copy still saying otherwise was read before the removal. Drops it if it's
+ * older than everything loaded while there's more to load, because paging back will bring it. Otherwise inserts it in `seq`
+ * order. Nothing loaded means nothing to patch, because a partial list must never be seeded. `nextCursor` and `pageParams`
+ * are never touched.
  */
 export function upsertLiveMessage<T extends ChatMessagePages>(data: T | undefined, message: ChatMessageDto): T | undefined {
   if (!data || data.pages.length === 0) return data;
   for (let i = 0; i < data.pages.length; i++) {
     const rows = data.pages[i]!.data;
     const at = rows.findIndex((m) => m.id === message.id);
-    if (at !== -1) return withPage(data, i, rows.map((m, j) => (j === at ? message : m)));
+    if (at !== -1) return rows[at]!.removed && !message.removed ? data : withPage(data, i, rows.map((m, j) => (j === at ? message : m)));
   }
   const last = data.pages.length - 1;
   const lowest = lowestSeq(data.pages);
@@ -66,6 +68,11 @@ export function markMessageRemoved<T extends ChatMessagePages>(data: T | undefin
     if (rows.some((m) => m.id === messageId)) return withPage(data, i, rows.map((m) => (m.id === messageId ? { ...m, body: null, removed: true } : m)));
   }
   return data;
+}
+
+/** Takes the removed message's words out of a thread's preview, if that's what the preview is of. */
+export function markLastMessageRemoved(conversation: ChatConversationDto | undefined, seq: number): ChatConversationDto | undefined {
+  return conversation?.lastMessage?.seq === seq ? { ...conversation, lastMessage: { ...conversation.lastMessage, body: null } } : conversation;
 }
 
 /** Keeps only the newest page, so a refetch after being away asks for one page rather than everything scrolled through. */

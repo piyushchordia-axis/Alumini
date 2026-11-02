@@ -1,6 +1,7 @@
 import type { DashboardDto, PlatformStatsDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toPlatformTenantRowDto } from "../dto/platform.dto";
+import { countOpenChatReports } from "../repositories/chatReports.repo";
 import { countEvents, countUpcomingEvents } from "../repositories/events.repo";
 import { countFunding } from "../repositories/funding.repo";
 import { countJobs } from "../repositories/jobs.repo";
@@ -10,17 +11,19 @@ import { countPosts, countPostsSince } from "../repositories/posts.repo";
 import { countOpenReports } from "../repositories/reports.repo";
 import { countTenantsByStatus, listTenantsForPlatform } from "../repositories/tenants.repo";
 import { countUsers } from "../repositories/users.repo";
+import { chatReportScope, type ChatReportViewer } from "./chat/adminReports.service";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export async function getTenantDashboard(ctx: AppContext, tenantId: string): Promise<DashboardDto> {
+export async function getTenantDashboard(ctx: AppContext, tenantId: string, viewer: ChatReportViewer): Promise<DashboardDto> {
   const now = Date.now();
-  const [byStatus, newMembers30d, active30d, pendingContent, openReports, upcomingEvents, postsLast7d] = await Promise.all([
+  const [byStatus, newMembers30d, active30d, pendingContent, openReports, openChatReports, upcomingEvents, postsLast7d] = await Promise.all([
     countMembersByStatus(ctx.db, tenantId),
     countNewMembersSince(ctx.db, tenantId, new Date(now - 30 * DAY)),
     countActiveMembersSince(ctx.db, tenantId, new Date(now - 30 * DAY)),
     countPendingContent(ctx.db, tenantId),
     countOpenReports(ctx.db, tenantId),
+    countOpenChatReports(ctx.db, tenantId, chatReportScope(viewer)),
     countUpcomingEvents(ctx.db, tenantId),
     countPostsSince(ctx.db, tenantId, new Date(now - 7 * DAY)),
   ]);
@@ -33,6 +36,7 @@ export async function getTenantDashboard(ctx: AppContext, tenantId: string): Pro
     activeMembersLast30d: active30d,
     pendingContent,
     openReports,
+    openChatReports,
     upcomingEvents,
     postsLast7d,
   };

@@ -8,7 +8,7 @@ import { billingCountsForPeriod } from "../repositories/memberships.repo";
 import { countDeliveredMessages } from "../repositories/messages.repo";
 import { findTenantById } from "../repositories/tenants.repo";
 import type { AuthContext } from "../types/request";
-import { recordAudit } from "./audit.service";
+import { recordAudit, recordAuditStrict } from "./audit.service";
 import { billingPeriod, currentMonth, cycleFraction, todayIn } from "./billing.periods";
 
 interface PlatformActor extends AuthContext {
@@ -58,19 +58,15 @@ export async function createBillingPlan(ctx: AppContext, actor: PlatformActor, t
       messageRatesMinor: input.messageRatesMinor,
       createdByUserId: actor.userId,
     });
-    await recordAudit(
-      ctx,
-      {
-        tenantId,
-        actorUserId: actor.userId,
-        action: "platform.billing.plan.create",
-        targetType: "billing_plan",
-        targetId: plan.id,
-        metadata: { billingModel: plan.billingModel, effectiveFrom: plan.effectiveFrom, closedPlans: closed },
-        ip: actor.ip,
-      },
-      tx,
-    );
+    await recordAuditStrict(tx, {
+      tenantId,
+      actorUserId: actor.userId,
+      action: "platform.billing.plan.create",
+      targetType: "billing_plan",
+      targetId: plan.id,
+      metadata: { billingModel: plan.billingModel, effectiveFrom: plan.effectiveFrom, closedPlans: closed },
+      ip: actor.ip,
+    });
     return plan;
   });
   return toBillingPlanDto(row);

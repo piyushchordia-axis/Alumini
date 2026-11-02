@@ -123,9 +123,9 @@ export async function moderateContent(
   id: string,
   action: ContentAction,
   note?: string | null,
-  opts: { db?: DbClient; skipReportResolution?: boolean } = {},
+  opts: { skipReportResolution?: boolean } = {},
 ): Promise<ModerationResult> {
-  const db = opts.db ?? ctx.db;
+  const { db } = ctx;
   const repo = REGISTRY[contentType];
   const tenantId = tenantCtx.tenant.id;
   const row = await repo.find(db, tenantId, id);
@@ -141,38 +141,30 @@ export async function moderateContent(
     });
   };
   // A check needs its write in the same transaction, or two restores could both find the one free place.
-  if (action === "restore" && repo.beforeRestore && !opts.db) await runInTransaction(ctx, write);
+  if (action === "restore" && repo.beforeRestore) await runInTransaction(ctx, write);
   else await write(db);
   await repo.afterTransition?.(ctx, db, row, row.moderationStatus, to);
-  await recordAudit(
-    ctx,
-    {
-      tenantId,
-      actorUserId: actor.userId,
-      actorMembershipId: actor.membershipId ?? null,
-      action: `content.${action}`,
-      targetType: contentType.toLowerCase(),
-      targetId: id,
-      metadata: { contentType, from: row.moderationStatus, to, note: note ?? null },
-      ip: actor.ip,
-    },
-    db,
-  );
+  await recordAudit(ctx, {
+    tenantId,
+    actorUserId: actor.userId,
+    actorMembershipId: actor.membershipId ?? null,
+    action: `content.${action}`,
+    targetType: contentType.toLowerCase(),
+    targetId: id,
+    metadata: { contentType, from: row.moderationStatus, to, note: note ?? null },
+    ip: actor.ip,
+  });
   const n = AUTHOR_NOTIFICATIONS[action];
   if (n) {
     const label = contentLabel(contentType);
-    await notify(
-      ctx,
-      {
-        tenantId,
-        recipientMembershipIds: [row.authorMembershipId],
-        type: n.type,
-        title: n.title.replace("post", label),
-        body: `"${row.title}"${note ? ` — ${note}` : ""}`,
-        data: { contentType, contentId: id, status: to, ...(row.postId ? { postId: row.postId } : {}) },
-      },
-      db,
-    );
+    await notify(ctx, {
+      tenantId,
+      recipientMembershipIds: [row.authorMembershipId],
+      type: n.type,
+      title: n.title.replace("post", label),
+      body: `"${row.title}"${note ? ` — ${note}` : ""}`,
+      data: { contentType, contentId: id, status: to, ...(row.postId ? { postId: row.postId } : {}) },
+    });
   }
   if (to === "REMOVED" && !opts.skipReportResolution) {
     await resolveOpenReportsForContent(db, tenantId, contentType, id, { resolvedByUserId: actor.userId, resolutionNote: "auto: content removed" });

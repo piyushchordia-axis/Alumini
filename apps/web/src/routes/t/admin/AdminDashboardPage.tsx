@@ -33,6 +33,10 @@ export function AdminDashboardPage() {
         <Link to={`${base}/reports`}>
           <Stat label="Open reports" value={d.openReports} hint="Flagged by members" />
         </Link>
+        {/* Always here, messaging on or off: it may have been switched off because of what's in this queue. */}
+        <Link to={`${base}/chat-reports`}>
+          <Stat label="Open chat reports" value={d.openChatReports} hint="Private messages members reported" />
+        </Link>
         <Stat label="Approved members" value={d.approvedMembers} hint={`${d.activeMembersLast30d} active in the last 30 days`} />
         <Stat label="New members (30d)" value={d.newMembersLast30d} />
         <Stat label="Posts (7d)" value={d.postsLast7d} />

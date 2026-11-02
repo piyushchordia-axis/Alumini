@@ -36,6 +36,7 @@ export const qk = {
     member: (slug: string, id: string) => ["admin", slug, "member", id] as const,
     moderation: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "moderation", filters ?? {}] as const,
     reports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "reports", filters ?? {}] as const,
+    chatReports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "chat-reports", filters ?? {}] as const,
     settings: (slug: string) => ["admin", slug, "settings"] as const,
     profileFields: (slug: string) => ["admin", slug, "profile-fields"] as const,
     invitations: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "invitations", filters ?? {}] as const,
@@ -51,5 +52,6 @@ export const qk = {
     comparison: (filters?: Record<string, unknown>) => ["platform", "comparison", filters ?? {}] as const,
     users: (filters?: Record<string, unknown>) => ["platform", "users", filters ?? {}] as const,
     audit: (filters?: Record<string, unknown>) => ["platform", "audit", filters ?? {}] as const,
+    chatReports: (filters?: Record<string, unknown>) => ["platform", "chat-reports", filters ?? {}] as const,
   },
 };

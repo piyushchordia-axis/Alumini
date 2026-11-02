@@ -155,6 +155,13 @@
       "when": 1793621699781,
       "tag": "0021_chat_withheld_view",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793631616443,
+      "tag": "0022_chat_message_removed",
+      "breakpoints": true
     }
   ]
 }

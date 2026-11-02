@@ -24,10 +24,16 @@ describe("notificationTarget", () => {
     expect(notificationTarget("SYSTEM", "not an object")).toBeNull();
   });
 
-  it("sends a chat report to the admin section that will hold it, as an admin notification", () => {
+  it("sends a chat report to the admin page that holds it, as an admin notification", () => {
     expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: "r1" })).toEqual({ kind: "admin", section: "chat-reports" });
     expect(notificationTarget("CHAT_REPORT_FILED", {})).toEqual({ kind: "admin", section: "chat-reports" });
     expect(NOTIFICATION_CATEGORY.CHAT_REPORT_FILED).toBe("ADMIN");
+  });
+
+  it("points a removed message at its thread, and counts it among a member's own account notices", () => {
+    expect(notificationTarget("CHAT_MESSAGE_REMOVED", { conversationId: "c1", messageId: "m1" })).toEqual({ kind: "chat", conversationId: "c1" });
+    expect(notificationTarget("CHAT_MESSAGE_REMOVED", {})).toBeNull();
+    expect(NOTIFICATION_CATEGORY.CHAT_MESSAGE_REMOVED).toBe("ACCOUNT");
   });
 
   it("routes Wave 1 notifications", () => {
@@ -57,7 +63,7 @@ describe("notificationTarget", () => {
   });
 
   it("gives every notification type a destination when its payload is complete, and doesn't throw when it's empty", () => {
-    const payload = { postId: "p1", eventId: "e1", contentType: "POST", contentId: "c1" };
+    const payload = { postId: "p1", eventId: "e1", contentType: "POST", contentId: "c1", conversationId: "t1" };
     for (const type of NOTIFICATION_TYPES) {
       expect(notificationTarget(type, payload), type).not.toBeNull();
       expect(() => notificationTarget(type, {})).not.toThrow();

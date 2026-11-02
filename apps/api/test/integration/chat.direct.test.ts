@@ -393,8 +393,18 @@ describe.skipIf(!dbAvailable)("direct conversations", () => {
         // The report notifies an admin and writes the audit log, both inside its transaction.
         expect((await chat(b).report(sent.body.data.id)).status).toBe(201);
         expect(await ctx.db.select().from(notifications)).toEqual([expect.objectContaining({ type: "CHAT_REPORT_FILED", recipientMembershipId: admin.membership.id })]);
-        // recordAudit swallows its errors, so a freeze there shows up as a missing row rather than a failed request.
         expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "chat_report.file"))).toHaveLength(1);
+
+        // So does handling it: the view, the removal with its notification and tombstone, and the checks on who may act.
+        const reports = `/api/v1/t/${tenant.slug}/admin/chat-reports`;
+        const { body: queue } = await request(narrow.app).get(reports).set(admin.headers);
+        const reportId = queue.data[0].id as string;
+        expect((await request(narrow.app).post(`${reports}/${reportId}/view`).set(admin.headers).send()).status).toBe(200);
+        expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "chat_report.view"))).toHaveLength(1);
+        expect((await request(narrow.app).post(`${reports}/${reportId}/resolve`).set(admin.headers).send({ action: "REMOVE_MESSAGE", note: "Upheld" })).status).toBe(200);
+        expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "chat_report.resolve"))).toHaveLength(1);
+        expect(await ctx.db.select().from(notifications).where(eq(notifications.type, "CHAT_MESSAGE_REMOVED"))).toHaveLength(1);
+        expect((await request(narrow.app).patch(`/api/v1/t/${tenant.slug}/admin/members/${c.membership.id}/role`).set(admin.headers).send({ role: "MEMBER" })).status).toBe(200);
 
         expect((await chat(b).block(a.membership.id)).status).toBe(201);
         expect((await chat(a).send(id, "Withheld")).status).toBe(201);

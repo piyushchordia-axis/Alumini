@@ -1,6 +1,7 @@
 import type { PlatformJobRunInput } from "../../schemas/platform";
 import type { PlatformComparisonDto } from "../../types/dto";
 import type {
+  AdminChatReportsQuery,
   AssignAdminInput,
   AuditQuery,
   BillingPlanCreateInput,
@@ -14,7 +15,7 @@ import type {
   SnapshotCreateInput,
   TenantSettingsUpdate,
 } from "../..";
-import type { AdminMemberDto, AuditDto, BillingPlanDto, BillingSnapshotDto, BillingUsageDto, OutboundMessageDto, Page, PlatformStatsDto, PlatformTenantDto, PlatformTenantRowDto, PlatformUserDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminMemberDto, AuditDto, BillingPlanDto, BillingSnapshotDto, BillingUsageDto, OutboundMessageDto, Page, PlatformChatReportDto, PlatformStatsDto, PlatformTenantDto, PlatformTenantRowDto, PlatformUserDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -48,6 +49,9 @@ export function platformEndpoints(core: ApiCore) {
     },
     audit: {
       list: (query?: Partial<AuditQuery>) => core.request<Page<AuditDto>>({ path: path("/audit"), query: q(query) }),
+    },
+    chatReports: {
+      list: (query?: Partial<AdminChatReportsQuery>) => core.request<Page<PlatformChatReportDto>>({ path: path("/chat-reports"), query: q(query) }),
     },
     comparison: (query?: Partial<BillingUsageQuery>) => core.data<PlatformComparisonDto>({ path: path("/analytics/comparison"), query: q(query) }),
     comparisonCsv: (query?: Partial<BillingUsageQuery>) => core.download({ path: path("/exports/comparison.csv"), query: q(query) }),
