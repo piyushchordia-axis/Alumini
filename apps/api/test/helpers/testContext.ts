@@ -118,11 +118,29 @@ export async function createTestContext(overrides: Record<string, string | undef
   return ctx;
 }
 
+/**
+ * Empties every table before each test. TRUNCATE replaces the files of every table and index, which took 1.8s here and
+ * was nearly the whole suite's run time, so this deletes the rows instead (about 20ms) with foreign key checks off for
+ * this one statement. Turning those off needs a superuser, so anyone else falls back to TRUNCATE.
+ */
 export async function truncateAllTables(db: Db): Promise<void> {
-  const rows = await db.execute<{ tablename: string }>(
-    sql`select tablename from pg_tables where schemaname = 'public' and tablename <> '__drizzle_migrations'`,
+  await db.execute(
+    sql.raw(`DO $$
+      DECLARE
+        name text;
+        names text;
+      BEGIN
+        IF current_setting('is_superuser') = 'on' THEN
+          SET LOCAL session_replication_role = replica;
+          FOR name IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '__drizzle_migrations' LOOP
+            EXECUTE format('DELETE FROM %I', name);
+          END LOOP;
+        ELSE
+          SELECT string_agg(format('%I', tablename), ', ') INTO names FROM pg_tables WHERE schemaname = 'public' AND tablename <> '__drizzle_migrations';
+          IF names IS NOT NULL THEN
+            EXECUTE 'TRUNCATE TABLE ' || names || ' RESTART IDENTITY CASCADE';
+          END IF;
+        END IF;
+      END $$`),
   );
-  const names = rows.rows.map((r) => `"${r.tablename}"`);
-  if (names.length === 0) return;
-  await db.execute(sql.raw(`TRUNCATE TABLE ${names.join(", ")} RESTART IDENTITY CASCADE`));
 }
