@@ -1,12 +1,15 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultFeaturesFor } from "@illuminize/shared";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
+import { createLogger } from "../lib/logger";
+import { runInTransaction } from "../lib/transaction";
+import { reportContextIds, seedDirectThread } from "../repositories/chat.repo";
 import { createDb, type Db } from "./client";
 import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
-import { businessListings, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
+import { businessListings, chatConversations, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -161,45 +164,47 @@ export const SEED_MEMBERS: Record<string, MemberSeed[]> = {
   ],
 };
 
+async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed): Promise<string> {
+  const [user] = await db
+    .insert(users)
+    .values({ phoneE164: m.phone, phoneRegion: "IN", displayName: m.fullName })
+    .onConflictDoUpdate({ target: users.phoneE164, set: { displayName: m.fullName } })
+    .returning();
+  const status = m.status ?? "APPROVED";
+  const [row] = await db
+    .insert(memberships)
+    .values({
+      tenantId,
+      userId: user!.id,
+      role: m.role ?? "MEMBER",
+      status,
+      statusReason: m.statusReason ?? null,
+      statusChangedAt: status === "PENDING" ? null : new Date(),
+      fullName: m.fullName,
+      batchYear: m.batchYear,
+      professionType: m.professionType,
+      companyName: m.companyName ?? null,
+      designation: m.designation ?? null,
+      city: m.city ?? null,
+      country: m.country ?? null,
+      bio: m.bio ?? null,
+      interests: m.interests ?? [],
+      lastActiveAt: status === "APPROVED" ? new Date() : null,
+    })
+    .onConflictDoUpdate({
+      target: [memberships.tenantId, memberships.userId],
+      set: { fullName: m.fullName, role: m.role ?? "MEMBER", updatedAt: new Date() },
+    })
+    .returning();
+  return row!.id;
+}
+
 export async function seedMembers(db: Db, tenantIds: Record<string, string>): Promise<Record<string, string>> {
   const membershipIds: Record<string, string> = {};
   for (const [slug, members] of Object.entries(SEED_MEMBERS)) {
     const tenantId = tenantIds[slug];
     if (!tenantId) continue;
-    for (const m of members) {
-      const [user] = await db
-        .insert(users)
-        .values({ phoneE164: m.phone, phoneRegion: "IN", displayName: m.fullName })
-        .onConflictDoUpdate({ target: users.phoneE164, set: { displayName: m.fullName } })
-        .returning();
-      const status = m.status ?? "APPROVED";
-      const [row] = await db
-        .insert(memberships)
-        .values({
-          tenantId,
-          userId: user!.id,
-          role: m.role ?? "MEMBER",
-          status,
-          statusReason: m.statusReason ?? null,
-          statusChangedAt: status === "PENDING" ? null : new Date(),
-          fullName: m.fullName,
-          batchYear: m.batchYear,
-          professionType: m.professionType,
-          companyName: m.companyName ?? null,
-          designation: m.designation ?? null,
-          city: m.city ?? null,
-          country: m.country ?? null,
-          bio: m.bio ?? null,
-          interests: m.interests ?? [],
-          lastActiveAt: status === "APPROVED" ? new Date() : null,
-        })
-        .onConflictDoUpdate({
-          target: [memberships.tenantId, memberships.userId],
-          set: { fullName: m.fullName, role: m.role ?? "MEMBER", updatedAt: new Date() },
-        })
-        .returning();
-      membershipIds[`${slug}:${m.phone}`] = row!.id;
-    }
+    for (const m of members) membershipIds[`${slug}:${m.phone}`] = await upsertSeedMember(db, tenantId, m);
   }
   return membershipIds;
 }
@@ -409,9 +414,104 @@ async function seedBusinessListings(db: Db, tenantIds: Record<string, string>, m
   }
 }
 
+/** Distinctive, so tests can show it never turns up anywhere outside the reported thread. */
+export const SEEDED_REPORTED_CHAT_BODY = "Pay me by Friday or I tell everyone at the reunion what you did. (demo-chat-report-7Q4X)";
+
+/** Direct threads between seeded members. Written through the repository, because the seed has no chat API or realtime to go through. */
+async function seedChatThreads(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chatConversations).where(eq(chatConversations.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const [rahul, priya, arjun, meera, vikram, sneha, ananya] = ["+919100000001", "+919100000002", "+919100000003", "+919100000004", "+919100000005", "+919100000006", "+919000000001"].map(member) as [string, string, string, string, string, string, string];
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: rahul,
+      bId: priya,
+      requesterId: rahul,
+      state: "ACCEPTED",
+      unreadByRecipient: 1,
+      messages: [
+        { senderId: rahul, body: "Priya, are you in London next month? I'll be over for a fintech conference.", at: ago(6, 120) },
+        { senderId: priya, body: "I am! Coffee near King's Cross?", at: ago(6, 60) },
+        { senderId: rahul, body: "Perfect. I'd also love your take on our product roadmap.", at: ago(6, 55) },
+        { senderId: priya, body: "Happy to. Send it over beforehand and I'll read it on the train.", at: ago(5) },
+        { senderId: rahul, body: "Sent to your work email. Thanks!", at: ago(1, 30) },
+      ],
+    });
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: sneha,
+      bId: ananya,
+      requesterId: sneha,
+      state: "ACCEPTED",
+      messages: [
+        { senderId: sneha, body: "Ananya, could the alumni office share the 2008 batch reunion plans?", at: ago(9) },
+        { senderId: ananya, body: "Yes, the committee meets on Saturday. I'll send you the notes after.", at: ago(8, 300) },
+      ],
+    });
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: arjun,
+      bId: meera,
+      requesterId: arjun,
+      state: "ACCEPTED",
+      messages: [
+        { senderId: arjun, body: "Meera, can your firm take on my export paperwork?", at: ago(4, 200) },
+        { senderId: meera, body: "We don't do that kind of work, sorry. Try a customs agent in Surat.", at: ago(4, 180) },
+        { senderId: arjun, body: "You owe me a favour from college.", at: ago(4, 170) },
+        { senderId: meera, body: "I don't think I do, and I'd rather leave it there.", at: ago(4, 160) },
+        { senderId: arjun, body: SEEDED_REPORTED_CHAT_BODY, at: ago(4, 150) },
+        { senderId: meera, body: "Please don't message me again.", at: ago(4, 140) },
+      ],
+    });
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: vikram,
+      bId: rahul,
+      requesterId: vikram,
+      state: "PENDING",
+      messages: [{ senderId: vikram, body: "Hi Rahul, I'm finishing at IIM Ahmedabad and would love to hear how you started Zylo Labs.", at: ago(1) }],
+    });
+  });
+}
+
+async function seedChatReport(db: Db, tenantId: string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chatReports).where(eq(chatReports.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const [target] = await db.select().from(chatMessages).where(and(eq(chatMessages.tenantId, tenantId), eq(chatMessages.body, SEEDED_REPORTED_CHAT_BODY))).limit(1);
+  if (!target) return;
+  const [other] = await db.select({ id: chatMessages.senderMembershipId }).from(chatMessages).where(and(eq(chatMessages.conversationId, target.conversationId), ne(chatMessages.senderMembershipId, target.senderMembershipId!))).limit(1);
+  await db.insert(chatReports).values({
+    tenantId,
+    targetKind: "MESSAGE",
+    targetId: target.id,
+    conversationId: target.conversationId,
+    reporterMembershipId: other!.id,
+    reportedMembershipId: target.senderMembershipId,
+    reason: "HARASSMENT",
+    details: "He's threatening me because I wouldn't do him a favour.",
+    contextMessageIds: await reportContextIds(db, target, { joinedSeq: 0 }, []),
+  });
+}
+
+/** Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. */
+async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
+  const school = tenantIds["demo-school"];
+  if (!school) return;
+  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Ira Banerjee", batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
+}
+
 /** The Wave 2 connections data. Runs after everything else, and each part guards itself, so an existing database gets it from the next seed. */
 export async function seedConnections(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<void> {
   await seedBusinessListings(db, tenantIds, m);
+  const uni = tenantIds["demo-university"];
+  if (uni) {
+    const mid = seededMember(m);
+    await seedChatThreads(db, uni, (phone) => mid("demo-university", phone));
+    await seedChatReport(db, uni);
+  }
+  await seedCurrentPupil(db, tenantIds);
 }
 
 export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number; history: DemoHistoryResult }> {

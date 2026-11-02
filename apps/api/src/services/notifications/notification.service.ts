@@ -68,10 +68,11 @@ export async function notify(ctx: AppContext, input: NotifyInput, db: DbClient =
 
 export async function notifyTenantAdmins(
   ctx: AppContext,
-  input: Omit<NotifyInput, "recipientMembershipIds"> & { excludeMembershipId?: string },
+  input: Omit<NotifyInput, "recipientMembershipIds"> & { excludeMembershipId?: string; excludeMembershipIds?: Array<string | null> },
   db: DbClient = ctx.db,
 ): Promise<void> {
   const admins = await listTenantAdmins(db, input.tenantId);
-  const recipientMembershipIds = admins.map((a) => a.id).filter((id) => id !== input.excludeMembershipId);
+  const excluded = new Set([input.excludeMembershipId, ...(input.excludeMembershipIds ?? [])]);
+  const recipientMembershipIds = admins.map((a) => a.id).filter((id) => !excluded.has(id));
   await notify(ctx, { ...input, recipientMembershipIds }, db);
 }

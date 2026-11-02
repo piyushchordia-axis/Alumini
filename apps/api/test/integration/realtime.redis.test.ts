@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Emitter } from "@socket.io/redis-emitter";
-import { REALTIME_PATH, type NotificationEvent } from "@illuminize/shared";
+import { REALTIME_PATH, type ChatChangedEvent, type NotificationEvent } from "@illuminize/shared";
 import Redis from "ioredis";
 import { io, type Socket } from "socket.io-client";
+import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RedisEmitterPublisher, type SocketIoPublisher } from "../../src/realtime/publisher";
 import { rooms } from "../../src/realtime/rooms";
 import { attachRealtime, type RealtimeServer } from "../../src/realtime/server";
-import { createTenant, createUser, loginAs } from "../helpers/factories";
+import { auth, createMembership, createTenant, createUser, loginAs } from "../helpers/factories";
 import { isRealRedisAvailable, realRedisUrl } from "../helpers/realRedis";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -70,5 +71,32 @@ describe.skipIf(!ready)("live updates across API nodes (real Redis)", () => {
     const gone = new Promise<string>((resolve) => socket.once("disconnect", resolve));
     b.publisher.disconnect(rooms.user(user.id));
     expect(await gone).toBe("io server disconnect");
+  });
+
+  it("a chat request sent through one node reaches a member connected to the other", async () => {
+    const [a, b] = nodes as [(typeof nodes)[0], (typeof nodes)[0]];
+    await a.ctx.truncateAll();
+    b.ctx.realtime = b.publisher;
+    const { tenant } = await createTenant(a.ctx);
+    const reader = await createUser(a.ctx, { phone: "+919844455567" });
+    const writer = await createUser(a.ctx, { phone: "+919844455568" });
+    const readerMembership = await createMembership(a.ctx, tenant.id, reader.id);
+    await createMembership(a.ctx, tenant.id, writer.id);
+    // Each node has its own mock session store, so each member signs in on the node they use.
+    const readerSession = await loginAs(a.ctx, reader.phoneE164);
+    const writerSession = await loginAs(b.ctx, writer.phoneE164);
+
+    const socket = io(a.url, { path: REALTIME_PATH, transports: ["websocket"], reconnection: false, forceNew: true, auth: { token: readerSession.accessToken } });
+    sockets.push(socket);
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", () => resolve());
+      socket.once("connect_error", reject);
+    });
+    for (let i = 0; i < 50 && (await a.io.local.in(rooms.user(reader.id)).fetchSockets()).length === 0; i++) await new Promise((r) => setTimeout(r, 20));
+
+    const changed = new Promise<ChatChangedEvent>((resolve) => socket.once("chat:changed", resolve));
+    const res = await request(b.ctx.app).post(`/api/v1/t/${tenant.slug}/chat/direct`).set(auth(writerSession.accessToken)).send({ membershipId: readerMembership.id, body: "Across nodes", clientKey: "across-nodes-1" });
+    expect(res.status).toBe(201);
+    expect(await changed).toEqual({ tenantSlug: tenant.slug, conversationId: res.body.data.conversation.id });
   });
 });

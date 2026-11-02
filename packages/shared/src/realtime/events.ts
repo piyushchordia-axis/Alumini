@@ -1,11 +1,10 @@
 import type { NotificationType } from "../constants";
-import type { ErrorCode } from "../errorCodes";
-import type { NotificationDto } from "../types/dto";
+import type { ChatMessageDto, NotificationDto } from "../types/dto";
 
 /**
- * Live events over Socket.IO. Names are "domain:verb"; every tenant-scoped payload carries tenantSlug so a client
- * signed in to several institutions can route it. Events from the client always take an ack (AckResult), mirroring the
- * REST error shape. Wave 2 adds chat ("chat:message", "chat:read", "chat:typing", "chat:join").
+ * Live events over Socket.IO, always server to client: every write goes over REST, which already has tenant status,
+ * membership checks, feature gates, rate limits and token refresh. Names are "domain:verb"; every tenant-scoped payload
+ * carries tenantSlug so a client signed in to several institutions can route it.
  */
 export interface NotificationEvent {
   tenantSlug: string;
@@ -31,17 +30,55 @@ export interface BulkNotificationEvent {
   postId?: string;
 }
 
+export interface ChatMessageEvent {
+  tenantSlug: string;
+  conversationId: string;
+  message: ChatMessageDto;
+}
+
+/** The member read a thread on another device. Only ever goes to their own devices: there are no read receipts. */
+export interface ChatReadEvent {
+  tenantSlug: string;
+  conversationId: string;
+  membershipId: string;
+  lastReadSeq: number;
+}
+
+export interface ChatRemovedEvent {
+  tenantSlug: string;
+  conversationId: string;
+  messageId: string;
+  seq: number;
+}
+
+/** Something about this thread changed, so refetch it. Carries no content, because a request's recipient gets only this. */
+export interface ChatChangedEvent {
+  tenantSlug: string;
+  conversationId: string;
+}
+
+export interface ChatUnreadEvent {
+  tenantSlug: string;
+  membershipId: string;
+  /** Conversations with something unread, not messages. */
+  unread: number;
+  requests: number;
+}
+
 export interface ServerToClientEvents {
   "notification:new": (payload: NotificationEvent) => void;
   "notification:bulk": (payload: BulkNotificationEvent) => void;
   "notification:unread": (payload: UnreadEvent) => void;
+  "chat:message": (payload: ChatMessageEvent) => void;
+  "chat:read": (payload: ChatReadEvent) => void;
+  "chat:removed": (payload: ChatRemovedEvent) => void;
+  "chat:changed": (payload: ChatChangedEvent) => void;
+  "chat:unread": (payload: ChatUnreadEvent) => void;
   /** The access token used to connect has expired; the server disconnects right after. Refresh and reconnect. */
   "auth:expired": () => void;
 }
 
-export type AckResult<T> = { ok: true; data: T } | { ok: false; error: { code: ErrorCode; message: string } };
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- extended by chat in Wave 2
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the socket stays server to client, see above
 export interface ClientToServerEvents {}
 
 /** HTTP path of the Socket.IO endpoint (same origin as the API). */

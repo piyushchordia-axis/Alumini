@@ -70,6 +70,12 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
       res.status(409).json({ error: { code: "CONFLICT", message: "That already exists. Refresh and try again." } });
       return;
     }
+    if (pg?.code === "55P03") {
+      // Waited too long for a row lock (SET LOCAL lock_timeout). Nothing was saved, and clients can safely try again.
+      logger.warn({ reqId: req.id, url: req.originalUrl }, "Gave up waiting for a row lock");
+      res.status(503).json({ error: { code: "INTERNAL", message: "That took too long. Try again." } });
+      return;
+    }
     if (pg?.code === "22P02" || pg?.code === "22007" || pg?.code === "22008") {
       // Invalid text representation (e.g. a malformed uuid) or an impossible date that slipped past validation.
       res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid value in request" } });

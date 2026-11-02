@@ -128,6 +128,7 @@ try {
     // Only what was toggled goes out, so a stale tab can't undo another admin's change.
     await open();
     if (!(await businesses.isChecked())) throw new Error("the Business directory switch should start on");
+    if (!(await page.locator('label:has-text("Messaging") input').isChecked())) throw new Error("the Messaging switch should start on outside schools");
     sentFeatures(await save(), undefined);
     await page.waitForSelector("text=Settings saved");
 
@@ -303,6 +304,14 @@ try {
     await page.waitForURL(/\/t\/demo-school\/admin\/members$/);
     await page.waitForSelector('nav[aria-label="Admin sections"] >> text=Moderation');
     await page.waitForSelector("text=Platform console");
+  });
+
+  await step("messaging starts off at a school, with the reason shown", async () => {
+    await page.goto(`${BASE}/t/demo-school/admin/settings`);
+    await page.waitForSelector("text=New member approval");
+    if (await page.locator('label:has-text("Messaging") input').isChecked()) throw new Error("the Messaging switch should start off at a school");
+    await page.waitForSelector("text=current pupils still can't use it");
+    await shot("p05b-school-settings");
   });
 
   await step("admin console stacks on a phone", async () => {

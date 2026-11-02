@@ -3,11 +3,12 @@ import type { AppContext } from "../context";
 import { toMembershipSummaryDto, toUserDto } from "../dto/user.dto";
 import { AppError } from "../lib/errors";
 import { normalizePhone } from "../lib/phone";
-import { runInTransaction } from "../lib/transaction";
+import { afterCommit, runInTransaction } from "../lib/transaction";
 import { resolveOpenReportsOnListingsOfUser } from "../repositories/businesses.repo";
 import { listMembershipsForUser } from "../repositories/memberships.repo";
 import { deleteUser, findUserById, upsertUserOnLogin } from "../repositories/users.repo";
 import { recordAudit } from "./audit.service";
+import { prepareChatForAccountDeletion } from "./chat/lifecycle";
 import { issueSession, revokeAllSessions, type SessionMeta } from "./token.service";
 
 export async function loginWithVerifiedPhone(ctx: AppContext, phoneE164: string, meta: SessionMeta): Promise<AuthSessionDto> {
@@ -39,9 +40,11 @@ export async function deleteAccount(ctx: AppContext, userId: string, ip?: string
   const user = await findUserById(ctx.db, userId);
   if (!user) return;
   await recordAudit(ctx, { actorUserId: userId, action: "auth.account_deleted", ip, metadata: { phone: user.phoneE164 } });
-  await revokeAllSessions(ctx, userId);
   await runInTransaction(ctx, async (tx) => {
     await resolveOpenReportsOnListingsOfUser(tx, userId, "auto: author deleted");
+    await prepareChatForAccountDeletion(tx, userId);
     await deleteUser(tx, userId);
+    // Once it's done: a deletion that gives up on a row lock tells them to try again, and they have to still be signed in to.
+    await afterCommit(ctx, tx, () => revokeAllSessions(ctx, userId));
   });
 }

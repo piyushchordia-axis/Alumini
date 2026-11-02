@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import type { AppContext } from "./context";
+import { errSerializer } from "./lib/logger";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { requestId } from "./middleware/requestId";
 import { apiRouter } from "./routes";
@@ -34,6 +35,8 @@ export function createApp(ctx: AppContext): Express {
         serializers: {
           req: (req: { id: string; method: string; url: string }) => ({ id: req.id, method: req.method, url: req.url }),
           res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+          // pino-http brings its own otherwise, which would log query parameters.
+          err: errSerializer,
         },
         customLogLevel: (_req, res, err) => {
           if (err || res.statusCode >= 500) return "error";

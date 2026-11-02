@@ -16,3 +16,4 @@ export * from "./payments";
 export * from "./profileFields";
 export * from "./invitations";
 export * from "./engagement";
+export * from "./chat";

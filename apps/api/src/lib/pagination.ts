@@ -34,14 +34,23 @@ export function parseCursorDate(v: string): Date {
   return d;
 }
 
+const MAX_SEQ = 2147483647;
+
+/** Cursor value parser for a position in a conversation, also for `afterSeq`. `new Date("10")` is valid, so the default parser would let this through to Postgres. */
+export function parseCursorSeq(v: string): number {
+  const n = /^\d{1,10}$/.test(v) ? Number(v) : NaN;
+  if (!(n <= MAX_SEQ)) throw AppError.badRequest("Invalid pagination cursor");
+  return n;
+}
+
 /**
- * Keyset condition for `(sortCol, idCol)` ordering.
+ * Keyset condition for `(sortCol, idCol)` ordering. `sortCol` can be an expression, when a row sorts by more than a column.
  * direction "desc": rows strictly after the cursor in descending order.
  * Timestamp columns are stored with millisecond precision (migration 0004), so the ISO value in the cursor matches the
  * stored value exactly.
  */
 export function keysetCondition(
-  sortCol: AnyPgColumn,
+  sortCol: AnyPgColumn | SQL,
   idCol: AnyPgColumn,
   cursor: Cursor | undefined,
   direction: "asc" | "desc",
@@ -50,7 +59,9 @@ export function keysetCondition(
   if (!cursor) return undefined;
   const value = parse(cursor.v);
   const cmp = direction === "desc" ? lt : gt;
-  return or(cmp(sortCol, value), and(eq(sortCol, value), cmp(idCol, cursor.id)));
+  // Drizzle's overloads take one or the other, not the union, and it tells them apart at runtime.
+  const sort = sortCol as SQL;
+  return or(cmp(sort, value), and(eq(sort, value), cmp(idCol, cursor.id)));
 }
 
 export interface CursorPage<T> {

@@ -16,7 +16,7 @@ const school = (): TenantFeatures => defaultFeaturesFor("SCHOOL");
 describe.skipIf(!dbAvailable)("tenant features", () => {
   let ctx: TestContext;
   let platform: Record<string, string>;
-  // The school-off table is empty until later slices add their keys, so tests borrow "funding" to prove the rules work.
+  // Borrows a key that isn't in the table, so these keep proving the rules whichever keys later slices add.
   const schoolOff = SCHOOL_OFF_FEATURES as TenantFeature[];
 
   beforeAll(async () => {
@@ -112,6 +112,42 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
       const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
       await api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ allowSelfRegistration: false }).expect(200);
       expect(await storedFeatures(tenant.id)).toEqual({ feed: true });
+    });
+  });
+
+  describe("the messaging key", () => {
+    it("reads off at a school whose row was stripped to {feed: true}, and on anywhere else", async () => {
+      const stripped = { feed: true };
+      const { tenant: school } = await createTenant(ctx, { type: "SCHOOL", features: stripped });
+      const { tenant: college } = await createTenant(ctx, { type: "COLLEGE", features: stripped });
+      const atSchool = await memberSession(ctx, school.id);
+      const atCollege = await memberSession(ctx, college.id);
+      const refused = await api().get(`/api/v1/t/${school.slug}/chat/conversations`).set(atSchool.headers);
+      expect(refused.status).toBe(403);
+      expect(refused.body.error.code).toBe("FEATURE_DISABLED");
+      expect((await api().get(`/api/v1/t/${college.slug}/chat/conversations`).set(atCollege.headers)).status).toBe(200);
+      expect((await api().get(`/api/v1/tenants/${school.slug}`)).body.data.settings.features.messaging).toBe(false);
+      expect((await api().get(`/api/v1/tenants/${college.slug}`)).body.data.settings.features.messaging).toBe(true);
+    });
+
+    it("refuses a school's existing threads once off, and comes straight back when on again", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL", features: { messaging: true } });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const a = await memberSession(ctx, tenant.id);
+      const b = await memberSession(ctx, tenant.id);
+      const base = `/api/v1/t/${tenant.slug}/chat`;
+      const opened = await api().post(`${base}/direct`).set(a.headers).send({ membershipId: b.membership.id, body: "Hello", clientKey: "existing-thread-1" });
+      expect(opened.status).toBe(201);
+      const thread = `${base}/conversations/${opened.body.data.conversation.id}`;
+      const toggle = (messaging: boolean) => api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ features: { messaging } }).expect(200);
+
+      await toggle(false);
+      for (const res of [await api().get(thread).set(b.headers), await api().get(`${thread}/messages`).set(b.headers), await api().post(`${thread}/accept`).set(b.headers)]) {
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe("FEATURE_DISABLED");
+      }
+      await toggle(true);
+      expect((await api().get(thread).set(b.headers)).status).toBe(200);
     });
   });
 
@@ -238,7 +274,7 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
       expect(res.status).toBe(200);
       expect((await storedFeatures(tenant.id)).funding).toBe(false);
       const [audit] = await ctx.db.select().from(auditLog).where(and(eq(auditLog.tenantId, tenant.id), eq(auditLog.action, "platform.tenant.update")));
-      expect(audit?.metadata).toMatchObject({ forcedOff: ["funding"] });
+      expect(audit?.metadata).toMatchObject({ forcedOff: expect.arrayContaining(["funding"]) });
     });
   });
 

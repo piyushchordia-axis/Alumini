@@ -1,4 +1,4 @@
-import { resolveFeatures, tenantSlugSchema, utcToZonedWallTime, type TenantFeature } from "@illuminize/shared";
+import { isCurrentPupil, resolveFeatures, tenantSlugSchema, utcToZonedWallTime, type TenantFeature } from "@illuminize/shared";
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../context";
@@ -83,6 +83,14 @@ export function requireFeature(feature: TenantFeature): RequestHandler {
     next();
   };
 }
+
+/** Keeps current pupils out of private contact, whatever the school has switched on. Goes after requireMember. */
+export const requireChatEligible: RequestHandler = (req, _res, next) => {
+  const t = req.tenantCtx;
+  const m = req.membership;
+  if (!t || !m || isCurrentPupil(t.tenant, m)) return next(AppError.forbidden("Chat isn't available to current pupils", "FEATURE_DISABLED"));
+  next();
+};
 
 /** Records member activity at most once per hour: last_active_at, plus the day in member_activity_days for billing. */
 export function touchActivity(ctx: AppContext): RequestHandler {

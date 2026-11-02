@@ -24,7 +24,7 @@ export function directoryRoutes(ctx: AppContext): Router {
   router.get(
     "/directory/:membershipId",
     route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
-      ok(res, await getMemberProfile(ctx, req.tenantCtx!.tenant.id, params.membershipId));
+      ok(res, await getMemberProfile(ctx, req.tenantCtx!, req.membership!, params.membershipId));
     }),
   );
   return router;

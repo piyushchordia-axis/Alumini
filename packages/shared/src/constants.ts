@@ -54,6 +54,36 @@ export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number];
 /** Listings one member may have, counting everything an admin hasn't removed. */
 export const MAX_BUSINESS_LISTINGS = 5;
 
+/** One thread per pair of members (DIRECT), or a shared room (GROUP). */
+export const CHAT_CONVERSATION_KINDS = ["DIRECT", "GROUP"] as const;
+export type ChatConversationKind = (typeof CHAT_CONVERSATION_KINDS)[number];
+/** What opened the thread. A thread opened by accepting a mentorship or referral skips the message request. */
+export const CHAT_ORIGINS = ["MESSAGE_REQUEST", "MENTORSHIP", "REFERRAL", "GROUP"] as const;
+export type ChatOrigin = (typeof CHAT_ORIGINS)[number];
+export const CHAT_DIRECT_STATES = ["PENDING", "ACCEPTED", "DECLINED", "CLOSED"] as const;
+export type ChatDirectState = (typeof CHAT_DIRECT_STATES)[number];
+export const CHAT_PARTICIPANT_STATES = ["INVITED", "ACTIVE", "LEFT", "REMOVED"] as const;
+export type ChatParticipantState = (typeof CHAT_PARTICIPANT_STATES)[number];
+export const CHAT_PARTICIPANT_ROLES = ["OWNER", "MEMBER"] as const;
+export type ChatParticipantRole = (typeof CHAT_PARTICIPANT_ROLES)[number];
+export const CHAT_MESSAGE_KINDS = ["TEXT", "SYSTEM"] as const;
+export type ChatMessageKind = (typeof CHAT_MESSAGE_KINDS)[number];
+export const CHAT_INBOXES = ["MAIN", "REQUESTS"] as const;
+export type ChatInbox = (typeof CHAT_INBOXES)[number];
+export const CHAT_REPORT_TARGET_KINDS = ["MESSAGE", "MENTORSHIP_NOTE", "REFERRAL_NOTE"] as const;
+export type ChatReportTargetKind = (typeof CHAT_REPORT_TARGET_KINDS)[number];
+export const CHAT_REPORT_ACTIONS = ["NONE", "REMOVE_MESSAGE"] as const;
+export type ChatReportAction = (typeof CHAT_REPORT_ACTIONS)[number];
+export const CHAT_MESSAGE_MAX_LENGTH = 4000;
+/** How long a requester waits before asking again, counted from their last request or from the thread closing. */
+export const CHAT_REREQUEST_AFTER_DAYS = 30;
+/** Requests one member may send another, the first included. */
+export const CHAT_MAX_REQUESTS_PER_PAIR = 3;
+/** Messages an admin can be shown either side of a reported one, frozen when the report is filed. */
+export const CHAT_REPORT_CONTEXT_EACH_SIDE = 5;
+/** How clients show a message or thread whose other member deleted their account. */
+export const DELETED_MEMBER_NAME = "Deleted member";
+
 export const EVENT_KINDS = ["CASUAL_MEETUP", "ORGANISED_EVENT"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
@@ -92,6 +122,7 @@ export const NOTIFICATION_TYPES = [
   "ANNOUNCEMENT",
   "CELEBRATION",
   "CELEBRATION_WISH",
+  "CHAT_REPORT_FILED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -151,7 +182,7 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const MAX_INVITE_IMPORT_ROWS = 500;
 export const INVITE_TTL_DAYS = 90;
 
-export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses"] as const;
+export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
 

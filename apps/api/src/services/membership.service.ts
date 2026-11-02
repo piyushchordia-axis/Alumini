@@ -146,12 +146,12 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
     }
     return row;
   });
-  return toMembershipDto(row, await answersForOne(ctx, tenant.id, row.id, "self"));
+  return toMembershipDto(row, tenant, await answersForOne(ctx, tenant.id, row.id, "self"));
 }
 
 /** The caller's own membership with their answers. */
-export async function getMyMembership(ctx: AppContext, membership: MembershipRow): Promise<MembershipDto> {
-  return toMembershipDto(membership, await answersForOne(ctx, membership.tenantId, membership.id, "self"));
+export async function getMyMembership(ctx: AppContext, tenantCtx: TenantContext, membership: MembershipRow): Promise<MembershipDto> {
+  return toMembershipDto(membership, tenantCtx.tenant, await answersForOne(ctx, membership.tenantId, membership.id, "self"));
 }
 
 export async function updateMyProfile(
@@ -168,7 +168,7 @@ export async function updateMyProfile(
     if (input.fullName) await updateUser(tx, membership.userId, { displayName: input.fullName });
     return updated;
   });
-  return toMembershipDto(row, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
+  return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
 }
 
 async function loadTarget(ctx: AppContext, tenantId: string, membershipId: string) {

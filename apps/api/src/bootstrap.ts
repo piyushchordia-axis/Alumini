@@ -25,7 +25,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
   if (config.isProduction && !config.webAppUrl && o.role === "api") {
     logger.warn("WEB_APP_URL is not set: email confirmation, invites and digests are off until it points at the web app");
   }
-  const { pool, db } = createDb(config.DATABASE_URL);
+  const { pool, db } = createDb(config.DATABASE_URL, logger);
   const redis = createRedis(config.REDIS_URL);
   redis.on("error", (err) => logger.error({ err }, "Redis error"));
   const producer = createBullConnection(config.REDIS_URL, "producer");

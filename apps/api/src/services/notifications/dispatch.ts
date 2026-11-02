@@ -1,4 +1,4 @@
-import { notificationLevelFor } from "@illuminize/shared";
+import { NOTIFICATION_CATEGORY, notificationLevelFor } from "@illuminize/shared";
 import type { JobHandler } from "../../jobs/JobQueue";
 import { PermanentJobError } from "../../jobs/JobQueue";
 import { findMembershipsByIds } from "../../repositories/memberships.repo";
@@ -18,11 +18,15 @@ const BROADCAST_ROOMS = 1000;
  * in the meantime are simply skipped.
  */
 export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async (ctx, { tenantId, notificationIds, bulk, push }) => {
-  const rows = await findNotificationsByIds(ctx.db, tenantId, notificationIds);
-  if (rows.length === 0) return;
+  const stored = await findNotificationsByIds(ctx.db, tenantId, notificationIds);
+  if (stored.length === 0) return;
   const tenant = await findTenantById(ctx.db, tenantId);
   if (!tenant) return;
-  const recipients = await findMembershipsByIds(ctx.db, tenantId, [...new Set(rows.map((r) => r.recipientMembershipId))]);
+  const recipients = await findMembershipsByIds(ctx.db, tenantId, [...new Set(stored.map((r) => r.recipientMembershipId))]);
+  // Someone suspended, pending or rejected still hears about their own account, and nothing else.
+  const statusOf = new Map(recipients.map((m) => [m.id, m.status]));
+  const rows = stored.filter((r) => NOTIFICATION_CATEGORY[r.type] === "ACCOUNT" || statusOf.get(r.recipientMembershipId) === "APPROVED");
+  if (rows.length === 0) return;
 
   // Open apps update the bell straight away.
   const userByMembership = new Map(recipients.map((m) => [m.id, m.userId]));

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
-const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory", businesses: "Business directory" };
+const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory", businesses: "Business directory", messaging: "Messaging" };
 
 export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
   const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
@@ -74,9 +74,9 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
             <Checkbox key={f} checked={features[f]} onChange={(e) => setFeatures({ ...features, [f]: e.target.checked })} label={FEATURE_LABELS[f]} />
           ))}
         </div>
-        {tenantType === "SCHOOL" && SCHOOL_OFF_FEATURES.length > 0 && (
+        {tenantType === "SCHOOL" && (
           <p className="mt-2 text-xs text-slate-500">
-            {SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]).join(", ")} start off for schools because they let members contact each other privately. You can turn them on, but current pupils can't use them.
+            {new Intl.ListFormat("en-GB").format(SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]))} {SCHOOL_OFF_FEATURES.length === 1 ? "starts" : "start"} off for schools because members can contact each other privately there. If you turn {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"} on, current pupils still can't use {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"}.
           </p>
         )}
       </fieldset>

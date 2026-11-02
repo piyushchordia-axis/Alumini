@@ -3,6 +3,10 @@ import type {
   BillingCycle,
   BillingModel,
   CelebrationKind,
+  ChatConversationKind,
+  ChatMessageKind,
+  ChatOrigin,
+  ChatReportTargetKind,
   ContentType,
   EventKind,
   BusinessCategory,
@@ -290,6 +294,8 @@ export interface MembershipDto {
   celebrateAnniversary: boolean;
   /** Answers to the institution's questions (the member's own and admins' views include admin-only ones). */
   fields: ProfileFieldAnswerDto[];
+  /** Approved and not a current pupil, so private contact is open to them. Whether it's switched on is a separate question. */
+  chatEligible: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -318,13 +324,99 @@ export interface MemberProfileDto extends MemberCardDto {
   /** Present only when the member chose to share it. */
   phone: string | null;
   memberSince: string;
+  /** Whether to offer "Message". Never false because of a block, which would reveal it. */
+  canMessage: boolean;
 }
 
-export interface AdminMemberDto extends MembershipDto {
+export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible"> {
   userId: string;
   phone: string;
   lastActiveAt: string | null;
   lastLoginAt: string | null;
+}
+
+export interface ChatMemberDto {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+}
+
+export interface ChatMessageDto {
+  id: string;
+  conversationId: string;
+  /** Position in the conversation. Order by this, never by time. A member can see gaps, which aren't missing messages. */
+  seq: number;
+  kind: ChatMessageKind;
+  /** Null once the sender has deleted their account: show DELETED_MEMBER_NAME. */
+  sender: ChatMemberDto | null;
+  /** Null when an admin removed the message. */
+  body: string | null;
+  removed: boolean;
+  meta: Record<string, unknown> | null;
+  /** The client's own key for the send, on the sender's copy only, so it can settle its optimistic row. */
+  clientKey: string | null;
+  createdAt: string;
+}
+
+/**
+ * A direct thread as this member sees it. A requester's REQUEST_SENT looks the same whether the request is waiting,
+ * declined or blocked, and REQUEST_DECLINED is only ever shown to the member who declined.
+ */
+export type ChatThreadState = "REQUEST_SENT" | "REQUEST_RECEIVED" | "REQUEST_DECLINED" | "ACCEPTED" | "CLOSED";
+
+export interface ChatLastMessageDto {
+  seq: number;
+  /** Null when an admin removed the message. */
+  body: string | null;
+  mine: boolean;
+  createdAt: string;
+}
+
+export interface ChatConversationDto {
+  id: string;
+  kind: ChatConversationKind;
+  origin: ChatOrigin;
+  /** Null once the other member has deleted their account: show DELETED_MEMBER_NAME. */
+  peer: ChatMemberDto | null;
+  state: ChatThreadState;
+  canSend: boolean;
+  /** When this member may next ask, for a thread they can't send in until then. Null if they can't. */
+  canRerequestAt: string | null;
+  blockedByMe: boolean;
+  /** 0 while this member has the other blocked. */
+  unread: number;
+  /** How far they've read of what they can see. */
+  lastReadSeq: number;
+  mutedUntil: string | null;
+  /** When this member last had anything to see here, which a message withheld from them doesn't change. */
+  lastMessageAt: string;
+  /** Null on a request, which shows its text only when opened. */
+  lastMessage: ChatLastMessageDto | null;
+}
+
+export interface ChatDirectResultDto {
+  conversation: ChatConversationDto;
+  message: ChatMessageDto;
+}
+
+export interface ChatBadgeDto {
+  /** Conversations with something unread, not messages. */
+  unread: number;
+  requests: number;
+}
+
+export interface ChatBlockDto {
+  member: ChatMemberDto;
+  createdAt: string;
+}
+
+export interface ChatReportDto {
+  id: string;
+  targetKind: ChatReportTargetKind;
+  targetId: string;
+  reason: ReportReason;
+  status: ReportStatus;
+  createdAt: string;
 }
 
 export interface NotificationDto {

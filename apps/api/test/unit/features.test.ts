@@ -43,6 +43,30 @@ describe("the businesses key", () => {
   });
 });
 
+describe("the messaging key", () => {
+  it("starts off for schools and on everywhere else", () => {
+    expect(defaultFeaturesFor("SCHOOL").messaging).toBe(false);
+    for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(defaultFeaturesFor(type).messaging, type).toBe(true);
+    expect(SCHOOL_OFF_FEATURES).toContain("messaging");
+  });
+
+  it("reads off for a school whose row doesn't mention it, on for anyone else's, and on where a school's admin turned it on", () => {
+    expect(resolveFeatures("SCHOOL", { feed: true }).messaging).toBe(false);
+    expect(resolveFeatures("COLLEGE", { feed: true }).messaging).toBe(true);
+    expect(resolveFeatures("SCHOOL", { messaging: true }).messaging).toBe(true);
+  });
+
+  it("isn't switched on at a school by a partial change to another key", () => {
+    expect(applyFeatureChange("SCHOOL", { feed: true }, { jobs: false }).features.messaging).toBe(false);
+  });
+
+  it("is forced off by retyping to a school", () => {
+    const { features, forcedOff } = retypeToSchool("COLLEGE", {});
+    expect(features.messaging).toBe(false);
+    expect(forcedOff).toContain("messaging");
+  });
+});
+
 describe("resolveFeatures", () => {
   it("fills missing keys, lets stored keys win and drops keys that no longer exist", () => {
     expect(resolveFeatures("COLLEGE", {})).toEqual(allOn());
@@ -52,7 +76,7 @@ describe("resolveFeatures", () => {
   });
 });
 
-// Both tables are empty until later slices add their keys, so these tests borrow an existing key to prove the rules work.
+// These borrow a key that isn't in the tables, so they keep proving the rules whichever keys later slices add.
 describe("with a key in the school-off table", () => {
   const table = SCHOOL_OFF_FEATURES as TenantFeature[];
   beforeEach(() => void table.push("funding"));

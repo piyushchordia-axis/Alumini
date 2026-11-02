@@ -23,7 +23,7 @@ export function membershipRoutes(ctx: AppContext): Router {
     "/memberships/me",
     route({}, async ({ req, res }) => {
       if (!req.membership) throw AppError.notFound("You are not a member of this institution", "NOT_A_MEMBER");
-      ok(res, await getMyMembership(ctx, req.membership));
+      ok(res, await getMyMembership(ctx, req.tenantCtx!, req.membership));
     }),
   );
 

@@ -1,11 +1,14 @@
+import { eq } from "drizzle-orm";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { notifications } from "../../src/db/schema";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { memberships, notifications } from "../../src/db/schema";
+import { NoopRealtimePublisher } from "../../src/realtime/publisher";
 import { upsertPushToken } from "../../src/repositories/users.repo";
 import { ExpoPushChannel } from "../../src/services/notifications/ExpoPushChannel";
 import { PushSendError } from "../../src/services/notifications/NotificationChannel";
 import { notify } from "../../src/services/notifications/notification.service";
 import { createTenant, memberSession } from "../helpers/factories";
+import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -51,6 +54,63 @@ describe.skipIf(!dbAvailable)("notification delivery jobs", () => {
     expect(result.failed).toEqual([]);
     expect(expo.state.sent).toHaveLength(1);
     expect(expo.state.sent[0]).toMatchObject({ to: "ExponentPushToken[author]", data: { type: "POST_COMMENT", tenantSlug: "jobs-u", postId: post.body.data.id } });
+  });
+
+  describe("for someone who isn't approved", () => {
+    async function suspended(status: "SUSPENDED" | "PENDING" | "REJECTED" = "SUSPENDED") {
+      const { tenant } = await createTenant(ctx);
+      const m = await memberSession(ctx, tenant.id);
+      await upsertPushToken(ctx.db, { userId: m.user.id, token: "ExponentPushToken[x]", platform: "IOS" });
+      await ctx.db.update(memberships).set({ status }).where(eq(memberships.id, m.membership.id));
+      const realtime = new CapturingRealtime();
+      ctx.realtime = realtime;
+      return { tenant, m, realtime };
+    }
+    afterEach(() => {
+      ctx.realtime = new NoopRealtimePublisher();
+    });
+
+    for (const status of ["SUSPENDED", "PENDING", "REJECTED"] as const) {
+      it(`delivers nothing but account news to someone ${status.toLowerCase()}`, async () => {
+        const { tenant, m, realtime } = await suspended(status);
+        await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id], type: "POST_COMMENT", title: "Someone commented" });
+        await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id], type: "CHAT_REPORT_FILED", title: "A report" });
+        const result = await ctx.jobs.drain();
+        expect(result.failed).toEqual([]);
+        expect(expo.state.sent).toEqual([]);
+        expect(realtime.events).toEqual([]);
+        // Stored all the same: it's there to read if they're reinstated.
+        expect(await ctx.db.select().from(notifications).where(eq(notifications.recipientMembershipId, m.membership.id))).toHaveLength(2);
+      });
+    }
+
+    it("still tells a suspended member about their own account", async () => {
+      const { tenant, m, realtime } = await suspended();
+      await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id], type: "MEMBERSHIP_SUSPENDED", title: "Membership suspended" });
+      expect((await ctx.jobs.drain()).failed).toEqual([]);
+      expect(expo.state.sent).toHaveLength(1);
+      expect(realtime.to(m.user.id, "notification:new")).toHaveLength(1);
+    });
+
+    it("sorts a mixed batch, delivering to the approved and skipping the rest", async () => {
+      const { tenant, m, realtime } = await suspended();
+      const approved = await memberSession(ctx, tenant.id);
+      await upsertPushToken(ctx.db, { userId: approved.user.id, token: "ExponentPushToken[y]", platform: "IOS" });
+      await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id, approved.membership.id], type: "POST_COMMENT", title: "A comment" });
+      await ctx.jobs.drain();
+      expect(expo.state.sent.map((s) => s.to)).toEqual(["ExponentPushToken[y]"]);
+      expect(realtime.to(approved.user.id, "notification:new")).toHaveLength(1);
+      expect(realtime.to(m.user.id)).toEqual([]);
+    });
+
+    it("leaves a suspended member out of a bulk broadcast", async () => {
+      const { tenant, m, realtime } = await suspended();
+      const approved = await memberSession(ctx, tenant.id);
+      await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id, approved.membership.id], type: "ANNOUNCEMENT", title: "News", bulk: true });
+      await ctx.jobs.drain();
+      expect(realtime.to(approved.user.id, "notification:bulk")).toHaveLength(1);
+      expect(realtime.to(m.user.id)).toEqual([]);
+    });
   });
 
   it("skips notifications deleted before delivery", async () => {

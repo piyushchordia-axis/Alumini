@@ -29,6 +29,7 @@ export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategor
   NEW_MEMBER_PENDING: "ADMIN",
   CONTENT_PENDING: "ADMIN",
   REPORT_FILED: "ADMIN",
+  CHAT_REPORT_FILED: "ADMIN",
 };
 
 /** OFF: not stored or shown. IN_APP: in the notification list and bell. IN_APP_PUSH: also a push to devices. */
@@ -96,7 +97,7 @@ export type NotificationTarget =
   | { kind: "business"; id: string }
   | { kind: "myContent" }
   | { kind: "profile" }
-  | { kind: "admin"; section: "members" | "moderation" | "reports" };
+  | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
 
 interface NotificationData {
   postId?: string;
@@ -151,6 +152,7 @@ const TARGETS: Record<NotificationType, TargetFor> = {
   NEW_MEMBER_PENDING: () => ({ kind: "admin", section: "members" }),
   CONTENT_PENDING: () => ({ kind: "admin", section: "moderation" }),
   REPORT_FILED: () => ({ kind: "admin", section: "reports" }),
+  CHAT_REPORT_FILED: () => ({ kind: "admin", section: "chat-reports" }),
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,

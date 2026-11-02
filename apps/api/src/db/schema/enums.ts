@@ -4,6 +4,14 @@ import {
   BILLING_CYCLES,
   BILLING_MODELS,
   BUSINESS_CATEGORIES,
+  CHAT_CONVERSATION_KINDS,
+  CHAT_DIRECT_STATES,
+  CHAT_MESSAGE_KINDS,
+  CHAT_ORIGINS,
+  CHAT_PARTICIPANT_ROLES,
+  CHAT_PARTICIPANT_STATES,
+  CHAT_REPORT_ACTIONS,
+  CHAT_REPORT_TARGET_KINDS,
   CONTENT_TYPES,
   EVENT_KINDS,
   FUNDING_KINDS,
@@ -64,3 +72,11 @@ export const profileFieldTypeEnum = pgEnum("profile_field_type", PROFILE_FIELD_T
 export const profileFieldVisibilityEnum = pgEnum("profile_field_visibility", PROFILE_FIELD_VISIBILITIES);
 export const invitationStatusEnum = pgEnum("invitation_status", INVITATION_STATUSES);
 export const postKindEnum = pgEnum("post_kind", POST_KINDS);
+export const chatConversationKindEnum = pgEnum("chat_conversation_kind", CHAT_CONVERSATION_KINDS);
+export const chatOriginEnum = pgEnum("chat_origin", CHAT_ORIGINS);
+export const chatDirectStateEnum = pgEnum("chat_direct_state", CHAT_DIRECT_STATES);
+export const chatParticipantStateEnum = pgEnum("chat_participant_state", CHAT_PARTICIPANT_STATES);
+export const chatParticipantRoleEnum = pgEnum("chat_participant_role", CHAT_PARTICIPANT_ROLES);
+export const chatMessageKindEnum = pgEnum("chat_message_kind", CHAT_MESSAGE_KINDS);
+export const chatReportTargetKindEnum = pgEnum("chat_report_target_kind", CHAT_REPORT_TARGET_KINDS);
+export const chatReportActionEnum = pgEnum("chat_report_action", CHAT_REPORT_ACTIONS);

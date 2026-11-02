@@ -1,64 +1,20 @@
-import http from "node:http";
-import type { AddressInfo } from "node:net";
 import { ApiClientError, createApiClient, MemoryTokenStorage } from "@illuminize/shared/client";
 import { createRealtimeClient } from "@illuminize/shared/realtime";
-import { REALTIME_PATH, type NotificationEvent, type UnreadEvent } from "@illuminize/shared";
-import { io, type Socket } from "socket.io-client";
+import type { NotificationEvent, UnreadEvent } from "@illuminize/shared";
 import request from "supertest";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { attachRealtime } from "../../src/realtime/server";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { notify } from "../../src/services/notifications/notification.service";
 import { auth, createMembership, createTenant, createUser, loginAs } from "../helpers/factories";
-import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
+import { connect, disconnected, next, openSockets as sockets, startServer, type Harness } from "../helpers/realtimeHarness";
+import { isDatabaseAvailable } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
-
-interface Harness {
-  ctx: TestContext;
-  baseUrl: string;
-  close(): Promise<void>;
-}
-
-async function startServer(env: Record<string, string> = {}): Promise<Harness> {
-  const ctx = await createTestContext(env);
-  const server = http.createServer(ctx.app);
-  const rt = attachRealtime(server, ctx, { adapter: "memory" });
-  ctx.realtime = rt.publisher;
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-  return {
-    ctx,
-    baseUrl: `http://127.0.0.1:${port}`,
-    async close() {
-      await rt.close();
-      await ctx.dispose();
-    },
-  };
-}
-
-const sockets: Socket[] = [];
-function connect(baseUrl: string, token: string | undefined): Promise<Socket> {
-  return new Promise((resolve, reject) => {
-    const s = io(baseUrl, { path: REALTIME_PATH, transports: ["websocket"], reconnection: false, forceNew: true, auth: token ? { token } : {} });
-    sockets.push(s);
-    s.once("connect", () => resolve(s));
-    s.once("connect_error", (err) => reject(err));
-  });
-}
-const next = <T>(s: Socket, event: string, timeoutMs = 3000) =>
-  new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`timed out waiting for ${event}`)), timeoutMs);
-    s.once(event, (payload: T) => {
-      clearTimeout(t);
-      resolve(payload);
-    });
-  });
-const disconnected = (s: Socket) => next<string>(s, "disconnect");
 
 describe.skipIf(!dbAvailable)("live updates (Socket.IO)", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await startServer();
+    await h.ctx.truncateAll(); // earlier test files may have left rows, and factory phones restart in every file
   });
   afterEach(async () => {
     sockets.splice(0).forEach((s) => s.disconnect());
@@ -100,6 +56,30 @@ describe.skipIf(!dbAvailable)("live updates (Socket.IO)", () => {
     const unread = next<UnreadEvent>(other, "notification:unread");
     await request(h.ctx.app).post(`/api/v1/t/${tenant.slug}/notifications/read-all`).set(auth(session.accessToken));
     expect(await unread).toEqual({ tenantSlug: tenant.slug, membershipId: membership.id, count: 0 });
+  });
+
+  it("disconnects instead of crashing when Redis fails just after the handshake", async () => {
+    const { session } = await member();
+    const logged = vi.spyOn(h.ctx.logger, "error");
+    const realExists = h.ctx.redis.exists.bind(h.ctx.redis);
+    const exists = vi.spyOn(h.ctx.redis, "exists");
+    // The handshake's check passes, and the one after joining the rooms finds Redis gone.
+    exists.mockImplementationOnce(realExists as never).mockRejectedValueOnce(new Error("Redis went away"));
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const socket = await connect(h.baseUrl, session.accessToken);
+      const reason = socket.connected ? await disconnected(socket) : "already gone";
+      expect(["io server disconnect", "already gone"]).toContain(reason);
+      await vi.waitFor(() => expect(logged).toHaveBeenCalledWith(expect.objectContaining({ err: expect.any(Error) }), "Could not set up a live connection"));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      exists.mockRestore();
+      logged.mockRestore();
+    }
+    // The server is still up, and the client can come straight back.
+    expect((await connect(h.baseUrl, session.accessToken)).connected).toBe(true);
   });
 
   it("closes a session's sockets on sign-out, and every socket on sign-out everywhere or account deletion", async () => {

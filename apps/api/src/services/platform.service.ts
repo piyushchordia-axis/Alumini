@@ -11,7 +11,7 @@ import type {
   TenantSettingsUpdate,
   TenantSettingsDto,
 } from "@illuminize/shared";
-import { defaultFeaturesFor, retypeToSchool } from "@illuminize/shared";
+import { defaultFeaturesFor, retypeToSchool, wallPartsInZone } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
@@ -100,6 +100,15 @@ function settingsColumns(input: TenantSettingsUpdate | undefined) {
   };
 }
 
+/**
+ * The batch year of an admin given none: last year, within what the institution allows. Not this year, because in a school
+ * this year's batch with no date of birth counts as a current pupil, which would shut an adult admin out of private contact.
+ */
+function fallbackAdminBatchYear(tenant: Pick<TenantRow, "timezone">, settings: { minBatchYear: number; maxBatchYear: number }): number {
+  const lastYear = wallPartsInZone(new Date(), tenant.timezone).year - 1;
+  return Math.max(settings.minBatchYear, Math.min(settings.maxBatchYear, lastYear));
+}
+
 async function ensureAdminMembership(
   db: DbClient,
   tenant: TenantRow,
@@ -163,7 +172,7 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
       updatedByUserId: actor.userId,
     });
     if (input.initialAdmin) {
-      await ensureAdminMembership(tx, tenant, input.initialAdmin, actor.userId, Math.min(settings.maxBatchYear, new Date().getFullYear()));
+      await ensureAdminMembership(tx, tenant, input.initialAdmin, actor.userId, fallbackAdminBatchYear(tenant, settings));
     }
     await recordAudit(
       ctx,
@@ -242,7 +251,7 @@ export async function listPlatformTenantAdmins(ctx: AppContext, tenantId: string
 
 export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, tenantId: string, input: AssignAdminInput): Promise<AdminMemberDto> {
   const { tenant, settings } = await loadTenant(ctx, tenantId);
-  const { membership, created } = await ensureAdminMembership(ctx.db, tenant, input, actor.userId, Math.min(settings.maxBatchYear, new Date().getFullYear()));
+  const { membership, created } = await ensureAdminMembership(ctx.db, tenant, input, actor.userId, fallbackAdminBatchYear(tenant, settings));
   await recordAudit(ctx, {
     tenantId,
     actorUserId: actor.userId,

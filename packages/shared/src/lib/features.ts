@@ -1,7 +1,8 @@
 import { TENANT_FEATURES, type TenantFeature, type TenantFeatures, type TenantType } from "../constants";
+import { wallPartsInZone } from "./time";
 
 /** Keys that start off for schools and that retyping an institution to SCHOOL forces off. Its admin can turn them on. */
-export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = [];
+export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = ["messaging"];
 
 /** What each key needs: a key reads as off while what it needs is off. One level deep, so a prerequisite has none of its own. */
 export const FEATURE_PREREQUISITES: Readonly<Partial<Record<TenantFeature, TenantFeature>>> = {};
@@ -44,4 +45,20 @@ export function retypeToSchool(fromType: TenantType, stored: Partial<TenantFeatu
 /** The keys `edited` changes from `saved`. A settings form sends only these, so a stale tab can't undo another admin's change. */
 export function changedFeatures(saved: TenantFeatures, edited: TenantFeatures): Partial<TenantFeatures> {
   return Object.fromEntries(TENANT_FEATURES.filter((f) => edited[f] !== saved[f]).map((f) => [f, edited[f]]));
+}
+
+/**
+ * Whether a member of a school is still a pupil, and so kept out of private contact however the school sets its features.
+ * Schools only, with the year read in the institution's time zone. A future batch year always counts. Otherwise a date of
+ * birth decides: under 18 counts, 18 or over doesn't, even in the current batch year. With no date of birth, the current
+ * batch year counts, because they may still be at school.
+ */
+export function isCurrentPupil(tenant: { type: TenantType; timezone: string }, member: { batchYear: number; dateOfBirth: string | null }, now: Date = new Date()): boolean {
+  if (tenant.type !== "SCHOOL") return false;
+  const today = wallPartsInZone(now, tenant.timezone);
+  if (member.batchYear > today.year) return true;
+  if (!member.dateOfBirth) return member.batchYear === today.year;
+  const [year = 0, month = 0, day = 0] = member.dateOfBirth.split("-").map(Number);
+  // As numbers, YYYYMMDD compares like a date. Someone born on 29 February turns 18 on 1 March in a common year.
+  return today.year * 10000 + today.month * 100 + today.day < (year + 18) * 10000 + month * 100 + day;
 }

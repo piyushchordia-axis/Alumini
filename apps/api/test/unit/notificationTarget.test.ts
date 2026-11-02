@@ -1,4 +1,4 @@
-import { NOTIFICATION_TYPES, notificationLevelFor, notificationTarget, resolveNotificationPrefs } from "@illuminize/shared";
+import { NOTIFICATION_CATEGORY, NOTIFICATION_TYPES, notificationLevelFor, notificationTarget, resolveNotificationPrefs } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("notificationTarget", () => {
@@ -22,6 +22,12 @@ describe("notificationTarget", () => {
     expect(notificationTarget("REPORT_FILED", {})).toEqual({ kind: "admin", section: "reports" });
     expect(notificationTarget("EVENT_RSVP", {})).toBeNull();
     expect(notificationTarget("SYSTEM", "not an object")).toBeNull();
+  });
+
+  it("sends a chat report to the admin section that will hold it, as an admin notification", () => {
+    expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: "r1" })).toEqual({ kind: "admin", section: "chat-reports" });
+    expect(notificationTarget("CHAT_REPORT_FILED", {})).toEqual({ kind: "admin", section: "chat-reports" });
+    expect(NOTIFICATION_CATEGORY.CHAT_REPORT_FILED).toBe("ADMIN");
   });
 
   it("routes Wave 1 notifications", () => {

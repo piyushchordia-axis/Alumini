@@ -75,7 +75,11 @@ export function attachRealtime(server: http.Server, ctx: AppContext, o: { adapte
       await socket.join([rooms.user(userId), rooms.session(sid)]);
       // A sign-out may have landed between the handshake and joining the rooms.
       if (!(await isSessionAlive(ctx, sid))) socket.disconnect(true);
-    })();
+    })().catch((err: unknown) => {
+      // Nothing else awaits this, and an unhandled rejection kills the API. The client reconnects and tries again.
+      ctx.logger.error({ err }, "Could not set up a live connection");
+      socket.disconnect(true);
+    });
     const expiresIn = Math.max(exp * 1000 - Date.now(), 0);
     const timer = setTimeout(() => {
       socket.emit("auth:expired");

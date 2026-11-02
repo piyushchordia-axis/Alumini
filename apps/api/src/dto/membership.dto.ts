@@ -1,13 +1,12 @@
-import type { AdminMemberDto, AuditDto, MemberCardDto, MemberProfileDto, MembershipDto, NotificationDto, ProfileFieldAnswerDto } from "@illuminize/shared";
+import { isCurrentPupil, type AdminMemberDto, type AuditDto, type MemberCardDto, type MemberProfileDto, type MembershipDto, type NotificationDto, type ProfileFieldAnswerDto } from "@illuminize/shared";
 import type { AuditRow } from "../repositories/audit.repo";
 import type { NotificationRow } from "../repositories/notifications.repo";
 import type { UserRow } from "../repositories/users.repo";
-import type { MembershipRow } from "../types/request";
+import type { MembershipRow, TenantRow } from "../types/request";
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
-/** `fields`: the answers this viewer may see (load them with answersFor). */
-export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[] = []): MembershipDto {
+function membershipFields(m: MembershipRow, fields: ProfileFieldAnswerDto[]): Omit<MembershipDto, "chatEligible"> {
   return {
     id: m.id,
     tenantId: m.tenantId,
@@ -38,6 +37,11 @@ export function toMembershipDto(m: MembershipRow, fields: ProfileFieldAnswerDto[
   };
 }
 
+/** `fields`: the answers this viewer may see (load them with answersFor). */
+export function toMembershipDto(m: MembershipRow, tenant: Pick<TenantRow, "type" | "timezone">, fields: ProfileFieldAnswerDto[] = []): MembershipDto {
+  return { ...membershipFields(m, fields), chatEligible: m.status === "APPROVED" && !isCurrentPupil(tenant, m) };
+}
+
 export function toMemberCardDto(m: MembershipRow, isOpenToWork = false): MemberCardDto {
   return {
     id: m.id,
@@ -54,7 +58,7 @@ export function toMemberCardDto(m: MembershipRow, isOpenToWork = false): MemberC
   };
 }
 
-export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE164">, isOpenToWork = false, fields: ProfileFieldAnswerDto[] = []): MemberProfileDto {
+export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE164">, isOpenToWork = false, fields: ProfileFieldAnswerDto[] = [], canMessage = false): MemberProfileDto {
   return {
     ...toMemberCardDto(m, isOpenToWork),
     bio: m.bio,
@@ -63,12 +67,13 @@ export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE
     fields,
     phone: m.isPhoneVisible ? user.phoneE164 : null,
     memberSince: m.createdAt.toISOString(),
+    canMessage,
   };
 }
 
 export function toAdminMemberDto(m: MembershipRow, user: UserRow, fields: ProfileFieldAnswerDto[] = []): AdminMemberDto {
   return {
-    ...toMembershipDto(m, fields),
+    ...membershipFields(m, fields),
     userId: user.id,
     phone: user.phoneE164,
     lastActiveAt: iso(m.lastActiveAt),
