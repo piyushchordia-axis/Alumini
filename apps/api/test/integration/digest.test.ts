@@ -1,3 +1,4 @@
+import { defaultFeaturesFor } from "@illuminize/shared";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -95,11 +96,20 @@ describe.skipIf(!dbAvailable)("weekly digest", () => {
   it("skips features the institution has off, and weeks with nothing to show", async () => {
     const { tenant, author, week } = await setup();
     await ctx.db.insert(jobs).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Only a job", companyName: "X", jobType: "FULL_TIME", description: "-", moderationStatus: "APPROVED" });
-    await ctx.db.update(tenantSettings).set({ features: { feed: true, jobs: false, funding: true, events: true, directory: true } }).where(eq(tenantSettings.tenantId, tenant.id));
+    await ctx.db.update(tenantSettings).set({ features: { ...defaultFeaturesFor("COLLEGE"), jobs: false } }).where(eq(tenantSettings.tenantId, tenant.id));
     await runDigest(ctx, { tenantId: tenant.id, weekStart: week }, meta);
     expect(await ctx.db.select().from(tenantDigests)).toHaveLength(0);
     const latest = await request(ctx.app).get(`/api/v1/t/${tenant.slug}/digest/latest`).set(author.headers);
     expect(latest.body.data).toBeNull();
+  });
+
+  it("treats a feature missing from the stored row as its type's default", async () => {
+    const { tenant, author, week } = await setup();
+    const [job] = await ctx.db.insert(jobs).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Only a job", companyName: "X", jobType: "FULL_TIME", description: "-", moderationStatus: "APPROVED" }).returning();
+    await ctx.db.update(tenantSettings).set({ features: { feed: true } }).where(eq(tenantSettings.tenantId, tenant.id));
+    await runDigest(ctx, { tenantId: tenant.id, weekStart: week }, meta);
+    const [digest] = await ctx.db.select().from(tenantDigests);
+    expect(digest?.content.jobIds).toEqual([job!.id]);
   });
 
   it("emails every member exactly once across pages", async () => {

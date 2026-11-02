@@ -17,7 +17,7 @@ export const APP_SECTIONS: AppSection[] = [
 ];
 
 export function enabledSections(features: TenantFeatures): AppSection[] {
-  return APP_SECTIONS.filter((s) => features[s.feature] ?? true);
+  return APP_SECTIONS.filter((s) => features[s.feature]);
 }
 
 /** Where `/t/:slug/app` lands: the first enabled section, or the profile when every section is off. */

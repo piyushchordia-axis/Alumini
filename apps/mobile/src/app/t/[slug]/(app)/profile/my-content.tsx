@@ -10,23 +10,43 @@ import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
 import { useRouter } from "expo-router";
 
-type Tab = "posts" | "jobs" | "funding" | "events";
+type Tab = "posts" | "jobs" | "funding" | "events" | "pastEvents";
 
 export default function MyContentScreen() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
+  const f = tenant.settings.features;
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("posts");
+  const tabs = (
+    [
+      { value: "posts", label: "Posts", on: f.feed },
+      { value: "jobs", label: "Jobs", on: f.jobs },
+      { value: "funding", label: "Funding", on: f.funding },
+      { value: "events", label: "Events", on: f.events },
+      { value: "pastEvents", label: "Past events", on: f.events },
+    ] satisfies { value: Tab; label: string; on: boolean }[]
+  ).filter((t) => t.on);
+  const [picked, setTab] = useState<Tab | null>(null);
+  const tab: Tab = picked ?? tabs[0]?.value ?? "posts";
   const posts = useInfiniteList(qk.posts(slug, { mine: true }), (cursor) => api.posts.list(slug, { mine: true, cursor, limit: 20 }), tab === "posts");
   const jobs = useInfiniteList(qk.jobs(slug, { mine: true }), (cursor) => api.jobs.list(slug, { mine: true, cursor, limit: 20 }), tab === "jobs");
   const funding = useInfiniteList(qk.funding(slug, { mine: true }), (cursor) => api.funding.list(slug, { mine: true, cursor, limit: 20 }), tab === "funding");
   const events = useInfiniteList(qk.events(slug, { mine: true, scope: "upcoming" }), (cursor) => api.events.list(slug, { mine: true, scope: "upcoming", cursor, limit: 20 }), tab === "events");
-  const active = { posts, jobs, funding, events }[tab];
+  const pastEvents = useInfiniteList(qk.events(slug, { mine: true, scope: "past" }), (cursor) => api.events.list(slug, { mine: true, scope: "past", cursor, limit: 20 }), tab === "pastEvents");
+  const active = { posts, jobs, funding, events, pastEvents }[tab];
+  const section = tab === "pastEvents" ? "events" : tab;
   type Item = { id: string; title?: string; body?: string; moderationStatus: "PENDING" | "APPROVED" | "REJECTED" | "REMOVED"; moderationNote?: string | null };
+  if (tabs.length === 0) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding and events." />
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ padding: spacing.lg }}>
-        <Tabs value={tab} onChange={setTab} tabs={[{ value: "posts", label: "Posts" }, { value: "jobs", label: "Jobs" }, { value: "funding", label: "Funding" }, { value: "events", label: "Events" }]} />
+        <Tabs value={tab} onChange={setTab} tabs={tabs.map(({ value, label }) => ({ value, label }))} />
       </View>
       <FlatList
         data={active.items as Item[]}
@@ -42,7 +62,8 @@ export default function MyContentScreen() {
           tab === "posts" ? (
             <PostCard slug={slug} post={item as Parameters<typeof PostCard>[0]["post"]} />
           ) : (
-            <Card onPress={() => router.push(`/t/${slug}/${tab}/${item.id}`)}>
+            // A removed item's page 404s even for its author, so that card opens nothing.
+            <Card onPress={item.moderationStatus === "REMOVED" ? undefined : () => router.push(`/t/${slug}/${section}/${item.id}`)}>
               <Row style={{ justifyContent: "space-between" }}>
                 <Text style={{ fontWeight: "700", color: colors.text, flex: 1 }} numberOfLines={1}>
                   {item.title ?? item.body}

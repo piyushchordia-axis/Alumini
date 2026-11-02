@@ -101,6 +101,7 @@ export function PlatformTenantDetailPage() {
           <SettingsForm
             key={settings.updatedAt}
             initial={settings}
+            tenantType={tenant.type}
             onSubmit={async (input) => {
               await api.platform.tenants.updateSettings(tenantId, input);
               refresh();

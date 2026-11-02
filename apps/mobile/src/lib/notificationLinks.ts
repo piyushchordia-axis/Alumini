@@ -3,8 +3,10 @@ import { notificationTarget } from "@illuminize/shared";
 /** Screen for a notification (list tap or push tap). Mobile has no admin console, so admin notifications open nothing. */
 export function notificationHref(slug: string, type: string, data: unknown): `/t/${string}` | null {
   const t = notificationTarget(type, data);
+  if (!t) return null;
   const base = `/t/${slug}` as const;
-  switch (t?.kind) {
+  // No default: a target kind added without a route here is a compile error, not a silent dead link.
+  switch (t.kind) {
     case "post":
       return `${base}/feed/${t.id}`;
     case "event":
@@ -19,7 +21,7 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/profile`;
     case "celebrations":
       return `${base}/feed`;
-    default:
+    case "admin":
       return null;
   }
 }

@@ -1,13 +1,13 @@
 import type { AdminSettingsDto, TenantBrandingUpdate, TenantPublicDto, TenantSettingsDto, TenantSettingsUpdate } from "@illuminize/shared";
-import { DEFAULT_TENANT_FEATURES } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toTenantPublicDto, toTenantSettingsDto } from "../dto/tenant.dto";
 import { AppError } from "../lib/errors";
+import { runInTransaction } from "../lib/transaction";
 import { findSettings, updateSettings, updateTenant } from "../repositories/tenants.repo";
 import type { AuthContext, TenantContext } from "../types/request";
 import { recordAudit } from "./audit.service";
 import { tenantOutboundChannels } from "./billing.service";
-import { invalidateTenantCache } from "./tenant.service";
+import { featuresToStore, invalidateTenantCache } from "./tenant.service";
 
 interface AdminActor extends AuthContext {
   membershipId?: string | null;
@@ -17,25 +17,29 @@ interface AdminActor extends AuthContext {
 export async function getTenantSettings(ctx: AppContext, tenantCtx: TenantContext): Promise<AdminSettingsDto> {
   const [settings, outboundChannels] = await Promise.all([findSettings(ctx.db, tenantCtx.tenant.id), tenantOutboundChannels(ctx, tenantCtx.tenant.id)]);
   const s = settings ?? tenantCtx.settings;
-  return { settings: toTenantSettingsDto(s), branding: toTenantPublicDto(tenantCtx.tenant, s), outboundChannels };
+  return { settings: toTenantSettingsDto(s, tenantCtx.tenant.type), branding: toTenantPublicDto(tenantCtx.tenant, s), outboundChannels };
 }
 
 export async function updateTenantSettings(ctx: AppContext, tenantCtx: TenantContext, actor: AdminActor, input: TenantSettingsUpdate): Promise<TenantSettingsDto> {
-  const current = (await findSettings(ctx.db, tenantCtx.tenant.id)) ?? tenantCtx.settings;
-  const minBatchYear = input.minBatchYear ?? current.minBatchYear;
-  const maxBatchYear = input.maxBatchYear ?? current.maxBatchYear;
-  if (minBatchYear > maxBatchYear) throw AppError.badRequest("minBatchYear must be <= maxBatchYear");
-  const row = await updateSettings(ctx.db, tenantCtx.tenant.id, {
-    ...(input.memberApprovalMode !== undefined ? { memberApprovalMode: input.memberApprovalMode } : {}),
-    ...(input.contentModerationMode !== undefined ? { contentModerationMode: input.contentModerationMode } : {}),
-    ...(input.allowSelfRegistration !== undefined ? { allowSelfRegistration: input.allowSelfRegistration } : {}),
-    minBatchYear,
-    maxBatchYear,
-    ...(input.features ? { features: { ...DEFAULT_TENANT_FEATURES, ...current.features, ...input.features } } : {}),
-    ...(input.inviteAutoApprove !== undefined ? { inviteAutoApprove: input.inviteAutoApprove } : {}),
-    updatedByUserId: actor.userId,
+  // The row stays locked from read to write, because the map written is the stored one plus this change. Without the lock,
+  // an overlapping save or retype could be undone by the stale keys this one writes back.
+  const row = await runInTransaction(ctx, async (tx) => {
+    const current = await findSettings(tx, tenantCtx.tenant.id, true);
+    if (!current) throw AppError.notFound("Settings not found");
+    const minBatchYear = input.minBatchYear ?? current.minBatchYear;
+    const maxBatchYear = input.maxBatchYear ?? current.maxBatchYear;
+    if (minBatchYear > maxBatchYear) throw AppError.badRequest("minBatchYear must be <= maxBatchYear");
+    return (await updateSettings(tx, tenantCtx.tenant.id, {
+      ...(input.memberApprovalMode !== undefined ? { memberApprovalMode: input.memberApprovalMode } : {}),
+      ...(input.contentModerationMode !== undefined ? { contentModerationMode: input.contentModerationMode } : {}),
+      ...(input.allowSelfRegistration !== undefined ? { allowSelfRegistration: input.allowSelfRegistration } : {}),
+      minBatchYear,
+      maxBatchYear,
+      ...(input.features ? { features: featuresToStore(tenantCtx.tenant.type, current.features, input.features) } : {}),
+      ...(input.inviteAutoApprove !== undefined ? { inviteAutoApprove: input.inviteAutoApprove } : {}),
+      updatedByUserId: actor.userId,
+    }))!;
   });
-  if (!row) throw AppError.notFound("Settings not found");
   await invalidateTenantCache(ctx, tenantCtx.tenant.slug);
   await recordAudit(ctx, {
     tenantId: tenantCtx.tenant.id,
@@ -47,7 +51,7 @@ export async function updateTenantSettings(ctx: AppContext, tenantCtx: TenantCon
     metadata: { changes: input },
     ip: actor.ip,
   });
-  return toTenantSettingsDto(row);
+  return toTenantSettingsDto(row, tenantCtx.tenant.type);
 }
 
 export async function updateTenantBranding(ctx: AppContext, tenantCtx: TenantContext, actor: AdminActor, input: TenantBrandingUpdate): Promise<TenantPublicDto> {

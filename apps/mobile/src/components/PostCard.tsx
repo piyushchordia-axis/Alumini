@@ -36,6 +36,9 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
     },
     onError: (e) => Alert.alert("Could not delete", errorMessage(e)),
   });
+  // A removed post's page 404s even for its author, and the API refuses edits, so its author can only delete it.
+  const removed = post.moderationStatus === "REMOVED";
+  const canOpen = !detail && !removed;
   return (
     <Card style={post.kind === "ANNOUNCEMENT" ? { borderLeftWidth: 4, borderLeftColor: theme.primary } : undefined}>
       <Row style={{ justifyContent: "space-between" }}>
@@ -45,7 +48,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
         <ModerationBadge status={post.moderationStatus} />
       </Row>
       <ModerationNote status={post.moderationStatus} note={post.moderationNote} />
-      <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} disabled={detail} accessibilityRole={detail ? undefined : "link"}>
+      <Pressable onPress={() => canOpen && router.push(`/t/${slug}/feed/${post.id}`)} disabled={!canOpen} accessibilityRole={canOpen ? "link" : undefined}>
         <Body>{post.body}</Body>
       </Pressable>
       {post.poll && <PollView slug={slug} postId={post.id} poll={post.poll} canVote={post.moderationStatus === "APPROVED"} />}
@@ -73,15 +76,17 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
             </Pressable>
           ))}
           <Muted size={13}>{post.reactionCount}</Muted>
-          <Pressable onPress={() => !detail && router.push(`/t/${slug}/feed/${post.id}`)} style={{ marginLeft: 10 }} accessibilityRole="button" accessibilityLabel={`${post.commentCount} comments`}>
+          <Pressable onPress={() => canOpen && router.push(`/t/${slug}/feed/${post.id}`)} disabled={!canOpen} style={{ marginLeft: 10 }} accessibilityRole="button" accessibilityLabel={`${post.commentCount} comments`}>
             <Muted size={13}>💬 {post.commentCount}</Muted>
           </Pressable>
         </Row>
         {post.isMine ? (
           <Row gap={14}>
-            <Pressable onPress={() => router.push(`/t/${slug}/feed/edit/${post.id}`)} accessibilityRole="button" accessibilityLabel="Edit post" hitSlop={8}>
-              <Text style={{ color: colors.faint, fontSize: 12 }}>Edit</Text>
-            </Pressable>
+            {!removed && (
+              <Pressable onPress={() => router.push(`/t/${slug}/feed/edit/${post.id}`)} accessibilityRole="button" accessibilityLabel="Edit post" hitSlop={8}>
+                <Text style={{ color: colors.faint, fontSize: 12 }}>Edit</Text>
+              </Pressable>
+            )}
             <Pressable onPress={() => Alert.alert("Delete post?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} accessibilityRole="button" accessibilityLabel="Delete post" hitSlop={8}>
               <Text style={{ color: colors.faint, fontSize: 12 }}>Delete</Text>
             </Pressable>

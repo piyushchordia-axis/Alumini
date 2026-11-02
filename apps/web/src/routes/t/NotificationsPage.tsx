@@ -11,8 +11,10 @@ import { qk } from "@/lib/queryKeys";
 
 function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | null {
   const t = notificationTarget(n.type, n.data);
+  if (!t) return null;
   const base = `/t/${slug}/app`;
-  switch (t?.kind) {
+  // No default: a target kind added without a route here is a compile error, not a silent dead link.
+  switch (t.kind) {
     case "post":
       return `${base}/feed/${t.id}`;
     case "event":
@@ -30,8 +32,6 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
     case "admin":
       if (!isAdmin) return null;
       return t.section === "members" ? `/t/${slug}/admin/members?status=PENDING` : `/t/${slug}/admin/${t.section}`;
-    default:
-      return null;
   }
 }
 

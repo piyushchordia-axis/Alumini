@@ -52,7 +52,7 @@ export function useAppHeaderOptions() {
 /** Wraps a tab's stack: if the institution has switched the section off, go to the first enabled one instead. */
 export function FeatureGate({ feature, children }: { feature: TenantFeature; children: ReactNode }) {
   const { tenant } = useMembership();
-  if (!(tenant.settings.features[feature] ?? true)) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
+  if (!tenant.settings.features[feature]) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
   return <>{children}</>;
 }
 

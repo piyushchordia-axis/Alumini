@@ -1,4 +1,4 @@
-import { countryByCode, DEFAULT_TENANT_FEATURES } from "@illuminize/shared";
+import { countryByCode, defaultFeaturesFor } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -64,7 +64,7 @@ export default function LoginScreen() {
       setSession(session);
       const m = session.memberships.find((x) => x.tenant.slug === slug);
       // The tenant layout has loaded the institution, so its feature switches are in the query cache.
-      router.replace(!m ? `/t/${slug}/register` : m.status === "APPROVED" ? homeHref(slug!, tenant.data?.settings.features ?? DEFAULT_TENANT_FEATURES) : `/t/${slug}/pending`);
+      router.replace(!m ? `/t/${slug}/register` : m.status === "APPROVED" ? homeHref(slug!, tenant.data?.settings.features ?? defaultFeaturesFor(tenant.data?.type ?? "OTHER")) : `/t/${slug}/pending`);
     } catch (err) {
       setError(err);
     } finally {

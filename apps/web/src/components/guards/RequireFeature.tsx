@@ -7,7 +7,7 @@ import { APP_SECTIONS, homePath } from "@/lib/sections";
 /** Hides a section the institution has switched off, including deep links to it. */
 export function RequireFeature({ feature }: { feature: TenantFeature }) {
   const { tenant } = useMembership();
-  if (tenant.settings.features[feature] ?? true) return <Outlet />;
+  if (tenant.settings.features[feature]) return <Outlet />;
   const label = APP_SECTIONS.find((s) => s.feature === feature)?.label ?? feature;
   return (
     <EmptyState

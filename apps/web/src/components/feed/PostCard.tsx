@@ -53,6 +53,8 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
+  // A removed post's page 404s even for its author, and the API refuses edits, so its author can only delete it.
+  const removed = post.moderationStatus === "REMOVED";
 
   return (
     <Card as="article" className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary p-4" : "p-4"}>
@@ -107,7 +109,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
           </button>
         ))}
         <span className="ml-1">{post.reactionCount}</span>
-        {detail ? (
+        {detail || removed ? (
           <span className="ml-3">💬 {post.commentCount}</span>
         ) : (
           <Link to={`/t/${slug}/app/feed/${post.id}`} className="ml-3 hover:text-slate-800">
@@ -117,7 +119,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
         <span className="ml-auto flex items-center gap-3">
           {post.isMine ? (
             <>
-              {!editing && (
+              {!editing && !removed && (
                 <button type="button" className="text-xs text-slate-400 hover:text-slate-700" onClick={startEditing}>
                   Edit
                 </button>

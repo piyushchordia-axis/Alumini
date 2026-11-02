@@ -122,40 +122,42 @@ function contentTarget(d: NotificationData): NotificationTarget | null {
   }
 }
 
-/** Resolves a notification (type + data payload, as stored or as sent in a push) to a destination, or null. */
+type TargetFor = (d: NotificationData) => NotificationTarget | null;
+
+const postTarget: TargetFor = (d) => (d.postId ? { kind: "post", id: d.postId } : null);
+const eventTarget: TargetFor = (d) => (d.eventId ? { kind: "event", id: d.eventId } : null);
+const profileTarget: TargetFor = () => ({ kind: "profile" });
+const celebrationsTarget: TargetFor = () => ({ kind: "celebrations" });
+
+const TARGETS: Record<NotificationType, TargetFor> = {
+  POST_COMMENT: postTarget,
+  POST_REACTION: postTarget,
+  ANNOUNCEMENT: postTarget,
+  EVENT_RSVP: eventTarget,
+  EVENT_UPDATED: eventTarget,
+  EVENT_CANCELLED: eventTarget,
+  CONTENT_APPROVED: (d) => contentTarget(d) ?? { kind: "myContent" },
+  // The author can still open a rejected item, and its page shows the admin's note.
+  CONTENT_REJECTED: (d) => contentTarget(d) ?? { kind: "myContent" },
+  // A removed item's page 404s even for its author, so go to My posts, which lists it. A removed comment's post is still there.
+  CONTENT_REMOVED: (d) => (d.contentType === "COMMENT" && d.postId ? { kind: "post", id: d.postId } : { kind: "myContent" }),
+  MEMBERSHIP_APPROVED: profileTarget,
+  MEMBERSHIP_REJECTED: profileTarget,
+  MEMBERSHIP_SUSPENDED: profileTarget,
+  MEMBERSHIP_REINSTATED: profileTarget,
+  NEW_MEMBER_PENDING: () => ({ kind: "admin", section: "members" }),
+  CONTENT_PENDING: () => ({ kind: "admin", section: "moderation" }),
+  REPORT_FILED: () => ({ kind: "admin", section: "reports" }),
+  CELEBRATION: celebrationsTarget,
+  CELEBRATION_WISH: celebrationsTarget,
+  SYSTEM: contentTarget,
+};
+
+/**
+ * Resolves a notification (type + data payload, as stored or as sent in a push) to a destination, or null. `type` can be
+ * any string a push carried, and hasOwn keeps one like "constructor" from reaching a property of Object.prototype.
+ */
 export function notificationTarget(type: NotificationType | string, data: unknown): NotificationTarget | null {
   const d = (data && typeof data === "object" ? data : {}) as NotificationData;
-  switch (type) {
-    case "POST_COMMENT":
-    case "POST_REACTION":
-      return d.postId ? { kind: "post", id: d.postId } : null;
-    case "EVENT_RSVP":
-    case "EVENT_UPDATED":
-    case "EVENT_CANCELLED":
-      return d.eventId ? { kind: "event", id: d.eventId } : null;
-    case "CONTENT_APPROVED":
-      return contentTarget(d) ?? { kind: "myContent" };
-    case "CONTENT_REJECTED":
-    case "CONTENT_REMOVED":
-      // Rejected/removed items are listed (with the admin's note) under My posts.
-      return contentTarget(d) ?? { kind: "myContent" };
-    case "MEMBERSHIP_APPROVED":
-    case "MEMBERSHIP_REJECTED":
-    case "MEMBERSHIP_SUSPENDED":
-    case "MEMBERSHIP_REINSTATED":
-      return { kind: "profile" };
-    case "NEW_MEMBER_PENDING":
-      return { kind: "admin", section: "members" };
-    case "CONTENT_PENDING":
-      return { kind: "admin", section: "moderation" };
-    case "REPORT_FILED":
-      return { kind: "admin", section: "reports" };
-    case "ANNOUNCEMENT":
-      return d.postId ? { kind: "post", id: d.postId } : null;
-    case "CELEBRATION":
-    case "CELEBRATION_WISH":
-      return { kind: "celebrations" };
-    default:
-      return contentTarget(d);
-  }
+  return Object.hasOwn(TARGETS, type) ? TARGETS[type as NotificationType](d) : null;
 }

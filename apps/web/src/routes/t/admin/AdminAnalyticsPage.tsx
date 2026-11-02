@@ -71,10 +71,10 @@ function Charts({ d, weeks }: { d: TenantAnalyticsDto; weeks: number }) {
   const { tenant } = useAdminTenant();
   const features = tenant.settings.features;
   const content: LineSeries[] = [
-    features.feed !== false && { name: "Posts", values: d.series.posts },
-    features.feed !== false && { name: "Comments", values: d.series.comments },
-    features.jobs !== false && { name: "Jobs", values: d.series.jobs },
-    features.events !== false && { name: "Events", values: d.series.events },
+    features.feed && { name: "Posts", values: d.series.posts },
+    features.feed && { name: "Comments", values: d.series.comments },
+    features.jobs && { name: "Jobs", values: d.series.jobs },
+    features.events && { name: "Events", values: d.series.events },
   ]
     .filter((s): s is { name: string; values: number[] } => !!s)
     .map((s, i) => ({ ...s, color: SERIES[i]! }));

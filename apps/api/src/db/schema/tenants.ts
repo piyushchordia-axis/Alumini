@@ -1,4 +1,4 @@
-import { DEFAULT_TENANT_FEATURES, DEFAULT_TENANT_TIMEZONE, type TenantFeatures } from "@illuminize/shared";
+import { DEFAULT_TENANT_TIMEZONE, type TenantFeatures } from "@illuminize/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -52,7 +52,8 @@ export const tenantSettings = pgTable("tenant_settings", {
   allowSelfRegistration: boolean("allow_self_registration").notNull().default(true),
   minBatchYear: integer("min_batch_year").notNull().default(1950),
   maxBatchYear: integer("max_batch_year").notNull().default(2032),
-  features: jsonb("features").$type<TenantFeatures>().notNull().default(DEFAULT_TENANT_FEATURES),
+  /** A row may lack keys, which take the tenant type's default. Always read it through resolveFeatures (ESLint rejects a direct key read). */
+  features: jsonb("features").$type<Partial<TenantFeatures>>().notNull(),
   /** Invited members (matched by their verified phone) are approved straight away. */
   inviteAutoApprove: boolean("invite_auto_approve").notNull().default(true),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),

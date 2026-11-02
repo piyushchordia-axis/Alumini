@@ -11,7 +11,7 @@ import type {
   TenantSettingsUpdate,
   TenantSettingsDto,
 } from "@illuminize/shared";
-import { DEFAULT_TENANT_FEATURES } from "@illuminize/shared";
+import { defaultFeaturesFor, retypeToSchool } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
@@ -28,6 +28,7 @@ import { findPlanEffectiveOn } from "../repositories/billing.repo";
 import { findMembership, findMembershipWithUser, insertMembership, listMembershipsForUser, listTenantAdmins, updateMembership } from "../repositories/memberships.repo";
 import {
   findSettings,
+  findTenantById,
   findTenantBySlug,
   findTenantWithSettingsById,
   insertTenant,
@@ -40,7 +41,7 @@ import {
 import { findOrCreateUserByPhone, findUserById, searchUsers, updateUser } from "../repositories/users.repo";
 import type { AuthContext, MembershipRow, TenantRow } from "../types/request";
 import { recordAudit } from "./audit.service";
-import { invalidateTenantCache } from "./tenant.service";
+import { featuresToStore, invalidateTenantCache } from "./tenant.service";
 
 interface PlatformActor extends AuthContext {
   ip?: string;
@@ -79,14 +80,15 @@ export async function getPlatformTenant(ctx: AppContext, tenantId: string): Prom
   const [counts, plan, admins] = await Promise.all([tenantCounts(ctx.db, tenantId), findPlanEffectiveOn(ctx.db, tenantId, today()), adminsOf(ctx.db, tenantId)]);
   return {
     tenant: { ...toTenantPublicDto(tenant, settings), createdAt: tenant.createdAt.toISOString(), updatedAt: tenant.updatedAt.toISOString() },
-    settings: toTenantSettingsDto(settings),
+    settings: toTenantSettingsDto(settings, tenant.type),
     counts: toTenantCountsDto(counts),
     currentPlan: plan ? toBillingPlanDto(plan) : null,
     admins,
   };
 }
 
-function settingsColumns(input: TenantSettingsUpdate | undefined, currentFeatures = DEFAULT_TENANT_FEATURES) {
+/** Every settings column except features, which depend on the tenant type and what is stored. */
+function settingsColumns(input: TenantSettingsUpdate | undefined) {
   if (!input) return {};
   return {
     ...(input.memberApprovalMode !== undefined ? { memberApprovalMode: input.memberApprovalMode } : {}),
@@ -94,7 +96,6 @@ function settingsColumns(input: TenantSettingsUpdate | undefined, currentFeature
     ...(input.allowSelfRegistration !== undefined ? { allowSelfRegistration: input.allowSelfRegistration } : {}),
     ...(input.minBatchYear !== undefined ? { minBatchYear: input.minBatchYear } : {}),
     ...(input.maxBatchYear !== undefined ? { maxBatchYear: input.maxBatchYear } : {}),
-    ...(input.features ? { features: { ...DEFAULT_TENANT_FEATURES, ...currentFeatures, ...input.features } } : {}),
     ...(input.inviteAutoApprove !== undefined ? { inviteAutoApprove: input.inviteAutoApprove } : {}),
   };
 }
@@ -158,6 +159,7 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
       tenantId: tenant.id,
       maxBatchYear: new Date().getFullYear() + 6,
       ...settingsColumns(input.settings),
+      features: featuresToStore(tenant.type, defaultFeaturesFor(tenant.type), input.settings?.features ?? {}),
       updatedByUserId: actor.userId,
     });
     if (input.initialAdmin) {
@@ -183,16 +185,25 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
 }
 
 export async function updatePlatformTenant(ctx: AppContext, actor: PlatformActor, tenantId: string, input: PlatformTenantUpdateInput): Promise<PlatformTenantDto> {
-  const { tenant } = await loadTenant(ctx, tenantId);
-  await updateTenant(ctx.db, tenantId, input);
+  const { tenant, retype } = await runInTransaction(ctx, async (tx) => {
+    // Takes the settings lock before reading the type or features, so a features save or another retype can't overlap this one.
+    const settings = await findSettings(tx, tenantId, true);
+    const current = await findTenantById(tx, tenantId);
+    if (!settings || !current) throw AppError.notFound("Institution not found", "TENANT_NOT_FOUND");
+    const forced = input.type === "SCHOOL" && current.type !== "SCHOOL" ? retypeToSchool(current.type, settings.features) : null;
+    await updateTenant(tx, tenantId, input);
+    if (forced?.forcedOff.length) await updateSettings(tx, tenantId, { features: forced.features, updatedByUserId: actor.userId });
+    return { tenant: current, retype: forced };
+  });
   await invalidateTenantCache(ctx, tenant.slug);
+  // After the commit: recordAudit swallows errors, and a failed insert inside the transaction would silently roll the update back.
   await recordAudit(ctx, {
     tenantId,
     actorUserId: actor.userId,
     action: "platform.tenant.update",
     targetType: "tenant",
     targetId: tenantId,
-    metadata: { fields: Object.keys(input), status: input.status ?? null },
+    metadata: { fields: Object.keys(input), status: input.status ?? null, ...(retype ? { forcedOff: retype.forcedOff } : {}) },
     ip: actor.ip,
   });
   return getPlatformTenant(ctx, tenantId);
@@ -200,10 +211,17 @@ export async function updatePlatformTenant(ctx: AppContext, actor: PlatformActor
 
 export async function updatePlatformTenantSettings(ctx: AppContext, actor: PlatformActor, tenantId: string, input: TenantSettingsUpdate): Promise<TenantSettingsDto> {
   const { tenant } = await loadTenant(ctx, tenantId);
-  const current = (await findSettings(ctx.db, tenantId))!;
-  const next = { minBatchYear: input.minBatchYear ?? current.minBatchYear, maxBatchYear: input.maxBatchYear ?? current.maxBatchYear };
-  if (next.minBatchYear > next.maxBatchYear) throw AppError.badRequest("minBatchYear must be <= maxBatchYear");
-  const row = (await updateSettings(ctx.db, tenantId, { ...settingsColumns(input, current.features), updatedByUserId: actor.userId }))!;
+  // Locked from read to write, for the same reason as updateTenantSettings.
+  const row = await runInTransaction(ctx, async (tx) => {
+    const current = (await findSettings(tx, tenantId, true))!;
+    const next = { minBatchYear: input.minBatchYear ?? current.minBatchYear, maxBatchYear: input.maxBatchYear ?? current.maxBatchYear };
+    if (next.minBatchYear > next.maxBatchYear) throw AppError.badRequest("minBatchYear must be <= maxBatchYear");
+    return (await updateSettings(tx, tenantId, {
+      ...settingsColumns(input),
+      ...(input.features ? { features: featuresToStore(tenant.type, current.features, input.features) } : {}),
+      updatedByUserId: actor.userId,
+    }))!;
+  });
   await invalidateTenantCache(ctx, tenant.slug);
   await recordAudit(ctx, {
     tenantId,
@@ -214,7 +232,7 @@ export async function updatePlatformTenantSettings(ctx: AppContext, actor: Platf
     metadata: { changes: input },
     ip: actor.ip,
   });
-  return toTenantSettingsDto(row);
+  return toTenantSettingsDto(row, tenant.type);
 }
 
 export async function listPlatformTenantAdmins(ctx: AppContext, tenantId: string): Promise<AdminMemberDto[]> {

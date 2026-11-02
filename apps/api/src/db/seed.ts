@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { defaultFeaturesFor } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createDb, type Db } from "./client";
@@ -94,9 +95,11 @@ export async function seedCore(db: Db, platformAdminPhones: string[]): Promise<S
         memberApprovalMode: t.memberApprovalMode,
         contentModerationMode: t.contentModerationMode,
         maxBatchYear: new Date().getFullYear() + 6,
+        features: defaultFeaturesFor(t.type),
       })
       .onConflictDoUpdate({
         target: tenantSettings.tenantId,
+        // Not features: reseeding must not override an admin's choice.
         set: { memberApprovalMode: t.memberApprovalMode, contentModerationMode: t.contentModerationMode, updatedAt: new Date() },
       });
   }

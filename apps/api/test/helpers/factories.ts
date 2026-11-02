@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { tenantSettings, tenants, users } from "../../src/db/schema";
 import type { TestContext } from "./testContext";
-import type { ApprovalMode } from "@illuminize/shared";
+import { defaultFeaturesFor, type ApprovalMode, type TenantFeatures, type TenantType } from "@illuminize/shared";
 
 let counter = 0;
 export const nextId = () => ++counter;
@@ -9,6 +9,9 @@ export const nextId = () => ++counter;
 export interface TenantFactoryOptions {
   slug?: string;
   name?: string;
+  type?: TenantType;
+  /** As stored, so a test can leave keys out. Defaults to the type's defaults. */
+  features?: Partial<TenantFeatures>;
   memberApprovalMode?: ApprovalMode;
   contentModerationMode?: ApprovalMode;
   allowSelfRegistration?: boolean;
@@ -17,12 +20,13 @@ export interface TenantFactoryOptions {
 
 export async function createTenant(ctx: TestContext, opts: TenantFactoryOptions = {}) {
   const n = nextId();
+  const type = opts.type ?? "COLLEGE";
   const [tenant] = await ctx.db
     .insert(tenants)
     .values({
       slug: opts.slug ?? `tenant-${n}`,
       name: opts.name ?? `Tenant ${n}`,
-      type: "COLLEGE",
+      type,
       status: opts.status ?? "ACTIVE",
       city: "Mumbai",
       country: "IN",
@@ -36,6 +40,7 @@ export async function createTenant(ctx: TestContext, opts: TenantFactoryOptions 
       contentModerationMode: opts.contentModerationMode ?? "AUTO_APPROVE",
       allowSelfRegistration: opts.allowSelfRegistration ?? true,
       maxBatchYear: new Date().getFullYear() + 6,
+      features: opts.features ?? defaultFeaturesFor(type),
     })
     .returning();
   return { tenant: tenant!, settings: settings! };

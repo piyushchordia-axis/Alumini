@@ -1,5 +1,5 @@
 import type { APPROVAL_MODES} from "@illuminize/shared";
-import { TENANT_FEATURES, type TenantFeature, type TenantSettingsDto, type TenantSettingsUpdate } from "@illuminize/shared";
+import { changedFeatures, SCHOOL_OFF_FEATURES, TENANT_FEATURES, type TenantFeature, type TenantSettingsDto, type TenantSettingsUpdate, type TenantType } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
@@ -7,7 +7,7 @@ import { toast } from "@/stores/uiStore";
 
 const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory" };
 
-export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
+export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
   const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
   const [contentModerationMode, setContentModerationMode] = useState(initial.contentModerationMode);
   const [allowSelfRegistration, setAllowSelfRegistration] = useState(initial.allowSelfRegistration);
@@ -23,7 +23,16 @@ export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto
         e.preventDefault();
         setBusy(true);
         try {
-          await onSubmit({ memberApprovalMode, contentModerationMode, allowSelfRegistration, minBatchYear: Number(minBatchYear), maxBatchYear: Number(maxBatchYear), features, inviteAutoApprove });
+          const changed = changedFeatures(initial.features, features);
+          await onSubmit({
+            memberApprovalMode,
+            contentModerationMode,
+            allowSelfRegistration,
+            minBatchYear: Number(minBatchYear),
+            maxBatchYear: Number(maxBatchYear),
+            ...(Object.keys(changed).length > 0 ? { features: changed } : {}),
+            inviteAutoApprove,
+          });
           toast.success("Settings saved");
         } catch (err) {
           toast.error(errorMessage(err));
@@ -65,6 +74,11 @@ export function SettingsForm({ initial, onSubmit }: { initial: TenantSettingsDto
             <Checkbox key={f} checked={features[f]} onChange={(e) => setFeatures({ ...features, [f]: e.target.checked })} label={FEATURE_LABELS[f]} />
           ))}
         </div>
+        {tenantType === "SCHOOL" && SCHOOL_OFF_FEATURES.length > 0 && (
+          <p className="mt-2 text-xs text-slate-500">
+            {SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]).join(", ")} start off for schools because they let members contact each other privately. You can turn them on, but current pupils can't use them.
+          </p>
+        )}
       </fieldset>
       <Button type="submit" loading={busy}>
         Save settings

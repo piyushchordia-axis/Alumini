@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ALTER COLUMN "features" DROP DEFAULT;

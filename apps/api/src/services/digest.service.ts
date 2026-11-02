@@ -1,4 +1,4 @@
-import { resolveNotificationPrefs, type DigestDto } from "@illuminize/shared";
+import { resolveFeatures, resolveNotificationPrefs, type DigestDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import type { JobHandler } from "../jobs/JobQueue";
 import { runInTransaction } from "../lib/transaction";
@@ -40,10 +40,11 @@ export const runDigest: JobHandler<"digest.tenant"> = async (ctx, { tenantId, we
   if (!(await claimTenantRun(ctx.db, "digest", tenantId, weekStart))) return;
   const now = at ? new Date(at) : new Date();
   const found = await digestCandidates(ctx.db, tenantId, new Date(now.getTime() - 7 * 86_400_000), now);
+  const features = resolveFeatures(tenant.type, settings.features);
   const content = {
-    postIds: settings.features.feed ? found.postIds : [],
-    jobIds: settings.features.jobs ? found.jobIds : [],
-    eventIds: settings.features.events ? found.eventIds : [],
+    postIds: features.feed ? found.postIds : [],
+    jobIds: features.jobs ? found.jobIds : [],
+    eventIds: features.events ? found.eventIds : [],
     newMembers: found.newMembers,
   };
   await runInTransaction(ctx, async (tx) => {

@@ -1,4 +1,4 @@
-import type { TenantPublicDto, TenantSummaryDto } from "@illuminize/shared";
+import { applyFeatureChange, FEATURE_PREREQUISITES, type TenantFeatures, type TenantPublicDto, type TenantSummaryDto, type TenantType } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toTenantPublicDto, toTenantSummaryDto } from "../dto/tenant.dto";
 import { AppError } from "../lib/errors";
@@ -42,6 +42,16 @@ export async function getPublicTenant(ctx: AppContext, slug: string): Promise<Te
 
 export async function invalidateTenantCache(ctx: AppContext, slug: string): Promise<void> {
   await ctx.redis.del(keys.cacheTenant(slug), keys.cacheTenantsList());
+}
+
+/** The feature map to store after `change`. Refuses the change (400) if it turns a key on that may not be on. */
+export function featuresToStore(type: TenantType, stored: Partial<TenantFeatures>, change: Partial<TenantFeatures>): TenantFeatures {
+  const { features, conflict } = applyFeatureChange(type, stored, change);
+  if (conflict) {
+    const message = `The ${conflict} feature needs ${FEATURE_PREREQUISITES[conflict] ?? "another feature"} to be on`;
+    throw AppError.badRequest(message, [{ path: `features.${conflict}`, message }]);
+  }
+  return features;
 }
 
 const DATE_FIELDS = ["createdAt", "updatedAt", "lastLoginAt", "statusChangedAt", "lastActiveAt"] as const;

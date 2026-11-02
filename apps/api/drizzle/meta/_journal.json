@@ -127,6 +127,13 @@
       "when": 1793560611568,
       "tag": "0017_wave2_drop_extra",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793563160113,
+      "tag": "0018_wave2_features_no_default",
+      "breakpoints": true
     }
   ]
 }

@@ -95,10 +95,36 @@ try {
   });
 
   await step("settings page loads and saves", async () => {
-    await page.goto(`${BASE}/t/demo-college/admin/settings`);
-    await page.waitForSelector("text=New member approval");
-    await page.click('button:has-text("Save settings")');
+    // Each save remounts the form once its refetch lands, wiping anything toggled before then, so reopen the page between saves.
+    const open = async () => {
+      await page.goto(`${BASE}/t/demo-college/admin/settings`);
+      await page.waitForSelector("text=New member approval");
+    };
+    const save = async () => {
+      const [res] = await Promise.all([page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().endsWith("/admin/settings")), page.click('button:has-text("Save settings")')]);
+      if (!res.ok()) throw new Error(`settings save failed: ${res.status()}`);
+      return res.request().postDataJSON();
+    };
+    const sentFeatures = (body, expected) => {
+      if (JSON.stringify(body.features) !== JSON.stringify(expected)) throw new Error(`settings save sent features ${JSON.stringify(body.features)}, expected ${JSON.stringify(expected)}`);
+    };
+    const directory = page.locator('label:has-text("Member directory") input');
+
+    // Only what was toggled goes out, so a stale tab can't undo another admin's change.
+    await open();
+    sentFeatures(await save(), undefined);
     await page.waitForSelector("text=Settings saved");
+
+    await open();
+    await directory.uncheck();
+    sentFeatures(await save(), { directory: false });
+
+    // The switch stayed off, and turning it back on restores demo-college for the later steps.
+    await open();
+    if (await directory.isChecked()) throw new Error("the Member directory switch didn't stay off after saving");
+    await directory.check();
+    sentFeatures(await save(), { directory: true });
+
     await page.click("text=Branding");
     await page.waitForSelector("text=Preview");
     await shot("a05-settings");

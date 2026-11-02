@@ -1,4 +1,4 @@
-import { tenantSlugSchema, utcToZonedWallTime, type TenantFeature } from "@illuminize/shared";
+import { resolveFeatures, tenantSlugSchema, utcToZonedWallTime, type TenantFeature } from "@illuminize/shared";
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
 import type { AppContext } from "../context";
@@ -78,8 +78,8 @@ export const requireTenantAdmin: RequestHandler = (req, _res, next) => {
 
 export function requireFeature(feature: TenantFeature): RequestHandler {
   return (req, _res, next) => {
-    const enabled = req.tenantCtx?.settings.features?.[feature] ?? true;
-    if (!enabled) return next(AppError.forbidden(`The ${feature} feature is disabled for this institution`, "FEATURE_DISABLED"));
+    const t = req.tenantCtx;
+    if (!t || !resolveFeatures(t.tenant.type, t.settings.features)[feature]) return next(AppError.forbidden(`The ${feature} feature is disabled for this institution`, "FEATURE_DISABLED"));
     next();
   };
 }

@@ -133,13 +133,6 @@ export const INVITE_TTL_DAYS = 90;
 export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
-export const DEFAULT_TENANT_FEATURES: TenantFeatures = {
-  feed: true,
-  jobs: true,
-  funding: true,
-  events: true,
-  directory: true,
-};
 
 export const CELEBRATION_KINDS = ["BIRTHDAY", "ANNIVERSARY"] as const;
 export type CelebrationKind = (typeof CELEBRATION_KINDS)[number];

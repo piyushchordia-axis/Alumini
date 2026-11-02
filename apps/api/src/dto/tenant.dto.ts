@@ -1,4 +1,4 @@
-import type { TenantPublicDto, TenantSettingsDto, TenantSummaryDto } from "@illuminize/shared";
+import { resolveFeatures, type TenantPublicDto, type TenantSettingsDto, type TenantSummaryDto, type TenantType } from "@illuminize/shared";
 import type { TenantRow, TenantSettingsRow } from "../types/request";
 
 export function toTenantSummaryDto(t: TenantRow): TenantSummaryDto {
@@ -15,14 +15,14 @@ export function toTenantSummaryDto(t: TenantRow): TenantSummaryDto {
   };
 }
 
-export function toTenantSettingsDto(s: TenantSettingsRow): TenantSettingsDto {
+export function toTenantSettingsDto(s: TenantSettingsRow, type: TenantType): TenantSettingsDto {
   return {
     memberApprovalMode: s.memberApprovalMode,
     contentModerationMode: s.contentModerationMode,
     allowSelfRegistration: s.allowSelfRegistration,
     minBatchYear: s.minBatchYear,
     maxBatchYear: s.maxBatchYear,
-    features: s.features,
+    features: resolveFeatures(type, s.features),
     inviteAutoApprove: s.inviteAutoApprove,
     updatedAt: s.updatedAt.toISOString(),
   };
@@ -43,7 +43,7 @@ export function toTenantPublicDto(t: TenantRow, s: TenantSettingsRow): TenantPub
       allowSelfRegistration: s.allowSelfRegistration,
       minBatchYear: s.minBatchYear,
       maxBatchYear: s.maxBatchYear,
-      features: s.features,
+      features: resolveFeatures(t.type, s.features),
     },
   };
 }

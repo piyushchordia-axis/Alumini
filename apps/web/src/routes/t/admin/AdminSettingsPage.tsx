@@ -36,6 +36,7 @@ export function AdminSettingsPage() {
           <SettingsForm
             key={q.data.settings.updatedAt}
             initial={q.data.settings}
+            tenantType={tenant.type}
             onSubmit={async (input) => {
               await api.admin.settings.update(slug, input);
               refresh();

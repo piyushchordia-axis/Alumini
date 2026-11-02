@@ -1,4 +1,4 @@
-import { notificationLevelFor, notificationTarget, resolveNotificationPrefs } from "@illuminize/shared";
+import { NOTIFICATION_TYPES, notificationLevelFor, notificationTarget, resolveNotificationPrefs } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("notificationTarget", () => {
@@ -22,6 +22,40 @@ describe("notificationTarget", () => {
     expect(notificationTarget("ANNOUNCEMENT", { postId: "p9" })).toEqual({ kind: "post", id: "p9" });
     expect(notificationTarget("CELEBRATION", { kind: "BIRTHDAY" })).toEqual({ kind: "celebrations" });
     expect(notificationTarget("CELEBRATION_WISH", {})).toEqual({ kind: "celebrations" });
+  });
+
+  it("sends a removed item to My posts, because its page 404s for the author", () => {
+    for (const contentType of ["POST", "JOB", "FUNDING", "EVENT"]) {
+      expect(notificationTarget("CONTENT_REMOVED", { contentType, contentId: "x1", status: "REMOVED" })).toEqual({ kind: "myContent" });
+    }
+    expect(notificationTarget("CONTENT_REMOVED", { contentType: "COMMENT", contentId: "c1" })).toEqual({ kind: "myContent" });
+  });
+
+  it("keeps a rejected item on its own page, which its author can still open", () => {
+    expect(notificationTarget("CONTENT_REJECTED", { contentType: "POST", contentId: "p1" })).toEqual({ kind: "post", id: "p1" });
+    expect(notificationTarget("CONTENT_REJECTED", { contentType: "JOB", contentId: "j1" })).toEqual({ kind: "job", id: "j1" });
+    expect(notificationTarget("CONTENT_REJECTED", { contentType: "EVENT", contentId: "e1" })).toEqual({ kind: "event", id: "e1" });
+    expect(notificationTarget("CONTENT_REJECTED", {})).toEqual({ kind: "myContent" });
+  });
+
+  it("answers null, without throwing, for any string that isn't a notification type", () => {
+    for (const type of ["", "SOMETHING_NEW", "constructor", "toString", "hasOwnProperty", "__proto__"]) {
+      expect(notificationTarget(type, { postId: "p1", contentType: "POST", contentId: "p1" })).toBeNull();
+    }
+  });
+
+  it("gives every notification type a destination when its payload is complete, and doesn't throw when it's empty", () => {
+    const payload = { postId: "p1", eventId: "e1", contentType: "POST", contentId: "c1" };
+    for (const type of NOTIFICATION_TYPES) {
+      expect(notificationTarget(type, payload), type).not.toBeNull();
+      expect(() => notificationTarget(type, {})).not.toThrow();
+    }
+  });
+
+  it("keeps SYSTEM notices routed by what they carry", () => {
+    expect(notificationTarget("SYSTEM", { contentType: "JOB", contentId: "j1" })).toEqual({ kind: "job", id: "j1" });
+    expect(notificationTarget("SYSTEM", { postId: "p1" })).toEqual({ kind: "post", id: "p1" });
+    expect(notificationTarget("SYSTEM", {})).toBeNull();
   });
 });
 

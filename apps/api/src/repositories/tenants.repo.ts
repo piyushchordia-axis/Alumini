@@ -56,8 +56,9 @@ export async function listActiveTenants(db: DbClient, q?: string): Promise<Tenan
     .limit(200);
 }
 
-export async function findSettings(db: DbClient, tenantId: string): Promise<TenantSettingsRow | undefined> {
-  const [row] = await db.select().from(tenantSettings).where(eq(tenantSettings.tenantId, tenantId)).limit(1);
+export async function findSettings(db: DbClient, tenantId: string, forUpdate = false): Promise<TenantSettingsRow | undefined> {
+  const query = db.select().from(tenantSettings).where(eq(tenantSettings.tenantId, tenantId)).limit(1);
+  const [row] = forUpdate ? await query.for("update") : await query;
   return row;
 }
 

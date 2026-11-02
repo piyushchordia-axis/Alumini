@@ -5,6 +5,6 @@ export const SECTIONS: TenantFeature[] = ["feed", "jobs", "funding", "events", "
 
 /** Where a member lands: the first enabled section, or their profile when every section is off. */
 export function homeHref(slug: string, features: TenantFeatures): `/t/${string}` {
-  const first = SECTIONS.find((s) => features[s] ?? true);
+  const first = SECTIONS.find((s) => features[s]);
   return `/t/${slug}/${first ?? "profile"}`;
 }
