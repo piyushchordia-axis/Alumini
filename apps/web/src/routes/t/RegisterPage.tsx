@@ -1,4 +1,4 @@
-import { isApiClientError } from "@illuminize/shared/client";
+import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import type { MembershipDto } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -18,7 +18,8 @@ import { toast } from "@/stores/uiStore";
 export function RegisterPage() {
   const slug = useTenantSlug();
   const tenant = useTenant(slug);
-  const membership = useMembershipQuery(slug);
+  // Nothing here refetches behind the form: with no membership cached, a refetch shows the spinner and loses what they've typed.
+  const membership = useMembershipQuery(slug, { refetchOnWindowFocus: false, refetchOnReconnect: false });
   const fields = useProfileFields(slug);
   // An invitation for my (verified) phone: prefill, and allowed in even when registration is closed.
   const invitation = useQuery({ queryKey: qk.myInvitation(slug), queryFn: () => api.membership.invitation(slug), staleTime: 60_000 });
@@ -29,10 +30,13 @@ export function RegisterPage() {
   }, [tenant.data]);
 
   if (tenant.isLoading || membership.isLoading || fields.isLoading || invitation.isLoading) return <Loading />;
-  if (tenant.error || !tenant.data) return <ErrorBox error={tenant.error ?? "Not found"} className="m-6" />;
+  const tenantError = fatalQueryError(tenant);
+  if (tenantError || !tenant.data) return <ErrorBox error={tenantError ?? "Not found"} className="m-6" />;
+  const membershipError = fatalQueryError(membership);
+  const notMember = isApiClientError(membershipError) && membershipError.status === 404;
   const existing = membership.data;
   if (existing && existing.status !== "REJECTED") return <Navigate to={existing.status === "APPROVED" ? `/t/${slug}/app` : `/t/${slug}/pending`} replace />;
-  if (membership.error && !(isApiClientError(membership.error) && membership.error.status === 404)) return <ErrorBox error={membership.error} className="m-6" />;
+  if (membershipError && !notMember) return <ErrorBox error={membershipError} className="m-6" />;
 
   const t = tenant.data;
   const reapplying = existing?.status === "REJECTED";

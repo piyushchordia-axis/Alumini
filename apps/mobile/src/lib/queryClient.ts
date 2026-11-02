@@ -1,8 +1,9 @@
-import { isApiClientError } from "@illuminize/shared/client";
-import { focusManager, QueryClient } from "@tanstack/react-query";
+import { forgetGuardDataOnAnswer, isApiClientError } from "@illuminize/shared/client";
+import { focusManager, QueryCache, QueryClient } from "@tanstack/react-query";
 import { AppState, Platform } from "react-native";
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: forgetGuardDataOnAnswer }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

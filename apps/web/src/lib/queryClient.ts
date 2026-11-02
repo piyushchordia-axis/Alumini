@@ -1,7 +1,8 @@
-import { QueryClient } from "@tanstack/react-query";
-import { isApiClientError } from "@illuminize/shared/client";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { forgetGuardDataOnAnswer, isApiClientError } from "@illuminize/shared/client";
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: forgetGuardDataOnAnswer }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

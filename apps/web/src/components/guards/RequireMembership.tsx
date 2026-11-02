@@ -1,4 +1,4 @@
-import { isApiClientError } from "@illuminize/shared/client";
+import { fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { TenantLoadError } from "@/components/common/TenantLoadError";
@@ -19,24 +19,27 @@ export function RequireMembership() {
   const user = useAuthStore((s) => s.user);
   const lastSlug = useUiStore((s) => s.lastTenantSlug);
   const setLast = useUiStore((s) => s.setLastTenantSlug);
+  const tenantError = fatalQueryError(tenant);
+  const membershipError = fatalQueryError(membership);
   const approved = membership.data?.status === "APPROVED";
+  const answeredNotApproved = !approved && (!!membership.data || (!!membership.error && !isTransientError(membership.error)));
 
   useEffect(() => {
     if (tenant.data) applyTenantTheme(tenant.data);
   }, [tenant.data]);
 
   // Only remember institutions the user can actually open, so the start page never bounces them back into a
-  // waiting or rejected screen.
+  // waiting or rejected screen. A network failure or a 5xx is no reason to forget one.
   useEffect(() => {
     if (approved) setLast(slug);
-    else if ((membership.data || membership.error) && lastSlug === slug) setLast(null);
-  }, [approved, membership.data, membership.error, lastSlug, slug, setLast]);
+    else if (answeredNotApproved && lastSlug === slug) setLast(null);
+  }, [approved, answeredNotApproved, lastSlug, slug, setLast]);
 
   if (tenant.isLoading || membership.isLoading) return <Loading />;
-  if (tenant.error) return <TenantLoadError error={tenant.error} onRetry={() => void tenant.refetch()} />;
-  if (membership.error) {
-    if (isApiClientError(membership.error) && (membership.error.code === "NOT_A_MEMBER" || membership.error.status === 404)) return <Navigate to={`/t/${slug}/register`} replace />;
-    return <TenantLoadError error={membership.error} onRetry={() => void membership.refetch()} />;
+  if (tenantError) return <TenantLoadError error={tenantError} onRetry={() => void tenant.refetch()} />;
+  if (membershipError) {
+    if (isApiClientError(membershipError) && (membershipError.code === "NOT_A_MEMBER" || membershipError.status === 404)) return <Navigate to={`/t/${slug}/register`} replace />;
+    return <TenantLoadError error={membershipError} onRetry={() => void membership.refetch()} />;
   }
   if (!tenant.data || !membership.data) return <Loading />;
   if (!approved) return <Navigate to={`/t/${slug}/pending`} replace />;

@@ -1,32 +1,35 @@
+import { splitSections, type MemberSection } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Avatar, Modal } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
-import { enabledSections, homePath } from "@/lib/sections";
+import { homePath, SECTION_LINKS } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
-
-/** Phones show this many sections in the bottom bar; the rest go into the "More" sheet. */
-const BOTTOM_BAR_SECTIONS = 4;
 
 export function HomeLayout() {
   const { tenant, membership, isTenantAdmin } = useMembership();
   const base = `/t/${tenant.slug}/app`;
-  const sections = enabledSections(tenant.settings.features).map((s) => ({ ...s, to: `${base}/${s.path}` }));
-  const barSections = sections.length > BOTTOM_BAR_SECTIONS + 1 ? sections.slice(0, BOTTOM_BAR_SECTIONS) : sections;
-  const overflow = sections.slice(barSections.length);
+  const toLink = (section: MemberSection) => ({ ...SECTION_LINKS[section], to: `${base}/${SECTION_LINKS[section].path}` });
+  const { bar, overflow } = splitSections(tenant.settings.features);
+  const barLinks = bar.map(toLink);
+  const overflowLinks = overflow.map(toLink);
+  const sections = [...barLinks, ...overflowLinks];
 
   const pollInterval = usePollInterval();
   const unread = useQuery({ queryKey: qk.unread(tenant.slug), queryFn: () => api.notifications.unreadCount(tenant.slug), refetchInterval: pollInterval });
   const unreadCount = unread.data?.count ?? 0;
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const qc = useQueryClient();
   const refreshToken = useAuthStore((s) => s.refreshToken);
   const [moreOpen, setMoreOpen] = useState(false);
+  // No bar link is active on these routes, so More shows where the member is. NavLink's own matching, so it can't disagree with the sheet.
+  const onSheetRoute = [...overflowLinks.map((i) => i.to), `${base}/my-content`, `${base}/profile`].some((to) => matchPath({ path: to, end: false }, pathname));
 
   const signOut = async () => {
     try {
@@ -41,7 +44,8 @@ export function HomeLayout() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition", isActive ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-100");
-  const sheetLink = "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100";
+  const sheetRow = "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium";
+  const sheetLinkClass = ({ isActive }: { isActive: boolean }) => clsx(sheetRow, isActive ? "bg-primary/10 text-primary" : "text-slate-700 hover:bg-slate-100");
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -107,7 +111,7 @@ export function HomeLayout() {
       </div>
 
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {barSections.map((i) => (
+        {barLinks.map((i) => (
           <NavLink key={i.to} to={i.to} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary" : "text-slate-500")}>
             <span className="text-lg leading-none" aria-hidden>
               {i.icon}
@@ -115,7 +119,14 @@ export function HomeLayout() {
             {i.label}
           </NavLink>
         ))}
-        <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" aria-expanded={moreOpen} className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", moreOpen ? "text-primary" : "text-slate-500")}>
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          aria-current={onSheetRoute ? "true" : undefined}
+          className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", moreOpen || onSheetRoute ? "text-primary" : "text-slate-500")}
+        >
           <span className="text-lg leading-none" aria-hidden>
             ☰
           </span>
@@ -126,27 +137,27 @@ export function HomeLayout() {
       <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title={tenant.shortName ?? tenant.name}>
         {/* Following any link in the sheet closes it. */}
         <div className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setMoreOpen(false)}>
-          {overflow.map((i) => (
-            <NavLink key={i.to} to={i.to} className={sheetLink}>
+          {overflowLinks.map((i) => (
+            <NavLink key={i.to} to={i.to} className={sheetLinkClass}>
               <span aria-hidden>{i.icon}</span>
               {i.label}
             </NavLink>
           ))}
-          <NavLink to={`${base}/my-content`} className={sheetLink}>
+          <NavLink to={`${base}/my-content`} className={sheetLinkClass}>
             <span aria-hidden>🗂️</span>My posts
           </NavLink>
-          <NavLink to={`${base}/profile`} className={sheetLink}>
+          <NavLink to={`${base}/profile`} className={sheetLinkClass}>
             <span aria-hidden>👤</span>My profile
           </NavLink>
           {isTenantAdmin && (
-            <NavLink to={`/t/${tenant.slug}/admin`} className={sheetLink}>
+            <NavLink to={`/t/${tenant.slug}/admin`} className={sheetLinkClass}>
               <span aria-hidden>🛡️</span>Admin console
             </NavLink>
           )}
-          <NavLink to="/?switch=1" className={sheetLink}>
+          <NavLink to="/?switch=1" className={sheetLinkClass({ isActive: false })}>
             <span aria-hidden>🔁</span>Switch institution
           </NavLink>
-          <button type="button" className={clsx(sheetLink, "w-full text-left text-red-600")} onClick={() => void signOut()}>
+          <button type="button" className={clsx(sheetRow, "w-full text-left text-red-600 hover:bg-slate-100")} onClick={() => void signOut()}>
             <span aria-hidden>🚪</span>Sign out
           </button>
         </div>

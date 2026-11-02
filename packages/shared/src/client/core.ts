@@ -1,4 +1,4 @@
-import { ApiClientError } from "./ApiClientError";
+import { ApiClientError, isTransientError } from "./ApiClientError";
 import type { TokenPair, TokenStorage } from "./TokenStorage";
 
 export interface ApiClientOptions {
@@ -91,6 +91,7 @@ export class ApiCore {
     const message = errBody?.message ?? `Request failed (${res.status})`;
 
     if (res.status === 401 && useAuth && !isRetry && code === "TOKEN_EXPIRED") {
+      // A refresh that got no answer rejects here, so the caller sees that failure and the session below is left alone.
       const refreshed = await this.refresh();
       if (refreshed) return this.send(opts, accept, true);
     }
@@ -130,7 +131,10 @@ export class ApiCore {
     return (body as { data: T } | undefined)?.data as T;
   }
 
-  /** Single-flight refresh: concurrent 401s share one refresh call. */
+  /**
+   * Single-flight refresh: concurrent 401s share one refresh call. Resolves null when the session is over. Rejects with a
+   * transient error when the refresh got no answer, which says nothing about the session, so the tokens stay.
+   */
   refresh(): Promise<TokenPair | null> {
     if (!this.refreshing) {
       this.refreshing = this.doRefresh().finally(() => {
@@ -147,7 +151,8 @@ export class ApiCore {
       const body = await this.request<{ data: TokenPair }>({ method: "POST", path: "/auth/refresh", body: { refreshToken }, auth: false });
       await this.opts.storage.setTokens(body.data);
       return body.data;
-    } catch {
+    } catch (err) {
+      if (isTransientError(err)) throw err;
       await this.opts.storage.clear();
       this.opts.onUnauthorized?.();
       return null;

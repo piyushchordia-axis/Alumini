@@ -1,13 +1,14 @@
 import type { MembershipDto, TenantPublicDto } from "@illuminize/shared";
-import { useQuery } from "@tanstack/react-query";
+import { GUARD_QUERY_META } from "@illuminize/shared/client";
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/authStore";
 
-export function useMembershipQuery(slug: string) {
+export function useMembershipQuery(slug: string, options?: Pick<UseQueryOptions<MembershipDto>, "refetchOnWindowFocus" | "refetchOnReconnect">) {
   const token = useAuthStore((s) => s.accessToken);
-  return useQuery({ queryKey: qk.membership(slug), queryFn: () => api.membership.me(slug), enabled: !!token, retry: false, staleTime: 30_000 });
+  return useQuery({ queryKey: qk.membership(slug), queryFn: () => api.membership.me(slug), enabled: !!token, retry: false, staleTime: 30_000, meta: GUARD_QUERY_META, ...options });
 }
 
 export interface MembershipContextValue {

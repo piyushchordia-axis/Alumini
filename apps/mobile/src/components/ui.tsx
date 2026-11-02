@@ -103,11 +103,16 @@ export function Chip({ label, active, onPress, color }: { label: string; active?
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
-      {tabs.map((t) => (
-        <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
-          <Text style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>{t.label}</Text>
-        </Pressable>
-      ))}
+      {/* Labels stay on one line: tabs share the width when they fit and scroll sideways when they don't. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+        {tabs.map((t) => (
+          <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
+            <Text numberOfLines={1} style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>
+              {t.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -225,8 +230,8 @@ const styles = StyleSheet.create({
   hint: { color: colors.muted, fontSize: 12 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   chipText: { fontSize: 13, color: colors.text },
-  tabs: { flexDirection: "row", backgroundColor: "#e2e8f0", borderRadius: radius.md, padding: 3 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 9 },
+  tabs: { backgroundColor: "#e2e8f0", borderRadius: radius.md, padding: 3, overflow: "hidden" },
+  tab: { flexGrow: 1, paddingVertical: 8, paddingHorizontal: spacing.md, alignItems: "center", borderRadius: 9 },
   tabActive: { backgroundColor: "#fff" },
   tabText: { fontSize: 13, fontWeight: "600", color: colors.muted },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm },

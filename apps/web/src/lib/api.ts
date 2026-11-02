@@ -1,4 +1,5 @@
 import { createApiClient, type TokenStorage } from "@illuminize/shared/client";
+import { queryClient } from "@/lib/queryClient";
 import { useAuthStore } from "@/stores/authStore";
 
 const storage: TokenStorage = {
@@ -19,5 +20,9 @@ const storage: TokenStorage = {
 export const api = createApiClient({
   baseUrl: import.meta.env.VITE_API_URL ?? "",
   storage,
-  onUnauthorized: () => useAuthStore.getState().clear(),
+  // The next person to sign in here must not see this member's cached data, which a failed refetch would otherwise leave on screen.
+  onUnauthorized: () => {
+    useAuthStore.getState().clear();
+    queryClient.clear();
+  },
 });

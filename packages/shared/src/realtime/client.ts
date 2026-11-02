@@ -8,8 +8,10 @@ export interface RealtimeClientOptions {
   baseUrl: string;
   /** The current access token (read on every connect, so a refreshed token is picked up). */
   getAccessToken(): Promise<string | null>;
-  /** Refreshes the session (the API client's single-flight refresh); resolves null when the session is over. */
+  /** Refreshes the session (the API client's single-flight refresh); resolves null when the session is over, rejects when it got no answer. */
   refresh(): Promise<unknown>;
+  /** How long to wait before trying again after a refresh that got no answer. */
+  refreshRetryMs?: number;
 }
 
 export interface RealtimeClient {
@@ -27,6 +29,8 @@ export interface RealtimeClient {
 /** Consecutive authentication failures before the client gives up (until the next start()). */
 const MAX_AUTH_FAILURES = 3;
 
+const REFRESH_RETRY_MS = 30_000;
+
 /**
  * Typed Socket.IO client shared by the web and mobile apps. WebSocket transport only (works in browsers and React
  * Native, and needs no sticky sessions). An expired token is refreshed through the API client and the socket
@@ -40,6 +44,7 @@ export function createRealtimeClient(opts: RealtimeClientOptions): RealtimeClien
   let everConnected = false;
   let expired = false;
   let authFailures = 0;
+  let refreshRetry: ReturnType<typeof setTimeout> | undefined;
   const handlers = new Map<string, Set<AnyHandler>>();
   const statusListeners = new Set<(s: RealtimeStatus) => void>();
   const reconnectListeners = new Set<() => void>();
@@ -53,13 +58,23 @@ export function createRealtimeClient(opts: RealtimeClientOptions): RealtimeClien
   const refreshAndReconnect = async () => {
     authFailures += 1;
     if (authFailures > MAX_AUTH_FAILURES) return stopInternal("disconnected");
-    const result = await opts.refresh().catch(() => null);
+    let result: unknown;
+    try {
+      result = await opts.refresh();
+    } catch {
+      // No answer, so the session may well be fine. Nothing restarts this client on the web, so it has to keep trying itself.
+      authFailures -= 1;
+      setStatus("disconnected");
+      if (started) refreshRetry = setTimeout(() => void refreshAndReconnect(), opts.refreshRetryMs ?? REFRESH_RETRY_MS);
+      return;
+    }
     if (!result) return stopInternal("disconnected");
     if (started && socket && !socket.connected) socket.connect();
   };
 
   const stopInternal = (next: RealtimeStatus) => {
     started = false;
+    clearTimeout(refreshRetry);
     socket?.disconnect();
     setStatus(next);
   };

@@ -1,5 +1,5 @@
 import type { MembershipDto } from "@illuminize/shared";
-import { isApiClientError } from "@illuminize/shared/client";
+import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Text, View } from "react-native";
@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { homeHref } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
+import { useTenantStore } from "@/stores/tenantStore";
 
 export default function RegisterScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -20,16 +21,31 @@ export default function RegisterScreen() {
   const tenant = useTenant(slug);
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
-  const membership = useMembershipQuery(slug);
+  const setLast = useTenantStore((s) => s.setLastTenantSlug);
+  // Nothing here refetches behind the form: with no membership cached, a refetch shows the spinner and loses what they've typed.
+  const membership = useMembershipQuery(slug, { refetchOnWindowFocus: false, refetchOnReconnect: false });
   const fields = useProfileFields(authed ? slug : undefined);
   // An invitation for my (verified) phone: prefill, and allowed in even when registration is closed.
   const invitation = useQuery({ queryKey: qk.myInvitation(slug ?? ""), queryFn: () => api.membership.invitation(slug!), enabled: authed && !!slug, staleTime: 60_000 });
   if (!hydrated) return <Spinner />;
   if (!authed) return <Redirect href={`/t/${slug}/login`} />;
   if (tenant.isLoading || membership.isLoading || fields.isLoading || invitation.isLoading || !tenant.data) return <Spinner />;
+  const membershipError = fatalQueryError(membership);
+  const notMember = isApiClientError(membershipError) && membershipError.status === 404;
   const existing = membership.data;
   if (existing && existing.status !== "REJECTED") return <Redirect href={existing.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
-  if (membership.error && !(isApiClientError(membership.error) && membership.error.status === 404)) return <LoadError error={membership.error} onRetry={() => void membership.refetch()} onBack={() => router.replace("/")} />;
+  if (membershipError && !notMember)
+    return (
+      <LoadError
+        error={membershipError}
+        onRetry={() => void membership.refetch()}
+        onBack={() => {
+          // Forget it as the start page so the picker does not bounce straight back here.
+          setLast(null);
+          router.replace("/");
+        }}
+      />
+    );
   const t = tenant.data;
   const reapplying = existing?.status === "REJECTED";
   const inv = invitation.data ?? null;

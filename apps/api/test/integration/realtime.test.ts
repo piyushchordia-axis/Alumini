@@ -1,6 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { createApiClient, MemoryTokenStorage } from "@illuminize/shared/client";
+import { ApiClientError, createApiClient, MemoryTokenStorage } from "@illuminize/shared/client";
 import { createRealtimeClient } from "@illuminize/shared/realtime";
 import { REALTIME_PATH, type NotificationEvent, type UnreadEvent } from "@illuminize/shared";
 import { io, type Socket } from "socket.io-client";
@@ -173,6 +173,56 @@ describe.skipIf(!dbAvailable)("live updates with short-lived tokens", () => {
     expect(received[0]).toMatchObject({ tenantSlug: "live-refresh", notification: { title: "After refresh" } });
     client.stop();
     expect(statuses).toContain("connected");
+    expect(client.status).toBe("idle");
+  });
+
+  it("keeps trying when a refresh gets no answer, because that says nothing about the session", async () => {
+    const { tenant } = await createTenant(h.ctx, { slug: "live-retry" });
+    const user = await createUser(h.ctx, { phone: "+919833333334" });
+    await createMembership(h.ctx, tenant.id, user.id);
+    const session = await loginAs(h.ctx, user.phoneE164);
+    const storage = new MemoryTokenStorage();
+    await storage.setTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken });
+    const api = createApiClient({ baseUrl: h.baseUrl, storage });
+    let refreshes = 0;
+    const client = createRealtimeClient({
+      baseUrl: h.baseUrl,
+      getAccessToken: () => storage.getAccessToken(),
+      refreshRetryMs: 20,
+      // More failures in a row than the client allows for a refused token, so counting these towards that limit would show.
+      refresh: () => (++refreshes <= 5 ? Promise.reject(new ApiClientError(503, "INTERNAL", "down")) : api.core.refresh()),
+    });
+    let reconnects = 0;
+    client.onReconnect(() => void (reconnects += 1));
+    client.start();
+    for (let i = 0; i < 80 && reconnects === 0; i++) await new Promise((r) => setTimeout(r, 50));
+    expect(refreshes).toBeGreaterThan(5);
+    expect(reconnects).toBeGreaterThanOrEqual(1);
+    client.stop();
+  });
+
+  it("stops retrying once stopped, so a signed-out client doesn't keep calling the API", async () => {
+    const { tenant } = await createTenant(h.ctx, { slug: "live-retry-stop" });
+    const user = await createUser(h.ctx, { phone: "+919833333335" });
+    await createMembership(h.ctx, tenant.id, user.id);
+    const session = await loginAs(h.ctx, user.phoneE164);
+    let refreshes = 0;
+    const client = createRealtimeClient({
+      baseUrl: h.baseUrl,
+      getAccessToken: async () => session.accessToken,
+      refreshRetryMs: 20,
+      refresh: () => {
+        refreshes += 1;
+        return Promise.reject(new ApiClientError(0, "NETWORK_ERROR", "offline"));
+      },
+    });
+    client.start();
+    for (let i = 0; i < 60 && refreshes === 0; i++) await new Promise((r) => setTimeout(r, 50));
+    expect(refreshes).toBeGreaterThanOrEqual(1);
+    client.stop();
+    const stoppedAt = refreshes;
+    await new Promise((r) => setTimeout(r, 100));
+    expect(refreshes).toBe(stoppedAt);
     expect(client.status).toBe("idle");
   });
 });

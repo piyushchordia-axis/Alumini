@@ -1,27 +1,21 @@
-import type { TenantFeature, TenantFeatures } from "@illuminize/shared";
+import { homeSection, type MemberSection, type TenantFeatures } from "@illuminize/shared";
 
-export interface AppSection {
-  feature: TenantFeature;
+export interface SectionLink {
   path: string;
   label: string;
   icon: string;
 }
 
-/** The member app's main sections, in navigation order. Each one can be switched off per institution. */
-export const APP_SECTIONS: AppSection[] = [
-  { feature: "feed", path: "feed", label: "Feed", icon: "💬" },
-  { feature: "jobs", path: "jobs", label: "Jobs", icon: "💼" },
-  { feature: "funding", path: "funding", label: "Funding", icon: "🚀" },
-  { feature: "events", path: "events", label: "Events", icon: "📅" },
-  { feature: "directory", path: "directory", label: "Directory", icon: "🎓" },
-];
+export const SECTION_LINKS: Record<MemberSection, SectionLink> = {
+  feed: { path: "feed", label: "Feed", icon: "💬" },
+  jobs: { path: "jobs", label: "Jobs", icon: "💼" },
+  directory: { path: "directory", label: "Directory", icon: "🎓" },
+  events: { path: "events", label: "Events", icon: "📅" },
+  funding: { path: "funding", label: "Funding", icon: "🚀" },
+};
 
-export function enabledSections(features: TenantFeatures): AppSection[] {
-  return APP_SECTIONS.filter((s) => features[s.feature]);
-}
-
-/** Where `/t/:slug/app` lands: the first enabled section, or the profile when every section is off. */
+/** Where `/t/:slug/app` lands: the home section, or the profile when every section is off. */
 export function homePath(slug: string, features: TenantFeatures): string {
-  const first = enabledSections(features)[0];
-  return `/t/${slug}/app/${first ? first.path : "profile"}`;
+  const home = homeSection(features);
+  return `/t/${slug}/app/${home ? SECTION_LINKS[home].path : "profile"}`;
 }

@@ -33,7 +33,7 @@ export function useAppHeaderOptions() {
     ),
     headerRight: () => (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} hitSlop={8} accessibilityRole="button" accessibilityLabel={count ? `Notifications, ${count} unread` : "Notifications"}>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`, { withAnchor: true })} hitSlop={8} accessibilityRole="button" accessibilityLabel={count ? `Notifications, ${count} unread` : "Notifications"}>
           <Text style={{ fontSize: 20 }}>🔔</Text>
           {!!count && (
             <View style={{ position: "absolute", top: -4, right: -6, backgroundColor: colors.danger, borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: "center" }}>

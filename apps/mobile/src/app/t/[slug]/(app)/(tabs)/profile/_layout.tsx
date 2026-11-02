@@ -1,5 +1,8 @@
 import { Stack } from "expo-router";
 
+/** What a screen opened straight from another tab goes back to, with `withAnchor`. */
+export const unstable_settings = { anchor: "index" };
+
 export default function ProfileStack() {
   return (
     <Stack screenOptions={{ headerTitleStyle: { fontWeight: "700" } }}>

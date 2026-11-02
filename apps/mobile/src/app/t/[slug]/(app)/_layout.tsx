@@ -1,70 +1,63 @@
-import { isApiClientError } from "@illuminize/shared/client";
-import { Redirect, Tabs, useLocalSearchParams, useRouter } from "expo-router";
+import { fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { Text } from "react-native";
 import { LoadError, Spinner } from "@/components/ui";
 import { MembershipContext, useMembershipQuery } from "@/hooks/useMembership";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { useTenant } from "@/hooks/useTenant";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
-import { colors, useTheme } from "@/theme";
 
-const ICONS: Record<string, string> = { feed: "💬", jobs: "💼", funding: "🚀", events: "📅", directory: "🎓" };
+export const unstable_settings = { anchor: "(tabs)" };
 
-/** Membership guard + the five-tab member shell. Each tab's stack draws its own header (see AppHeader). */
-export default function AppTabsLayout() {
+/** Membership guard for everything a member sees. A stack, so a later screen can sit above the tabs and still have them to go back to. */
+export default function AppLayout() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
-  const theme = useTheme();
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
+  const lastSlug = useTenantStore((s) => s.lastTenantSlug);
   const setLast = useTenantStore((s) => s.setLastTenantSlug);
   const tenant = useTenant(slug);
   const membership = useMembershipQuery(slug);
+  const membershipError = fatalQueryError(membership);
   const approved = membership.data?.status === "APPROVED";
+  const answeredNotApproved = authed && !approved && (!!membership.data || (!!membership.error && !isTransientError(membership.error)));
   usePushRegistration(authed && approved);
 
-  // Remember only institutions the member can open, so the start screen never bounces into a waiting screen.
+  // Remember only institutions the member can open, so the start screen never bounces them back into a waiting or
+  // error screen. A network failure or a 5xx is no reason to forget one.
   useEffect(() => {
     if (approved && slug) setLast(slug);
   }, [approved, slug, setLast]);
+  // Separate, because re-running the one above when this changes would undo Switch institution, which forgets it while this screen is still mounted.
+  useEffect(() => {
+    if (answeredNotApproved && lastSlug === slug) setLast(null);
+  }, [answeredNotApproved, lastSlug, slug, setLast]);
+
+  // The picker redirects to a remembered institution, so without this the way out of an error screen leads straight back to it.
+  const chooseAnother = () => {
+    setLast(null);
+    router.replace("/");
+  };
 
   if (!hydrated) return <Spinner />;
   if (!authed) return <Redirect href={`/t/${slug}/login`} />;
   if (tenant.isLoading || membership.isLoading) return <Spinner />;
-  if (!tenant.data) return <LoadError error={tenant.error ?? "Institution not found"} onRetry={() => void tenant.refetch()} onBack={() => router.replace("/")} />;
-  if (membership.error) {
-    const notMember = isApiClientError(membership.error) && (membership.error.status === 404 || membership.error.code === "NOT_A_MEMBER");
+  if (!tenant.data) return <LoadError error={tenant.error ?? "Institution not found"} onRetry={() => void tenant.refetch()} onBack={chooseAnother} />;
+  if (membershipError) {
+    const notMember = isApiClientError(membershipError) && (membershipError.status === 404 || membershipError.code === "NOT_A_MEMBER");
     if (notMember) return <Redirect href={`/t/${slug}/register`} />;
-    return <LoadError error={membership.error} onRetry={() => void membership.refetch()} onBack={() => router.replace("/")} />;
+    return <LoadError error={membershipError} onRetry={() => void membership.refetch()} onBack={chooseAnother} />;
   }
   if (!membership.data) return <Spinner />;
   if (!approved) return <Redirect href={`/t/${slug}/pending`} />;
 
-  const f = tenant.data.settings.features;
   const isTenantAdmin = membership.data.role === "TENANT_ADMIN" || !!user?.isPlatformAdmin;
   return (
     <MembershipContext.Provider value={{ tenant: tenant.data, membership: membership.data, isTenantAdmin }}>
-      <Tabs
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: theme.primary,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.6 }}>{ICONS[route.name.split("/")[0] ?? ""] ?? "•"}</Text>,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-        })}
-      >
-        <Tabs.Screen name="feed" options={{ title: "Feed", href: f.feed ? undefined : null }} />
-        <Tabs.Screen name="jobs" options={{ title: "Jobs", href: f.jobs ? undefined : null }} />
-        <Tabs.Screen name="funding" options={{ title: "Funding", href: f.funding ? undefined : null }} />
-        <Tabs.Screen name="events" options={{ title: "Events", href: f.events ? undefined : null }} />
-        <Tabs.Screen name="directory" options={{ title: "Directory", href: f.directory ? undefined : null }} />
-        {/* Reached from the header (avatar and bell), so no tab button. Not `href: null`: expo-router now treats that as a
-            hidden screen and redirects away from it, which would make every profile screen unreachable. */}
-        <Tabs.Screen name="profile" options={{ title: "Profile", tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
-      </Tabs>
+      <Stack screenOptions={{ headerShown: false }} />
     </MembershipContext.Provider>
   );
 }

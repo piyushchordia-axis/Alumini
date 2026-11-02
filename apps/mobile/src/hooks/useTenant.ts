@@ -1,9 +1,10 @@
+import { GUARD_QUERY_META } from "@illuminize/shared/client";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function useTenant(slug: string | undefined) {
-  return useQuery({ queryKey: qk.tenant(slug ?? ""), queryFn: () => api.tenants.get(slug!), enabled: !!slug, staleTime: 5 * 60_000 });
+  return useQuery({ queryKey: qk.tenant(slug ?? ""), queryFn: () => api.tenants.get(slug!), enabled: !!slug, staleTime: 5 * 60_000, meta: GUARD_QUERY_META });
 }
 
 export function useTenantList(q?: string) {

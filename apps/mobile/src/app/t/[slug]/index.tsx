@@ -1,5 +1,5 @@
 import { isApiClientError } from "@illuminize/shared/client";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useGlobalSearchParams, useRouter } from "expo-router";
 import { Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar, Button, Spinner } from "@/components/ui";
@@ -11,7 +11,8 @@ import { colors, spacing, useTheme } from "@/theme";
 
 /** Tenant landing: branding + sign-in, or a redirect into the app for signed-in users. */
 export default function TenantLandingScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  // Global, because the layout's error screen unmounts the stack, and Try again brings it back on this screen with no params of its own.
+  const { slug } = useGlobalSearchParams<{ slug: string }>();
   const router = useRouter();
   const theme = useTheme();
   const tenant = useTenant(slug);

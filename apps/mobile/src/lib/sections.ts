@@ -1,10 +1,22 @@
-import type { TenantFeature, TenantFeatures } from "@illuminize/shared";
+import { homeSection, type MemberSection, type TenantFeatures } from "@illuminize/shared";
 
-/** Member app tabs in order; each can be switched off per institution. */
-export const SECTIONS: TenantFeature[] = ["feed", "jobs", "funding", "events", "directory"];
+export interface SectionTab {
+  /** The route folder under (app)/(tabs), which is also the URL segment. */
+  path: string;
+  label: string;
+  icon: string;
+}
 
-/** Where a member lands: the first enabled section, or their profile when every section is off. */
+export const SECTION_TABS: Record<MemberSection, SectionTab> = {
+  feed: { path: "feed", label: "Feed", icon: "💬" },
+  jobs: { path: "jobs", label: "Jobs", icon: "💼" },
+  directory: { path: "directory", label: "Directory", icon: "🎓" },
+  events: { path: "events", label: "Events", icon: "📅" },
+  funding: { path: "funding", label: "Funding", icon: "🚀" },
+};
+
+/** Where a member lands: the home section, or their profile when every section is off. */
 export function homeHref(slug: string, features: TenantFeatures): `/t/${string}` {
-  const first = SECTIONS.find((s) => features[s]);
-  return `/t/${slug}/${first ?? "profile"}`;
+  const home = homeSection(features);
+  return `/t/${slug}/${home ? SECTION_TABS[home].path : "profile"}`;
 }
