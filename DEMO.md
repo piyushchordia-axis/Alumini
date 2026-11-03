@@ -28,10 +28,12 @@ shown on screen.
 | Who | Phone number | What you'll see |
 | --- | --- | --- |
 | A brand-new alumnus | any number you like | Picks an institution, registers, and is approved instantly (Demo University) or waits for approval (Demo College, Demo School) |
-| Member of Demo University | `+91 91000 00001` (Rahul Mehta) | The full member app with posts, jobs, funding, events and directory |
-| Admin of Demo University | `+91 90000 00001` | Members and posts are approved automatically |
+| Member of Demo University | `+91 91000 00001` (Rahul Mehta) | The full member app: posts, messages, groups, mentors, jobs with referrals, businesses, funding, events and directory |
+| Another member of Demo University | `+91 91000 00002` (Priya Nair) | A mentorship request and a referral request waiting for her answer |
+| Admin of Demo University | `+91 90000 00001` | Members and posts are approved automatically; a reported chat message is waiting |
 | Admin of Demo College | `+91 90000 00002` | Approval is required for members **and** posts; pending items and a spam report are waiting |
-| Admin of Demo School | `+91 90000 00003` | Members need approval, posts publish immediately |
+| Admin of Demo School | `+91 90000 00003` | Members need approval, posts publish immediately; messaging, groups and mentorship start off |
+| Pupil at Demo School | `+91 91000 00026` (Naina Sen) | Still at school, so never sees messages, groups, mentors or referrals |
 | Illuminize staff | `+91 99999 99999` | The platform console at `/platform` |
 
 The phone field has a country picker. Choose **IN +91**, then type the 10 digits.
@@ -77,6 +79,73 @@ phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
 
+**Wave 2: connect one to one** (run `pnpm db:reset` first, so the demo data for these is fresh)
+
+Demo University now has **Messages**, **Groups**, **Mentors** and **Businesses** too, and referral requests inside
+**Jobs**. On a computer every section is in the menu on the left. On a phone, or a narrow window, the bar at the bottom
+shows four sections and **More** holds the rest (Events, Groups, Mentors, Businesses and Funding), with your posts,
+profile and sign out.
+
+- **Messages, with two browsers.** This walks through a message request, live messages, a report and what an admin
+  sees.
+  1. In your normal browser window, sign in to Demo University as Priya (`+91 91000 00002`). In a private window, sign
+     in as Sneha (`+91 91000 00006`), open **Messages** and then the **Requests** tab.
+  2. As Priya, open **Directory**, search for "Sneha", open **Sneha Kulkarni** and choose **Message this member**. Write
+     something and send it. A first message is a request: Priya's screen says **Request sent**, and she can't write
+     more until Sneha accepts.
+  3. As Sneha, watch the request appear under Requests, and a number appear on Messages, without reloading. Open it:
+     Sneha can **Accept request**, **Decline request** (Priya is never told) or **Block member**. Choose **Accept
+     request**.
+  4. Write to each other. Each message shows up in the other window within a second or two.
+  5. As Sneha, report one of Priya's messages: point at it (on a phone, tap it) and choose the flag beside it, **Report
+     message**. Pick a reason and **Send report**. The dialog says admins will see this message and up to 10 around it,
+     and nothing more.
+  6. In a third window, or after signing out, sign in to Demo University as its admin (`+91 90000 00001`) and choose
+     **Admin**. The dashboard has an **Open chat reports** tile. Open **Chat reports**: it shows who reported whom and
+     why, but no messages. Another report is already there: Meera reported a threatening message from Arjun.
+  7. Choose **View messages** on Sneha's report. You see the reported message and the few around it, and nothing else
+     of their chat. Choose **Remove message** and confirm: it becomes "This message was removed" in both members'
+     chats, and Priya is told. Then open **Audit log**: your view is recorded as `chat_report.view`, and the removal as
+     `chat_report.resolve`. Leaving Chat reports hides the messages, so seeing them again means choosing View messages
+     again, which is recorded too.
+
+  Also try **Conversation options → Block member** in a chat: the other member isn't told, and nothing they send
+  reaches you from then on. **Blocked members**, at the top of Messages, lists them and lets you unblock. Chat is text
+  only, and pushes to a phone never show what a message says.
+- **Groups.** Sign in as Arjun (`+91 91000 00003`), open **Groups** and, under **Discover**, open **London & UK alumni**
+  and **Join group**: you see the whole conversation so far. **Create group** asks whether a group is open (anyone can
+  find and join it) or invite-only (only people you invite see it, and they see messages from when they join), and
+  that can't be changed later. As Rahul (`+91 91000 00001`), open his invite-only **Batch of 2012 reunion committee**
+  chat, then **Group details** and **Invite members**, and search for the members to invite. They find the invitation
+  under **Groups → Invitations**.
+- **Mentors.** Sign in as Priya and open **Mentors**, then **Requests**: Riya Fernandes is waiting for an answer, with a
+  note. **Accept request** opens a chat that starts with her note. **Find mentors** lists members who offer to mentor,
+  with filters by area and how often they can meet, and **Be a mentor** is how you offer. As Rahul, Requests shows the
+  mentorship he already has with Farhan Lobo, with **Open chat** and **End mentorship**.
+- **Referrals.** Open **Jobs** and tick **Can refer**: Rahul's backend engineer job and Priya's product manager job take
+  referral requests. As Arjun, open one and choose **Ask for a referral** with a short note. As Priya, **Jobs →
+  Referrals** shows the requests waiting for her, and accepting one opens a chat. When you post a job, tick **I can
+  refer people for this job** to offer the same.
+- **Businesses.** Open **Businesses** to see what alumni run, search, or filter by category and city. Email and phone
+  show only on a listing's own page. **Add a business** lists yours (up to five). Demo University's admin finds
+  "Instant Visa Desk" under **Admin → Reports**, and Demo College's admin (`+91 90000 00002`) has "Joshi Automation
+  Services" waiting under **Moderation**.
+- **Schools and current pupils.**
+  1. Sign in to **Demo School** as its admin (`+91 90000 00003`) and open **Admin → Settings**. Messaging, Groups and
+     Mentorship are off, and the page says why: members can contact each other privately, and the school may still
+     have pupils.
+  2. Tick **Messaging** first (Mentorship needs it), then **Groups** and **Mentorship**, and **Save settings**.
+  3. Sign in to Demo School as Aditya Reddy (`+91 91000 00021`), an alumnus: Messages is in the menu now, and Groups and
+     Mentors too.
+  4. Sign in to Demo School as Naina Sen (`+91 91000 00026`). Her batch is two years away, so she's still at school:
+     she sees no Messages, Groups or Mentors, and Jobs has no Referrals, even though the school switched them all on.
+- **Notification settings** (bell → ⚙️ Settings) now have **Messages** and **Mentorship and referrals**. Messages can be
+  **In app** (the number on Messages alone) or **In app + push**; they never appear under the bell.
+- **Deleting your account** (Profile) now explains that your messages stay in other people's chats, shown as from a
+  "Deleted member", and that groups you own pass to the member who has been in them longest.
+- **On the phone app** everything members do above works the same: Messages is a tab, and you tap a message to report
+  it. The admin steps (Chat reports, Audit log, Settings, Reports and Moderation) are on the web only.
+
 **Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)
 - **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed opens with today's birthday (Meera) and Rahul's own
   third anniversary of joining. Tap **Send wishes**; Meera sees them under the bell. Only the day and month are ever
@@ -105,8 +174,8 @@ phone-sized preview in the browser. Port 4000 must still be public.
 - **The bell updates live.** Open the web app in two browsers (one in a private window) as two members of Demo
   University. When one reacts to or comments on the other's post, the other's bell count changes within a second, with
   no reload. The phone app gets the same live updates while it is open.
-- Push notifications, and from now on invites, digests and reminders, are delivered in the background, so actions in
-  the app return immediately and temporary provider outages are retried.
+- Push notifications, and from now on invitations, announcements and digests, are delivered in the background, so
+  actions in the app return immediately and temporary provider outages are retried.
 
 **Fix pass after the first review** (web, iOS and Android)
 - **Event times** are saved in the event's own time zone, whatever zone your laptop or phone is in. The phone app
@@ -147,5 +216,9 @@ phone-sized preview in the browser. Port 4000 must still be public.
 | Expo Go says the project needs a different SDK | Update Expo Go from the store. If it still does not match, use `pnpm mobile:web` for the browser preview. |
 | Phone app shows "Could not reach the server" | Make port 4000 public (step 4.1), then restart `pnpm mobile:tunnel`. |
 | Uploaded photos do not show | Same fix: make port 4000 public. |
-| Phone app's bell does not update live | Same fix: make port 4000 public. The web app's live updates go through the web port and need nothing. |
+| Phone app's bell or messages do not update live | Same fix: make port 4000 public. The web app's live updates go through the web port and need nothing. |
 | Tunnel will not start | Stop it with Ctrl+C and run `pnpm mobile:tunnel` again; the tunnel service is occasionally busy. |
+| No Messages, Groups or Mentors | At Demo School they start off until its admin turns them on (see "Schools and current pupils" above), and a pupil never sees them. At the other institutions, look in **Admin → Settings**: someone may have switched them off. |
+| No seeded chats, groups, mentors or businesses | The demo data is older than Wave 2. Run `pnpm db:reset`. |
+| A profile still asks "Open to mentoring students" | That question is from the demo data before Mentors replaced it. Run `pnpm db:reset`. |
+| "Too many codes requested" or "Too many requests" when signing in | Each number gets 5 codes an hour, and each computer 20 requests for a code. Wait, or run `pnpm db:reset`, which also clears these limits (and resets the demo data). |

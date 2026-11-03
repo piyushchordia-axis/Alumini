@@ -668,11 +668,15 @@ async function seedReferrals(db: Db, tenantId: string, member: (phone: string) =
   });
 }
 
-/** Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. */
+/**
+ * Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. Named so
+ * the generated members (seedDemoHistory's FIRST and LAST lists) can't share the name: Demo University's +91931000005, who
+ * asks Priya for a referral, would otherwise be a second "Ira Banerjee".
+ */
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
   if (!school) return;
-  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Ira Banerjee", batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
+  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Naina Sen", batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
 }
 
 /** The Wave 2 connections data. Runs after everything else, and each part guards itself, so an existing database gets it from the next seed. */

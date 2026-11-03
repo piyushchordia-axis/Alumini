@@ -946,15 +946,19 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
       const { tenant } = await createTenant(ctx);
       const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
       const member = await bareMember(ctx, tenant.id);
+      const suspended = await bareMember(ctx, tenant.id, { status: "SUSPENDED" });
+      const pending = await bareMember(ctx, tenant.id, { status: "PENDING" });
       const as = adminOf(tenant.slug, admin);
       await ctx.redis.set(keys.rateLimit("member-admin-action", admin.user.id), "59", "EX", 3600);
       process.env.RATE_LIMIT_IN_TESTS = "1";
       try {
         expect((await as.setRole(member.id, "MEMBER")).status).toBe(200);
-        for (const over of [await as.setRole(member.id, "MEMBER"), await as.suspend(member.id), await as.profile(member.id, {})]) {
+        for (const over of [await as.setRole(member.id, "MEMBER"), await as.suspend(member.id), await as.profile(member.id, {}), await as.reinstate(suspended.id)]) {
           expect(over.status).toBe(429);
           expect(over.body.error.code).toBe("RATE_LIMITED");
         }
+        // Approving new members one at a time isn't held back.
+        expect((await as.approve(pending.id)).status).toBe(200);
         expect((await as.member(member.id)).status).toBe(200);
       } finally {
         delete process.env.RATE_LIMIT_IN_TESTS;

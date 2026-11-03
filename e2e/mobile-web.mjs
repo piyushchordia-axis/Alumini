@@ -1369,7 +1369,7 @@ try {
   });
 
   await step("a current pupil sees no Messages, Groups, Mentors or referrals, even with all of them switched on", async () => {
-    const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Ira Banerjee, demo-school
+    const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Naina Sen, demo-school
     const pupil = await context.newPage();
     pupil.setDefaultTimeout(20000);
     const chatCalls = [];

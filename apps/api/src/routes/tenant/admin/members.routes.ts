@@ -49,14 +49,24 @@ export function memberRoutes(ctx: AppContext): Router {
     }),
   );
 
-  for (const action of ["approve", "reinstate"] as const) {
-    router.post(
-      `/members/:membershipId/${action}`,
-      route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
-        ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, action));
-      }),
-    );
-  }
+  // Approving isn't held back, so admins can work through a queue of new members one at a time. The service refuses
+  // approving an admin as it does reinstating one, but only approved members are given the role, so no admin is pending
+  // or rejected.
+  router.post(
+    "/members/:membershipId/approve",
+    route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
+      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "approve"));
+    }),
+  );
+
+  // Reinstating a suspended admin is refused while a chat report names the actor, so it's held back like suspending.
+  router.post(
+    "/members/:membershipId/reinstate",
+    heldBackLimit,
+    route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
+      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "reinstate"));
+    }),
+  );
 
   router.post(
     "/members/:membershipId/reject",

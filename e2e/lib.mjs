@@ -15,7 +15,10 @@ async function call(method, path, body, token) {
   return json?.data;
 }
 
-/** Asks for a code. Another script run moments ago may have asked for this phone, which then waits a minute; the wait costs no code. */
+/**
+ * Asks for a code. Another script run moments ago may have asked for this phone, which then waits a minute. The refused
+ * request issues no code, but it still counts against the API's 20 code requests an hour from this machine.
+ */
 async function requestOtp(phone) {
   try {
     return await call("POST", "/auth/otp/request", { phone });
@@ -29,7 +32,7 @@ async function requestOtp(phone) {
 
 const sessions = new Map();
 /**
- * Signs someone in through the API with the development OTP, once per run: every code requested counts against a limit
+ * Signs someone in through the API with the development OTP, once per run: every code request counts against a limit
  * of 20 an hour for the whole machine, shared by every e2e script, and each phone also waits a minute between codes.
  */
 export function apiSession(phone) {
