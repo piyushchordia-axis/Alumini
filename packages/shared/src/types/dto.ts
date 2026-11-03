@@ -20,6 +20,10 @@ import type {
   JobType,
   MaritalStatus,
   MembershipRole,
+  MentorArea,
+  MentorAvailability,
+  MentorshipBox,
+  MentorshipStatus,
   MessageChannel,
   MembershipStatus,
   ModerationStatus,
@@ -321,6 +325,12 @@ export interface MemberCardDto {
   isOpenToWork: boolean;
 }
 
+/** A card in the directory, which alone works out whether a member mentors. */
+export interface DirectoryCardDto extends MemberCardDto {
+  /** An active mentor. Always false while mentorship is off here, or for a viewer who can't use it. */
+  isMentor: boolean;
+}
+
 export interface MemberProfileDto extends MemberCardDto {
   bio: string | null;
   linkedinUrl: string | null;
@@ -339,6 +349,93 @@ export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible"> {
   phone: string;
   lastActiveAt: string | null;
   lastLoginAt: string | null;
+}
+
+/** One member, as an admin opens them. */
+export interface AdminMemberDetailDto extends AdminMemberDto {
+  audit: AuditDto[];
+  /** Their mentor profile, active or not, or null if they never offered to mentor. Its note can't be reported, so admins see it here. */
+  mentorProfile: MentorProfileDto | null;
+}
+
+/** A member's mentor profile, as they and admins see it. */
+export interface MentorProfileDto {
+  areas: MentorArea[];
+  availability: MentorAvailability;
+  availabilityNote: string | null;
+  note: string | null;
+  /** In the Mentors list. False once they stop mentoring, or an admin removes them as a mentor. */
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A mentor in the Mentors list. */
+export interface MentorCardDto {
+  member: MemberCardDto;
+  areas: MentorArea[];
+  availability: MentorAvailability;
+}
+
+/** The viewer's own request to a mentor that is still open. It reads the same whatever has become of it on the mentor's side. */
+export interface MentorshipLinkDto {
+  id: string;
+  status: Extract<MentorshipStatus, "REQUESTED" | "ACCEPTED">;
+  /** The chat, once accepted. */
+  conversationId: string | null;
+}
+
+/** A mentor's own page. */
+export interface MentorDto extends MentorCardDto {
+  availabilityNote: string | null;
+  note: string | null;
+  isMe: boolean;
+  /** Set while the viewer has a request waiting with them, or a mentorship under way: they can't ask again until it's over. */
+  myRequest: MentorshipLinkDto | null;
+}
+
+/**
+ * A mentorship request as one side of it sees it. The mentee's copy depends only on what they did and what the mentor
+ * answered, so a request the mentor never sees reads exactly like one they haven't answered yet.
+ */
+export interface MentorshipDto {
+  id: string;
+  /** received: this member is the mentor. sent: the mentee. */
+  box: MentorshipBox;
+  status: MentorshipStatus;
+  /** The other member: the mentee on a received request, the mentor on a sent one. Null once they've deleted their account: show DELETED_MEMBER_NAME. */
+  member: MemberCardDto | null;
+  /** The mentee's note, which became the chat's first message if accepted. */
+  note: string;
+  /** The chat an acceptance opened, still there once it has ended. */
+  conversationId: string | null;
+  /** ENDED by this member: they withdrew the request, or ended the mentorship. */
+  endedByMe: boolean;
+  createdAt: string;
+  /** When the mentor accepted or declined, or stopped mentoring, which declines what was waiting. */
+  respondedAt: string | null;
+  /** Set only if it was accepted: ENDED without it was withdrawn before an answer. */
+  acceptedAt: string | null;
+  endedAt: string | null;
+  canAccept: boolean;
+  canDecline: boolean;
+  /** On a received request that never became a mentorship and that this member hasn't reported yet, withdrawn ones included. */
+  canReport: boolean;
+  canWithdraw: boolean;
+  canEnd: boolean;
+}
+
+export interface MentorshipPageDto extends CursorPage<MentorshipDto> {
+  /** Requests in this list still waiting for an answer, across every page. */
+  waiting: number;
+}
+
+/** What a member still has in mentorship, which decides whether the apps keep a way into it while they can't use it. */
+export interface MentorshipSummaryDto {
+  /** Listed as a mentor. */
+  listed: boolean;
+  /** Requests waiting and mentorships under way, sent or received, as their lists show them. */
+  open: number;
 }
 
 export interface ChatMemberDto {

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultFeaturesFor } from "@illuminize/shared";
+import { defaultFeaturesFor, type MentorArea, type MentorAvailability } from "@illuminize/shared";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createLogger } from "../lib/logger";
@@ -10,7 +10,7 @@ import { seedGroup } from "../repositories/chatGroups.repo";
 import { createDb, type Db } from "./client";
 import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
-import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
+import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, mentorProfiles, mentorships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -555,6 +555,62 @@ async function seedChatGroups(db: Db, tenantId: string, member: (phone: string) 
   });
 }
 
+/**
+ * Mentors in demo-university, a request waiting for one and a mentorship under way with the chat its acceptance opened.
+ * Rahul and Priya mentor, alongside generated members, and every mentee is generated, so none of the members the e2e
+ * journeys sign in as (Arjun, Meera, Vikram, Sneha, the admin, and the generated +91931000006 and 07, or anyone after
+ * +91931000011) has a mentor profile, a request or a new thread.
+ */
+async function seedMentorship(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(mentorProfiles).where(eq(mentorProfiles.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const phones = ["+91931000008", "+91931000009", "+91931000010", "+91931000011"];
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, phones)));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const [coder, civil, finalYear, founder] = phones.map((p) => byPhone.get(p));
+  const [rahul, priya] = ["+919100000001", "+919100000002"].map(member) as [string, string];
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const profile = (membershipId: string | undefined, areas: MentorArea[], availability: MentorAvailability, availabilityNote: string | null, note: string, days: number) =>
+    membershipId ? [{ tenantId, membershipId, areas, availability, availabilityNote, note, createdAt: ago(days), updatedAt: ago(days) }] : [];
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await tx.insert(mentorProfiles).values([
+      ...profile(rahul, ["ENTREPRENEURSHIP", "FINANCE"], "MONTHLY", "Saturday mornings, Mumbai time", "I started Zylo Labs after six years in banking. Happy to talk through fundraising, early hiring, or whether to start at all.", 60),
+      ...profile(priya, ["CAREER_ADVICE", "HIGHER_STUDIES", "WORKING_ABROAD"], "FORTNIGHTLY", "Weekday evenings, UK time", "I moved from engineering to product, and from India to the UK. Glad to help with either, or with applying for a master's abroad.", 45),
+      ...profile(coder, ["SOFTWARE_IT", "CAREER_ADVICE"], "WEEKLY", null, "I review CVs and run practice interviews for software roles.", 30),
+      ...profile(civil, ["PUBLIC_SERVICE", "LAW"], "ONE_OFF", "One call, any weekday", "Ask me about the civil services exams, or what the work is really like.", 20),
+    ]);
+    if (finalYear) {
+      await tx.insert(mentorships).values({ tenantId, mentorMembershipId: priya, menteeMembershipId: finalYear, note: "I'm in my final year and weighing a master's in the UK against working first. Could I ask how you decided?", createdAt: ago(2), updatedAt: ago(2) });
+    }
+    if (founder) {
+      const note = "I'm building a small payments tool for local shops and would value advice on finding the first ten customers.";
+      const [accepted] = await tx
+        .insert(mentorships)
+        .values({ tenantId, mentorMembershipId: rahul, menteeMembershipId: founder, status: "ACCEPTED", note, respondedAt: ago(11), acceptedAt: ago(11), createdAt: ago(12), updatedAt: ago(11) })
+        .returning({ id: mentorships.id });
+      const [first] = await seedDirectThread(tx, {
+        tenantId,
+        aId: founder,
+        bId: rahul,
+        requesterId: founder,
+        state: "ACCEPTED",
+        origin: { kind: "MENTORSHIP", id: accepted!.id },
+        messages: [
+          { senderId: founder, body: note, at: ago(11) },
+          { senderId: rahul, body: "Glad to help. Send me a one-page summary of what you've built, and who has tried it so far.", at: ago(10, 600) },
+          { senderId: founder, body: "Sent it to you just now. Three shops in Andheri are using it every day.", at: ago(10, 300) },
+        ],
+      });
+      await tx.update(mentorships).set({ conversationId: first!.conversationId }).where(eq(mentorships.id, accepted!.id));
+    }
+  });
+}
+
 /** Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. */
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
@@ -571,6 +627,7 @@ export async function seedConnections(db: Db, tenantIds: Record<string, string>,
     await seedChatThreads(db, uni, (phone) => mid("demo-university", phone));
     await seedChatReport(db, uni);
     await seedChatGroups(db, uni, (phone) => mid("demo-university", phone));
+    await seedMentorship(db, uni, (phone) => mid("demo-university", phone));
   }
   await seedCurrentPupil(db, tenantIds);
 }

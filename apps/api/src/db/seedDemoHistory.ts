@@ -111,18 +111,15 @@ const FIELDS: Record<string, FieldSeed[]> = {
   "demo-university": [
     { key: "department", label: "Department", type: "SELECT", options: opts("Computer Science", "Electronics", "Mechanical", "Civil", "Commerce", "Design"), filterable: true },
     { key: "hostel", label: "Hostel", type: "SELECT", options: opts("Tagore", "Raman", "Sarojini", "Bhabha"), filterable: true },
-    { key: "mentoring", label: "Open to mentoring students", type: "BOOLEAN", helpText: "Students can find you in the directory." },
     { key: "office_notes", label: "Alumni office notes", type: "LONG_TEXT", visibility: "ADMINS", memberEditable: false },
   ],
   "demo-college": [
     { key: "branch", label: "Branch", type: "SELECT", options: opts("Computer", "IT", "E&TC", "Mechanical", "Civil"), filterable: true },
     { key: "higher_studies", label: "Higher studies", type: "SELECT", options: opts("None", "MS", "MBA", "PhD") },
-    { key: "mentoring", label: "Open to mentoring students", type: "BOOLEAN" },
   ],
   "demo-school": [
     { key: "house", label: "School house", type: "SELECT", options: opts("Red", "Blue", "Green", "Yellow"), filterable: true },
     { key: "year_joined", label: "Year you joined the school", type: "NUMBER" },
-    { key: "mentoring", label: "Open to mentoring students", type: "BOOLEAN" },
   ],
 };
 

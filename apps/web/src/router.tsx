@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { RequireAuth } from "@/components/guards/RequireAuth";
-import { AppHomeRedirect, RequireChat, RequireFeature, RequireGroups } from "@/components/guards/RequireFeature";
+import { AppHomeRedirect, RequireChat, RequireFeature, RequireGroups, RequireMentors } from "@/components/guards/RequireFeature";
 import { RequireMembership } from "@/components/guards/RequireMembership";
 import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
@@ -29,6 +29,9 @@ import { JobFormPage } from "@/routes/t/JobFormPage";
 import { JobsPage } from "@/routes/t/JobsPage";
 import { LandingPage } from "@/routes/t/LandingPage";
 import { LoginPage } from "@/routes/t/LoginPage";
+import { MentorDetailRoute } from "@/routes/t/MentorDetailPage";
+import { MentorRequestRoute } from "@/routes/t/MentorRequestPage";
+import { MentorsPage } from "@/routes/t/MentorsPage";
 import { BlockedMembersPage } from "@/routes/t/BlockedMembersPage";
 import { ChatThreadRoute } from "@/routes/t/ChatThreadPage";
 import { MessagesPage, NoConversationPane } from "@/routes/t/MessagesPage";
@@ -99,6 +102,15 @@ export const router = createBrowserRouter([
                       { path: "groups/new", element: <GroupFormPage /> },
                       { path: "groups/:groupId", element: <GroupDetailRoute /> },
                       { path: "groups/:groupId/edit", element: <GroupFormPage /> },
+                    ],
+                  },
+                  // Not behind RequireMentors: someone who can't use mentorship now can still leave what they're in from here.
+                  { path: "mentors", element: <MentorsPage /> },
+                  {
+                    element: <RequireMentors />,
+                    children: [
+                      { path: "mentors/:membershipId", element: <MentorDetailRoute /> },
+                      { path: "mentors/:membershipId/request", element: <MentorRequestRoute /> },
                     ],
                   },
                   {

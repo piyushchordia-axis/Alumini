@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -22,6 +22,9 @@ const step = async (name, fn) => {
   }
 };
 
+// The groups journey's two members, kept signed in for the mentorship journey, so it costs no extra login: every e2e
+// script shares 20 codes an hour, and a fresh context would start from tokens the first may have rotated since.
+let groupsMembers = null;
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(20000);
@@ -131,7 +134,7 @@ try {
     await shot("m04d-poll");
   });
 
-  await step("every section opens its own screen, with Events, Groups and Funding behind More", async () => {
+  await step("every section opens its own screen, with Events, Groups, Mentors and Funding behind More", async () => {
     if ((await page.locator('a[role="tab"]').locator("visible=true").count()) !== 5) throw new Error("the tab bar should show four sections, then More");
     const moreColor = () => barTab("More").evaluate((el) => getComputedStyle(el).color);
     const moreColorOnFeed = await moreColor();
@@ -143,13 +146,14 @@ try {
       ["Directory", "directory", page.getByPlaceholder("Name, company, role")],
       ["Events", "events", page.getByText("Mumbai alumni coffee meetup")],
       ["Groups", "groups", page.getByRole("link", { name: /^London & UK alumni/ })],
+      ["Mentors", "mentors", page.locator('[role="tab"][aria-selected="true"]').getByText("Find mentors", { exact: true })],
       ["Funding", "funding", page.getByText("Seeking funding", { exact: true })],
     ];
     for (const [label, path, content] of sections) {
       await openSection(label);
       await page.waitForURL(`**/t/demo-university/${path}`);
       await content.locator("visible=true").first().waitFor();
-      if (label === "Funding" || label === "Events" || label === "Groups") continue;
+      if (label === "Funding" || label === "Events" || label === "Groups" || label === "Mentors") continue;
       await selectedBarTab(label).waitFor();
       if (await selectedBarTab("More").count()) throw new Error(`More shows as selected on ${label}`);
     }
@@ -210,6 +214,9 @@ try {
     await page.getByPlaceholder("Name, company, role").fill("Priya");
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
+    // A seeded mentor: her card says so, to the eye and in its name.
+    const card = page.getByRole("button", { name: /^Priya Nair, .*Mentor/ }).locator("visible=true").first();
+    await card.getByText("Mentor", { exact: true }).waitFor();
     // inactive tab stacks stay mounted on web and overlap; dispatch the click straight to the card
     await hit.dispatchEvent("click");
     await page.getByText("Member since").waitFor();
@@ -356,6 +363,8 @@ try {
     };
     await openSection("Feed");
     await openSettings();
+    // Mentorship is on here and this member can use it, so its requests and answers have a row of their own.
+    await page.locator('[role="radiogroup"][aria-label="Mentorship and referrals"]').locator("visible=true").first().waitFor();
     await group().getByText("Off", { exact: true }).click();
     await group().locator('[role="radio"][aria-checked="true"]').getByText("Off", { exact: true }).waitFor();
     await page.goto(BASE + "/t/demo-university");
@@ -809,11 +818,280 @@ try {
     await shown(owner.getByRole("link", { name: new RegExp(`^${openName}`) })).waitFor();
     await shown(owner.getByRole("link", { name: new RegExp(`^${closedName}`) })).waitFor();
     await owner.screenshot({ path: `${SHOTS}/m11g-my-posts-groups.png` });
-    await ownerContext.close();
-    await joinerContext.close();
+    await owner.close();
+    await joiner.close();
+    groupsMembers = { ownerContext, joinerContext };
   });
 
-  await step("a current pupil sees no Messages or Groups, even with both switched on", async () => {
+  await step("mentorship: offered, found and asked with a note, accepted into a live chat that opens with the note, ended read-only, and a request reported", async () => {
+    // The groups journey's two members, signed in already, so this costs no code from the 20 an hour every e2e script shares:
+    // no mentor profile, request or direct thread of the seed's, and in neither script's direct-message pair.
+    const MENTOR = "+91931000006";
+    const MENTEE = "+91931000007";
+    const nameOf = async (phone) => (await apiSession(phone)).memberships.find((m) => m.tenant.slug === "demo-university").fullName;
+    const [mentorName, menteeName] = [await nameOf(MENTOR), await nameOf(MENTEE)];
+    const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
+    const kept = groupsMembers;
+    groupsMembers = null;
+    const mentorContext = kept?.ownerContext ?? (await signedInMobileContext(browser, BASE, MENTOR, phone));
+    const menteeContext = kept?.joinerContext ?? (await signedInMobileContext(browser, BASE, MENTEE, phone));
+    const mentor = await mentorContext.newPage();
+    const mentee = await menteeContext.newPage();
+    for (const p of [mentor, mentee]) p.setDefaultTimeout(20000);
+    const app = `${BASE}/t/demo-university`;
+    // Screens underneath stay mounted on the web export, so the one on top is the last match.
+    const shown = (locator) => locator.locator("visible=true").last();
+    const log = (p) => shown(p.locator('[role="log"]'));
+    const live = { timeout: 10000 };
+    const tab = (p, name, selected) => shown(p.locator(selected === undefined ? '[role="tab"]' : `[role="tab"][aria-selected="${selected}"]`).getByText(name, { exact: true }));
+    const row = (p, text) => shown(p.locator("article", { hasText: text }));
+    const tabBar = (p) => p.locator('a[role="tab"]').locator("visible=true");
+    const areas = ["Career advice", "Entrepreneurship", "Software and IT", "Finance", "Working abroad"];
+    const about = `I moved from consulting into software. Ask me about either. ${unique}`;
+
+    // Offering to mentor: five areas at most, how often, and a note for mentees. Each choice says whether it's chosen.
+    await mentor.goto(`${app}/mentors`);
+    await tab(mentor, "Find mentors", true).waitFor();
+    await tab(mentor, "Be a mentor").click();
+    await mentor.waitForURL(/\/mentors\?tab=be-a-mentor$/);
+    await tab(mentor, "Be a mentor", true).waitFor();
+    await shown(mentor.getByRole("heading", { name: "Offer to mentor" })).waitFor();
+    for (const area of areas) {
+      const box = shown(mentor.getByRole("checkbox", { name: area, exact: true }));
+      await box.click();
+      if ((await box.getAttribute("aria-checked")) !== "true") throw new Error(`"${area}" doesn't show as chosen`);
+    }
+    const sixth = shown(mentor.getByRole("checkbox", { name: "Law", exact: true }));
+    if ((await sixth.getAttribute("aria-disabled")) !== "true") throw new Error("a sixth mentor area can be chosen");
+    await sixth.click({ force: true });
+    if ((await sixth.getAttribute("aria-checked")) === "true") throw new Error("a sixth mentor area was chosen");
+    const fortnightly = shown(mentor.getByRole("radio", { name: "Every two weeks", exact: true }));
+    await fortnightly.click();
+    if ((await fortnightly.getAttribute("aria-checked")) !== "true") throw new Error("the availability doesn't show as chosen");
+    await shown(mentor.getByLabel("Availability note", { exact: true })).fill("Weekday evenings, India time");
+    await shown(mentor.getByLabel("Note to mentees", { exact: true })).fill(about);
+    await mentor.screenshot({ path: `${SHOTS}/m12a-be-a-mentor.png` });
+    await shown(mentor.getByRole("button", { name: "Save mentor profile" })).click();
+    await shown(mentor.getByRole("heading", { name: "You're listed as a mentor" })).waitFor();
+    await shown(mentor.getByText(/^You'll leave the Mentors list, and requests waiting for you will be declined\./)).waitFor();
+    await shown(mentor.getByRole("button", { name: "Stop mentoring" })).waitFor();
+
+    // The mentor waits on Requests, so the request has to arrive there live.
+    await tab(mentor, "Requests").click();
+    await mentor.waitForURL(/\/mentors\?tab=requests$/);
+    await tab(mentor, "Received", true).waitFor();
+    await shown(mentor.getByText("No requests yet", { exact: true })).waitFor();
+
+    // The mentee finds them by name and area, and not under an availability they didn't choose. A card's name says what it shows.
+    await mentee.goto(`${app}/mentors`);
+    await shown(mentee.getByLabel("Search mentors")).fill(mentorName);
+    const card = shown(mentee.getByRole("link", { name: new RegExp(`^${mentorName}, `) }));
+    await card.waitFor();
+    for (const area of areas) await card.getByText(area, { exact: true }).waitFor();
+    const spoken = await card.getAttribute("aria-label");
+    for (const part of [...areas, "Availability: Every two weeks"]) if (!spoken.includes(part)) throw new Error(`a mentor card's name leaves out "${part}": ${spoken}`);
+    const chip = (group, name) => shown(mentee.getByRole("group", { name: group, exact: true }).getByRole("button", { name, exact: true }));
+    await chip("Area", "Working abroad").click();
+    if ((await chip("Area", "Working abroad").getAttribute("aria-selected")) !== "true") throw new Error("the area filter doesn't show as chosen");
+    await card.waitFor();
+    await chip("Availability", "Weekly").click();
+    await shown(mentee.getByText("No mentors match", { exact: true })).waitFor();
+    await chip("Availability", "Every two weeks").click();
+    await card.click();
+    await mentee.waitForURL(/\/mentors\/[0-9a-f-]{36}$/);
+    const mentorPage = mentee.url();
+    await shown(mentee.getByRole("heading", { name: mentorName })).waitFor();
+    await shown(mentee.getByText("Every two weeks. Weekday evenings, India time", { exact: true })).waitFor();
+    await shown(mentee.getByText(about, { exact: true })).waitFor();
+    if (await tabBar(mentee).count()) throw new Error("a mentor's page shows the tab bar");
+    await mentee.screenshot({ path: `${SHOTS}/m12b-mentor.png` });
+
+    // A first request, which the mentor reports. The request form says who reads the note and what becomes of it.
+    await shown(mentee.getByRole("link", { name: "Request mentorship" })).click();
+    await mentee.waitForURL(/\/mentors\/request\/[0-9a-f-]{36}$/);
+    await shown(mentee.getByText(`${mentorName} will see this note. If they accept, it becomes the first message of a chat between you, or the latest one if you already chat.`, { exact: true })).waitFor();
+    // By its accessible name, the same on both apps, which leaves out the asterisk shown beside it.
+    const noteBox = shown(mentee.getByRole("textbox", { name: "Note to the mentor", exact: true }));
+    const first = `Could we talk about my startup some time? ${unique}`;
+    await noteBox.fill(first);
+    await shown(mentee.getByRole("button", { name: "Send request" })).click();
+    await mentee.waitForURL(/\/mentors\?tab=requests&box=sent$/);
+    await tab(mentee, "Sent", true).waitFor();
+    const firstSent = row(mentee, first);
+    await firstSent.getByText("Request sent", { exact: true }).waitFor();
+
+    // The mentor: the request arrives live, with its note, and Requests counts it.
+    const reported = row(mentor, first);
+    await reported.waitFor(live);
+    await reported.getByText(menteeName, { exact: true }).waitFor();
+    await reported.getByText("Waiting for your answer", { exact: true }).waitFor();
+    await shown(mentor.locator('[role="tab"][aria-selected="true"]', { hasText: "Requests" })).getByText("1", { exact: true }).waitFor();
+    await mentor.screenshot({ path: `${SHOTS}/m12d-mentorship-request-received.png` });
+
+    // Switched off, what the mentee is already in stays theirs to leave: Mentors stays behind More, and the request has
+    // Withdraw, with nothing to find or answer.
+    const off = await scriptFeatures(mentee, "demo-university");
+    off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
+    await mentee.goto(`${app}/feed`);
+    await tabBar(mentee).filter({ hasText: "More" }).first().click();
+    await shown(mentee.getByRole("link", { name: "Mentors", exact: true })).click();
+    await mentee.waitForURL(/\/t\/demo-university\/mentors$/);
+    await shown(mentee.getByText("has switched mentorship off", { exact: false })).waitFor();
+    await tab(mentee, "Sent").click();
+    await firstSent.getByRole("button", { name: "Withdraw request" }).waitFor();
+    if (await mentee.locator('[role="tab"]').getByText("Find mentors", { exact: true }).locator("visible=true").count()) throw new Error("Find mentors is offered with mentorship switched off");
+    await mentee.screenshot({ path: `${SHOTS}/m12g-mentorship-switched-off.png` });
+    await off.stop();
+
+    // The mentor reports it: it's declined, the mentee isn't told it was reported, and admins get only the note.
+    await reported.getByRole("button", { name: "Report request" }).click();
+    const reporting = shown(mentor.getByRole("dialog", { name: "Report request" }));
+    await reporting.getByText(`Admins will see only the note in this request, and nothing else. The request is declined: ${menteeName} will see it as declined, but won't be told it was reported.`, { exact: true }).waitFor();
+    await reporting.getByRole("button", { name: "Spam", exact: true }).click();
+    await mentor.screenshot({ path: `${SHOTS}/m12h-mentorship-report.png` });
+    await reporting.getByRole("button", { name: "Send report" }).click();
+    await reporting.waitFor({ state: "detached" });
+    // Said in the row it's about.
+    await reported.getByText("Thanks. Admins will take a look.", { exact: true }).waitFor();
+    await reported.getByText("Declined", { exact: true }).waitFor();
+    if (await reported.getByRole("button", { name: "Accept request" }).count()) throw new Error("a reported request can still be accepted");
+    if (await reported.getByRole("button", { name: "Report request" }).count()) throw new Error("a reported request can be reported again");
+
+    // Asked again, through the form, which refuses a note too short before sending anything.
+    await mentee.goto(mentorPage);
+    await shown(mentee.getByRole("link", { name: "Request mentorship" })).click();
+    await mentee.waitForURL(/\/mentors\/request\/[0-9a-f-]{36}$/);
+    await noteBox.fill("Hello!");
+    await shown(mentee.getByRole("button", { name: "Send request" })).click();
+    await shown(mentee.getByText("Write at least 10 characters", { exact: true })).waitFor();
+    // The longest a note may be, so it wraps everywhere it's shown: four sentences of 115 characters and one of 37.
+    const note = `${Array(4).fill(`Could you help me plan a move into software? I run a small company and want to understand the work first. ${unique}.`).join(" ")} I would welcome any advice you give.`;
+    if (note.length !== 500) throw new Error(`the test note is ${note.length} characters, not 500`);
+    await noteBox.fill(note);
+    // The error stays until the next send, and the help and the count stay in view beside it.
+    await shown(mentee.getByText("500 / 500", { exact: true })).waitFor();
+    await shown(mentee.getByText("Write at least 10 characters", { exact: true })).waitFor();
+    await shown(mentee.getByText(`${mentorName} will see this note.`, { exact: false })).waitFor();
+    // The mentor failing to refetch in the background keeps the form and the note.
+    const mentorGet = await scriptMentor(mentee, "demo-university", mentorPage.split("/").pop());
+    mentorGet.answer(503, "INTERNAL");
+    await mentorGet.refetch();
+    if ((await noteBox.inputValue()) !== note) throw new Error("a failed refetch of the mentor lost the note");
+    mentorGet.answer(null);
+    await mentorGet.stop();
+    await mentee.screenshot({ path: `${SHOTS}/m12c-mentorship-request-form.png` });
+    await shown(mentee.getByRole("button", { name: "Send request" })).click();
+    await mentee.waitForURL(/\/mentors\?tab=requests&box=sent$/);
+    await tab(mentee, "Sent", true).waitFor();
+    const sent = row(mentee, note);
+    await sent.getByText("Request sent", { exact: true }).waitFor();
+    await sent.getByRole("button", { name: "Withdraw request" }).waitFor();
+
+    // It arrives live too.
+    const received = row(mentor, note);
+    await received.waitFor(live);
+    await received.getByText("Waiting for your answer", { exact: true }).waitFor();
+    await shown(mentor.locator('[role="tab"][aria-selected="true"]', { hasText: "Requests" })).getByText("1", { exact: true }).waitFor();
+
+    // Accepting opens the chat, whose first message is the note, from the mentee.
+    await received.getByRole("button", { name: "Accept request" }).click();
+    await mentor.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    const threadId = mentor.url().split("/").pop();
+    await log(mentor).getByText(note, { exact: true }).waitFor();
+    if (await tabBar(mentor).count()) throw new Error("a mentorship's chat shows the tab bar");
+    // The mentee's list says so live, and its Open chat goes into the same thread.
+    await sent.getByText("Active", { exact: true }).waitFor(live);
+    await sent.getByRole("link", { name: "Open chat", exact: true }).click();
+    await mentee.waitForURL(new RegExp(`/messages/${threadId}$`));
+    await log(mentee).getByText(note, { exact: true }).waitFor();
+
+    // Messages both ways, live, and each one a single bubble on each side, below the note.
+    const send = async (p, text) => {
+      await shown(p.getByLabel("Write a message")).fill(text);
+      await shown(p.getByRole("button", { name: "Send message" })).click();
+      await log(p).getByText(text).waitFor();
+    };
+    const fromMentor = `Happy to. Shall we talk on Thursday? ${unique}`;
+    await send(mentor, fromMentor);
+    await log(mentee).getByText(fromMentor).waitFor(live);
+    const fromMentee = `Thursday works, thank you. ${unique}`;
+    await send(mentee, fromMentee);
+    await log(mentor).getByText(fromMentee).waitFor(live);
+    await mentee.waitForTimeout(1500);
+    for (const [p, who] of [
+      [mentor, "the mentor"],
+      [mentee, "the mentee"],
+    ]) {
+      for (const text of [note, fromMentor, fromMentee]) {
+        const bubbles = await log(p).getByText(text, { exact: true }).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text.slice(0, 40)}…"`);
+      }
+      const top = async (text) => (await log(p).getByText(text, { exact: true }).boundingBox()).y;
+      if (!((await top(note)) < (await top(fromMentor)) && (await top(fromMentor)) < (await top(fromMentee)))) throw new Error(`${who} doesn't see the note as the chat's first message`);
+    }
+    await mentor.screenshot({ path: `${SHOTS}/m12e-mentorship-chat.png` });
+
+    // The mentee ends it from Requests, through the confirm sheet, while the mentor's thread is open: it goes read-only there live.
+    await mentee.goto(`${app}/mentors?tab=requests&box=sent`);
+    await sent.getByRole("button", { name: "End mentorship" }).click();
+    const ending = mentee.getByRole("alertdialog", { name: "End this mentorship?" });
+    await ending.getByText(`${mentorName} will be told that it has ended.`, { exact: false }).waitFor();
+    await ending.getByRole("button", { name: "Cancel" }).click();
+    await ending.waitFor({ state: "hidden" });
+    await sent.getByText("Active", { exact: true }).waitFor();
+    await sent.getByRole("button", { name: "End mentorship" }).click();
+    await ending.getByRole("button", { name: "End mentorship" }).click();
+    await ending.waitFor({ state: "hidden" });
+    await sent.getByText("Ended", { exact: true }).waitFor();
+    // Said in the row it's about, where the member tapped.
+    await sent.getByText("Mentorship ended", { exact: true }).waitFor();
+    await shown(mentor.getByText("This conversation has closed")).waitFor(live);
+    if (await mentor.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the chat of an ended mentorship still offers the mentor a message box");
+    await mentor.screenshot({ path: `${SHOTS}/m12f-mentorship-ended-thread.png` });
+    await sent.getByRole("link", { name: "Open chat", exact: true }).click();
+    await mentee.waitForURL(new RegExp(`/messages/${threadId}$`));
+    await shown(mentee.getByText("This conversation has closed")).waitFor();
+    await log(mentee).getByText(fromMentor).waitFor();
+    if (await mentee.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the chat of an ended mentorship still offers the mentee a message box");
+    await mentor.goto(`${app}/mentors?tab=requests`);
+    await row(mentor, note).getByText("Ended", { exact: true }).waitFor();
+    await row(mentor, first).getByText("Declined", { exact: true }).waitFor();
+
+    // The mentee's lists, an ended mentorship and a 500-character note among them, with nothing scrolling sideways.
+    await mentee.goto(`${app}/mentors?tab=requests&box=sent`);
+    await row(mentee, first).getByText("Declined", { exact: true }).waitFor();
+    await row(mentee, note).getByText("Ended", { exact: true }).waitFor();
+    const overflow = await mentee.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`Requests scrolls sideways by ${overflow}px on a phone`);
+    await mentee.screenshot({ path: `${SHOTS}/m12i-mentorship-sent.png`, fullPage: true });
+
+    // The bell: the mentee heard their request was accepted and nothing of the report. The mentor's request names nobody, and leads to Received.
+    await mentee.goto(`${app}/profile/notifications`);
+    await shown(mentee.getByText(`${mentorName} accepted your mentorship request`, { exact: true })).waitFor();
+    if (await mentee.getByText("declined your mentorship request", { exact: false }).count()) throw new Error("reporting a request told the mentee it was declined");
+    await mentor.goto(`${app}/profile/notifications`);
+    await shown(mentor.getByText(`${menteeName} ended your mentorship`, { exact: true })).waitFor();
+    await shown(mentor.getByText("New mentorship request", { exact: true })).click();
+    await mentor.waitForURL(/\/mentors\?tab=requests&box=received$/);
+    await tab(mentor, "Received", true).waitFor();
+
+    // A mentor's page opened cold, as from a link or a push that launched the app, has no tab bar and a real way back.
+    await mentee.goto(mentorPage);
+    await shown(mentee.getByRole("heading", { name: mentorName })).waitFor();
+    if (await tabBar(mentee).count()) throw new Error("a mentor's page opened cold shows the tab bar");
+    await shown(mentee.getByRole("button", { name: "Back" })).click();
+    await mentee.waitForURL("**/t/demo-university/feed");
+    await tabBar(mentee).first().waitFor();
+
+    // The directory marks a mentor's card.
+    await mentee.goto(`${app}/directory`);
+    await shown(mentee.getByPlaceholder("Name, company, role")).fill(mentorName);
+    await shown(mentee.getByRole("button", { name: new RegExp(`^${mentorName}, .*Mentor`) })).getByText("Mentor", { exact: true }).waitFor();
+    await mentorContext.close();
+    await menteeContext.close();
+  });
+
+  await step("a current pupil sees no Messages, Groups or Mentors, even with all three switched on", async () => {
     const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Ira Banerjee, demo-school
     const pupil = await context.newPage();
     pupil.setDefaultTimeout(20000);
@@ -821,9 +1099,9 @@ try {
     pupil.on("request", (r) => {
       if (/\/api\/v1\/t\/[^/]+\/chat\//.test(r.url())) chatCalls.push(new URL(r.url()).pathname);
     });
-    // Schools start with messaging and groups off. On here, so only the pupil rule can be what hides them.
+    // Schools start with messaging, groups and mentorship off. On here, so only the pupil rule can be what hides them.
     const features = await scriptFeatures(pupil, "demo-school");
-    features.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
+    features.only("feed", "messaging", "groups", "mentorship", "jobs", "directory", "events", "businesses", "funding");
     await pupil.goto(`${BASE}/t/demo-school/feed`);
     const bar = pupil.locator('a[role="tab"]').locator("visible=true");
     await bar.filter({ hasText: "More" }).first().waitFor();
@@ -831,7 +1109,7 @@ try {
     if (shown.join() !== "Feed,Jobs,Directory,Events,More") throw new Error(`a pupil's tab bar shows ${shown.join(", ")}`);
     await bar.filter({ hasText: "More" }).first().click();
     await pupil.getByRole("link", { name: "Switch institution", exact: true }).locator("visible=true").first().waitFor();
-    for (const section of ["Messages", "Groups"]) {
+    for (const section of ["Messages", "Groups", "Mentors"]) {
       if (await pupil.getByRole("link", { name: section, exact: true }).locator("visible=true").count()) throw new Error(`a pupil's More hub offers ${section}`);
     }
     // The inbox and the Groups lists send them home; a thread, a new conversation or a group says it isn't available.
@@ -846,6 +1124,13 @@ try {
       await pupil.goto(`${BASE}/t/demo-school/${path}`);
       await pupil.getByText("Groups aren't available").locator("visible=true").first().waitFor();
     }
+    // With nothing of theirs to leave there, Mentors says it isn't open to them, and so do a mentor's page and the request form.
+    for (const path of ["mentors", "mentors/00000000-0000-4000-8000-000000000001", "mentors/request/00000000-0000-4000-8000-000000000001"]) {
+      await pupil.goto(`${BASE}/t/demo-school/${path}`);
+      await pupil.getByText("Mentors aren't available").locator("visible=true").first().waitFor();
+      if (!pupil.url().endsWith(`/t/demo-school/${path}`)) throw new Error(`${path} redirected a pupil to ${pupil.url()}`);
+    }
+    if (await pupil.getByRole("tab", { name: "Find mentors" }).locator("visible=true").count()) throw new Error("a pupil is offered Find mentors");
     await pupil.goto(`${BASE}/t/demo-school/profile/my-content`);
     await pupil.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
     if (await pupil.locator('[role="tab"]').getByText("Groups", { exact: true }).locator("visible=true").count()) throw new Error("a pupil's My posts has a Groups tab");

@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, gt, ilike, inArray, isNull, ne, notExists, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { wallPartsInZone, type ChatGroupScope, type ChatGroupVisibility } from "@illuminize/shared";
+import type { ChatGroupScope, ChatGroupVisibility } from "@illuminize/shared";
 import type { DbClient, Tx } from "../db/client";
 import { chatBlocks, chatConversations, chatGroups, chatInviteDeclines, chatMessages, chatParticipants, memberships } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
 import type { TenantRow } from "../types/request";
 import { groupLive, lockConversation, senderColumns, type ChatGroupRow, type ChatSender, type ConversationRow, type ParticipantRow } from "./chat.repo";
 import { escapeLike, type ModerationPatch } from "./content.common";
+import { notCurrentPupil } from "./memberships.repo";
 
 export type { ChatGroupRow };
 export type ChatGroupInsert = typeof chatGroups.$inferInsert;
@@ -369,22 +370,6 @@ export async function upsertParticipant(tx: Tx, key: Pick<ParticipantInsert, "co
     .insert(chatParticipants)
     .values({ ...key, ...changes })
     .onConflictDoUpdate({ target: [chatParticipants.conversationId, chatParticipants.membershipId], set: changes });
-}
-
-/**
- * The pupil rule of isCurrentPupil, in SQL, for a list that has to leave pupils out before it's cut to a page. The same
- * arithmetic: YYYYMMDD as a number compares like a date. Only a school has pupils.
- */
-function notCurrentPupil(tenant: Pick<TenantRow, "type" | "timezone">, now: Date): SQL | undefined {
-  if (tenant.type !== "SCHOOL") return undefined;
-  const t = wallPartsInZone(now, tenant.timezone);
-  const today = t.year * 10000 + t.month * 100 + t.day;
-  const dob = memberships.dateOfBirth;
-  return sql`not (
-    ${memberships.batchYear} > ${t.year}
-    or (${dob} is null and ${memberships.batchYear} = ${t.year})
-    or (${dob} is not null and (extract(year from ${dob})::int + 18) * 10000 + extract(month from ${dob})::int * 100 + extract(day from ${dob})::int > ${today})
-  )`;
 }
 
 /**

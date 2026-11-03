@@ -131,6 +131,9 @@ export const scriptTenant = (page, slug) => scriptGet(page, `/tenants/${slug}`, 
 /** A business listing: stale after 30 seconds, and a 5xx is tried three times, about 3 seconds in all. */
 export const scriptBusiness = (page, slug, id) => scriptGet(page, `/t/${slug}/businesses/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
 
+/** A mentor's page, which the request form reads too: stale after 30 seconds, and a 5xx is tried three times. */
+export const scriptMentor = (page, slug, membershipId) => scriptGet(page, `/t/${slug}/mentorship/mentors/${membershipId}`, { staleMs: 31_000, triesOn5xx: 3 });
+
 /** A chat thread's details (not its messages): stale after 30 seconds, and a 5xx is tried three times. */
 export const scriptConversation = (page, slug, id) => scriptGet(page, `/t/${slug}/chat/conversations/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
 

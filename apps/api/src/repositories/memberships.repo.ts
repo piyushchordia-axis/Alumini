@@ -1,3 +1,4 @@
+import { wallPartsInZone } from "@illuminize/shared";
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { jobSeekers, memberActivityDays, memberships, tenants, users } from "../db/schema";
@@ -233,4 +234,21 @@ export async function membershipStatusByPhones(db: DbClient, tenantId: string, p
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.tenantId, tenantId), inArray(users.phoneE164, phones)));
   return new Map(rows.map((r) => [r.phone, r.status]));
+}
+
+/**
+ * The pupil rule of isCurrentPupil, in SQL, for a list that has to leave pupils out before it's cut to a page. The same
+ * arithmetic: YYYYMMDD as a number compares like a date. Only a school has pupils. Reads the `memberships` table of the
+ * query around it, so join the member to check under that name.
+ */
+export function notCurrentPupil(tenant: Pick<TenantRow, "type" | "timezone">, now: Date): SQL | undefined {
+  if (tenant.type !== "SCHOOL") return undefined;
+  const t = wallPartsInZone(now, tenant.timezone);
+  const today = t.year * 10000 + t.month * 100 + t.day;
+  const dob = memberships.dateOfBirth;
+  return sql`not (
+    ${memberships.batchYear} > ${t.year}
+    or (${dob} is null and ${memberships.batchYear} = ${t.year})
+    or (${dob} is not null and (extract(year from ${dob})::int + 18) * 10000 + extract(month from ${dob})::int * 100 + extract(day from ${dob})::int > ${today})
+  )`;
 }

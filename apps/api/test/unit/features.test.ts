@@ -2,9 +2,11 @@ import {
   applyFeatureChange,
   changedFeatures,
   chatAvailable,
+  connectionsAvailable,
   defaultFeaturesFor,
   enabledGroupVisibilities,
   FEATURE_PREREQUISITES,
+  mentorshipAvailable,
   resolveFeatures,
   retypeToSchool,
   SCHOOL_OFF_FEATURES,
@@ -98,6 +100,70 @@ describe("the groups key", () => {
   });
 });
 
+describe("the mentorship key", () => {
+  it("starts off for schools and on everywhere else", () => {
+    expect(defaultFeaturesFor("SCHOOL").mentorship).toBe(false);
+    for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(defaultFeaturesFor(type).mentorship, type).toBe(true);
+    expect(SCHOOL_OFF_FEATURES).toContain("mentorship");
+  });
+
+  it("needs messaging, so it reads off whenever messaging is, whatever is stored", () => {
+    expect(FEATURE_PREREQUISITES.mentorship).toBe("messaging");
+    expect(resolveFeatures("COLLEGE", { messaging: false, mentorship: true }).mentorship).toBe(false);
+    expect(resolveFeatures("SCHOOL", { mentorship: true }).mentorship).toBe(false);
+    expect(resolveFeatures("SCHOOL", { messaging: true, mentorship: true }).mentorship).toBe(true);
+    expect(resolveFeatures("SCHOOL", { messaging: true }).mentorship).toBe(false);
+  });
+
+  it("goes off in the same change that turns messaging off, which never fails, and stays off when messaging comes back", () => {
+    const off = applyFeatureChange("COLLEGE", {}, { messaging: false });
+    expect(off).toEqual({ features: { ...allOn(), messaging: false, mentorship: false }, conflict: null });
+    expect(applyFeatureChange("COLLEGE", off.features, { messaging: true })).toEqual({ features: { ...allOn(), mentorship: false }, conflict: null });
+    // Asking for both at once is how it comes back.
+    expect(applyFeatureChange("COLLEGE", off.features, { messaging: true, mentorship: true })).toEqual({ features: allOn(), conflict: null });
+  });
+
+  it("stays off when messaging comes back, as the settings form shows it, even with nothing stored for it or on stored", () => {
+    // A row from before mentorship existed, with messaging switched off: mentorship reads off, though its default is on.
+    expect(applyFeatureChange("COLLEGE", { messaging: false }, { messaging: true }).features).toEqual({ ...allOn(), mentorship: false });
+    expect(applyFeatureChange("COLLEGE", { messaging: false, mentorship: true }, { messaging: true }).features).toEqual({ ...allOn(), mentorship: false });
+    expect(applyFeatureChange("SCHOOL", {}, { messaging: true }).features.mentorship).toBe(false);
+    // While messaging stays on, a change to something else leaves mentorship as it is, stored or not.
+    expect(applyFeatureChange("COLLEGE", {}, { jobs: false }).features.mentorship).toBe(true);
+    expect(applyFeatureChange("COLLEGE", { messaging: true, mentorship: false }, { jobs: false }).features.mentorship).toBe(false);
+  });
+
+  it("is refused when it's asked for while messaging was off and stays off", () => {
+    expect(applyFeatureChange("COLLEGE", { messaging: false }, { mentorship: true }).conflict).toBe("mentorship");
+    expect(applyFeatureChange("SCHOOL", {}, { mentorship: true }).conflict).toBe("mentorship");
+    expect(applyFeatureChange("SCHOOL", {}, { mentorship: true, messaging: true }).conflict).toBeNull();
+    // Turning messaging off in the same change isn't refused: that's the cascade, and it wins.
+    expect(applyFeatureChange("COLLEGE", {}, { messaging: false, mentorship: true })).toEqual({ features: { ...allOn(), messaging: false, mentorship: false }, conflict: null });
+    // Leaving it off, or naming it on while it's already on, isn't a conflict either.
+    expect(applyFeatureChange("SCHOOL", {}, { mentorship: false }).conflict).toBeNull();
+    expect(applyFeatureChange("COLLEGE", {}, { mentorship: true }).conflict).toBeNull();
+  });
+
+  it("is forced off by retyping to a school, alongside messaging and groups", () => {
+    const { features, forcedOff } = retypeToSchool("COLLEGE", {});
+    expect(features.mentorship).toBe(false);
+    expect(forcedOff).toEqual(["messaging", "groups", "mentorship"]);
+    expect(retypeToSchool("COLLEGE", { messaging: false }).forcedOff).toEqual(["groups"]);
+  });
+});
+
+describe("mentorshipAvailable and connectionsAvailable", () => {
+  it("need mentorship and messaging, and a member who isn't a pupil", () => {
+    const all = defaultFeaturesFor("COLLEGE");
+    expect(mentorshipAvailable(all, true)).toBe(true);
+    expect(mentorshipAvailable(all, false)).toBe(false);
+    expect(mentorshipAvailable({ ...all, mentorship: false }, true)).toBe(false);
+    expect(mentorshipAvailable({ ...all, messaging: false }, true)).toBe(false);
+    expect(connectionsAvailable(all, true)).toBe(true);
+    expect(connectionsAvailable({ ...all, mentorship: false }, true)).toBe(false);
+  });
+});
+
 describe("enabledGroupVisibilities", () => {
   it("allows open groups on groups alone, and invite-only ones only with messaging as well", () => {
     expect(enabledGroupVisibilities({ ...defaultFeaturesFor("COLLEGE") })).toEqual(["OPEN", "INVITE_ONLY"]);
@@ -180,6 +246,17 @@ describe("with a prerequisite", () => {
     expect(resolveFeatures("COLLEGE", { jobs: false, funding: true }).funding).toBe(false);
     expect(resolveFeatures("COLLEGE", { jobs: true, funding: true }).funding).toBe(true);
     expect(resolveFeatures("COLLEGE", { funding: false }).funding).toBe(false);
+  });
+
+  it("turns the dependent off with what it needs, and refuses it only while what it needs was off and stays off", () => {
+    expect(applyFeatureChange("COLLEGE", {}, { jobs: false })).toMatchObject({ features: { jobs: false, funding: false }, conflict: null });
+    expect(applyFeatureChange("COLLEGE", { jobs: false }, { funding: true }).conflict).toBe("funding");
+    expect(applyFeatureChange("COLLEGE", { jobs: false }, { funding: true, jobs: true })).toMatchObject({ features: { jobs: true, funding: true }, conflict: null });
+  });
+
+  it("keeps the dependent off when what it needs comes back on its own", () => {
+    expect(applyFeatureChange("COLLEGE", { jobs: false }, { jobs: true }).features).toMatchObject({ jobs: true, funding: false });
+    expect(applyFeatureChange("COLLEGE", { jobs: false, funding: true }, { jobs: true }).features).toMatchObject({ jobs: true, funding: false });
   });
 });
 

@@ -17,7 +17,7 @@ import type {
   TenantSettingsUpdate,
 } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
-import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDto, AdminReportDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
+import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDetailDto, AdminMemberDto, AdminReportDto, MentorProfileDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
@@ -38,7 +38,7 @@ export function adminEndpoints(core: ApiCore) {
     dashboard: (slug: string) => core.data<DashboardDto>(p(slug, "/dashboard")),
     members: {
       list: (slug: string, query?: Partial<AdminMembersQuery>) => core.request<Page<AdminMemberDto>>({ ...p(slug, "/members"), query: q(query) }),
-      get: (slug: string, id: string) => core.data<AdminMemberDto & { audit: AuditDto[] }>(p(slug, `/members/${id}`)),
+      get: (slug: string, id: string) => core.data<AdminMemberDetailDto>(p(slug, `/members/${id}`)),
       approve: (slug: string, id: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/approve`) }),
       reinstate: (slug: string, id: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/reinstate`) }),
       reject: (slug: string, id: string, reason: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/reject`), body: { reason } }),
@@ -67,6 +67,10 @@ export function adminEndpoints(core: ApiCore) {
       view: (slug: string, id: string) => core.data<AdminChatReportViewDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/view`) }),
       resolve: (slug: string, id: string, input: ChatReportResolveInput) => core.data<AdminChatReportDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/resolve`), body: input }),
       dismiss: (slug: string, id: string, note?: string | null) => core.data<AdminChatReportDto>({ method: "POST", ...p(slug, `/chat-reports/${id}/dismiss`), body: { note: note ?? null } }),
+    },
+    mentors: {
+      /** Takes a member out of the Mentors list and declines what's waiting for them. They can offer again, and suspension is there for repeats. */
+      remove: (slug: string, membershipId: string) => core.data<MentorProfileDto>({ method: "POST", ...p(slug, `/mentors/${membershipId}/remove`) }),
     },
     analytics: (slug: string, weeks = 12) => core.data<TenantAnalyticsDto>({ ...p(slug, "/analytics"), query: { weeks } }),
     /** CSV downloads (streamed by the server; saved by the caller). */

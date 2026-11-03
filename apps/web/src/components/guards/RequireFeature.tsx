@@ -1,4 +1,4 @@
-import { chatAvailable, type TenantFeature } from "@illuminize/shared";
+import { chatAvailable, mentorshipAvailable, type TenantFeature } from "@illuminize/shared";
 import { Navigate, Outlet, useMatch } from "react-router-dom";
 import { EmptyState, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -54,6 +54,26 @@ export function RequireGroups() {
       icon="🔒"
       title="Groups aren't available"
       description={`Groups aren't open to your account at ${tenant.shortName ?? tenant.name}.`}
+      action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
+    />
+  );
+}
+
+/** Mentors need mentorship, which needs messaging, and a member who isn't a current pupil. */
+export function RequireMentors() {
+  const { tenant, membership } = useMembership();
+  if (mentorshipAvailable(tenant.settings.features, membership.chatEligible)) return <Outlet />;
+  return <MentorsUnavailable />;
+}
+
+/** What Mentors says to a member who can't use mentorship and has nothing in it to leave. */
+export function MentorsUnavailable() {
+  const { tenant } = useMembership();
+  return (
+    <EmptyState
+      icon="🔒"
+      title="Mentors aren't available"
+      description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
     />
   );

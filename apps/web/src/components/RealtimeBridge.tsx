@@ -1,3 +1,4 @@
+import { mentorshipKeys } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { chatSync } from "@/lib/chat";
@@ -24,6 +25,8 @@ export function RealtimeBridge() {
         if (ADMIN_TYPES.has(e.notification.type)) void qc.invalidateQueries({ queryKey: ["admin", e.tenantSlug] });
         if (e.notification.type === "CELEBRATION_WISH") void qc.invalidateQueries({ queryKey: ["celebrations", e.tenantSlug] });
       }),
+      // A request or mentorship changed, on either side, notified or not (a withdrawal tells nobody): lists and pages refetch.
+      realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
       realtime.on("notification:unread", (e) => {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count });
       }),
@@ -33,7 +36,10 @@ export function RealtimeBridge() {
         if (e.type === "ANNOUNCEMENT") void qc.invalidateQueries({ queryKey: ["posts", e.tenantSlug] });
       }),
       // Catch up on anything missed while disconnected.
-      realtime.onReconnect(() => void qc.invalidateQueries({ queryKey: ["notifications"] })),
+      realtime.onReconnect(() => {
+        void qc.invalidateQueries({ queryKey: ["notifications"] });
+        void qc.invalidateQueries({ queryKey: ["mentorship"] });
+      }),
     ];
     return () => offs.forEach((off) => off());
   }, [qc]);

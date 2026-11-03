@@ -117,14 +117,14 @@ export function Sheet({ open, title, onClose, onDismiss, children }: { open: boo
 }
 
 /** A line about what just happened, read out by screen readers. Mobile has no toasts. */
-export function StatusLine({ text, tone = "info" }: { text: string | null; tone?: "info" | "warning" }) {
+export function StatusLine({ text, tone = "info", flush = false }: { text: string | null; tone?: "info" | "warning"; /** Inside a card, with no margin of its own. */ flush?: boolean }) {
   // Android reads a live region by itself; iOS has to be told.
   useEffect(() => {
     if (text && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(text);
   }, [text]);
   if (!text) return null;
   return (
-    <View role="status" accessibilityLiveRegion="polite" style={{ marginHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: tone === "warning" ? "#fef3c7" : "#e0f2fe" }}>
+    <View role="status" accessibilityLiveRegion="polite" style={{ marginHorizontal: flush ? 0 : spacing.md, marginBottom: flush ? 0 : spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: tone === "warning" ? "#fef3c7" : "#e0f2fe" }}>
       <Text style={{ fontSize: 13, color: tone === "warning" ? "#92400e" : "#075985" }}>{text}</Text>
     </View>
   );

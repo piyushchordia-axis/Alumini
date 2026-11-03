@@ -1,4 +1,4 @@
-import { countryName, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type MemberCardDto, type ProfessionType } from "@illuminize/shared";
+import { countryName, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type DirectoryCardDto, type ProfessionType } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -11,10 +11,12 @@ import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
-function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
+function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }) {
   const router = useRouter();
+  // The card's name stands in for what's inside it, so it says the badges too.
+  const badges = [member.role === "TENANT_ADMIN" && "Admin", member.isOpenToWork && "Open to work", member.isMentor && "Mentor"].filter(Boolean);
   return (
-    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={`${member.fullName}, batch of ${member.batchYear}`}>
+    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, `batch of ${member.batchYear}`].join(", ")}>
       <Row gap={12} style={{ flexWrap: "nowrap" }}>
         <Avatar name={member.fullName} src={member.avatarUrl} size={48} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -24,6 +26,7 @@ function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
             </Text>
             {member.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />}
             {member.isOpenToWork && <Badge label="Open to work" tone="success" />}
+            {member.isMentor && <Badge label="Mentor" tone="info" />}
           </Row>
           <Muted size={13}>
             {member.designation ?? PROFESSION_TYPE_LABELS[member.professionType]}

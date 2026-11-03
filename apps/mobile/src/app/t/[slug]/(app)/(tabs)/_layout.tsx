@@ -5,6 +5,7 @@ import { PlatformPressable } from "expo-router/react-navigation";
 import { type ColorValue, Text } from "react-native";
 import { useChatBadge } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
+import { useMentorsWayOut } from "@/lib/mentors";
 import { SECTION_TABS, sectionBadges } from "@/lib/sections";
 import { colors, useTheme } from "@/theme";
 
@@ -37,16 +38,21 @@ export default function TabsLayout() {
   const { tenant, membership } = useMembership();
   const theme = useTheme();
   const segments: string[] = useSegments();
-  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible);
+  // Mentors stays behind More while this member can't use mentorship but still has something there to leave.
+  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible, { mentorsWayOut: useMentorsWayOut() });
   const badgeData = useChatBadge(tenant.slug, chatAvailable(tenant.settings.features, membership.chatEligible)).data;
   const badges = sectionBadges(badgeData);
   // A section behind More has its badge in the More hub, so More says there's something inside, and what.
   const moreBadges = overflow.map((s) => badges[s]).filter((b): b is ChatBadgeLabel => !!b && b.count > 0);
   const moreBadge: ChatBadgeLabel = { count: moreBadges.reduce((sum, b) => sum + b.count, 0), label: `More, ${moreBadges.map((b) => b.label).join(", ")}` };
   const badgeFor = (section: MemberSection) => tabBadge(bar.includes(section) ? badges[section] : undefined);
+  // Mentors stays reachable while it's off for this member, with no button, so a link to it (a push, say) still opens the
+  // screen that says so (see the Mentors screen). Declared after the profile, so a link to a section that's off never
+  // redirects to it. With something there to leave, it's in More instead, above.
+  const mentorsOff = !bar.includes("mentors") && !overflow.includes("mentors");
   // A focused tab with no button highlights nothing, so More stands in for the screens reached through it.
   const tab = segments[segments.indexOf("(tabs)") + 1];
-  const moreActive = tab === "profile" || overflow.some((s) => SECTION_TABS[s].path === tab);
+  const moreActive = tab === "profile" || overflow.some((s) => SECTION_TABS[s].path === tab) || (mentorsOff && tab === SECTION_TABS.mentors.path);
   return (
     <Tabs
       backBehavior="history"
@@ -60,6 +66,7 @@ export default function TabsLayout() {
     >
       {/* Every route folder needs a screen here: without one, opening it redirects to the first tab. */}
       {MEMBER_SECTIONS.map((section) => {
+        if (section === "mentors" && mentorsOff) return null;
         const { path, label, icon } = SECTION_TABS[section];
         const visibility = bar.includes(section) ? {} : overflow.includes(section) ? NO_BUTTON : { href: null };
         return <Tabs.Screen key={section} name={path} options={{ title: label, tabBarIcon: ({ focused }) => <TabIcon icon={icon} active={focused} />, ...badgeFor(section), ...visibility }} />;
@@ -67,6 +74,7 @@ export default function TabsLayout() {
       {/* Reached from the header (avatar and bell) and from More. Declared before More because a link to a section that is
           off redirects to the first screen that isn't hidden, and with every section off that must be this one, their home. */}
       <Tabs.Screen name="profile" options={{ title: "Profile", ...NO_BUTTON }} />
+      {mentorsOff && <Tabs.Screen key="mentors" name={SECTION_TABS.mentors.path} options={{ title: SECTION_TABS.mentors.label, ...NO_BUTTON }} />}
       <Tabs.Screen
         name="more"
         options={{

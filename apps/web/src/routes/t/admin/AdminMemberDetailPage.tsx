@@ -1,5 +1,7 @@
-import { MARITAL_STATUS_LABELS, PROFESSION_TYPE_LABELS, countryName } from "@illuminize/shared";
-import { useQuery } from "@tanstack/react-query";
+import { MARITAL_STATUS_LABELS, MENTOR_AREA_LABELS, PROFESSION_TYPE_LABELS, countryName, mentorAvailabilityText, type MentorProfileDto } from "@illuminize/shared";
+import { errorMessage } from "@illuminize/shared/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
@@ -9,6 +11,8 @@ import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { AdminFieldAnswers } from "@/components/admin/AdminFieldAnswers";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { toast } from "@/stores/uiStore";
 import { MemberActionButtons, useMemberActions } from "./AdminMembersPage";
 
 export function AdminMemberDetailPage() {
@@ -74,10 +78,65 @@ export function AdminMemberDetailPage() {
         </dl>
       </Card>
       <AdminFieldAnswers member={m} />
+      {m.mentorProfile && <MentorProfileCard slug={slug} membershipId={m.id} profile={m.mentorProfile} />}
       <section>
         <h2 className="mb-2 text-sm font-semibold text-slate-700">Recent activity</h2>
         <AuditTable rows={m.audit} />
       </section>
     </div>
+  );
+}
+
+/**
+ * What the member wrote to offer mentoring. Its note can't be reported like a chat message, so it's shown here, where an
+ * admin can take them out of the Mentors list.
+ */
+function MentorProfileCard({ slug, membershipId, profile }: { slug: string; membershipId: string; profile: MentorProfileDto }) {
+  const qc = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api.admin.mentors.remove(slug, membershipId),
+    onSuccess: () => {
+      setConfirming(false);
+      toast.success("Removed as a mentor");
+      void qc.invalidateQueries({ queryKey: qk.admin.member(slug, membershipId) });
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const rows: Array<[string, string]> = [
+    ["Areas", profile.areas.map((a) => MENTOR_AREA_LABELS[a]).join(", ")],
+    ["Availability", mentorAvailabilityText(profile)],
+    ["Note", profile.note ?? "—"],
+  ];
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-700">Mentor profile</h2>
+        <span className="text-xs text-slate-500">{profile.isActive ? "Listed in Mentors" : "Not listed in Mentors"}</span>
+      </div>
+      <dl className="mt-3 grid gap-3 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-slate-500">{k}</dt>
+            <dd className="whitespace-pre-wrap break-words text-slate-900">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {profile.isActive && (
+        <Button variant="outline" className="mt-4 min-h-11" onClick={() => setConfirming(true)}>
+          Remove as mentor
+        </Button>
+      )}
+      <ConfirmDialog
+        open={confirming}
+        title="Remove as mentor?"
+        body="They'll no longer appear in Mentors, and requests waiting for them will be declined. Mentorships already under way carry on. They can offer to mentor again, so suspend them if it happens again."
+        confirmLabel="Remove as mentor"
+        destructive
+        busy={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onCancel={() => setConfirming(false)}
+      />
+    </Card>
   );
 }

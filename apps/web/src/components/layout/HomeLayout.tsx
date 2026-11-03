@@ -8,6 +8,7 @@ import { Avatar, Modal } from "@/components/ui";
 import { useChatBadge, useChatScope } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { useMentorsWayOut } from "@/lib/mentors";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
 import { useAppRouteHandle } from "@/lib/routeHandle";
@@ -18,7 +19,7 @@ export function HomeLayout() {
   const { tenant, membership, isTenantAdmin } = useMembership();
   const base = `/t/${tenant.slug}/app`;
   const toLink = (section: MemberSection) => ({ ...SECTION_LINKS[section], section, to: `${base}/${SECTION_LINKS[section].path}` });
-  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible);
+  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible, { mentorsWayOut: useMentorsWayOut() });
   const barLinks = bar.map(toLink);
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];

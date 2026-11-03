@@ -589,7 +589,9 @@ export async function deleteWithheldMessagesOf(tx: Tx, membershipIds: string[]):
 
 /**
  * Writes a whole direct thread with real `seq` values, for the seed, which has no chat API or realtime to go through.
- * `unreadByRecipient` leaves that many of the newest messages unread by whoever didn't send them.
+ * `unreadByRecipient` leaves that many of the newest messages unread by whoever didn't send them. With `origin`, it's a
+ * thread an accepted mentorship or referral opened, as openDirectFromOrigin writes one: no request, and the first message
+ * is the note, with the same client key.
  */
 export async function seedDirectThread(
   tx: Tx,
@@ -601,19 +603,23 @@ export async function seedDirectThread(
     state: NonNullable<ConversationRow["directState"]>;
     messages: Array<{ senderId: string; body: string; at: Date }>;
     unreadByRecipient?: number;
+    origin?: { kind: "MENTORSHIP" | "REFERRAL"; id: string };
   },
 ): Promise<ChatMessageRow[]> {
-  const { tenantId, aId, bId, requesterId, state, messages, unreadByRecipient = 0 } = input;
+  const { tenantId, aId, bId, requesterId, state, messages, unreadByRecipient = 0, origin } = input;
   const first = messages[0]!.at;
   const last = messages[messages.length - 1]!;
   const { low, high } = directPair(aId, bId);
+  const opening = origin
+    ? { origin: origin.kind, originId: origin.id, requesterMembershipId: null, requestedAt: null, requestCount: 0 }
+    : { origin: "MESSAGE_REQUEST" as const, requesterMembershipId: requesterId, requestedAt: first, requestCount: 1 };
   const [conversation] = await tx
     .insert(chatConversations)
-    .values({ tenantId, kind: "DIRECT", origin: "MESSAGE_REQUEST", lastSeq: messages.length, lastMessageAt: last.at, directLowId: low, directHighId: high, directState: state, requesterMembershipId: requesterId, requestedAt: first, requestCount: 1, createdAt: first, updatedAt: last.at })
+    .values({ tenantId, kind: "DIRECT", ...opening, lastSeq: messages.length, lastMessageAt: last.at, directLowId: low, directHighId: high, directState: state, createdAt: first, updatedAt: last.at })
     .returning();
   const rows = await tx
     .insert(chatMessages)
-    .values(messages.map((m, i) => ({ tenantId, conversationId: conversation!.id, seq: i + 1, senderMembershipId: m.senderId, kind: "TEXT" as const, body: m.body, createdAt: m.at })))
+    .values(messages.map((m, i) => ({ tenantId, conversationId: conversation!.id, seq: i + 1, senderMembershipId: m.senderId, kind: "TEXT" as const, body: m.body, clientKey: origin && i === 0 ? `origin-${origin.id}` : null, createdAt: m.at })))
     .returning();
   const lastReadBy = (membershipId: string) => {
     const read = messages.length - (membershipId === last.senderId ? 0 : unreadByRecipient);

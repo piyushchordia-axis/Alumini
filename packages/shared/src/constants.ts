@@ -114,6 +114,68 @@ export const CHAT_GROUP_INVITE_TTL_DAYS = 30;
 /** How long declining someone's invitation or message request keeps their invitations away. */
 export const CHAT_INVITE_DECLINE_DAYS = 30;
 
+/** What a mentor can help with. A fixed list, because free text would make the filter useless. */
+export const MENTOR_AREAS = [
+  "CAREER_ADVICE",
+  "HIGHER_STUDIES",
+  "ENTREPRENEURSHIP",
+  "SOFTWARE_IT",
+  "FINANCE",
+  "CONSULTING",
+  "MARKETING_SALES",
+  "DESIGN_MEDIA",
+  "LAW",
+  "HEALTHCARE",
+  "PUBLIC_SERVICE",
+  "WORKING_ABROAD",
+] as const;
+export type MentorArea = (typeof MENTOR_AREAS)[number];
+export const MENTOR_AREA_LABELS: Record<MentorArea, string> = {
+  CAREER_ADVICE: "Career advice",
+  HIGHER_STUDIES: "Higher studies",
+  ENTREPRENEURSHIP: "Entrepreneurship",
+  SOFTWARE_IT: "Software and IT",
+  FINANCE: "Finance",
+  CONSULTING: "Consulting",
+  MARKETING_SALES: "Marketing and sales",
+  DESIGN_MEDIA: "Design and media",
+  LAW: "Law",
+  HEALTHCARE: "Healthcare",
+  PUBLIC_SERVICE: "Public service",
+  WORKING_ABROAD: "Working abroad",
+};
+/** Areas one mentor may list. */
+export const MENTOR_MAX_AREAS = 5;
+
+export const MENTOR_AVAILABILITIES = ["WEEKLY", "FORTNIGHTLY", "MONTHLY", "ONE_OFF"] as const;
+export type MentorAvailability = (typeof MENTOR_AVAILABILITIES)[number];
+export const MENTOR_AVAILABILITY_LABELS: Record<MentorAvailability, string> = {
+  WEEKLY: "Weekly",
+  FORTNIGHTLY: "Every two weeks",
+  MONTHLY: "Monthly",
+  ONE_OFF: "A one-off conversation",
+};
+export const MENTOR_NOTE_MAX_LENGTH = 500;
+export const MENTOR_AVAILABILITY_NOTE_MAX_LENGTH = 200;
+
+/**
+ * REQUESTED: waiting for the mentor. ACCEPTED: under way, with a chat. DECLINED: the mentor said no, or stopped mentoring
+ * first. ENDED: withdrawn by the mentee before an answer, or ended by either side after.
+ */
+export const MENTORSHIP_STATUSES = ["REQUESTED", "ACCEPTED", "DECLINED", "ENDED"] as const;
+export type MentorshipStatus = (typeof MENTORSHIP_STATUSES)[number];
+/** received: requests to this member as a mentor. sent: this member's own requests. Lower case, as it goes in URLs. */
+export const MENTORSHIP_BOXES = ["received", "sent"] as const;
+export type MentorshipBox = (typeof MENTORSHIP_BOXES)[number];
+/** A request's note, after trimming. The mentor reads it, and it becomes the chat's first message if they accept. */
+export const MENTORSHIP_NOTE_MIN_LENGTH = 10;
+export const MENTORSHIP_NOTE_MAX_LENGTH = 500;
+/** Requests one member may send one mentor in any MENTORSHIP_REQUEST_WINDOW_DAYS, whatever became of them. */
+export const MENTORSHIP_MAX_REQUESTS_PER_PAIR = 3;
+export const MENTORSHIP_REQUEST_WINDOW_DAYS = 30;
+/** Requests waiting and mentorships under way, together, that one mentee may have. */
+export const MENTORSHIP_MAX_OPEN_PER_MENTEE = 5;
+
 export const EVENT_KINDS = ["CASUAL_MEETUP", "ORGANISED_EVENT"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
@@ -155,6 +217,10 @@ export const NOTIFICATION_TYPES = [
   "CELEBRATION_WISH",
   "CHAT_REPORT_FILED",
   "CHAT_MESSAGE_REMOVED",
+  "MENTORSHIP_REQUESTED",
+  "MENTORSHIP_ACCEPTED",
+  "MENTORSHIP_DECLINED",
+  "MENTORSHIP_ENDED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -214,9 +280,21 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const MAX_INVITE_IMPORT_ROWS = 500;
 export const INVITE_TTL_DAYS = 90;
 
-export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging", "groups"] as const;
+export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging", "groups", "mentorship"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
+/** What an admin's settings and the API's refusals call each switch. */
+export const TENANT_FEATURE_LABELS: Record<TenantFeature, string> = {
+  feed: "Community feed",
+  jobs: "Jobs",
+  funding: "Funding",
+  events: "Events & meetups",
+  directory: "Member directory",
+  businesses: "Business directory",
+  messaging: "Messaging",
+  groups: "Groups",
+  mentorship: "Mentorship",
+};
 
 export const CELEBRATION_KINDS = ["BIRTHDAY", "ANNIVERSARY"] as const;
 export type CelebrationKind = (typeof CELEBRATION_KINDS)[number];

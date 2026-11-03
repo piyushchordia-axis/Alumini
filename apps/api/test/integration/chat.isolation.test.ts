@@ -2,9 +2,10 @@ import type { ChatConversationDto } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatReports, contentReports, memberships } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatReports, contentReports, memberships, mentorProfiles, mentorships } from "../../src/db/schema";
 import { acceptedThread, chatApi, createGroup, groupsApi, openRequest, postToGroup, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
+import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -94,6 +95,41 @@ describe.skipIf(!dbAvailable)("chat between institutions", () => {
     expect((await groups.invites()).body.data).toEqual([]);
     expect((await chatApi(ctx, two.slug, outsider).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
     expect(await ctx.db.select().from(contentReports)).toEqual([]);
+  });
+
+  it("answers 404 for another institution's mentors and mentorship requests, through this slug, to members and admins", async () => {
+    const { one, two, a, b, outsider } = await twoTenants();
+    await offerToMentor(ctx, one.slug, a);
+    const asked = await askMentor(ctx, one.slug, b, a.membership.id);
+    const m = mentorshipApi(ctx, two.slug, outsider);
+    for (const res of [await m.mentor(a.membership.id), await m.request(a.membership.id), await m.accept(asked.id), await m.decline(asked.id), await m.withdraw(asked.id), await m.end(asked.id), await m.report(asked.id)]) {
+      expect(res.status, res.request.url).toBe(404);
+    }
+    expect((await m.mentors()).body.data).toEqual([]);
+    for (const box of ["received", "sent"] as const) expect((await m.requests(box)).body).toMatchObject({ data: [], waiting: 0 });
+    expect((await m.summary()).body.data).toEqual({ listed: false, open: 0 });
+    const admin = await memberSession(ctx, two.id, { role: "TENANT_ADMIN" });
+    expect((await request(ctx.app).post(`/api/v1/t/${two.slug}/admin/mentors/${a.membership.id}/remove`).set(admin.headers).send()).status).toBe(404);
+    expect((await request(ctx.app).get(`/api/v1/t/${two.slug}/admin/members/${a.membership.id}`).set(admin.headers)).status).toBe(404);
+    const [stored] = await ctx.db.select().from(mentorships).where(eq(mentorships.id, asked.id));
+    expect(stored).toMatchObject({ status: "REQUESTED", tenantId: one.id });
+    expect(await ctx.db.select().from(mentorProfiles).where(eq(mentorProfiles.isActive, false))).toEqual([]);
+    expect(await ctx.db.select().from(chatReports)).toEqual([]);
+  });
+
+  it("keeps a mentor profile to the institution it was offered in, for someone in two", async () => {
+    const one = (await createTenant(ctx)).tenant;
+    const two = (await createTenant(ctx)).tenant;
+    const a = await memberSession(ctx, one.id);
+    const aInTwo: Session = { ...a, membership: await createMembership(ctx, two.id, a.user.id) };
+    const viewer = await memberSession(ctx, two.id);
+    await offerToMentor(ctx, one.slug, a);
+    expect((await mentorshipApi(ctx, two.slug, aInTwo).me()).body.data).toBeNull();
+    expect((await mentorshipApi(ctx, two.slug, aInTwo).summary()).body.data).toEqual({ listed: false, open: 0 });
+    expect((await mentorshipApi(ctx, one.slug, a).summary()).body.data).toEqual({ listed: true, open: 0 });
+    expect((await mentorshipApi(ctx, two.slug, viewer).mentors()).body.data).toEqual([]);
+    const refused = await mentorshipApi(ctx, two.slug, viewer).request(aInTwo.membership.id);
+    expect(refused.body.error.code).toBe("CONTACT_UNAVAILABLE");
   });
 
   it("gives one person in two institutions separate groups and invitations", async () => {

@@ -12,6 +12,7 @@ import { eventRoutes } from "./events.routes";
 import { fundingRoutes } from "./funding.routes";
 import { jobRoutes } from "./jobs.routes";
 import { membershipRoutes } from "./membership.routes";
+import { mentorshipRoutes } from "./mentorship.routes";
 import { notificationRoutes } from "./notifications.routes";
 import { paymentRoutes } from "./payments.routes";
 import { postRoutes } from "./posts.routes";
@@ -32,6 +33,7 @@ export function tenantRouter(ctx: AppContext): Router {
   router.use(businessRoutes(ctx));
   router.use(chatRoutes(ctx));
   router.use(chatGroupRoutes(ctx));
+  router.use(mentorshipRoutes(ctx));
   router.use(postRoutes(ctx));
   router.use(celebrationRoutes(ctx));
   router.use(eventRoutes(ctx));

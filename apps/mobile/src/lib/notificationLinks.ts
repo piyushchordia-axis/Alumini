@@ -23,6 +23,8 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/groups?tab=invitations`;
     case "myContent":
       return `${base}/profile/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
+    case "mentorship":
+      return `${base}/mentors?tab=requests&box=${t.box}`;
     case "profile":
       return `${base}/profile`;
     case "celebrations":

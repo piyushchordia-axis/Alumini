@@ -24,11 +24,14 @@ export const chatClientKeySchema = z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, "Us
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 /** Zero-width and other invisible characters count as nothing, or a message could be an empty bubble. */
-const VISIBLE_CHARACTER = /[^\s\u00AD\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/;
+export const VISIBLE_CHARACTER = /[^\s\u00AD\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/;
+
+/** Drops control characters other than newlines and tabs, then trims: what every piece of chat text is cleaned with. */
+export const stripControlCharacters = (v: string): string => v.replace(CONTROL_CHARACTERS, "").trim();
 
 export const chatMessageBodySchema = z
   .string()
-  .transform((v) => v.replace(CONTROL_CHARACTERS, "").trim())
+  .transform(stripControlCharacters)
   .pipe(z.string().min(1, "Write a message").max(CHAT_MESSAGE_MAX_LENGTH).regex(VISIBLE_CHARACTER, "Write a message"));
 
 export const chatMessageCreateSchema = z.object({ body: chatMessageBodySchema, clientKey: chatClientKeySchema });
@@ -59,17 +62,15 @@ export type ChatBlockCreateInput = z.infer<typeof chatBlockCreateSchema>;
 export const chatReportCreateSchema = z.object({ reason: z.enum(REPORT_REASONS), details: optionalTrimmed(1000) });
 export type ChatReportCreateInput = z.input<typeof chatReportCreateSchema>;
 
-const stripControl = (v: string) => v.replace(CONTROL_CHARACTERS, "").trim();
-
 export const chatGroupNameSchema = z
   .string()
-  .transform(stripControl)
+  .transform(stripControlCharacters)
   .pipe(z.string().min(CHAT_GROUP_NAME_MIN_LENGTH, `Use at least ${CHAT_GROUP_NAME_MIN_LENGTH} characters`).max(CHAT_GROUP_NAME_MAX_LENGTH).regex(VISIBLE_CHARACTER, "Give the group a name"));
 
 /** Empty clears it. */
 export const chatGroupDescriptionSchema = z
   .string()
-  .transform(stripControl)
+  .transform(stripControlCharacters)
   .pipe(z.string().max(CHAT_GROUP_DESCRIPTION_MAX_LENGTH))
   .transform((v) => (VISIBLE_CHARACTER.test(v) ? v : null))
   .nullable();

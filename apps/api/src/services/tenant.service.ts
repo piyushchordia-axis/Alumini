@@ -1,4 +1,4 @@
-import { applyFeatureChange, FEATURE_PREREQUISITES, type TenantFeatures, type TenantPublicDto, type TenantSummaryDto, type TenantType } from "@illuminize/shared";
+import { applyFeatureChange, FEATURE_PREREQUISITES, TENANT_FEATURE_LABELS, type TenantFeatures, type TenantPublicDto, type TenantSummaryDto, type TenantType } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toTenantPublicDto, toTenantSummaryDto } from "../dto/tenant.dto";
 import { AppError } from "../lib/errors";
@@ -48,7 +48,8 @@ export async function invalidateTenantCache(ctx: AppContext, slug: string): Prom
 export function featuresToStore(type: TenantType, stored: Partial<TenantFeatures>, change: Partial<TenantFeatures>): TenantFeatures {
   const { features, conflict } = applyFeatureChange(type, stored, change);
   if (conflict) {
-    const message = `The ${conflict} feature needs ${FEATURE_PREREQUISITES[conflict] ?? "another feature"} to be on`;
+    const needs = FEATURE_PREREQUISITES[conflict];
+    const message = needs ? `${TENANT_FEATURE_LABELS[conflict]} needs ${TENANT_FEATURE_LABELS[needs]}. Turn on ${TENANT_FEATURE_LABELS[needs]} first.` : `${TENANT_FEATURE_LABELS[conflict]} can't be turned on here`;
     throw AppError.badRequest(message, [{ path: `features.${conflict}`, message }]);
   }
   return features;

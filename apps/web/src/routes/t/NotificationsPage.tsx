@@ -1,4 +1,4 @@
-import { notificationTarget, type NotificationDto } from "@illuminize/shared";
+import { mentorsQuery, notificationTarget, type NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
@@ -31,6 +31,8 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
       return `${base}/groups?tab=invitations`;
     case "myContent":
       return `${base}/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
+    case "mentorship":
+      return `${base}/mentors${mentorsQuery("requests", t.box)}`;
     case "profile":
       return `${base}/profile`;
     case "celebrations":

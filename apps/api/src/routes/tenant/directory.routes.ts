@@ -12,7 +12,7 @@ export function directoryRoutes(ctx: AppContext): Router {
   router.get(
     "/directory",
     route({ query: directoryQuerySchema }, async ({ req, res, query }) => {
-      res.json(await searchMembers(ctx, req.tenantCtx!.tenant.id, query));
+      res.json(await searchMembers(ctx, req.tenantCtx!, req.membership!, query));
     }),
   );
   router.get(

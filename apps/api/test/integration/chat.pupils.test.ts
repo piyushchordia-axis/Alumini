@@ -2,13 +2,14 @@ import { wallPartsInZone } from "@illuminize/shared";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { chatConversations, memberships, tenants } from "../../src/db/schema";
+import { chatConversations, memberships, mentorships, tenants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { lockConversation } from "../../src/repositories/chat.repo";
 import { appendMessage, chatRecipients } from "../../src/services/chat/fanout";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
 import { acceptedThread, chatApi, createGroup, groupsApi, type Session } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
+import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -123,6 +124,66 @@ describe.skipIf(!dbAvailable)("current pupils", () => {
         expect(refused.body.error.code).toBe("FEATURE_DISABLED");
       });
     }
+  });
+
+  describe("and mentorship", () => {
+    /** A school with messaging and mentorship both on, so only the pupil rule can be what keeps them out. */
+    async function mentorSchool() {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL", features: { messaging: true, mentorship: true } });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2000, fullName: "Alum Mentor" });
+      await offerToMentor(ctx, tenant.slug, alum);
+      return { tenant, alum };
+    }
+    const UNKNOWN = "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81";
+
+    for (const rule of RULES) {
+      it(`refuses ${rule.name} everything that starts something, with features on, and leaves them every way out`, async () => {
+        const { tenant, alum } = await mentorSchool();
+        const pupil = await memberSession(ctx, tenant.id, rule.member());
+        const m = mentorshipApi(ctx, tenant.slug, pupil);
+        for (const res of [await m.mentors(), await m.mentor(alum.membership.id), await m.save(), await m.request(alum.membership.id), await m.accept(UNKNOWN), await m.decline(UNKNOWN)]) {
+          expect(res.status, res.request.url).toBe(403);
+          expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+          expect(res.headers["cache-control"]).toBe("no-store");
+        }
+        // The ways out answer as they would for anyone, so nobody is stuck in a connection.
+        expect((await m.me()).status).toBe(200);
+        expect((await m.requests("sent")).status).toBe(200);
+        expect((await m.summary()).body.data).toEqual({ listed: false, open: 0 });
+        expect((await m.stop()).status).toBe(204);
+        for (const res of [await m.withdraw(UNKNOWN), await m.end(UNKNOWN), await m.report(UNKNOWN)]) expect(res.status, res.request.url).toBe(404);
+        expect(await ctx.db.select().from(mentorships)).toEqual([]);
+      });
+    }
+
+    for (const rule of RULES) {
+      it(`never lists ${rule.name} as a mentor, and answers a request to them CONTACT_UNAVAILABLE`, async () => {
+        const { tenant, alum } = await mentorSchool();
+        const member = await memberSession(ctx, tenant.id, { batchYear: 2001, fullName: "Becoming Pupil" });
+        await offerToMentor(ctx, tenant.slug, member);
+        await ctx.db.update(memberships).set(rule.member()).where(eq(memberships.id, member.membership.id));
+        const m = mentorshipApi(ctx, tenant.slug, alum);
+        expect((await m.mentors()).body.data).toEqual([]);
+        expect((await m.mentor(member.membership.id)).status).toBe(404);
+        const res = await m.request(member.membership.id);
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONTACT_UNAVAILABLE");
+        expect(await ctx.db.select().from(mentorships)).toEqual([]);
+      });
+    }
+
+    it("hides a waiting request from a mentee who has become a pupil, and refuses to accept it", async () => {
+      const { tenant, alum } = await mentorSchool();
+      const member = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+      const asked = await askMentor(ctx, tenant.slug, member, alum.membership.id);
+      expect((await mentorshipApi(ctx, tenant.slug, alum).requests("received")).body.waiting).toBe(1);
+      await ctx.db.update(memberships).set({ batchYear: thisYear() + 1 }).where(eq(memberships.id, member.membership.id));
+      expect((await mentorshipApi(ctx, tenant.slug, alum).requests("received")).body).toMatchObject({ data: [], waiting: 0 });
+      const refused = await mentorshipApi(ctx, tenant.slug, alum).accept(asked.id);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error.code).toBe("CONTACT_UNAVAILABLE");
+      expect(await ctx.db.select().from(chatConversations)).toEqual([]);
+    });
   });
 
   describe("as the one contacted", () => {

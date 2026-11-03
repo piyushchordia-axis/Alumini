@@ -1,3 +1,4 @@
+import { mentorshipKeys } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { AppState } from "react-native";
@@ -22,13 +23,19 @@ export function RealtimeBridge() {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.unreadCount });
         void qc.invalidateQueries({ queryKey: qk.notifications(e.tenantSlug), predicate: (q) => q.queryKey.length === 2 });
       }),
+      // A request or mentorship changed, on either side, notified or not (a withdrawal tells nobody): lists and pages refetch.
+      realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
       realtime.on("notification:unread", (e) => qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count })),
       // One notification sent to many members (an announcement): refetch rather than patch.
       realtime.on("notification:bulk", (e) => {
         void qc.invalidateQueries({ queryKey: ["notifications", e.tenantSlug] });
         if (e.type === "ANNOUNCEMENT") void qc.invalidateQueries({ queryKey: ["posts", e.tenantSlug] });
       }),
-      realtime.onReconnect(() => void qc.invalidateQueries({ queryKey: ["notifications"] })),
+      // Catch up on anything missed while disconnected.
+      realtime.onReconnect(() => {
+        void qc.invalidateQueries({ queryKey: ["notifications"] });
+        void qc.invalidateQueries({ queryKey: ["mentorship"] });
+      }),
     ];
     return () => offs.forEach((off) => off());
   }, [qc]);

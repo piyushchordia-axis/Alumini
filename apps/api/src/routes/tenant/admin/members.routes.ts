@@ -1,4 +1,4 @@
-import { adminMembersQuerySchema, memberReasonSchema, memberRoleSchema, membershipIdParamsSchema, membershipProfileUpdateSchema } from "@illuminize/shared";
+import { adminMembersQuerySchema, memberReasonSchema, memberRoleSchema, membershipIdParamsSchema, membershipProfileUpdateSchema, type AdminMemberDetailDto } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../../../context";
 import { toAuditDto } from "../../../dto/membership.dto";
@@ -13,6 +13,7 @@ import {
   getMemberForAdmin,
   listMembers,
 } from "../../../services/membership.service";
+import { getMentorProfileForAdmin, removeMentorAsAdmin } from "../../../services/mentorship/mentorship.service";
 
 export function memberRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
@@ -38,11 +39,13 @@ export function memberRoutes(ctx: AppContext): Router {
     "/members/:membershipId",
     route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
       const tenantId = req.tenantCtx!.tenant.id;
-      const [member, audit] = await Promise.all([
+      const [member, audit, mentorProfile] = await Promise.all([
         getMemberForAdmin(ctx, tenantId, params.membershipId),
         listAuditForMembership(ctx.db, tenantId, params.membershipId, req.auth!.userId),
+        getMentorProfileForAdmin(ctx, tenantId, params.membershipId),
       ]);
-      ok(res, { ...member, audit: audit.map((a) => toAuditDto(a)) });
+      const detail: AdminMemberDetailDto = { ...member, audit: audit.map((a) => toAuditDto(a)), mentorProfile };
+      ok(res, detail);
     }),
   );
 
@@ -83,6 +86,16 @@ export function memberRoutes(ctx: AppContext): Router {
     heldBackLimit,
     route({ params: membershipIdParamsSchema, body: membershipProfileUpdateSchema }, async ({ req, res, params, body }) => {
       ok(res, await adminUpdateProfile(ctx, req.tenantCtx!, actor(req), params.membershipId, body));
+    }),
+  );
+
+  // A mentor's note is their own words on their profile, not chat, so it can't be reported: an admin takes them out of the list
+  // instead. Held back like the member actions above while a chat report names the admin.
+  router.post(
+    "/mentors/:membershipId/remove",
+    heldBackLimit,
+    route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
+      ok(res, await removeMentorAsAdmin(ctx, req.tenantCtx!, actor(req), params.membershipId));
     }),
   );
 

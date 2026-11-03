@@ -38,8 +38,12 @@ export function AdminSettingsPage() {
             initial={q.data.settings}
             tenantType={tenant.type}
             onSubmit={async (input) => {
-              await api.admin.settings.update(slug, input);
-              refresh();
+              try {
+                await api.admin.settings.update(slug, input);
+              } finally {
+                // Refused too: the page may be stale (Messaging switched off in another tab, say), and the form remounts on what's saved.
+                refresh();
+              }
             }}
           />
         ) : (

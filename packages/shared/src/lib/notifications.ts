@@ -1,14 +1,14 @@
-import type { NotificationType, TenantFeatures } from "../constants";
-import { chatAvailable } from "./features";
+import type { MentorshipBox, NotificationType, TenantFeatures } from "../constants";
+import { chatAvailable, connectionsAvailable } from "./features";
 
 /**
  * What kind of notification a type is, for member preferences. ACCOUNT (membership and moderation outcomes, system
  * notices) is always delivered; the rest each have a level the member chooses.
  */
-export const NOTIFICATION_CATEGORIES = ["ACCOUNT", "ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"] as const;
+export const NOTIFICATION_CATEGORIES = ["ACCOUNT", "ACTIVITY", "CHAT", "CONNECTIONS", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 export type ConfigurableCategory = Exclude<NotificationCategory, "ACCOUNT">;
-export const CONFIGURABLE_CATEGORIES: readonly ConfigurableCategory[] = ["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"];
+export const CONFIGURABLE_CATEGORIES: readonly ConfigurableCategory[] = ["ACTIVITY", "CHAT", "CONNECTIONS", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"];
 
 export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategory> = {
   MEMBERSHIP_APPROVED: "ACCOUNT",
@@ -32,6 +32,10 @@ export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategor
   CONTENT_PENDING: "ADMIN",
   REPORT_FILED: "ADMIN",
   CHAT_REPORT_FILED: "ADMIN",
+  MENTORSHIP_REQUESTED: "CONNECTIONS",
+  MENTORSHIP_ACCEPTED: "CONNECTIONS",
+  MENTORSHIP_DECLINED: "CONNECTIONS",
+  MENTORSHIP_ENDED: "CONNECTIONS",
 };
 
 /** OFF: not stored or shown. IN_APP: in the notification list and bell. IN_APP_PUSH: also a push to devices. */
@@ -42,6 +46,7 @@ export const NOTIFICATION_CATEGORY_INFO: Record<ConfigurableCategory, { label: s
   ACTIVITY: { label: "Comments and reactions", description: "When members comment on or react to your posts.", minLevel: "OFF" },
   // The bell never shows chat, so the lowest level here is the Messages badge alone.
   CHAT: { label: "Messages", description: "New messages, message requests and group invitations. Unless you mute a conversation, its messages show on the Messages badge.", minLevel: "IN_APP" },
+  CONNECTIONS: { label: "Mentorship and referrals", description: "Requests to be someone's mentor, and answers to the requests you send.", minLevel: "OFF" },
   EVENTS: { label: "Events", description: "RSVPs to your events, and changes to events you're going to.", minLevel: "OFF" },
   ANNOUNCEMENTS: { label: "Announcements", description: "Notices from your institution's admins. Always shown in the app.", minLevel: "IN_APP" },
   CELEBRATIONS: { label: "Birthdays and anniversaries", description: "Greetings on your day and wishes from other members.", minLevel: "OFF" },
@@ -91,12 +96,14 @@ export function notificationLevelFor(type: NotificationType, prefs: Notification
   return resolveNotificationPrefs(prefs).categories[category];
 }
 
-/** The categories this member has a choice about here: chat only where they can use it, and admin work only for admins. */
+/** The categories this member has a choice about here: chat and connections only where they can use them, and admin work only for admins. */
 export function visibleNotificationCategories(input: { features: TenantFeatures; chatEligible: boolean; isTenantAdmin: boolean }): ConfigurableCategory[] {
   const { features, chatEligible, isTenantAdmin } = input;
   return CONFIGURABLE_CATEGORIES.filter((c) => {
     if (NOTIFICATION_CATEGORY_INFO[c].adminOnly && !isTenantAdmin) return false;
-    return c !== "CHAT" || chatAvailable(features, chatEligible);
+    if (c === "CHAT") return chatAvailable(features, chatEligible);
+    if (c === "CONNECTIONS") return connectionsAvailable(features, chatEligible);
+    return true;
   });
 }
 
@@ -120,6 +127,8 @@ export type NotificationTarget =
   | { kind: "chatGroup"; view: "invitations" }
   /** My posts, on one of its tabs when it matters which. */
   | { kind: "myContent"; tab?: "groups" }
+  /** The Mentors section's Requests tab, on the list the request is in: received as the mentor, sent as the mentee. */
+  | { kind: "mentorship"; box: MentorshipBox }
   | { kind: "profile" }
   | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
 
@@ -129,6 +138,8 @@ interface NotificationData {
   contentType?: string;
   contentId?: string;
   conversationId?: string;
+  /** Which of the recipient's lists a mentorship is in. */
+  box?: string;
 }
 
 function contentTarget(d: NotificationData): NotificationTarget | null {
@@ -161,6 +172,10 @@ const eventTarget: TargetFor = (d) => (d.eventId ? { kind: "event", id: d.eventI
 const profileTarget: TargetFor = () => ({ kind: "profile" });
 const celebrationsTarget: TargetFor = () => ({ kind: "celebrations" });
 const chatTarget: TargetFor = (d) => (d.conversationId ? { kind: "chat", conversationId: d.conversationId } : null);
+/** A mentorship's own list, or `fallback` for a payload that doesn't say, since each type has an obvious side. */
+const mentorshipTarget =
+  (fallback: MentorshipBox): TargetFor =>
+  (d) => ({ kind: "mentorship", box: d.box === "received" || d.box === "sent" ? d.box : fallback });
 
 const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   POST_COMMENT: postTarget,
@@ -189,6 +204,11 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   CHAT_OPENED: chatTarget,
   // Not into the group: the invitee isn't in it yet, and an invite-only one answers them 404 until they accept.
   CHAT_GROUP_INVITE: () => ({ kind: "chatGroup", view: "invitations" }),
+  MENTORSHIP_REQUESTED: mentorshipTarget("received"),
+  // Into the chat it opened, where the note is already the first message.
+  MENTORSHIP_ACCEPTED: (d) => chatTarget(d) ?? mentorshipTarget("sent")(d),
+  MENTORSHIP_DECLINED: mentorshipTarget("sent"),
+  MENTORSHIP_ENDED: mentorshipTarget("sent"),
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,

@@ -2,7 +2,7 @@ import { TENANT_FEATURES, type ChatGroupVisibility, type TenantFeature, type Ten
 import { wallPartsInZone } from "./time";
 
 /** Keys that start off for schools and that retyping an institution to SCHOOL forces off. Its admin can turn them on. */
-export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = ["messaging", "groups"];
+export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = ["messaging", "groups", "mentorship"];
 
 /**
  * The kinds of group these switches allow. Open groups need `groups`. An invite-only group of two is a private chat, so it
@@ -18,8 +18,21 @@ export function chatAvailable(features: TenantFeatures, chatEligible: boolean): 
   return (features.messaging || features.groups) && chatEligible;
 }
 
+/**
+ * Whether this member can use mentorship here: it's switched on, with messaging, because accepting opens a private chat, and
+ * they aren't a current pupil. A resolved map never has one without the other, but a hand-built one might.
+ */
+export function mentorshipAvailable(features: TenantFeatures, chatEligible: boolean): boolean {
+  return features.mentorship && features.messaging && chatEligible;
+}
+
+/** Whether this member has anything that connects them one to one beyond messages, which is what CONNECTIONS notifications are about. */
+export function connectionsAvailable(features: TenantFeatures, chatEligible: boolean): boolean {
+  return mentorshipAvailable(features, chatEligible);
+}
+
 /** What each key needs: a key reads as off while what it needs is off. One level deep, so a prerequisite has none of its own. */
-export const FEATURE_PREREQUISITES: Readonly<Partial<Record<TenantFeature, TenantFeature>>> = {};
+export const FEATURE_PREREQUISITES: Readonly<Partial<Record<TenantFeature, TenantFeature>>> = { mentorship: "messaging" };
 
 export function defaultFeaturesFor(type: TenantType): TenantFeatures {
   const off = type === "SCHOOL" ? SCHOOL_OFF_FEATURES : [];
@@ -44,9 +57,27 @@ export interface FeatureChangeResult {
   conflict: TenantFeature | null;
 }
 
-/** Applies a partial change on top of what is stored. Keys the change doesn't name keep their current value. */
+/**
+ * Applies a partial change on top of what is stored. Keys the change doesn't name keep their current value, which for a key
+ * whose prerequisite is off is off: turning the prerequisite back on doesn't bring it back, whatever is stored or missing,
+ * because the settings form shows it off and an admin turns it on by name. Switching a key off switches off what needs it, in
+ * the same change, and never fails, because it may be how an institution stops something in a hurry. Asking for a key while
+ * what it needs was off and stays off is the one conflict.
+ */
 export function applyFeatureChange(type: TenantType, stored: Partial<TenantFeatures> | null | undefined, change: Partial<TenantFeatures>): FeatureChangeResult {
-  return { features: resolveFeatures(type, { ...stored, ...change }), conflict: null };
+  const before = resolveFeatures(type, stored);
+  const kept: Partial<TenantFeatures> = {};
+  for (const f of TENANT_FEATURES) {
+    const needs = FEATURE_PREREQUISITES[f];
+    if (needs && change[f] === undefined && !before[needs]) kept[f] = before[f];
+  }
+  const features = resolveFeatures(type, { ...stored, ...kept, ...change });
+  const conflict =
+    TENANT_FEATURES.find((f) => {
+      const needs = FEATURE_PREREQUISITES[f];
+      return !!needs && change[f] === true && !before[needs] && !features[needs];
+    }) ?? null;
+  return { features, conflict };
 }
 
 /** An institution becoming a school: the school-off keys go off, and `forcedOff` names those that were on, for the audit log. */

@@ -1,7 +1,8 @@
-import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, MentorProfileUpsertInput, MentorsQuery, MentorshipRequestCreateInput, MentorshipRequestsQuery, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
+  DirectoryCardDto,
   DirectoryFiltersDto,
   EventDto,
   BusinessCardDto,
@@ -24,6 +25,12 @@ import type {
   MemberCardDto,
   MemberProfileDto,
   MembershipDto,
+  MentorCardDto,
+  MentorDto,
+  MentorProfileDto,
+  MentorshipDto,
+  MentorshipPageDto,
+  MentorshipSummaryDto,
   NotificationDto,
   MyInvitationDto,
   NotificationPrefsDto,
@@ -61,7 +68,7 @@ export function membershipEndpoints(core: ApiCore) {
 export function directoryEndpoints(core: ApiCore) {
   return {
     /** `field`: custom-field filters as "key:value". */
-    search: (slug: string, query?: Partial<Omit<DirectoryQuery, "field">> & { field?: string[] }) => core.request<CursorPage<MemberCardDto>>({ path: "/directory", tenantSlug: slug, query: q(query) }),
+    search: (slug: string, query?: Partial<Omit<DirectoryQuery, "field">> & { field?: string[] }) => core.request<CursorPage<DirectoryCardDto>>({ path: "/directory", tenantSlug: slug, query: q(query) }),
     filters: (slug: string) => core.data<DirectoryFiltersDto>({ path: "/directory/filters", tenantSlug: slug }),
     profile: (slug: string, membershipId: string) => core.data<MemberProfileDto>({ path: `/directory/${membershipId}`, tenantSlug: slug }),
   };
@@ -143,6 +150,30 @@ export function chatEndpoints(core: ApiCore) {
       decline: (slug: string, id: string) => core.request<void>({ method: "POST", path: `/chat/groups/${id}/invites/decline`, tenantSlug: slug }),
       removeMember: (slug: string, id: string, membershipId: string) => core.request<void>({ method: "DELETE", path: `/chat/groups/${id}/members/${membershipId}`, tenantSlug: slug }),
     },
+  };
+}
+
+export function mentorshipEndpoints(core: ApiCore) {
+  const action = (name: "accept" | "decline" | "withdraw" | "end") => (slug: string, id: string) => core.data<MentorshipDto>({ method: "POST", path: `/mentorship/requests/${id}/${name}`, tenantSlug: slug });
+  return {
+    /** This member's own mentor profile, active or not, or null if they never offered. */
+    me: (slug: string) => core.data<MentorProfileDto | null>({ path: "/mentorship/me", tenantSlug: slug }),
+    /** Offers to mentor, or edits the profile. */
+    saveMe: (slug: string, input: MentorProfileUpsertInput) => core.data<MentorProfileDto>({ method: "PUT", path: "/mentorship/me", tenantSlug: slug, body: input }),
+    /** Stops mentoring: declines what's waiting and leaves mentorships under way as they are. */
+    stop: (slug: string) => core.request<void>({ method: "DELETE", path: "/mentorship/me", tenantSlug: slug }),
+    /** Whether they're listed, and how many requests and mentorships they have open, even while mentorship is off for them. */
+    summary: (slug: string) => core.data<MentorshipSummaryDto>({ path: "/mentorship/summary", tenantSlug: slug }),
+    mentors: (slug: string, query?: Partial<MentorsQuery>) => core.request<CursorPage<MentorCardDto>>({ path: "/mentorship/mentors", tenantSlug: slug, query: q(query) }),
+    mentor: (slug: string, membershipId: string) => core.data<MentorDto>({ path: `/mentorship/mentors/${membershipId}`, tenantSlug: slug }),
+    request: (slug: string, input: MentorshipRequestCreateInput) => core.data<MentorshipDto>({ method: "POST", path: "/mentorship/requests", tenantSlug: slug, body: input }),
+    requests: (slug: string, query?: Partial<MentorshipRequestsQuery>) => core.request<MentorshipPageDto>({ path: "/mentorship/requests", tenantSlug: slug, query: q(query) }),
+    accept: action("accept"),
+    decline: action("decline"),
+    withdraw: action("withdraw"),
+    end: action("end"),
+    /** Reports a received request's note to the institution's admins, who see only the note. One still waiting is declined. */
+    report: (slug: string, id: string, input: ChatReportCreateInput) => core.data<MentorshipDto>({ method: "POST", path: `/mentorship/requests/${id}/report`, tenantSlug: slug, body: input }),
   };
 }
 

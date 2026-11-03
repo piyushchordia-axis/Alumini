@@ -24,7 +24,7 @@ interface ChatState {
 }
 
 export interface GroupNotice {
-  /** "groups" for the Groups screen, or a group's id for its details. */
+  /** "groups" for the Groups screen, "mentors" for the Mentors screen, or a group's id for its details. */
   on: string;
   text: string;
 }

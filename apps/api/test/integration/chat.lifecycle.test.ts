@@ -4,13 +4,14 @@ import { and, eq, sql } from "drizzle-orm";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, notifications, tenants } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, mentorProfiles, mentorships, notifications, tenants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
 import { acceptedThread, ageRequest, chatApi, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, loginAs, memberSession } from "../helpers/factories";
+import { acceptedMentorship, askMentor, mentorshipApi, NOTE, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -333,6 +334,68 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
       expect(await chatRecipients(ctx.db, group.id)).toEqual([]);
       expect((await deleteAccount(a)).status).toBeLessThan(300);
       expect(await groupRow(group.id)).toMatchObject({ ownerMembershipId: b.membership.id, memberCount: 1 });
+    });
+  });
+
+  describe("mentorship", () => {
+    const mentorshipRow = async (id: string) => (await ctx.db.select().from(mentorships).where(eq(mentorships.id, id)))[0]!;
+
+    it("on deletion, withdraws their waiting requests and declines those waiting for them, telling nobody, and their mentor profile goes", async () => {
+      const { tenant, a, b } = await setup();
+      const c = await memberSession(ctx, tenant.id);
+      await offerToMentor(ctx, tenant.slug, a);
+      await offerToMentor(ctx, tenant.slug, c);
+      const toThem = await askMentor(ctx, tenant.slug, b, a.membership.id);
+      const theirs = await askMentor(ctx, tenant.slug, a, c.membership.id);
+      await ctx.db.delete(notifications);
+      expect((await deleteAccount(a)).status).toBeLessThan(300);
+
+      expect(await mentorshipRow(toThem.id)).toMatchObject({ status: "DECLINED", mentorMembershipId: null, menteeMembershipId: b.membership.id });
+      expect(await mentorshipRow(theirs.id)).toMatchObject({ status: "ENDED", menteeMembershipId: null, acceptedAt: null });
+      expect(await ctx.db.select().from(mentorProfiles).where(eq(mentorProfiles.tenantId, tenant.id))).toHaveLength(1);
+      expect(await ctx.db.select().from(notifications)).toEqual([]);
+      expect((await mentorshipApi(ctx, tenant.slug, b).requests("sent")).body.data).toEqual([expect.objectContaining({ id: toThem.id, status: "DECLINED", member: null, canWithdraw: false })]);
+      expect((await mentorshipApi(ctx, tenant.slug, c).requests("received")).body).toMatchObject({ waiting: 0, data: [expect.objectContaining({ status: "ENDED", member: null })] });
+      expect((await mentorshipApi(ctx, tenant.slug, c).mentors()).body.data).toEqual([]);
+    });
+
+    it("on deletion, ends their mentorships under way and leaves the chat read-only, with what they wrote from a deleted member", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const dto = await acceptedMentorship(ctx, tenant.slug, a, b);
+      await chat(a).send(dto.conversationId!, "Glad to help");
+      await ctx.db.delete(notifications);
+      expect((await deleteAccount(a)).status).toBeLessThan(300);
+
+      expect(await mentorshipRow(dto.id)).toMatchObject({ status: "ENDED", mentorMembershipId: null, endedByMembershipId: null });
+      expect(await ctx.db.select().from(notifications)).toEqual([]);
+      expect((await mentorshipApi(ctx, tenant.slug, b).requests("sent")).body.data[0]).toMatchObject({ status: "ENDED", member: null, canEnd: false, conversationId: dto.conversationId });
+      expect((await chat(b).get(dto.conversationId!)).body.data).toMatchObject({ peer: null, canSend: false });
+      const messages = (await chat(b).messages(dto.conversationId!)).body.data as ChatMessageDto[];
+      expect(messages.map((m) => [m.body, m.sender?.id ?? null])).toEqual([
+        ["Glad to help", null],
+        [NOTE, b.membership.id],
+      ]);
+    });
+
+    it("on suspension, hides the mentor and makes them unavailable, while their mentees can still withdraw and end", async () => {
+      const { tenant, a, b } = await setup();
+      const c = await memberSession(ctx, tenant.id);
+      const d = await memberSession(ctx, tenant.id);
+      const underWay = await acceptedMentorship(ctx, tenant.slug, a, c);
+      const waiting = await askMentor(ctx, tenant.slug, b, a.membership.id);
+      await ctx.db.update(memberships).set({ status: "SUSPENDED" }).where(eq(memberships.id, a.membership.id));
+
+      expect((await mentorshipApi(ctx, tenant.slug, d).mentors()).body.data).toEqual([]);
+      expect((await mentorshipApi(ctx, tenant.slug, d).mentor(a.membership.id)).status).toBe(404);
+      const refused = await mentorshipApi(ctx, tenant.slug, d).request(a.membership.id);
+      expect(refused.body.error.code).toBe("CONTACT_UNAVAILABLE");
+      expect((await mentorshipApi(ctx, tenant.slug, a).requests("received")).body.error.code).toBe("MEMBERSHIP_SUSPENDED");
+      expect((await mentorshipApi(ctx, tenant.slug, b).withdraw(waiting.id)).status).toBe(200);
+      expect((await mentorshipApi(ctx, tenant.slug, c).end(underWay.id)).status).toBe(200);
+
+      // Reinstated, they're back in the list with their profile as it was.
+      await ctx.db.update(memberships).set({ status: "APPROVED" }).where(eq(memberships.id, a.membership.id));
+      expect((await mentorshipApi(ctx, tenant.slug, d).mentors()).body.data.map((r: { member: { id: string } }) => r.member.id)).toEqual([a.membership.id]);
     });
   });
 

@@ -236,6 +236,85 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
     });
   });
 
+  describe("the mentorship key", () => {
+    const settingsOf = (slug: string, admin: { headers: Record<string, string> }) => (features: Partial<TenantFeatures>) => api().patch(`/api/v1/t/${slug}/admin/settings`).set(admin.headers).send({ features });
+    const REFUSAL = "Mentorship needs Messaging. Turn on Messaging first.";
+    const refused = (res: request.Response) => {
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatchObject({ code: "VALIDATION_ERROR", message: REFUSAL, details: [{ path: "features.mentorship", message: REFUSAL }] });
+    };
+
+    it("reads off at a school whose row was stripped to {feed: true}, on every gated route, and on anywhere else", async () => {
+      const stripped = { feed: true };
+      const { tenant: school } = await createTenant(ctx, { type: "SCHOOL", features: stripped });
+      const { tenant: college } = await createTenant(ctx, { type: "COLLEGE", features: stripped });
+      const atSchool = await memberSession(ctx, school.id, { batchYear: 2000 });
+      const atCollege = await memberSession(ctx, college.id);
+      const base = `/api/v1/t/${school.slug}/mentorship`;
+      for (const res of [await api().get(`${base}/mentors`).set(atSchool.headers), await api().put(`${base}/me`).set(atSchool.headers).send({ areas: ["LAW"], availability: "WEEKLY" })]) {
+        expect(res.status, res.request.url).toBe(403);
+        expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+      }
+      expect((await api().get(`/api/v1/t/${college.slug}/mentorship/mentors`).set(atCollege.headers)).status).toBe(200);
+      expect((await api().get(`/api/v1/tenants/${school.slug}`)).body.data.settings.features.mentorship).toBe(false);
+      expect((await api().get(`/api/v1/tenants/${college.slug}`)).body.data.settings.features.mentorship).toBe(true);
+    });
+
+    it("can't be turned on while messaging is off: a 400 from an admin's settings that changes nothing, until messaging comes with it", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", batchYear: 1990 });
+      const save = settingsOf(tenant.slug, admin);
+      const before = await storedFeatures(tenant.id);
+      refused(await save({ mentorship: true }));
+      refused(await save({ mentorship: true, jobs: false }));
+      expect(await storedFeatures(tenant.id)).toEqual(before);
+      const both = await save({ mentorship: true, messaging: true });
+      expect(both.status).toBe(200);
+      expect(both.body.data.features).toMatchObject({ messaging: true, mentorship: true });
+    });
+
+    it("is refused the same way from the platform console, at creation too, leaving no institution behind", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE", features: { ...allOn(), messaging: false } });
+      refused(await api().patch(`/api/v1/platform/tenants/${tenant.id}/settings`).set(platform).send({ features: { mentorship: true } }));
+      refused(await api().post("/api/v1/platform/tenants").set(platform).send({ slug: "mentor-school", name: "Mentor School", type: "SCHOOL", settings: { features: { mentorship: true } } }));
+      expect((await api().get("/api/v1/tenants/mentor-school")).status).toBe(404);
+      const created = await api().post("/api/v1/platform/tenants").set(platform).send({ slug: "mentor-school", name: "Mentor School", type: "SCHOOL", settings: { features: { mentorship: true, messaging: true } } });
+      expect(created.status).toBe(201);
+      expect(created.body.data.settings.features).toMatchObject({ messaging: true, mentorship: true, groups: false });
+    });
+
+    it("goes off in the same save that turns messaging off, which never fails, and stays off when messaging comes back", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const member = await memberSession(ctx, tenant.id);
+      const save = settingsOf(tenant.slug, admin);
+      const mentors = () => api().get(`/api/v1/t/${tenant.slug}/mentorship/mentors`).set(member.headers);
+      expect((await mentors()).status).toBe(200);
+
+      const off = await save({ messaging: false, mentorship: true });
+      expect(off.status).toBe(200);
+      expect(off.body.data.features).toMatchObject({ messaging: false, mentorship: false });
+      expect(await storedFeatures(tenant.id)).toMatchObject({ messaging: false, mentorship: false });
+      expect((await mentors()).status).toBe(403);
+
+      expect((await save({ messaging: true })).body.data.features).toMatchObject({ messaging: true, mentorship: false });
+      expect((await mentors()).status).toBe(403);
+      expect((await save({ mentorship: true })).body.data.features).toMatchObject({ messaging: true, mentorship: true });
+      expect((await mentors()).status).toBe(200);
+    });
+
+    it("is forced off by retyping to a school, recorded with the others, and takes effect at once", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE" });
+      const member = await memberSession(ctx, tenant.id, { batchYear: 2000 });
+      expect((await api().get(`/api/v1/t/${tenant.slug}/mentorship/mentors`).set(member.headers)).status).toBe(200);
+      await api().patch(`/api/v1/platform/tenants/${tenant.id}`).set(platform).send({ type: "SCHOOL" }).expect(200);
+      expect((await storedFeatures(tenant.id)).mentorship).toBe(false);
+      const [audit] = await ctx.db.select().from(auditLog).where(and(eq(auditLog.tenantId, tenant.id), eq(auditLog.action, "platform.tenant.update")));
+      expect((audit?.metadata as { forcedOff: string[] }).forcedOff).toEqual(expect.arrayContaining(["messaging", "groups", "mentorship"]));
+      expect((await api().get(`/api/v1/t/${tenant.slug}/mentorship/mentors`).set(member.headers)).status).toBe(403);
+    });
+  });
+
   describe("a row stripped to {feed: true}", () => {
     async function strippedSchool() {
       const { tenant } = await createTenant(ctx, { type: "SCHOOL" });

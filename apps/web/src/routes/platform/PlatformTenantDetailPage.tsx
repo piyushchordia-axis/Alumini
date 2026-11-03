@@ -103,8 +103,12 @@ export function PlatformTenantDetailPage() {
             initial={settings}
             tenantType={tenant.type}
             onSubmit={async (input) => {
-              await api.platform.tenants.updateSettings(tenantId, input);
-              refresh();
+              try {
+                await api.platform.tenants.updateSettings(tenantId, input);
+              } finally {
+                // Refused too: the page may be stale (Messaging switched off by the institution, say), and the form remounts on what's saved.
+                refresh();
+              }
             }}
           />
         </Card>

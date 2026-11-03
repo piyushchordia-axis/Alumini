@@ -9,6 +9,7 @@ import { listMembershipsForUser } from "../repositories/memberships.repo";
 import { deleteUser, findUserById, upsertUserOnLogin } from "../repositories/users.repo";
 import { recordAudit } from "./audit.service";
 import { prepareChatForAccountDeletion } from "./chat/lifecycle";
+import { prepareMentorshipsForAccountDeletion } from "./mentorship/mentorship.service";
 import { issueSession, revokeAllSessions, type SessionMeta } from "./token.service";
 
 export async function loginWithVerifiedPhone(ctx: AppContext, phoneE164: string, meta: SessionMeta): Promise<AuthSessionDto> {
@@ -42,8 +43,10 @@ export async function deleteAccount(ctx: AppContext, userId: string, ip?: string
   await recordAudit(ctx, { actorUserId: userId, action: "auth.account_deleted", ip, metadata: { phone: user.phoneE164 } });
   await runInTransaction(ctx, async (tx) => {
     await resolveOpenReportsOnListingsOfUser(tx, userId, "auto: author deleted");
+    const finishMentorships = await prepareMentorshipsForAccountDeletion(ctx, tx, userId);
     await prepareChatForAccountDeletion(ctx, tx, userId);
     await deleteUser(tx, userId);
+    await finishMentorships();
     // Once it's done: a deletion that gives up on a row lock tells them to try again, and they have to still be signed in to.
     await afterCommit(ctx, tx, () => revokeAllSessions(ctx, userId));
   });

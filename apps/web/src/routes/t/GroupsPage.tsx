@@ -2,11 +2,12 @@ import { CHAT_INVITE_DECLINE_DAYS, type ChatGroupInviteDto, type CursorPage } fr
 import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ListBody } from "@/components/common/ListBody";
 import { GroupCard, InvitationCard } from "@/components/groups/GroupCards";
-import { Button, EmptyState, ErrorBox, Input, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
+import { EmptyState, Input, LinkButton, PageHeader, Tabs } from "@/components/ui";
 import { useChatBadge } from "@/hooks/useChat";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -17,27 +18,6 @@ import { forgetGroupThread, groupChatPath, groupsTabFromParams, refreshGroup, ty
 import { toast } from "@/stores/uiStore";
 
 const PAGE = 20;
-
-/** A list that keeps what it has on screen when a background refetch fails, and says so only with nothing to show. */
-function ListBody<T>({ list, empty, children }: { list: { isLoading: boolean; error: unknown; items: T[]; refetch: () => unknown; hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => unknown }; empty: ReactNode; children: (items: T[]) => ReactNode }) {
-  if (list.isLoading) return <Loading />;
-  if (list.error && list.items.length === 0)
-    return (
-      <div className="space-y-3">
-        <ErrorBox error={list.error} />
-        <Button variant="outline" size="sm" className="min-h-11" onClick={() => void list.refetch()}>
-          Retry loading
-        </Button>
-      </div>
-    );
-  if (list.items.length === 0) return <>{empty}</>;
-  return (
-    <>
-      <div className="grid gap-3">{children(list.items)}</div>
-      <LoadMore hasNextPage={list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
-    </>
-  );
-}
 
 function Discover({ slug }: { slug: string }) {
   const [q, setQ] = useState("");

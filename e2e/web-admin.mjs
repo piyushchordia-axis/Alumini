@@ -143,6 +143,26 @@ try {
     await directory.check();
     sentFeatures(await save(), { directory: true });
 
+    // Mentorship needs Messaging: unchecking Messaging unchecks Mentorship and holds it off, and one save stores both.
+    const messaging = page.locator('label:has-text("Messaging") input');
+    const mentorship = page.locator('label:has-text("Mentorship") input');
+    await open();
+    if (!(await mentorship.isChecked())) throw new Error("the Mentorship switch should start on outside schools");
+    await messaging.uncheck();
+    if ((await mentorship.isChecked()) || !(await mentorship.isDisabled())) throw new Error("unchecking Messaging should uncheck Mentorship and hold it off");
+    await page.getByText("Needs Messaging", { exact: true }).waitFor();
+    sentFeatures(await save(), { messaging: false, mentorship: false });
+    await open();
+    if ((await messaging.isChecked()) || (await mentorship.isChecked())) throw new Error("Messaging and Mentorship didn't both stay off after saving");
+
+    // Both back on, as demo-college started, for the later steps and the other scripts.
+    await messaging.check();
+    if ((await mentorship.isChecked()) || (await mentorship.isDisabled())) throw new Error("checking Messaging should free Mentorship without turning it on");
+    await mentorship.check();
+    sentFeatures(await save(), { messaging: true, mentorship: true });
+    await open();
+    if (!(await messaging.isChecked()) || !(await mentorship.isChecked())) throw new Error("Messaging and Mentorship didn't both come back on");
+
     await page.click("text=Branding");
     await page.waitForSelector("text=Preview");
     await shot("a05-settings");
@@ -429,12 +449,15 @@ try {
     await page.waitForSelector("text=Platform console");
   });
 
-  await step("messaging and groups start off at a school, with the reason shown", async () => {
+  await step("messaging, groups and mentorship start off at a school, with the reason shown", async () => {
     await page.goto(`${BASE}/t/demo-school/admin/settings`);
     await page.waitForSelector("text=New member approval");
     if (await page.locator('label:has-text("Messaging") input').isChecked()) throw new Error("the Messaging switch should start off at a school");
     if (await page.locator('label:has-text("Groups") input').isChecked()) throw new Error("the Groups switch should start off at a school");
-    await page.waitForSelector("text=Messaging and Groups start off for schools");
+    const mentorship = page.locator('label:has-text("Mentorship") input');
+    if ((await mentorship.isChecked()) || !(await mentorship.isDisabled())) throw new Error("the Mentorship switch should start off at a school, and wait for Messaging");
+    await page.getByText("Needs Messaging", { exact: true }).waitFor();
+    await page.waitForSelector("text=Messaging, Groups and Mentorship start off for schools");
     await page.waitForSelector("text=current pupils still can't use them");
     await shot("p05b-school-settings");
   });

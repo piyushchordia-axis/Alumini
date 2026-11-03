@@ -1,5 +1,5 @@
 import type { TenantFeatures } from "../constants";
-import { chatAvailable } from "./features";
+import { chatAvailable, mentorshipAvailable } from "./features";
 
 type SectionRule = (features: TenantFeatures, chatEligible: boolean) => boolean;
 
@@ -12,6 +12,7 @@ const SECTION_RULES = {
   directory: (f) => f.directory,
   events: (f) => f.events,
   groups: (f, chatEligible) => f.groups && chatEligible,
+  mentors: (f, chatEligible) => mentorshipAvailable(f, chatEligible),
   businesses: (f) => f.businesses,
   funding: (f) => f.funding,
 } satisfies Record<string, SectionRule>;
@@ -23,10 +24,17 @@ export const MEMBER_SECTIONS = Object.keys(SECTION_RULES) as MemberSection[];
 /** Phones show this many sections in the bar. More is always there too, because it also holds the profile and sign out. */
 const BAR_SECTIONS = 4;
 
-/** `chatEligible` is the membership's own value. Pass false while it isn't known. */
-export function splitSections(features: TenantFeatures, chatEligible: boolean): { bar: MemberSection[]; overflow: MemberSection[] } {
+/**
+ * `chatEligible` is the membership's own value. Pass false while it isn't known. `mentorsWayOut` keeps Mentors behind More
+ * while its rule says no, for a member who still has a listing, a request or a mentorship there to leave: the ways out stay
+ * open to them on the API, so the app mustn't hide the only way in.
+ */
+export function splitSections(features: TenantFeatures, chatEligible: boolean, opts: { mentorsWayOut?: boolean } = {}): { bar: MemberSection[]; overflow: MemberSection[] } {
   const enabled = MEMBER_SECTIONS.filter((s) => SECTION_RULES[s](features, chatEligible));
-  return { bar: enabled.slice(0, BAR_SECTIONS), overflow: enabled.slice(BAR_SECTIONS) };
+  const bar = enabled.slice(0, BAR_SECTIONS);
+  const overflow = enabled.slice(BAR_SECTIONS);
+  if (!opts.mentorsWayOut || enabled.includes("mentors")) return { bar, overflow };
+  return { bar, overflow: MEMBER_SECTIONS.filter((s) => s === "mentors" || overflow.includes(s)) };
 }
 
 /**

@@ -68,16 +68,32 @@ export function Input({ label, error, hint, style, ...rest }: TextInputProps & {
   );
 }
 
-/** Horizontal chip picker used as a lightweight select on mobile. */
-export function ChipSelect<T extends string>({ label, options, value, onChange, allowEmpty }: { label?: string; options: { value: T; label: string }[]; value: T | ""; onChange: (v: T | "") => void; allowEmpty?: boolean }) {
+/** Horizontal chip picker used as a lightweight select on mobile. `tall` makes each chip a full 44-point target. `emptyLabel` names the chip that picks nothing. */
+export function ChipSelect<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  allowEmpty,
+  emptyLabel = "Any",
+  tall = false,
+}: {
+  label?: string;
+  options: { value: T; label: string }[];
+  value: T | "";
+  onChange: (v: T | "") => void;
+  allowEmpty?: boolean;
+  emptyLabel?: string;
+  tall?: boolean;
+}) {
   const theme = useTheme();
   return (
     <View style={{ gap: 6 }}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {allowEmpty && <Chip label="Any" active={value === ""} onPress={() => onChange("")} color={theme.primary} />}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
+        {allowEmpty && <Chip label={emptyLabel} active={value === ""} onPress={() => onChange("")} color={theme.primary} tall={tall} />}
         {options.map((o) => (
-          <Chip key={o.value} label={o.label} active={value === o.value} onPress={() => onChange(o.value)} color={theme.primary} />
+          <Chip key={o.value} label={o.label} active={value === o.value} onPress={() => onChange(o.value)} color={theme.primary} tall={tall} />
         ))}
       </ScrollView>
     </View>

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { dropFrames, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { dropFrames, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -201,6 +201,8 @@ try {
     await page.click('nav >> text=Directory');
     await page.fill('input[placeholder="Name, company, role"]', "Priya");
     await page.waitForSelector("text=Priya Nair");
+    // A seeded mentor, which the directory says on her card.
+    await page.locator("a", { hasText: "Priya Nair" }).getByText("Mentor", { exact: true }).waitFor();
     await page.click("text=Priya Nair");
     await page.waitForSelector("h1:has-text('Priya Nair')");
     await shot("08-member");
@@ -372,6 +374,13 @@ try {
     await page.getByRole("tab", { name: "Discover", selected: true }).waitFor();
     await page.locator("h3", { hasText: "London & UK alumni" }).waitFor();
     await expectMoreActive(true, "Groups");
+
+    await moreButton.click();
+    await page.click('[role="dialog"] a:has-text("Mentors")');
+    await page.waitForURL(/\/app\/mentors$/);
+    await page.getByRole("tab", { name: "Find mentors", selected: true }).waitFor();
+    await page.locator("article", { hasText: "Rahul Mehta" }).waitFor();
+    await expectMoreActive(true, "Mentors");
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
@@ -413,7 +422,7 @@ try {
     await expectBar("Feed", "Jobs", "Directory", "Events");
     await moreButton.click();
     await page.waitForSelector('[role="dialog"] >> text=Switch institution');
-    for (const section of ["Funding", "Businesses"]) {
+    for (const section of ["Funding", "Businesses", "Mentors"]) {
       if (await page.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`the sheet lists ${section}, which is switched off`);
     }
     await page.keyboard.press("Escape");
@@ -731,7 +740,7 @@ try {
     await contextB.close();
   });
 
-  await step("a current pupil sees no Messages or Groups, even with both switched on", async () => {
+  await step("a current pupil sees no Messages, Groups or Mentors, even with all three switched on", async () => {
     const context = await signedInContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 } }); // Ira Banerjee, demo-school
     const pupil = await context.newPage();
     pupil.setDefaultTimeout(15000);
@@ -739,22 +748,27 @@ try {
     pupil.on("request", (r) => {
       if (/\/api\/v1\/t\/[^/]+\/chat\//.test(r.url())) chatCalls.push(new URL(r.url()).pathname);
     });
-    // Schools start with messaging and groups off. On here, so only the pupil rule can be what hides them.
+    // Schools start with messaging, groups and mentorship off. On here, so only the pupil rule can be what hides them.
     const features = await scriptFeatures(pupil, "demo-school");
-    features.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
+    features.only("feed", "messaging", "groups", "mentorship", "jobs", "directory", "events", "businesses", "funding");
     await pupil.goto(`${BASE}/t/demo-school/app/feed`);
     const bar = pupil.locator('nav[aria-label="Main"]:visible');
     await bar.locator("a").first().waitFor();
     const shown = (await bar.locator("a").allInnerTexts()).map((text) => text.split("\n").pop().trim());
-    for (const section of ["Messages", "Groups"]) if (shown.includes(section)) throw new Error(`a pupil's bottom bar offers ${section}: ${shown.join(", ")}`);
+    for (const section of ["Messages", "Groups", "Mentors"]) if (shown.includes(section)) throw new Error(`a pupil's bottom bar offers ${section}: ${shown.join(", ")}`);
     await pupil.click('nav[aria-label="Main"] >> button:has-text("More")');
     await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
-    for (const section of ["Messages", "Groups"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);
+    for (const section of ["Messages", "Groups", "Mentors"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);
     await pupil.keyboard.press("Escape");
     await pupil.goto(`${BASE}/t/demo-school/app/messages`);
     await pupil.waitForSelector("text=Messages aren't available");
     await pupil.goto(`${BASE}/t/demo-school/app/groups`);
     await pupil.waitForSelector("text=Groups aren't available");
+    // With nothing to leave there, a link to Mentors says the same, and a mentor's page too.
+    await pupil.goto(`${BASE}/t/demo-school/app/mentors`);
+    await pupil.waitForSelector("text=Mentors aren't available");
+    await pupil.goto(`${BASE}/t/demo-school/app/mentors/00000000-0000-4000-8000-000000000001/request`);
+    await pupil.waitForSelector("text=Mentors aren't available");
     await pupil.goto(`${BASE}/t/demo-school/app/my-content`);
     await pupil.locator('[role="tab"]:has-text("Posts")').waitFor();
     if (await pupil.locator('[role="tab"]:has-text("Groups")').count()) throw new Error("a pupil's My posts has a Groups tab");
@@ -900,6 +914,219 @@ try {
     await owner.getByRole("tab", { name: "Groups" }).click();
     await owner.locator("article", { hasText: openName }).getByText("Archived").waitFor();
     await owner.locator("article", { hasText: closedName }).waitFor();
+  });
+
+  await step("mentorship: offered, found and asked with a note, accepted into a live chat that opens with the note, ended read-only, and a request reported", async () => {
+    // The same two members this run registered, so nothing lands on the seeded mentors, requests or threads, and the run
+    // needs no more logins: the listener mentors, and the main page asks.
+    const mentor = listener.page;
+    const mentee = page;
+    const app = `${BASE}/t/demo-university/app`;
+    const log = (p) => p.locator('[role="log"]');
+    const live = { timeout: 8000 };
+    const areas = ["Career advice", "Entrepreneurship", "Software and IT", "Finance", "Working abroad"];
+    const about = `I moved from consulting into software. Ask me about either. ${unique}`;
+
+    // Offering to mentor: five areas at most, how often, and a note for mentees.
+    await mentor.goto(`${app}/mentors`);
+    await mentor.getByRole("tab", { name: "Find mentors", selected: true }).waitFor();
+    await mentor.getByRole("tab", { name: "Be a mentor" }).click();
+    await mentor.waitForURL(/\/app\/mentors\?tab=be-a-mentor$/);
+    await mentor.getByRole("heading", { name: "Offer to mentor" }).waitFor();
+    for (const area of areas) await mentor.getByLabel(area, { exact: true }).check();
+    if (await mentor.getByLabel("Law", { exact: true }).isEnabled()) throw new Error("a sixth mentor area can be chosen");
+    await mentor.getByLabel("Every two weeks", { exact: true }).check();
+    await mentor.getByLabel("Availability note").fill("Weekday evenings, India time");
+    await mentor.getByLabel("Note to mentees").fill(about);
+    await mentor.getByRole("button", { name: "Save mentor profile" }).click();
+    await mentor.getByRole("heading", { name: "You're listed as a mentor" }).waitFor();
+    await mentor.getByRole("button", { name: "Stop mentoring" }).waitFor();
+
+    // The mentor waits on Requests, so the request has to arrive there live.
+    await mentor.getByRole("tab", { name: "Requests" }).click();
+    await mentor.waitForURL(/\/app\/mentors\?tab=requests$/);
+    await mentor.getByRole("tab", { name: "Received", selected: true }).waitFor();
+    await mentor.getByText("No requests yet").waitFor();
+
+    // The mentee finds them by name and area, and not under an availability they didn't choose.
+    await mentee.goto(`${app}/mentors`);
+    await mentee.getByLabel("Search mentors").fill(LISTENER);
+    const card = mentee.locator("article", { hasText: LISTENER });
+    await card.waitFor();
+    for (const area of areas) await card.getByText(area, { exact: true }).waitFor();
+    await mentee.getByLabel("Area", { exact: true }).selectOption({ label: "Working abroad" });
+    await card.waitFor();
+    await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Weekly" });
+    await mentee.getByText("No mentors match").waitFor();
+    await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Every two weeks" });
+    await card.getByRole("link", { name: LISTENER }).click();
+    await mentee.waitForURL(/\/app\/mentors\/[0-9a-f-]{36}$/);
+    const mentorPage = mentee.url();
+    await mentee.getByRole("heading", { name: LISTENER }).waitFor();
+    await mentee.getByText("Every two weeks. Weekday evenings, India time").waitFor();
+    await mentee.getByText(about).waitFor();
+
+    // A first request, which the mentor reports. The request form says who reads the note and what becomes of it.
+    await mentee.getByRole("link", { name: "Request mentorship" }).click();
+    await mentee.waitForURL(/\/request$/);
+    await mentee.getByText(`${LISTENER} will see this note. If they accept, it becomes the first message of a chat between you, or the latest one if you already chat.`).waitFor();
+    // By its accessible name, the same on both apps, which leaves out the asterisk shown beside it.
+    const noteBox = mentee.getByRole("textbox", { name: "Note to the mentor", exact: true });
+    const first = `Could we talk about my startup some time? ${unique}`;
+    await noteBox.fill(first);
+    await mentee.getByRole("button", { name: "Send request" }).click();
+    await mentee.waitForURL(/\/app\/mentors\?tab=requests&box=sent$/);
+    const firstSent = mentee.locator("article", { hasText: first });
+    await firstSent.getByText("Request sent", { exact: true }).waitFor();
+
+    // The mentor: the request arrives live, with its note, and Requests counts it.
+    const reported = mentor.locator("article", { hasText: first });
+    await reported.waitFor(live);
+    await reported.getByText("Smoke Tester", { exact: true }).waitFor();
+    await reported.getByText("Waiting for your answer").waitFor();
+    await mentor.getByRole("tab", { name: /^Requests\s*1$/ }).waitFor();
+    await mentor.screenshot({ path: `${SHOTS}/12a-mentorship-request-received.png`, fullPage: true });
+
+    // Switched off, what the mentee is already in stays theirs to leave: Mentors stays in the menu, and the request has
+    // Withdraw, with nothing to find or answer.
+    const off = await scriptFeatures(mentee, "demo-university");
+    off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
+    await mentee.goto(`${app}/feed`);
+    await mentee.locator('nav[aria-label="Main"]:visible a[href$="/app/mentors"]').click();
+    await mentee.waitForURL(/\/app\/mentors$/);
+    await mentee.getByText("has switched mentorship off", { exact: false }).waitFor();
+    await mentee.getByRole("tab", { name: "Sent" }).click();
+    await firstSent.getByRole("button", { name: "Withdraw request" }).waitFor();
+    if (await mentee.getByRole("tab", { name: "Find mentors" }).count()) throw new Error("Find mentors is offered with mentorship switched off");
+    await off.stop();
+
+    // The mentor reports it: it's declined, and the mentee's list says so, with no notification; admins get only the note.
+    await reported.getByRole("button", { name: "Report request" }).click();
+    const reporting = mentor.locator('[role="dialog"]', { hasText: "Report request" });
+    await reporting.getByText("Admins will see only the note in this request, and nothing else. The request is declined: Smoke Tester will see it as declined, but won't be told it was reported.").waitFor();
+    await reporting.getByLabel("Reason").selectOption("SPAM");
+    await reporting.getByRole("button", { name: "Send report" }).click();
+    await reporting.waitFor({ state: "detached" });
+    await reported.getByText("Declined", { exact: true }).waitFor();
+    if (await reported.getByRole("button", { name: "Accept request" }).count()) throw new Error("a reported request can still be accepted");
+    if (await reported.getByRole("button", { name: "Report request" }).count()) throw new Error("a reported request can be reported again");
+    await mentee.goto(`${app}/mentors?tab=requests&box=sent`);
+    await firstSent.getByText("Declined", { exact: true }).waitFor();
+
+    // Asked again, through the form, which refuses a note too short before sending anything.
+    await mentee.goto(mentorPage);
+    await mentee.getByRole("link", { name: "Request mentorship" }).click();
+    await mentee.waitForURL(/\/request$/);
+    await noteBox.fill("Hello!");
+    await mentee.getByRole("button", { name: "Send request" }).click();
+    await mentee.getByText("Write at least 10 characters").waitFor();
+    // The longest a note may be, so it wraps everywhere it's shown: four sentences of 115 characters and one of 37.
+    const note = `${Array(4).fill(`Could you help me plan a move into software? I run a small company and want to understand the work first. ${unique}.`).join(" ")} I would welcome any advice you give.`;
+    if (note.length !== 500) throw new Error(`the test note is ${note.length} characters, not 500`);
+    await noteBox.fill(note);
+    await mentee.getByText("500 / 500").waitFor();
+    // The mentor failing to refetch in the background keeps the form and the note.
+    const mentorGet = await scriptMentor(mentee, "demo-university", mentorPage.split("/").pop());
+    mentorGet.answer(503, "INTERNAL");
+    await mentorGet.refetch();
+    if ((await noteBox.inputValue()) !== note) throw new Error("a failed refetch of the mentor lost the note");
+    mentorGet.answer(null);
+    await mentorGet.stop();
+    await mentee.getByRole("button", { name: "Send request" }).click();
+    await mentee.waitForURL(/\/app\/mentors\?tab=requests&box=sent$/);
+    const sent = mentee.locator("article", { hasText: note });
+    await sent.getByText("Request sent", { exact: true }).waitFor();
+    await sent.getByRole("button", { name: "Withdraw request" }).waitFor();
+
+    // It arrives live too.
+    const received = mentor.locator("article", { hasText: note });
+    await received.waitFor(live);
+    await mentor.getByRole("tab", { name: /^Requests\s*1$/ }).waitFor();
+
+    // Accepting opens the chat, whose first message is the note, from the mentee.
+    await received.getByRole("button", { name: "Accept request" }).click();
+    await mentor.waitForURL(/\/app\/messages\/[0-9a-f-]{36}$/);
+    const threadId = mentor.url().split("/").pop();
+    await log(mentor).locator("div.group").first().getByText(note).waitFor();
+    // The mentee's list says so live, and its Open chat goes into the same thread.
+    await sent.getByText("Active", { exact: true }).waitFor(live);
+    await sent.getByRole("link", { name: "Open chat", exact: true }).click();
+    await mentee.waitForURL(new RegExp(`/app/messages/${threadId}$`));
+    await log(mentee).locator("div.group").first().getByText(note).waitFor();
+
+    // Messages both ways, live, and each one a single bubble on each side.
+    const send = async (p, text) => {
+      await p.getByLabel("Write a message").fill(text);
+      await p.getByRole("button", { name: "Send message" }).click();
+      await log(p).getByText(text).waitFor();
+    };
+    const fromMentor = `Happy to. Shall we talk on Thursday? ${unique}`;
+    await send(mentor, fromMentor);
+    await log(mentee).getByText(fromMentor).waitFor(live);
+    const fromMentee = `Thursday works, thank you. ${unique}`;
+    await send(mentee, fromMentee);
+    await log(mentor).getByText(fromMentee).waitFor(live);
+    await mentee.waitForTimeout(1500);
+    for (const [p, who] of [
+      [mentor, "the mentor"],
+      [mentee, "the mentee"],
+    ]) {
+      for (const text of [note, fromMentor, fromMentee]) {
+        const bubbles = await log(p).getByText(text).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text.slice(0, 40)}…"`);
+      }
+    }
+    await mentor.screenshot({ path: `${SHOTS}/12b-mentorship-chat.png` });
+
+    // The mentee ends it from Requests, through the confirm dialog, while the mentor's thread is open: it goes read-only there live.
+    await mentee.goto(`${app}/mentors?tab=requests&box=sent`);
+    await sent.getByRole("button", { name: "End mentorship" }).click();
+    const ending = mentee.locator('[role="dialog"]', { hasText: "End this mentorship?" });
+    await ending.getByText(`${LISTENER} will be told that it has ended.`, { exact: false }).waitFor();
+    await ending.getByRole("button", { name: "Cancel" }).click();
+    await ending.waitFor({ state: "detached" });
+    await sent.getByText("Active", { exact: true }).waitFor();
+    await sent.getByRole("button", { name: "End mentorship" }).click();
+    await ending.getByRole("button", { name: "End mentorship" }).click();
+    await ending.waitFor({ state: "detached" });
+    await sent.getByText("Ended", { exact: true }).waitFor();
+    // Focus stays in the list, on the row, rather than falling to the page once the button that had it has gone.
+    if ((await mentee.evaluate(() => document.activeElement?.tagName)) !== "ARTICLE") throw new Error("ending a mentorship lost the focus");
+    await mentor.getByText("This conversation has closed").waitFor(live);
+    if (await mentor.getByLabel("Write a message").count()) throw new Error("the chat of an ended mentorship still offers the mentor a message box");
+    await sent.getByRole("link", { name: "Open chat", exact: true }).click();
+    await mentee.waitForURL(new RegExp(`/app/messages/${threadId}$`));
+    await mentee.getByText("This conversation has closed").waitFor();
+    await log(mentee).getByText(fromMentor).waitFor();
+    if (await mentee.getByLabel("Write a message").count()) throw new Error("the chat of an ended mentorship still offers the mentee a message box");
+    await mentor.goto(`${app}/mentors?tab=requests`);
+    await received.getByText("Ended", { exact: true }).waitFor();
+    await reported.getByText("Declined", { exact: true }).waitFor();
+
+    // Both lists at phone width, an ended mentorship and a 500-character note among them, with nothing scrolling sideways.
+    await mentee.setViewportSize({ width: 390, height: 844 });
+    await mentee.goto(`${app}/mentors?tab=requests&box=sent`);
+    await firstSent.getByText("Declined", { exact: true }).waitFor();
+    await sent.getByText("Ended", { exact: true }).waitFor();
+    const overflow = await mentee.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`Requests scrolls sideways by ${overflow}px on a phone`);
+    await mentee.screenshot({ path: `${SHOTS}/12c-mentorship-sent-phone.png`, fullPage: true });
+    await mentee.setViewportSize({ width: 1280, height: 900 });
+
+    // The bell: the mentee heard their request was accepted and nothing of the report. The mentor's request names nobody, and leads to Requests.
+    await mentee.goto(`${app}/notifications`);
+    await mentee.getByText(`${LISTENER} accepted your mentorship request`).waitFor();
+    if (await mentee.getByText("declined your mentorship request").count()) throw new Error("reporting a request told the mentee it was declined");
+    await mentor.goto(`${app}/notifications`);
+    await mentor.getByText("Smoke Tester ended your mentorship").waitFor();
+    await mentor.getByRole("link", { name: "New mentorship request" }).first().click();
+    await mentor.waitForURL(/\/app\/mentors\?tab=requests&box=received$/);
+    await mentor.getByRole("tab", { name: "Received", selected: true }).waitFor();
+
+    // The directory marks a mentor's card.
+    await mentee.goto(`${app}/directory`);
+    await mentee.fill('input[placeholder="Name, company, role"]', LISTENER);
+    await mentee.locator("a", { hasText: LISTENER }).getByText("Mentor", { exact: true }).waitFor();
     await listener.context.close();
     listener = null;
   });
@@ -921,6 +1148,8 @@ try {
     await page.waitForSelector("h1:has-text('Notifications')");
     await page.click("text=⚙️ Settings");
     await page.waitForSelector("h1:has-text('Notification settings')");
+    // Mentorship is on here and this member can use it, so its requests and answers have a row of their own.
+    await page.locator('[role="radiogroup"][aria-label="Mentorship and referrals"]').waitFor();
     const celebrations = page.locator('[role="radiogroup"][aria-label="Birthdays and anniversaries"]');
     // The switch moves before the save lands, so wait for it: reloading at once can cut the request off.
     const [saved] = await Promise.all([

@@ -55,7 +55,7 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     const m = await memberSession(ctx, tenant.id);
     const initial = await request(ctx.app).get(prefsUrl(tenant.slug)).set(m.headers);
     expect(initial.body.data).toEqual({
-      categories: { ACTIVITY: "IN_APP_PUSH", CHAT: "IN_APP_PUSH", EVENTS: "IN_APP_PUSH", ANNOUNCEMENTS: "IN_APP_PUSH", CELEBRATIONS: "IN_APP_PUSH", ADMIN: "IN_APP_PUSH" },
+      categories: { ACTIVITY: "IN_APP_PUSH", CHAT: "IN_APP_PUSH", CONNECTIONS: "IN_APP_PUSH", EVENTS: "IN_APP_PUSH", ANNOUNCEMENTS: "IN_APP_PUSH", CELEBRATIONS: "IN_APP_PUSH", ADMIN: "IN_APP_PUSH" },
       digestEmail: true,
       announcementMessages: true,
       celebrationsNoticeSeenAt: null,
@@ -83,6 +83,20 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     expect(off.status).toBe(200);
     expect(off.body.data.categories.CHAT).toBe("IN_APP");
     expect((await request(ctx.app).get(prefsUrl(tenant.slug)).set(m.headers)).body.data.categories.CHAT).toBe("IN_APP");
+  });
+
+  it("saves the CONNECTIONS level, which can go all the way off, and then stores no mentorship notification", async () => {
+    const { tenant } = await createTenant(ctx);
+    const m = await memberSession(ctx, tenant.id);
+    const loud = await memberSession(ctx, tenant.id);
+    const off = await request(ctx.app).patch(prefsUrl(tenant.slug)).set(m.headers).send({ categories: { CONNECTIONS: "OFF" } });
+    expect(off.status).toBe(200);
+    expect(off.body.data.categories.CONNECTIONS).toBe("OFF");
+    for (const type of ["MENTORSHIP_REQUESTED", "MENTORSHIP_ACCEPTED", "MENTORSHIP_DECLINED", "MENTORSHIP_ENDED"] as const) {
+      await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [m.membership.id, loud.membership.id], type, title: "Mentorship", data: { mentorshipId: "m1", box: "sent" } });
+    }
+    const rows = await ctx.db.select().from(notifications);
+    expect(rows.map((r) => r.recipientMembershipId)).toEqual(Array(4).fill(loud.membership.id));
   });
 
   it("drops notifications a member turned off, keeps account notices, and skips push for in-app only", async () => {

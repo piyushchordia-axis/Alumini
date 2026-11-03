@@ -16,6 +16,8 @@ export interface OpenDirectInput {
   seedMessage?: { senderMembershipId: string; body: string };
   /** Who agreed just now and doesn't need telling. Leave it out and both members get a push. */
   actorMembershipId?: string;
+  /** The caller tells the members itself, with its own notification, so neither the opening nor its first message pushes. */
+  quiet?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ export interface OpenDirectInput {
  * race, and it refuses like any other unavailable contact.
  */
 export async function openDirectFromOrigin(ctx: AppContext, tx: Tx, input: OpenDirectInput): Promise<{ conversationId: string; created: boolean; message: ChatMessageRow | null }> {
-  const { tenantId, aId, bId, origin, originId, seedMessage, actorMembershipId = null } = input;
+  const { tenantId, aId, bId, origin, originId, seedMessage, actorMembershipId = null, quiet = false } = input;
   await limitLockWait(tx);
   const tenant = await freshChatTenant(tx, tenantId);
   assertKindEnabled(tenant.features, "DIRECT");
@@ -50,12 +52,12 @@ export async function openDirectFromOrigin(ctx: AppContext, tx: Tx, input: OpenD
     if (!message) {
       const sender = seedMessage.senderMembershipId === aId ? a! : b!;
       // Opening the chat tells them, so its first message isn't a second push.
-      message = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender, body: seedMessage.body, clientKey, noPush: opened });
+      message = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender, body: seedMessage.body, clientKey, noPush: opened || quiet });
     }
   }
   if (opened) {
     await publishChanged(ctx, tx, tenant.slug, conversation.id);
-    await queuePushEvent(ctx, tx, { tenantId, conversationId: conversation.id, kind: "CHAT_OPENED", actorMembershipId });
+    if (!quiet) await queuePushEvent(ctx, tx, { tenantId, conversationId: conversation.id, kind: "CHAT_OPENED", actorMembershipId });
   }
   return { conversationId: conversation.id, created, message };
 }

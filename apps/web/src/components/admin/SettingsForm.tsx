@@ -1,20 +1,33 @@
-import type { APPROVAL_MODES} from "@illuminize/shared";
-import { changedFeatures, SCHOOL_OFF_FEATURES, TENANT_FEATURES, type TenantFeature, type TenantSettingsDto, type TenantSettingsUpdate, type TenantType } from "@illuminize/shared";
+import type { APPROVAL_MODES } from "@illuminize/shared";
+import { changedFeatures, FEATURE_PREREQUISITES, SCHOOL_OFF_FEATURES, TENANT_FEATURE_LABELS as FEATURE_LABELS, TENANT_FEATURES, type TenantFeature, type TenantFeatures, type TenantSettingsDto, type TenantSettingsUpdate, type TenantType } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
-const FEATURE_LABELS: Record<TenantFeature, string> = {
-  feed: "Community feed",
-  jobs: "Jobs",
-  funding: "Funding",
-  events: "Events & meetups",
-  directory: "Member directory",
-  businesses: "Business directory",
-  messaging: "Messaging",
-  groups: "Groups",
-};
+/** Turning a key off turns off whatever needs it, as the API does in the same save, so the form never shows a combination that can't be stored. */
+function toggled(features: TenantFeatures, key: TenantFeature, on: boolean): TenantFeatures {
+  const next = { ...features, [key]: on };
+  if (!on) for (const f of TENANT_FEATURES) if (FEATURE_PREREQUISITES[f] === key) next[f] = false;
+  return next;
+}
+
+/** One switch. A key whose prerequisite is off can't be turned on, and says what it needs outside its label, so the label stays its name alone. */
+function FeatureCheckbox({ feature, features, onChange }: { feature: TenantFeature; features: TenantFeatures; onChange: (next: TenantFeatures) => void }) {
+  const hintId = useId();
+  const needs = FEATURE_PREREQUISITES[feature];
+  const blocked = !!needs && !features[needs];
+  return (
+    <div>
+      <Checkbox checked={features[feature]} disabled={blocked} aria-describedby={blocked ? hintId : undefined} onChange={(e) => onChange(toggled(features, feature, e.target.checked))} label={FEATURE_LABELS[feature]} className={blocked ? "opacity-60" : undefined} />
+      {blocked && (
+        <p id={hintId} className="ml-6 text-xs text-slate-500">
+          Needs {FEATURE_LABELS[needs]}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
   const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
@@ -80,10 +93,11 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
         <legend className="mb-2 text-sm font-medium text-slate-700">Enabled features</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {TENANT_FEATURES.map((f) => (
-            <Checkbox key={f} checked={features[f]} onChange={(e) => setFeatures({ ...features, [f]: e.target.checked })} label={FEATURE_LABELS[f]} />
+            <FeatureCheckbox key={f} feature={f} features={features} onChange={setFeatures} />
           ))}
         </div>
         <p className="mt-2 text-xs text-slate-500">Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.</p>
+        <p className="mt-2 text-xs text-slate-500">Mentorship needs Messaging, because accepting a mentee opens a private chat. Turning Messaging off turns Mentorship off too.</p>
         {tenantType === "SCHOOL" && (
           <p className="mt-2 text-xs text-slate-500">
             {new Intl.ListFormat("en-GB").format(SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]))} {SCHOOL_OFF_FEATURES.length === 1 ? "starts" : "start"} off for schools because members can contact each other privately there. If you turn {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"} on, current pupils still can't use {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"}.

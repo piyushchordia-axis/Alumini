@@ -1,8 +1,8 @@
-import { PROFESSION_TYPE_LABELS, type MemberCardDto, countryName } from "@illuminize/shared";
+import { PROFESSION_TYPE_LABELS, type DirectoryCardDto, countryName } from "@illuminize/shared";
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card } from "@/components/ui";
 
-export function MemberCard({ slug, member }: { slug: string; member: MemberCardDto }) {
+export function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }) {
   return (
     <Link to={`/t/${slug}/app/directory/${member.id}`}>
       <Card className="flex items-center gap-3 p-4 transition hover:border-slate-300 hover:shadow">
@@ -12,6 +12,7 @@ export function MemberCard({ slug, member }: { slug: string; member: MemberCardD
             <span className="truncate font-semibold text-slate-900">{member.fullName}</span>
             {member.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}
             {member.isOpenToWork && <Badge tone="success">Open to work</Badge>}
+            {member.isMentor && <Badge tone="info">Mentor</Badge>}
           </div>
           <p className="truncate text-sm text-slate-600">
             {member.designation ? `${member.designation}` : PROFESSION_TYPE_LABELS[member.professionType]}

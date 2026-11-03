@@ -33,7 +33,7 @@ export function forgetGroupThread(qc: QueryClient, slug: string, id: string) {
 
 /**
  * Says something on the screen a member lands on after another group screen has done its work and gone, as the web app's
- * toasts do: `on` is "groups" for the Groups screen, or a group's id for its details.
+ * toasts do: `on` is "groups" for the Groups screen, "mentors" for the Mentors screen, or a group's id for its details.
  */
 export const leaveGroupNotice = (on: string, text: string) => useChatStore.getState().setGroupNotice({ on, text });
 

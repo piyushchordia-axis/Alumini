@@ -131,9 +131,50 @@ describe("the CHAT category", () => {
 
   it("leaves the other categories as they were, with admin work only for admins", () => {
     const all = only(...TENANT_FEATURES);
-    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: false })).toEqual(["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS"]);
-    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: true })).toEqual(["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"]);
+    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: false })).toEqual(["ACTIVITY", "CHAT", "CONNECTIONS", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS"]);
+    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: true })).toEqual(["ACTIVITY", "CHAT", "CONNECTIONS", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"]);
     expect(visibleNotificationCategories({ features: only(), chatEligible: false, isTenantAdmin: true })).toEqual(["ACTIVITY", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"]);
+  });
+});
+
+describe("the CONNECTIONS category", () => {
+  const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map((f) => [f, on.includes(f)])) as TenantFeatures;
+  const categories = (features: TenantFeatures, chatEligible: boolean) => visibleNotificationCategories({ features, chatEligible, isTenantAdmin: false });
+
+  it("is called Mentorship and referrals, can be turned off, and holds every mentorship notification", () => {
+    expect(NOTIFICATION_CATEGORY_INFO.CONNECTIONS).toMatchObject({ label: "Mentorship and referrals", minLevel: "OFF" });
+    for (const type of ["MENTORSHIP_REQUESTED", "MENTORSHIP_ACCEPTED", "MENTORSHIP_DECLINED", "MENTORSHIP_ENDED"] as const) {
+      expect(NOTIFICATION_CATEGORY[type], type).toBe("CONNECTIONS");
+      expect(notificationLevelFor(type, { categories: { CONNECTIONS: "OFF" } }), type).toBe("OFF");
+      expect(notificationLevelFor(type, null), type).toBe("IN_APP_PUSH");
+    }
+  });
+
+  it("shows only while mentorship is on, which needs messaging, for a member who can use it", () => {
+    expect(categories(only("mentorship", "messaging"), true)).toContain("CONNECTIONS");
+    expect(categories(only("mentorship", "messaging"), false)).not.toContain("CONNECTIONS");
+    expect(categories(only("mentorship"), true)).not.toContain("CONNECTIONS");
+    expect(categories(only("messaging", "groups", "jobs"), true)).not.toContain("CONNECTIONS");
+  });
+});
+
+describe("mentorship notifications", () => {
+  it("open the request's own list, received for the mentor and sent for the mentee", () => {
+    expect(notificationTarget("MENTORSHIP_REQUESTED", { mentorshipId: "m1", box: "received" })).toEqual({ kind: "mentorship", box: "received" });
+    expect(notificationTarget("MENTORSHIP_DECLINED", { mentorshipId: "m1", box: "sent" })).toEqual({ kind: "mentorship", box: "sent" });
+    expect(notificationTarget("MENTORSHIP_ENDED", { mentorshipId: "m1", box: "received" })).toEqual({ kind: "mentorship", box: "received" });
+    expect(notificationTarget("MENTORSHIP_ENDED", { mentorshipId: "m1", box: "sent" })).toEqual({ kind: "mentorship", box: "sent" });
+  });
+
+  it("fall back to the side each type is usually about, and ignore a box they don't know", () => {
+    expect(notificationTarget("MENTORSHIP_REQUESTED", {})).toEqual({ kind: "mentorship", box: "received" });
+    expect(notificationTarget("MENTORSHIP_DECLINED", { box: "RECEIVED" })).toEqual({ kind: "mentorship", box: "sent" });
+    expect(notificationTarget("MENTORSHIP_ENDED", { box: "constructor" })).toEqual({ kind: "mentorship", box: "sent" });
+  });
+
+  it("open the chat an acceptance opened, or the mentee's list without one", () => {
+    expect(notificationTarget("MENTORSHIP_ACCEPTED", { mentorshipId: "m1", conversationId: "c1", box: "sent" })).toEqual({ kind: "chat", conversationId: "c1" });
+    expect(notificationTarget("MENTORSHIP_ACCEPTED", { mentorshipId: "m1" })).toEqual({ kind: "mentorship", box: "sent" });
   });
 });
 

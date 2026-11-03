@@ -23,7 +23,8 @@ import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
 import { notify, notifyTenantAdmins } from "./notifications/notification.service";
 
-interface Actor extends AuthContext {
+/** An admin acting on a member, or Illuminize staff. */
+export interface Actor extends AuthContext {
   membershipId?: string | null;
   ip?: string;
 }
@@ -178,12 +179,13 @@ async function loadTarget(db: DbClient, tenantId: string, membershipId: string) 
 
 /**
  * While a chat report about them is open, a tenant admin can't use what they could get back at the reporter with: suspending
- * anyone, changing a role, restoring a suspended admin who could then close the report, or editing a profile, which can
- * publish a phone number or, at a school, turn someone into a current pupil and so cut them off from chat. Refuses before
+ * anyone, changing a role, restoring a suspended admin who could then close the report, editing a profile, which can
+ * publish a phone number or, at a school, turn someone into a current pupil and so cut them off from chat, or taking someone
+ * off the Mentors list, which a mentor who reported their request could otherwise be (see mentorship.service). Refuses before
  * looking at who is targeted, so the answer is the same for everyone and doesn't point at the reporter. Illuminize staff
  * aren't restricted, even if a report is about them. Goes inside the transaction of the change it guards.
  */
-async function assertNoOpenReportAboutActor(db: DbClient, tenantId: string, actor: Actor): Promise<void> {
+export async function assertNoOpenReportAboutActor(db: DbClient, tenantId: string, actor: Actor): Promise<void> {
   if (actor.isPlatformAdmin || !actor.membershipId) return;
   if (await hasOpenReportAbout(db, tenantId, actor.membershipId)) throw AppError.forbidden("This needs another admin or Illuminize staff", "NEEDS_ANOTHER_ADMIN");
 }
@@ -193,7 +195,7 @@ async function assertNoOpenReportAboutActor(db: DbClient, tenantId: string, acto
  * attempt to get back at someone or to find out when a report opens. The transaction has rolled back by then and nothing
  * changed, so a row that can't be written isn't worth turning the refusal into an error. Says nothing of any report.
  */
-async function recordingRefusal<T>(ctx: AppContext, tenantId: string, actor: Actor, attempted: string, membershipId: string, change: () => Promise<T>): Promise<T> {
+export async function recordingRefusal<T>(ctx: AppContext, tenantId: string, actor: Actor, attempted: string, membershipId: string, change: () => Promise<T>): Promise<T> {
   try {
     return await change();
   } catch (err) {

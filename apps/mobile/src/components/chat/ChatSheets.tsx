@@ -1,4 +1,4 @@
-import { REPORT_REASONS, REPORT_REASON_LABELS, type ChatConversationDto, type ReportReason } from "@illuminize/shared";
+import { REPORT_REASONS, REPORT_REASON_LABELS, type ChatConversationDto, type ChatReportCreateInput, type ReportReason } from "@illuminize/shared";
 import { CHAT_MUTE_OPTIONS, chatMuteUntil, isMuted, isMutedUntilTurnedOn, type ChatMuteOption } from "@illuminize/shared/chat";
 import { isApiClientError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -130,26 +130,42 @@ export function ConversationOptionsSheet({
   );
 }
 
-/** Reports one message. Admins see it with a few messages either side, frozen when it's filed, and nothing else. */
-export function ReportMessageSheet({ slug, messageId, onClose, onDone }: { slug: string; messageId: string | null; onClose: () => void; onDone: (text: string) => void }) {
+/**
+ * A chat report: a reason, optional details, and what admins will see, said in `intro` before anything is sent. A second
+ * report of the same thing is already in place, so its 409 closes the sheet as done rather than as an error.
+ */
+export function ChatReportSheet({
+  open,
+  title,
+  intro,
+  submit,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  title: string;
+  intro: string;
+  submit: (input: ChatReportCreateInput) => Promise<unknown>;
+  onClose: () => void;
+  /** After it's filed, or found already filed, with what to say about it. */
+  onDone: (text: string) => void;
+}) {
   const [reason, setReason] = useState<ReportReason>("HARASSMENT");
   const [details, setDetails] = useState("");
-  const report = useMutation({ mutationFn: (id: string) => api.chat.report(slug, id, { reason, details: details.trim() || null }) });
+  const report = useMutation({ mutationFn: () => submit({ reason, details: details.trim() || null }) });
   const finish = (text: string) => {
     setDetails("");
     report.reset();
     onDone(text);
   };
-  const submit = () => {
-    if (!messageId) return;
-    report.mutate(messageId, {
+  const send = () =>
+    report.mutate(undefined, {
       onSuccess: () => finish("Thanks. Admins will take a look."),
       onError: (err) => {
         // Already reported (or already removed): the outcome they wanted is in place, so it isn't an error to them.
         if (isApiClientError(err) && err.status === 409) finish(err.message);
       },
     });
-  };
   const close = () => {
     if (report.isPending) return;
     setDetails("");
@@ -157,8 +173,8 @@ export function ReportMessageSheet({ slug, messageId, onClose, onDone }: { slug:
     onClose();
   };
   return (
-    <Sheet open={!!messageId} title="Report message" onClose={close}>
-      <Text style={sectionText}>Admins will see this message and up to 10 around it.</Text>
+    <Sheet open={open} title={title} onClose={close}>
+      <Text style={sectionText}>{intro}</Text>
       <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 13, fontWeight: "600", color: "#334155" }}>Reason</Text>
         <View role="group" aria-label="Reason" style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
@@ -170,8 +186,22 @@ export function ReportMessageSheet({ slug, messageId, onClose, onDone }: { slug:
       {/* Off, so the web build's browser doesn't keep what's written here for session restore, where it would outlast sign-out. */}
       <Input label="Details (optional)" placeholder="Anything the admins should know?" value={details} onChangeText={setDetails} maxLength={1000} multiline autoComplete="off" />
       <ErrorText error={report.error && !(isApiClientError(report.error) && report.error.status === 409) ? report.error : null} />
-      <Button title="Send report" variant="danger" loading={report.isPending} onPress={submit} />
+      <Button title="Send report" variant="danger" loading={report.isPending} onPress={send} />
       <Button title="Cancel" variant="ghost" disabled={report.isPending} onPress={close} />
     </Sheet>
+  );
+}
+
+/** Reports one message. Admins see it with a few messages either side, frozen when it's filed, and nothing else. */
+export function ReportMessageSheet({ slug, messageId, onClose, onDone }: { slug: string; messageId: string | null; onClose: () => void; onDone: (text: string) => void }) {
+  return (
+    <ChatReportSheet
+      open={!!messageId}
+      title="Report message"
+      intro="Admins will see this message and up to 10 around it."
+      submit={(input) => api.chat.report(slug, messageId!, input)}
+      onClose={onClose}
+      onDone={onDone}
+    />
   );
 }

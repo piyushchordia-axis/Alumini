@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { Card, Screen } from "@/components/ui";
 import { useChatBadge } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
+import { useMentorsWayOut } from "@/lib/mentors";
 import { SECTION_TABS, sectionBadges } from "@/lib/sections";
 import { useSignOut } from "@/lib/session";
 import { useTenantStore } from "@/stores/tenantStore";
@@ -32,7 +33,7 @@ export default function MoreScreen() {
   const setLast = useTenantStore((s) => s.setLastTenantSlug);
   const signOut = useSignOut();
   const slug = tenant.slug;
-  const { overflow } = splitSections(tenant.settings.features, membership.chatEligible);
+  const { overflow } = splitSections(tenant.settings.features, membership.chatEligible, { mentorsWayOut: useMentorsWayOut() });
   const badges = sectionBadges(useChatBadge(slug, chatAvailable(tenant.settings.features, membership.chatEligible)).data);
   return (
     <Screen>

@@ -1,21 +1,26 @@
-import { isCurrentPupil, resolveFeatures, type CursorPage, type DirectoryFiltersDto, type DirectoryQuery, type MemberCardDto, type MemberProfileDto } from "@illuminize/shared";
+import { isCurrentPupil, mentorshipAvailable, resolveFeatures, type CursorPage, type DirectoryCardDto, type DirectoryFiltersDto, type DirectoryQuery, type MemberProfileDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toMemberCardDto, toMemberProfileDto } from "../dto/membership.dto";
 import { AppError } from "../lib/errors";
 import { keys } from "../redis/keys";
 import { directoryFacets, findApprovedMemberWithUser, searchDirectory } from "../repositories/directory.repo";
 import { openToWorkSet } from "../repositories/memberships.repo";
+import { listedMentorsAmong } from "../repositories/mentorship.repo";
 import type { MembershipRow, TenantContext } from "../types/request";
 import { answersForOne, getActiveFields } from "./profileFields.service";
 
-export async function searchMembers(ctx: AppContext, tenantId: string, query: DirectoryQuery): Promise<CursorPage<MemberCardDto>> {
-  const page = await searchDirectory(ctx.db, tenantId, query);
-  const open = await openToWorkSet(
-    ctx.db,
-    tenantId,
-    page.data.map((m) => m.id),
-  );
-  return { data: page.data.map((m) => toMemberCardDto(m, open.has(m.id))), nextCursor: page.nextCursor };
+/**
+ * A page of the directory. `isMentor` says who the Mentors list would show this viewer, so it's false for everyone while
+ * mentorship is off here or the viewer can't use it, and for anyone they blocked, whom that list leaves out.
+ */
+export async function searchMembers(ctx: AppContext, tenantCtx: TenantContext, viewer: MembershipRow, query: DirectoryQuery): Promise<CursorPage<DirectoryCardDto>> {
+  const { tenant, settings } = tenantCtx;
+  const page = await searchDirectory(ctx.db, tenant.id, query);
+  const ids = page.data.map((m) => m.id);
+  const now = new Date();
+  const mentors = mentorshipAvailable(resolveFeatures(tenant.type, settings.features), !isCurrentPupil(tenant, viewer, now)) ? listedMentorsAmong(ctx.db, tenant, viewer.id, ids, now) : Promise.resolve(new Set<string>());
+  const [open, mentoring] = await Promise.all([openToWorkSet(ctx.db, tenant.id, ids), mentors]);
+  return { data: page.data.map((m) => ({ ...toMemberCardDto(m, open.has(m.id)), isMentor: mentoring.has(m.id) })), nextCursor: page.nextCursor };
 }
 
 export async function getDirectoryFilters(ctx: AppContext, tenantId: string): Promise<DirectoryFiltersDto> {

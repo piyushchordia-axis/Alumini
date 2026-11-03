@@ -7,6 +7,7 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { Button, ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { refreshChat } from "@/lib/chat";
+import { refreshMentorship } from "@/lib/mentors";
 
 type Member = Pick<ChatMemberDto, "id" | "fullName">;
 
@@ -16,6 +17,8 @@ function useBlockChange(slug: string, member: Member, onDone?: (blocked: boolean
     mutationFn: (block: boolean) => (block ? api.chat.block(slug, member.id).then(() => true) : api.chat.unblock(slug, member.id).then(() => false)),
     onSuccess: (nowBlocked) => {
       void refreshChat(qc, slug);
+      // A block withdraws this member's requests to them, hides theirs, and takes them out of Find mentors.
+      void refreshMentorship(qc, slug);
       onDone?.(nowBlocked);
     },
   });

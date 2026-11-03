@@ -67,6 +67,15 @@ export interface ChatUnreadEvent {
   invites: number;
 }
 
+/**
+ * A request or mentorship this member is in changed, or their mentor listing did: refetch their mentorship lists and pages.
+ * Carries nothing else, and goes out on every change whether or not it notifies anyone, such as a withdrawal, which tells
+ * nobody, or to a member who turned those notifications off. Never to a mentor about a request they're never shown.
+ */
+export interface MentorshipChangedEvent {
+  tenantSlug: string;
+}
+
 export interface ServerToClientEvents {
   "notification:new": (payload: NotificationEvent) => void;
   "notification:bulk": (payload: BulkNotificationEvent) => void;
@@ -76,6 +85,7 @@ export interface ServerToClientEvents {
   "chat:removed": (payload: ChatRemovedEvent) => void;
   "chat:changed": (payload: ChatChangedEvent) => void;
   "chat:unread": (payload: ChatUnreadEvent) => void;
+  "mentorship:changed": (payload: MentorshipChangedEvent) => void;
   /** The access token used to connect has expired; the server disconnects right after. Refresh and reconnect. */
   "auth:expired": () => void;
 }

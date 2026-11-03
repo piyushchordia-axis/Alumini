@@ -21,6 +21,9 @@ import {
   JOB_TYPES,
   MARITAL_STATUSES,
   MEMBERSHIP_ROLES,
+  MENTOR_AREAS,
+  MENTOR_AVAILABILITIES,
+  MENTORSHIP_STATUSES,
   MESSAGE_CHANNELS,
   MEMBERSHIP_STATUSES,
   MODERATION_STATUSES,
@@ -82,3 +85,6 @@ export const chatMessageKindEnum = pgEnum("chat_message_kind", CHAT_MESSAGE_KIND
 export const chatReportTargetKindEnum = pgEnum("chat_report_target_kind", CHAT_REPORT_TARGET_KINDS);
 export const chatReportActionEnum = pgEnum("chat_report_action", CHAT_REPORT_ACTIONS);
 export const chatGroupVisibilityEnum = pgEnum("chat_group_visibility", CHAT_GROUP_VISIBILITIES);
+export const mentorAreaEnum = pgEnum("mentor_area", MENTOR_AREAS);
+export const mentorAvailabilityEnum = pgEnum("mentor_availability", MENTOR_AVAILABILITIES);
+export const mentorshipStatusEnum = pgEnum("mentorship_status", MENTORSHIP_STATUSES);
