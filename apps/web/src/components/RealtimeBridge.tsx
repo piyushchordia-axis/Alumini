@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { chatSync } from "@/lib/chat";
 import { qk } from "@/lib/queryKeys";
 import { realtime } from "@/lib/realtime";
 import { useIsAuthenticated } from "@/stores/authStore";
@@ -36,6 +37,8 @@ export function RealtimeBridge() {
     ];
     return () => offs.forEach((off) => off());
   }, [qc]);
+
+  useEffect(() => chatSync.attach(), []);
 
   useEffect(() => {
     if (authed) realtime.start();

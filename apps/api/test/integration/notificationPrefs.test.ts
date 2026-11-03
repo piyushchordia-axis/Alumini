@@ -55,7 +55,7 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     const m = await memberSession(ctx, tenant.id);
     const initial = await request(ctx.app).get(prefsUrl(tenant.slug)).set(m.headers);
     expect(initial.body.data).toEqual({
-      categories: { ACTIVITY: "IN_APP_PUSH", EVENTS: "IN_APP_PUSH", ANNOUNCEMENTS: "IN_APP_PUSH", CELEBRATIONS: "IN_APP_PUSH", ADMIN: "IN_APP_PUSH" },
+      categories: { ACTIVITY: "IN_APP_PUSH", CHAT: "IN_APP_PUSH", EVENTS: "IN_APP_PUSH", ANNOUNCEMENTS: "IN_APP_PUSH", CELEBRATIONS: "IN_APP_PUSH", ADMIN: "IN_APP_PUSH" },
       digestEmail: true,
       announcementMessages: true,
       celebrationsNoticeSeenAt: null,
@@ -72,6 +72,17 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     const again = await request(ctx.app).patch(prefsUrl(tenant.slug)).set(m.headers).send({ categories: { EVENTS: "IN_APP" } });
     expect(again.body.data.categories).toMatchObject({ ACTIVITY: "OFF", EVENTS: "IN_APP" });
     expect((await request(ctx.app).patch(prefsUrl(tenant.slug)).set(m.headers).send({ categories: { EVENTS: "LOUD" } })).status).toBe(400);
+  });
+
+  it("saves the CHAT level, which can leave push off but can't go below in-app", async () => {
+    const { tenant } = await createTenant(ctx);
+    const m = await memberSession(ctx, tenant.id);
+    const inApp = await request(ctx.app).patch(prefsUrl(tenant.slug)).set(m.headers).send({ categories: { CHAT: "IN_APP" } });
+    expect(inApp.body.data.categories.CHAT).toBe("IN_APP");
+    const off = await request(ctx.app).patch(prefsUrl(tenant.slug)).set(m.headers).send({ categories: { CHAT: "OFF" } });
+    expect(off.status).toBe(200);
+    expect(off.body.data.categories.CHAT).toBe("IN_APP");
+    expect((await request(ctx.app).get(prefsUrl(tenant.slug)).set(m.headers)).body.data.categories.CHAT).toBe("IN_APP");
   });
 
   it("drops notifications a member turned off, keeps account notices, and skips push for in-app only", async () => {

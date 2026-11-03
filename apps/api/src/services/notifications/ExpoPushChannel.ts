@@ -4,7 +4,7 @@ import type { RedisClient } from "../../redis/client";
 import { keys } from "../../redis/keys";
 import type { NotificationRow } from "../../repositories/notifications.repo";
 import { deletePushTokensByValue, listPushTokensForUsers } from "../../repositories/users.repo";
-import { PushSendError, type DeliveryContext, type NotificationRecipient, type PushChannel, type PushMessage } from "./NotificationChannel";
+import { PushSendError, type DeliveryContext, type NotificationRecipient, type PushChannel, type PushItem, type PushMessage } from "./NotificationChannel";
 
 const SEND_URL = "https://exp.host/--/api/v2/push/send";
 const RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
@@ -52,11 +52,22 @@ export class ExpoPushChannel implements PushChannel {
     };
   }
 
-  /** Builds one Expo message per recipient device. Recipients without push tokens get none. */
+  /** Builds the Expo messages for stored notifications. Recipients without push tokens get none. */
   async prepare(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<PushMessage[]> {
-    if (rows.length === 0) return [];
     const userByMembership = new Map(recipients.map((r) => [r.membershipId, r.userId]));
-    const tokens = await listPushTokensForUsers(this.db, [...new Set(recipients.map((r) => r.userId))]);
+    const items: PushItem[] = [];
+    for (const row of rows) {
+      const userId = userByMembership.get(row.recipientMembershipId);
+      if (!userId) continue;
+      items.push({ userId, title: row.title, body: BODY_STAYS_IN_APP.has(row.type) ? undefined : (row.body ?? undefined), data: { ...row.data, notificationId: row.id, type: row.type } });
+    }
+    return this.prepareFor(items, context);
+  }
+
+  /** Builds one Expo message per device of each item's user. */
+  async prepareFor(items: PushItem[], context: DeliveryContext): Promise<PushMessage[]> {
+    if (items.length === 0) return [];
+    const tokens = await listPushTokensForUsers(this.db, [...new Set(items.map((i) => i.userId))]);
     if (tokens.length === 0) return [];
     const tokensByUser = new Map<string, string[]>();
     for (const t of tokens) {
@@ -64,18 +75,9 @@ export class ExpoPushChannel implements PushChannel {
       tokensByUser.set(t.userId, [...(tokensByUser.get(t.userId) ?? []), t.token]);
     }
     const messages: PushMessage[] = [];
-    for (const row of rows) {
-      const userId = userByMembership.get(row.recipientMembershipId);
-      if (!userId) continue;
-      for (const token of tokensByUser.get(userId) ?? []) {
-        messages.push({
-          to: token,
-          title: row.title,
-          body: BODY_STAYS_IN_APP.has(row.type) ? undefined : (row.body ?? undefined),
-          data: { ...row.data, notificationId: row.id, type: row.type, tenantSlug: context.tenantSlug },
-          sound: "default",
-          channelId: "default",
-        });
+    for (const item of items) {
+      for (const token of tokensByUser.get(item.userId) ?? []) {
+        messages.push({ to: token, title: item.title, body: item.body, data: { ...item.data, tenantSlug: context.tenantSlug }, sound: "default", channelId: "default" });
       }
     }
     return messages;

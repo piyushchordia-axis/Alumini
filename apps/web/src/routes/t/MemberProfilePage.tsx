@@ -1,6 +1,7 @@
 import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
 import { Avatar, Badge, Card, ErrorBox, Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -13,9 +14,13 @@ export function MemberProfilePage() {
   const { membershipId = "" } = useParams();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
   if (profile.isLoading) return <Loading />;
-  if (profile.error || !profile.data) return <ErrorBox error={profile.error ?? "Not found"} />;
+  // Only with nothing to show: a refetch failing in the background keeps the profile on screen.
+  if (!profile.data) return <ErrorBox error={profile.error ?? "Not found"} />;
   const m = profile.data;
   const isSelf = m.id === membership.id;
+  // Blocking doesn't depend on messages being on: an institution may switch them off in the middle of an incident.
+  const canBlock = !isSelf && membership.chatEligible;
+  const chatOn = canBlock && tenant.settings.features.messaging;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Link to={`/t/${slug}/app/directory`} className="text-sm text-slate-500 hover:text-slate-800">
@@ -43,6 +48,11 @@ export function MemberProfilePage() {
               <Link to={`/t/${slug}/app/profile`} className="mt-2 inline-block text-sm text-primary underline">
                 Edit my profile
               </Link>
+            )}
+            {chatOn && m.canMessage && (
+              <div className="mt-3">
+                <MessageMemberButton slug={slug} member={m} />
+              </div>
             )}
           </div>
         </div>
@@ -89,6 +99,11 @@ export function MemberProfilePage() {
             <dd>{formatDate(m.memberSince)}</dd>
           </div>
         </dl>
+        {canBlock && (
+          <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+            <ProfileBlockButton slug={slug} member={m} />
+          </div>
+        )}
       </Card>
     </div>
   );

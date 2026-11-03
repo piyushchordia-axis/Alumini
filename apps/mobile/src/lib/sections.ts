@@ -9,6 +9,7 @@ export interface SectionTab {
 
 export const SECTION_TABS: Record<MemberSection, SectionTab> = {
   feed: { path: "feed", label: "Feed", icon: "💬" },
+  messages: { path: "messages", label: "Messages", icon: "✉️" },
   jobs: { path: "jobs", label: "Jobs", icon: "💼" },
   directory: { path: "directory", label: "Directory", icon: "🎓" },
   events: { path: "events", label: "Events", icon: "📅" },

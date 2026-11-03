@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { reconnect, scriptBusiness, scriptFeatures, scriptMembership, scriptNotification, scriptTenant } from "./lib.mjs";
+import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -131,13 +131,14 @@ try {
     await shot("m04d-poll");
   });
 
-  await step("every section opens its own screen, with Funding behind More", async () => {
+  await step("every section opens its own screen, with Events and Funding behind More", async () => {
     if ((await page.locator('a[role="tab"]').locator("visible=true").count()) !== 5) throw new Error("the tab bar should show four sections, then More");
     const moreColor = () => barTab("More").evaluate((el) => getComputedStyle(el).color);
     const moreColorOnFeed = await moreColor();
     // A route folder with no Tabs.Screen redirects to the first tab rather than failing, so check the URL and the content.
     const sections = [
       ["Feed", "feed", page.getByRole("button", { name: "New post" })],
+      ["Messages", "messages", page.getByText("No conversations yet", { exact: true })],
       ["Jobs", "jobs", page.getByText("Backend Engineer (Node.js)")],
       ["Directory", "directory", page.getByPlaceholder("Name, company, role")],
       ["Events", "events", page.getByText("Mumbai alumni coffee meetup")],
@@ -147,7 +148,7 @@ try {
       await openSection(label);
       await page.waitForURL(`**/t/demo-university/${path}`);
       await content.locator("visible=true").first().waitFor();
-      if (label === "Funding") continue;
+      if (label === "Funding" || label === "Events") continue;
       await selectedBarTab(label).waitFor();
       if (await selectedBarTab("More").count()) throw new Error(`More shows as selected on ${label}`);
     }
@@ -337,7 +338,8 @@ try {
     await shot("m07a-business-delete");
     await sheet.getByRole("button", { name: "Delete listing" }).click();
     await sheet.waitFor({ state: "hidden" });
-    await page.waitForURL("**/t/demo-university/businesses");
+    // Back to the list the stack put under a listing opened from a link. Expo Router hands that list the listing's params.
+    await page.waitForURL(/\/t\/demo-university\/businesses(\?id=[0-9a-f-]+)?$/);
     await visible(page.getByText("Lending software for small marketplaces", { exact: false })).waitFor();
     if (await page.getByText(`${name} and Sons`, { exact: true }).count()) throw new Error("a deleted listing is still in the list");
     // The next step takes the first bell on the page, which has to be the feed's rather than this screen's underneath it.
@@ -384,7 +386,17 @@ try {
       await content.locator("visible=true").first().waitFor();
       if (page.url() !== url) throw new Error(`${url} redirected to ${page.url()}`);
       await selectedBarTab(tab).waitFor();
-      await expectBar("Feed", "Jobs", "Directory", "Events", "More");
+      await expectBar("Feed", "Messages", "Jobs", "Directory", "More");
+    }
+
+    // A job or a listing opened cold, as from a push tap that launched the app, has its section's list to go back to.
+    for (const [url, list] of [
+      [job, /\/t\/demo-university\/jobs(\?jobId=[0-9a-f-]+)?$/],
+      [funding, /\/t\/demo-university\/funding(\?id=[0-9a-f-]+)?$/],
+    ]) {
+      await page.goto(url);
+      await page.getByLabel(/back$/i).locator("visible=true").first().click();
+      await page.waitForURL(list);
     }
 
     // With nothing mounted under My posts, it must still have a way back on the screen. Android has its back button, iOS only has this.
@@ -402,6 +414,273 @@ try {
     await page.getByText("Embedded credit for SME marketplaces", { exact: false }).locator("visible=true").first().waitFor();
     await selectedBarTab("More").waitFor();
     await notification.stop();
+
+    // A chat notice opens its thread above the tabs. One this member isn't in says so, with a way back, rather than going blank.
+    const removed = await scriptNotification(page, "demo-university", { type: "CHAT_MESSAGE_REMOVED", data: { conversationId: "00000000-0000-4000-8000-0000000000aa", messageId: "00000000-0000-4000-8000-0000000000ab" }, title: "An admin removed a message you sent" });
+    await page.goto(BASE + "/t/demo-university/profile/notifications");
+    await page.getByText("An admin removed a message you sent", { exact: true }).click();
+    await page.waitForURL("**/t/demo-university/messages/00000000-0000-4000-8000-0000000000aa");
+    await page.getByText("This conversation isn't available").locator("visible=true").first().waitFor();
+    if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("a thread shows the tab bar");
+    await page.getByRole("button", { name: "Go back" }).locator("visible=true").last().click();
+    await page.waitForURL("**/t/demo-university/profile/notifications");
+    await removed.stop();
+  });
+
+  await step("two members message each other live: request, accept, replies, a report and a block", async () => {
+    // Seeded members with no thread between them. web-member.mjs uses a different pair, so the two scripts can run in either order.
+    const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
+    const contextA = await signedInMobileContext(browser, BASE, "+919100000003", phone); // Arjun Singh
+    const contextB = await signedInMobileContext(browser, BASE, "+919100000005", phone); // Vikram Desai
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    for (const p of [pageA, pageB]) p.setDefaultTimeout(20000);
+    const app = `${BASE}/t/demo-university`;
+    // Screens underneath stay mounted on the web export, so the one on top is the last match.
+    const shown = (locator) => locator.locator("visible=true").last();
+    const log = (p) => shown(p.locator('[role="log"]'));
+    const live = { timeout: 10000 };
+    const send = async (p, text) => {
+      await shown(p.getByLabel("Write a message")).fill(text);
+      await shown(p.getByRole("button", { name: "Send message" })).click();
+    };
+    const tabBar = (p) => p.locator('a[role="tab"]').locator("visible=true");
+    const badgeA = async () => {
+      const { accessToken } = await apiSession("+919100000003");
+      const res = await fetch(`${API}/api/v1/t/demo-university/chat/badge`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      return (await res.json()).data;
+    };
+
+    // B waits on Requests, so the request has to arrive there live.
+    await pageB.goto(`${app}/messages`);
+    await shown(pageB.locator('[role="tab"]').getByText("Requests", { exact: true })).click();
+    await shown(pageB.getByText("No message requests")).waitFor();
+    const messagesTabB = pageB.locator('a[role="tab"]').filter({ hasText: "Messages" }).locator("visible=true").first();
+    if (await messagesTabB.getAttribute("aria-label")) throw new Error(`B starts with something waiting: ${await messagesTabB.getAttribute("aria-label")}`);
+
+    // A asks from B's profile. The first message goes as a request, and nothing more can follow it until B answers.
+    await pageA.goto(`${app}/directory`);
+    await shown(pageA.getByPlaceholder("Name, company, role")).fill("Vikram");
+    const hit = shown(pageA.getByText("Vikram Desai"));
+    await hit.waitFor();
+    await hit.dispatchEvent("click");
+    await shown(pageA.getByRole("link", { name: "Message this member" })).click();
+    await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
+    await shown(pageA.getByText("Your first message is a request")).waitFor();
+    const asked = `Hello Vikram, could I ask about IIM? ${unique}`;
+    await send(pageA, asked);
+    await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    await shown(pageA.getByText("Request sent", { exact: true })).waitFor();
+    await log(pageA).getByText(asked).waitFor();
+    if (await pageA.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the requester can write more before an answer");
+    if (await tabBar(pageA).count()) throw new Error("a thread shows the tab bar");
+    await pageA.screenshot({ path: `${SHOTS}/m10a-chat-request-sent.png` });
+
+    // B: the tab's badge and the Requests list change with no reload. The badge sits on the icon, so the label stays put.
+    const badged = pageB.locator('a[role="tab"][aria-label="Messages, 1 unread"]').locator("visible=true").first();
+    await badged.waitFor(live);
+    const labelBottom = (name) => tabBar(pageB).filter({ hasText: name }).first().getByText(name, { exact: true }).evaluate((el) => el.getBoundingClientRect().bottom);
+    const [withBadge, without] = [await labelBottom("Messages"), await labelBottom("Jobs")];
+    if (Math.abs(withBadge - without) > 1) throw new Error(`the badge moves the Messages label: ${withBadge} against ${without}`);
+    const request = shown(pageB.getByRole("link", { name: /^Arjun Singh/ }));
+    await request.waitFor(live);
+    await pageB.screenshot({ path: `${SHOTS}/m10b-chat-request-arrived.png` });
+    await request.click();
+    await log(pageB).getByText(asked).waitFor();
+    await shown(pageB.getByRole("button", { name: "Accept request" })).click();
+    const boxB = shown(pageB.getByLabel("Write a message"));
+    await boxB.waitFor();
+
+    // A can write once B accepts, with no reload, and messages go both ways live, one bubble each.
+    await shown(pageA.getByLabel("Write a message")).waitFor(live);
+    const fromA = `How was Ahmedabad? ${unique}`;
+    await send(pageA, fromA);
+    await log(pageB).getByText(fromA).waitFor(live);
+    const fromB = `Hot, and worth it.\nAsk away! ${unique}`;
+    await send(pageB, fromB);
+    await log(pageA).getByText(`Ask away! ${unique}`, { exact: false }).waitFor(live);
+    await pageA.waitForTimeout(1500);
+    for (const [p, who] of [
+      [pageA, "A"],
+      [pageB, "B"],
+    ]) {
+      for (const text of [asked, fromA, `Ask away! ${unique}`]) {
+        const bubbles = await log(p).getByText(text, { exact: false }).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text}"`);
+      }
+    }
+    await pageA.screenshot({ path: `${SHOTS}/m10c-chat-thread.png` });
+
+    // A thread marks what arrives read only while it's being looked at: not under another screen, and not with the app in
+    // the background. Each time the message does reach it, so only that rule can keep it unread.
+    const readOnReturn = async (what) => {
+      for (let i = 0; i < 50 && (await badgeA()).unread !== 0; i++) await pageA.waitForTimeout(200);
+      if ((await badgeA()).unread !== 0) throw new Error(`coming back to the thread ${what} didn't mark it read`);
+    };
+    await shown(pageA.getByRole("button", { name: "Conversation options" })).click();
+    await shown(pageA.getByRole("dialog", { name: "Conversation options" })).getByRole("link", { name: "Blocked members" }).click();
+    await shown(pageA.getByText("You haven't blocked anyone")).waitFor();
+    const underneath = `Are you around? ${unique}`;
+    await send(pageB, underneath);
+    // The thread is still there under the blocked list, out of sight.
+    await pageA.locator('[role="log"]').getByText(underneath).first().waitFor({ ...live, state: "attached" });
+    await pageA.waitForTimeout(2500);
+    if ((await badgeA()).unread !== 1) throw new Error("a thread under another screen was marked read");
+    await shown(pageA.getByRole("button", { name: "Back" })).click();
+    await readOnReturn("from another screen");
+
+    const setVisible = (p, visible) =>
+      p.evaluate((v) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (v ? "visible" : "hidden") });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, visible);
+    await setVisible(pageA, false);
+    const unseen = `Still there? ${unique}`;
+    await send(pageB, unseen);
+    await log(pageB).getByText(unseen).waitFor();
+    // B's bubble shows before the server has it, so wait for the send to land.
+    await log(pageB).getByText("Sending…").waitFor({ state: "detached" });
+    // The live connection closes in the background, so bring the message in the way a phone would: a network change
+    // refetches what's gone stale.
+    await pageA.evaluate(() => {
+      const now = Date.now;
+      Date.now = () => now() + 31_000;
+    });
+    await reconnect(pageA);
+    await log(pageA).getByText(unseen).waitFor(live);
+    await pageA.waitForTimeout(2500);
+    if ((await badgeA()).unread !== 1) throw new Error("a thread in an app in the background was marked read");
+    await setVisible(pageA, true);
+    await readOnReturn("in front again");
+
+    // A send that fails stays in the thread with Try again, which sends it under the same key.
+    const sendUrl = /\/api\/v1\/t\/demo-university\/chat\/conversations\/[0-9a-f-]+\/messages$/;
+    const sentKeys = [];
+    let fail = true;
+    await pageA.route(sendUrl, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      sentKeys.push(route.request().postDataJSON().clientKey);
+      if (!fail) return route.fallback();
+      return route.fulfill({ status: 503, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: { code: "INTERNAL", message: "e2e INTERNAL" } }) });
+    });
+    const retried = `Sent at the second try ${unique}`;
+    await send(pageA, retried);
+    const tryAgain = shown(pageA.getByRole("button", { name: "Try again" }));
+    await tryAgain.waitFor();
+    fail = false;
+    await tryAgain.click();
+    await log(pageB).getByText(retried).waitFor(live);
+    await pageA.getByRole("button", { name: "Try again" }).locator("visible=true").waitFor({ state: "detached" });
+    if (sentKeys.length < 2 || new Set(sentKeys).size !== 1) throw new Error(`Try again didn't reuse the client key: ${sentKeys.join(", ")}`);
+    if ((await log(pageA).getByText(retried).count()) !== 1) throw new Error("a retried message isn't exactly one bubble");
+    await pageA.unroute(sendUrl);
+
+    // A failed background refetch of the thread keeps the screen and the draft, and so does leaving and coming back.
+    const draft = `Half-written thought ${unique}`;
+    await shown(pageA.getByLabel("Write a message")).fill(draft);
+    const thread = await scriptConversation(pageA, "demo-university", pageA.url().split("/").pop());
+    thread.answer(503, "INTERNAL");
+    await thread.refetch();
+    if ((await shown(pageA.getByLabel("Write a message")).inputValue()) !== draft) throw new Error("a failed refetch of the thread lost the draft");
+    if (!(await log(pageA).getByText(fromA).isVisible())) throw new Error("a failed refetch of the thread replaced it");
+    thread.answer(null);
+    await thread.stop();
+    await shown(pageA.getByRole("button", { name: "Back" })).click();
+    await pageA.waitForURL(/\/directory\/[0-9a-f-]+$/);
+    await shown(pageA.getByRole("link", { name: "Message this member" })).click();
+    await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    if ((await shown(pageA.getByLabel("Write a message")).inputValue()) !== draft) throw new Error("leaving the thread and coming back lost the draft");
+    await shown(pageA.getByLabel("Write a message")).fill("");
+
+    // A reports B's message: tapping it offers Report message. The sheet says what admins will see, and a second report
+    // counts as done, not as an error. A's own messages offer no report.
+    const reportB = async () => {
+      await shown(log(pageA).getByText(`Ask away! ${unique}`, { exact: false })).click();
+      await shown(pageA.getByRole("button", { name: "Report message" })).click();
+      const sheet = shown(pageA.getByRole("dialog", { name: "Report message" }));
+      await sheet.getByText("Admins will see this message and up to 10 around it.").waitFor();
+      await sheet.getByRole("button", { name: "Send report" }).click();
+      await sheet.waitFor({ state: "detached" });
+    };
+    await reportB();
+    await shown(pageA.getByText("Thanks. Admins will take a look.")).waitFor();
+    await reportB();
+    await shown(pageA.getByText("You have already reported this message")).waitFor();
+    await shown(log(pageA).getByText(fromA)).click();
+    await pageA.waitForTimeout(300);
+    if (await pageA.getByRole("button", { name: "Report message" }).locator("visible=true").count()) throw new Error("a member can report their own message");
+
+    // A blocks B. B's next message looks sent to B and never reaches A, even after A unblocks.
+    await shown(pageA.getByRole("button", { name: "Conversation options" })).click();
+    await shown(pageA.getByRole("dialog", { name: "Conversation options" })).getByRole("button", { name: "Block member" }).click();
+    const confirm = pageA.getByRole("alertdialog", { name: "Block Vikram Desai?" });
+    await confirm.getByRole("button", { name: "Block member" }).click();
+    await shown(pageA.getByText("You blocked Vikram Desai")).waitFor();
+    if (await pageA.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the blocker can still write");
+    const whileBlocked = `Are you still there? ${unique}`;
+    await send(pageB, whileBlocked);
+    await log(pageB).getByText(whileBlocked).waitFor();
+    await pageB.waitForTimeout(3000);
+    if (await pageB.getByRole("button", { name: "Try again" }).locator("visible=true").count()) throw new Error("a message to a member who blocked you looked failed");
+    if (await log(pageB).getByText("Sending…").count()) throw new Error("a message to a member who blocked you is stuck sending");
+    if ((await log(pageB).getByText(whileBlocked).count()) !== 1) throw new Error("the blocked member's message isn't exactly one bubble on their side");
+    if (await log(pageA).getByText(whileBlocked).count()) throw new Error("a blocked member's message reached the blocker");
+    await shown(pageA.getByRole("button", { name: "Unblock member" })).click();
+    await shown(pageA.getByLabel("Write a message")).waitFor();
+    // A reload is a cold start on the thread, which mounts with the layout above it, as a push tap on a closed app does. It must
+    // still count as open: a message the live connection loses is fetched as soon as the next one shows the gap.
+    const lost = `Lost on the way ${unique}`;
+    const socket = await dropFrames(pageA, lost);
+    await pageA.reload();
+    await log(pageA).getByText(fromA).waitFor();
+    if (await log(pageA).getByText(whileBlocked).count()) throw new Error("unblocking brought back a message sent while blocked");
+    await socket.opened();
+    await send(pageB, lost);
+    await log(pageB).getByText(lost).waitFor();
+    await log(pageB).getByText("Sending…").waitFor({ state: "detached" });
+    const afterLost = `And the one after it ${unique}`;
+    await send(pageB, afterLost);
+    await log(pageA).getByText(afterLost).waitFor(live);
+    await log(pageA).getByText(lost).waitFor(live);
+    if (!socket.dropped()) throw new Error("the live connection never carried the message meant to be lost, so the gap went untested");
+
+    // The reload was a cold start on a thread: no tab bar, and Back has somewhere real to go.
+    if (await tabBar(pageA).count()) throw new Error("a thread opened cold shows the tab bar");
+    await shown(pageA.getByRole("button", { name: "Back" })).click();
+    await pageA.waitForURL("**/t/demo-university/feed");
+    await tabBar(pageA).first().waitFor();
+    await contextA.close();
+    await contextB.close();
+  });
+
+  await step("a current pupil sees no Messages, even with messaging switched on", async () => {
+    const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Ira Banerjee, demo-school
+    const pupil = await context.newPage();
+    pupil.setDefaultTimeout(20000);
+    const chatCalls = [];
+    pupil.on("request", (r) => {
+      if (/\/api\/v1\/t\/[^/]+\/chat\//.test(r.url())) chatCalls.push(new URL(r.url()).pathname);
+    });
+    // Schools start with messaging off. On here, so only the pupil rule can be what hides it.
+    const features = await scriptFeatures(pupil, "demo-school");
+    features.only("feed", "messaging", "jobs", "directory", "events", "businesses", "funding");
+    await pupil.goto(`${BASE}/t/demo-school/feed`);
+    const bar = pupil.locator('a[role="tab"]').locator("visible=true");
+    await bar.filter({ hasText: "More" }).first().waitFor();
+    const shown = await bar.evaluateAll((tabs) => tabs.map((tab) => tab.innerText.split("\n").pop()));
+    if (shown.join() !== "Feed,Jobs,Directory,Events,More") throw new Error(`a pupil's tab bar shows ${shown.join(", ")}`);
+    await bar.filter({ hasText: "More" }).first().click();
+    await pupil.getByRole("link", { name: "Switch institution", exact: true }).locator("visible=true").first().waitFor();
+    if (await pupil.getByRole("link", { name: "Messages", exact: true }).locator("visible=true").count()) throw new Error("a pupil's More hub offers Messages");
+    // The inbox sends them home; a thread or a new conversation says Messages aren't available.
+    await pupil.goto(`${BASE}/t/demo-school/messages`);
+    await pupil.waitForURL("**/t/demo-school/feed");
+    await pupil.goto(`${BASE}/t/demo-school/messages/00000000-0000-4000-8000-000000000001`);
+    await pupil.getByText("Messages aren't available").locator("visible=true").first().waitFor();
+    await pupil.screenshot({ path: `${SHOTS}/m10d-chat-pupil.png` });
+    if (chatCalls.length) throw new Error(`a pupil's app called the chat API: ${chatCalls.join(", ")}`);
+    await features.stop();
+    await context.close();
   });
 
   await step("sections the institution has switched off", async () => {

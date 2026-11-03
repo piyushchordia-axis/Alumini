@@ -4,7 +4,7 @@ import { blocksBetween, changeDirectState, findMessageByClientKey, getOrCreateDi
 import { findMembershipById } from "../../repositories/memberships.repo";
 import { findTenantById } from "../../repositories/tenants.repo";
 import { assertKindEnabled, contactUnavailable, freshChatTenant, isReachable } from "./common";
-import { appendMessage, publishChanged } from "./fanout";
+import { appendMessage, publishChanged, queuePushEvent } from "./fanout";
 
 export interface OpenDirectInput {
   tenantId: string;
@@ -14,6 +14,8 @@ export interface OpenDirectInput {
   originId: string;
   /** The note that started it, which becomes the first message. */
   seedMessage?: { senderMembershipId: string; body: string };
+  /** Who agreed just now and doesn't need telling. Leave it out and both members get a push. */
+  actorMembershipId?: string;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface OpenDirectInput {
  * race, and it refuses like any other unavailable contact.
  */
 export async function openDirectFromOrigin(ctx: AppContext, tx: Tx, input: OpenDirectInput): Promise<{ conversationId: string; created: boolean; message: ChatMessageRow | null }> {
-  const { tenantId, aId, bId, origin, originId, seedMessage } = input;
+  const { tenantId, aId, bId, origin, originId, seedMessage, actorMembershipId = null } = input;
   await limitLockWait(tx);
   const tenant = await freshChatTenant(tx, tenantId);
   assertKindEnabled(tenant.features, "DIRECT");
@@ -39,6 +41,7 @@ export async function openDirectFromOrigin(ctx: AppContext, tx: Tx, input: OpenD
 
   const opening = !created && conversation.directState !== "ACCEPTED";
   if (opening) await changeDirectState(tx, conversation.id, { directState: "ACCEPTED", origin, originId });
+  const opened = created || opening;
 
   let message: ChatMessageRow | null = null;
   if (seedMessage) {
@@ -46,10 +49,14 @@ export async function openDirectFromOrigin(ctx: AppContext, tx: Tx, input: OpenD
     message = (await findMessageByClientKey(tx, conversation.id, seedMessage.senderMembershipId, clientKey)) ?? null;
     if (!message) {
       const sender = seedMessage.senderMembershipId === aId ? a! : b!;
-      message = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender, body: seedMessage.body, clientKey });
+      // Opening the chat tells them, so its first message isn't a second push.
+      message = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender, body: seedMessage.body, clientKey, noPush: opened });
     }
   }
-  if (created || opening) await publishChanged(ctx, tx, tenant.slug, conversation.id);
+  if (opened) {
+    await publishChanged(ctx, tx, tenant.slug, conversation.id);
+    await queuePushEvent(ctx, tx, { tenantId, conversationId: conversation.id, kind: "CHAT_OPENED", actorMembershipId });
+  }
   return { conversationId: conversation.id, created, message };
 }
 

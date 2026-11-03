@@ -26,8 +26,7 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
     case "business":
       return `${base}/businesses/${t.id}`;
     case "chat":
-      // Nothing to open until the chat screens exist.
-      return null;
+      return `${base}/messages/${t.conversationId}`;
     case "myContent":
       return `${base}/my-content`;
     case "profile":

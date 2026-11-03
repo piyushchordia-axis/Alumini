@@ -6,6 +6,7 @@ import { BullJobQueue } from "../../src/jobs/BullJobQueue";
 import { createBullConnection } from "../../src/jobs/connection";
 import { PermanentJobError, type JobHandlers } from "../../src/jobs/JobQueue";
 import { startWorkers, syncSchedules, type RunningWorkers } from "../../src/jobs/runWorkers";
+import { queueConversationPush } from "../../src/services/chat/fanout";
 import type { ScheduledJob } from "../../src/jobs/schedules";
 import { loadConfig } from "../../src/config/env";
 import { createLogger } from "../../src/lib/logger";
@@ -48,6 +49,9 @@ describe.skipIf(!redisAvailable)("BullMQ job queue (real Redis)", () => {
     "push.checkReceipts": async (_c, data, meta) => {
       calls.push({ name: "receipts", attempt: meta.attempt, data });
     },
+    "chat.pushConversation": async (_c, data, meta) => {
+      calls.push({ name: "chat", attempt: meta.attempt, data });
+    },
   };
   const producer = createBullConnection(realRedisUrl(), "producer");
   const queue = new BullJobQueue({
@@ -63,7 +67,7 @@ describe.skipIf(!redisAvailable)("BullMQ job queue (real Redis)", () => {
   });
   afterAll(async () => {
     await workers?.close();
-    for (const name of ["jobs", "messages"] as const) await queue.queue(name).obliterate({ force: true });
+    for (const name of ["jobs", "messages", "chat"] as const) await queue.queue(name).obliterate({ force: true });
     await queue.close();
     await producer.quit();
   });
@@ -105,6 +109,55 @@ describe.skipIf(!redisAvailable)("BullMQ job queue (real Redis)", () => {
     await eventually(() => expect(calls.filter((c) => c.name === "receipts").length).toBe(before + 1));
     await new Promise((r) => setTimeout(r, 200));
     expect(calls.filter((c) => c.name === "receipts").length).toBe(before + 1);
+  });
+
+  describe("a chat push bucket", () => {
+    const window = { windowMs: 200, quietSec: 1 };
+    const chatCalls = () => calls.filter((c) => c.name === "chat").length;
+    const push = (conversationId: string, now: number) => queueConversationPush({ jobs: queue }, { tenantId: "t", conversationId }, window, now);
+
+    it("holds its id after completing, and doesn't stop the next bucket", async () => {
+      const before = chatCalls();
+      const now = Date.now();
+      await push("c-1", now);
+      await eventually(() => expect(chatCalls()).toBe(before + 1));
+      const bucket = Math.floor(now / window.windowMs);
+      const finished = await queue.queue("chat").getJob(`chatpush-c-1-${bucket}`);
+      expect(await finished!.isCompleted()).toBe(true);
+
+      // This is the trap: BullMQ still refuses the finished id, so a constant id here would mean no more pushes for a day.
+      await push("c-1", now);
+      await new Promise((r) => setTimeout(r, window.windowMs * 3));
+      expect(chatCalls()).toBe(before + 1);
+
+      await push("c-1", now + window.windowMs);
+      await eventually(() => expect(chatCalls()).toBe(before + 2));
+    });
+
+    it("merges everything queued in one bucket into one run, which waits for the end of the next", async () => {
+      const before = chatCalls();
+      const now = Date.now();
+      const q = queue.queue("chat");
+      await q.pause();
+      await push("c-2", now);
+      await push("c-2", now);
+      const bucket = Math.floor(now / window.windowMs);
+      const job = await q.getJob(`chatpush-c-2-${bucket}`);
+      expect(job!.opts.delay).toBe((bucket + 2) * window.windowMs - now);
+      expect(job!.queueName).toBe("chat");
+      await q.resume();
+      await eventually(() => expect(chatCalls()).toBe(before + 1));
+      await new Promise((r) => setTimeout(r, window.windowMs));
+      expect(chatCalls()).toBe(before + 1);
+    });
+
+    it("keeps conversations apart", async () => {
+      const before = chatCalls();
+      const now = Date.now();
+      await push("c-3", now);
+      await push("c-4", now);
+      await eventually(() => expect(chatCalls()).toBe(before + 2));
+    });
   });
 
   it("syncs scheduled jobs from the registry and runs them", async () => {

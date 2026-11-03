@@ -1,4 +1,4 @@
-import { NOTIFICATION_CATEGORY, NOTIFICATION_TYPES, notificationLevelFor, notificationTarget, resolveNotificationPrefs } from "@illuminize/shared";
+import { CHAT_PUSH_KINDS, CONFIGURABLE_CATEGORIES, NOTIFICATION_CATEGORY, NOTIFICATION_CATEGORY_INFO, NOTIFICATION_TYPES, TENANT_FEATURES, notificationLevelFor, notificationTarget, resolveNotificationPrefs, visibleNotificationCategories, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("notificationTarget", () => {
@@ -34,6 +34,13 @@ describe("notificationTarget", () => {
     expect(notificationTarget("CHAT_MESSAGE_REMOVED", { conversationId: "c1", messageId: "m1" })).toEqual({ kind: "chat", conversationId: "c1" });
     expect(notificationTarget("CHAT_MESSAGE_REMOVED", {})).toBeNull();
     expect(NOTIFICATION_CATEGORY.CHAT_MESSAGE_REMOVED).toBe("ACCOUNT");
+  });
+
+  it("opens the thread from every chat push, and from nothing else without a conversation", () => {
+    for (const kind of CHAT_PUSH_KINDS) {
+      expect(notificationTarget(kind, { conversationId: "c1", tenantSlug: "demo" }), kind).toEqual({ kind: "chat", conversationId: "c1" });
+      expect(notificationTarget(kind, {}), kind).toBeNull();
+    }
   });
 
   it("routes Wave 1 notifications", () => {
@@ -74,6 +81,45 @@ describe("notificationTarget", () => {
     expect(notificationTarget("SYSTEM", { contentType: "JOB", contentId: "j1" })).toEqual({ kind: "job", id: "j1" });
     expect(notificationTarget("SYSTEM", { postId: "p1" })).toEqual({ kind: "post", id: "p1" });
     expect(notificationTarget("SYSTEM", {})).toBeNull();
+  });
+});
+
+describe("chat push kinds", () => {
+  it("stay out of the stored types, so none can ever land in the bell", () => {
+    for (const kind of CHAT_PUSH_KINDS) {
+      expect(NOTIFICATION_TYPES as readonly string[], kind).not.toContain(kind);
+      expect(Object.hasOwn(NOTIFICATION_CATEGORY, kind), kind).toBe(false);
+    }
+  });
+});
+
+describe("the CHAT category", () => {
+  const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map((f) => [f, on.includes(f)])) as TenantFeatures;
+
+  it("is called Messages and can't go below in-app", () => {
+    expect(NOTIFICATION_CATEGORY_INFO.CHAT).toMatchObject({ label: "Messages", minLevel: "IN_APP" });
+    expect(CONFIGURABLE_CATEGORIES).toContain("CHAT");
+    expect(resolveNotificationPrefs({ categories: { CHAT: "OFF" } }).categories.CHAT).toBe("IN_APP");
+    expect(resolveNotificationPrefs(null).categories.CHAT).toBe("IN_APP_PUSH");
+  });
+
+  it("isn't what any stored notification files under", () => {
+    expect(Object.values(NOTIFICATION_CATEGORY)).not.toContain("CHAT");
+  });
+
+  it("shows only where the member can use chat", () => {
+    const categories = (features: TenantFeatures, chatEligible: boolean) => visibleNotificationCategories({ features, chatEligible, isTenantAdmin: false });
+    expect(categories(only("messaging"), true)).toContain("CHAT");
+    expect(categories(only("messaging"), false)).not.toContain("CHAT");
+    expect(categories(only("feed"), true)).not.toContain("CHAT");
+    expect(categories(only(), false)).not.toContain("CHAT");
+  });
+
+  it("leaves the other categories as they were, with admin work only for admins", () => {
+    const all = only(...TENANT_FEATURES);
+    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: false })).toEqual(["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS"]);
+    expect(visibleNotificationCategories({ features: all, chatEligible: true, isTenantAdmin: true })).toEqual(["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"]);
+    expect(visibleNotificationCategories({ features: only(), chatEligible: false, isTenantAdmin: true })).toEqual(["ACTIVITY", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"]);
   });
 });
 

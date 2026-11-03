@@ -190,6 +190,7 @@ describe("the outbox", () => {
 
   it("marks one as failed, with the reason and whether a retry can work", () => {
     expect(markOutboxFailed([entry("k1"), entry("k2")], "k1", "Offline", true)[0]).toMatchObject({ status: "failed", error: "Offline", retryable: true });
+    expect(markOutboxFailed([entry("k1")], "k1", "Slow down", true, "RATE_LIMITED")[0]).toMatchObject({ code: "RATE_LIMITED" });
   });
 });
 
@@ -699,6 +700,26 @@ describe("createChatSync", () => {
       const s = setup();
       s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 3, requests: 1 });
       expect(s.qc.getQueryData<ChatBadgeDto>(chatKeys.badge(SLUG))).toEqual({ unread: 3, requests: 1 });
+      expect(s.invalidated(chatKeys.badge(SLUG))).toBe(false);
+    });
+
+    it("chat:unread refetches when a badge fetch is in flight, because it read the counts before they changed", async () => {
+      const s = setup();
+      const key = chatKeys.badge(SLUG);
+      s.qc.setQueryData(key, { unread: 1, requests: 0 });
+      const responses: Array<(dto: ChatBadgeDto) => void> = [];
+      const observer = new QueryObserver(s.qc, { queryKey: key, queryFn: () => new Promise<ChatBadgeDto>((resolve) => responses.push(resolve)) });
+      const unsubscribe = observer.subscribe(() => undefined);
+      await vi.waitFor(() => expect(responses.length).toBe(1));
+
+      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 0, requests: 0 });
+      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0 });
+      await vi.waitFor(() => expect(responses.length).toBe(2));
+      responses[0]!({ unread: 1, requests: 0 });
+      responses[1]!({ unread: 0, requests: 0 });
+      await vi.waitFor(() => expect(s.qc.getQueryState(key)?.fetchStatus).toBe("idle"));
+      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0 });
+      unsubscribe();
     });
 
     it("chat:changed refetches the thread, the lists and the badge, and carries nothing to patch", () => {
@@ -796,7 +817,7 @@ describe("createChatSync", () => {
 
       const retried = await s.sync.retry(SLUG, CONVERSATION, "client-key-1");
       expect(retried).toMatchObject({ seq: 2 });
-      expect(send).toHaveBeenLastCalledWith(SLUG, CONVERSATION, { body: "Hello", clientKey: "client-key-1" });
+      expect(send).toHaveBeenLastCalledWith(SLUG, CONVERSATION, { body: "Hello", clientKey: "client-key-1" }, { signal: expect.any(AbortSignal) });
       expect(s.outbox()).toEqual([]);
     });
 
@@ -812,12 +833,118 @@ describe("createChatSync", () => {
       expect(s.outbox()).toEqual([]);
     });
 
+    it("keeps the API's error code on a failed send, so a screen can tell slowing down from a refusal", async () => {
+      const send = vi.fn<ChatSyncApi["send"]>().mockRejectedValueOnce(new ApiClientError(429, "RATE_LIMITED", "Too many requests")).mockRejectedValueOnce(new Error("boom"));
+      const s = setup({ api: { send } });
+      s.load(pages([[1]]));
+      await s.sync.send(SLUG, CONVERSATION, "Hello", "client-key-1");
+      expect(s.outbox()).toEqual([expect.objectContaining({ status: "failed", retryable: true, code: "RATE_LIMITED" })]);
+      // A retry starts clean, and an error that isn't the API's carries no code.
+      await s.sync.retry(SLUG, CONVERSATION, "client-key-1");
+      expect(s.outbox()![0]).not.toHaveProperty("code");
+    });
+
+    it("sends one at a time per thread, in the order they were written, whatever answers first", async () => {
+      const answers: Array<() => void> = [];
+      const send = vi.fn<ChatSyncApi["send"]>(
+        (_s, _i, input) =>
+          new Promise<ChatMessageDto>((resolve, reject) => {
+            const seq = 1 + answers.length + 1;
+            answers.push(() => (input.body === "Fails" ? reject(new ApiClientError(0, "NETWORK_ERROR", "Offline")) : resolve(message(seq, { body: input.body, clientKey: input.clientKey }))));
+          }),
+      );
+      const s = setup({ api: { send } });
+      s.load(pages([[1]]));
+      const first = s.sync.send(SLUG, CONVERSATION, "Fails", "client-key-1");
+      const second = s.sync.send(SLUG, CONVERSATION, "Second", "client-key-2");
+      const third = s.sync.send(SLUG, CONVERSATION, "Third", "client-key-3");
+      // All three show at once, and only the first has gone.
+      expect(s.outbox()!.map((e) => e.body)).toEqual(["Fails", "Second", "Third"]);
+      expect(send.mock.calls.map((c) => c[2].body)).toEqual(["Fails"]);
+      // A failure still lets the next one go.
+      answers[0]!();
+      expect(await first).toBeNull();
+      await flush();
+      expect(send.mock.calls.map((c) => c[2].body)).toEqual(["Fails", "Second"]);
+      answers[1]!();
+      await second;
+      await flush();
+      expect(send.mock.calls.map((c) => c[2].body)).toEqual(["Fails", "Second", "Third"]);
+      answers[2]!();
+      await third;
+      expect(s.outbox()).toEqual([expect.objectContaining({ clientKey: "client-key-1", status: "failed" })]);
+
+      // Another thread doesn't wait for this one.
+      const other = vi.fn<ChatSyncApi["send"]>(() => new Promise<ChatMessageDto>(() => {}));
+      const t = setup({ api: { send: other } });
+      void t.sync.send(SLUG, CONVERSATION, "Waiting", "client-key-4");
+      void t.sync.send(SLUG, "c2", "Elsewhere", "client-key-5");
+      expect(other.mock.calls.map((c) => c[2].body)).toEqual(["Waiting", "Elsewhere"]);
+    });
+
     it("makes up a valid key when not given one, and has nothing to retry for an unknown key", async () => {
       const s = setup();
       s.load(pages([[1]]));
       await s.sync.send(SLUG, CONVERSATION, "Hello");
       expect(chatClientKeySchema.safeParse(s.api.send.mock.calls[0]![2].clientKey).success).toBe(true);
       expect(await s.sync.retry(SLUG, CONVERSATION, "not-a-real-key")).toBeNull();
+    });
+
+    it("fails a send that gets no answer in time, so it can be tried again under its key and the ones behind it go", async () => {
+      vi.useFakeTimers();
+      const signals: Array<AbortSignal | undefined> = [];
+      const send = vi
+        .fn<ChatSyncApi["send"]>()
+        .mockImplementationOnce((_s, _i, _input, options) => {
+          signals.push(options?.signal);
+          return new Promise<ChatMessageDto>(() => {});
+        })
+        .mockImplementation(async (_s, _i, input) => message(2, { body: input.body, clientKey: input.clientKey }));
+      const s = setup({ api: { send } });
+      s.load(pages([[1]]));
+      const first = s.sync.send(SLUG, CONVERSATION, "Lost on the way", "client-key-1");
+      const second = s.sync.send(SLUG, CONVERSATION, "Behind it", "client-key-2");
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(s.outbox()!.map((e) => e.status)).toEqual(["sending", "sending"]);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await first).toBeNull();
+      expect(signals[0]!.aborted).toBe(true);
+      expect(s.outbox()).toEqual([expect.objectContaining({ clientKey: "client-key-1", status: "failed", retryable: true, code: "NETWORK_ERROR" })]);
+      expect(await second).toMatchObject({ clientKey: "client-key-2" });
+      expect(send.mock.calls.map((c) => c[2].body)).toEqual(["Lost on the way", "Behind it"]);
+
+      await s.sync.retry(SLUG, CONVERSATION, "client-key-1");
+      expect(send).toHaveBeenLastCalledWith(SLUG, CONVERSATION, { body: "Lost on the way", clientKey: "client-key-1" }, expect.anything());
+    });
+
+    it("takes its time limit as an option", async () => {
+      vi.useFakeTimers();
+      const qc = new QueryClient();
+      const send = vi.fn<ChatSyncApi["send"]>(() => new Promise<ChatMessageDto>(() => {}));
+      const sync = createChatSync({ realtime: { on: () => () => undefined, onReconnect: () => () => undefined } as never, api: { send, messages: vi.fn() }, queryClient: qc, getActive: () => null, sendTimeoutMs: 5_000 });
+      const sending = sync.send(SLUG, CONVERSATION, "Hello", "client-key-1");
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await sending).toBeNull();
+    });
+
+    it("reads the thread again after a send that wasn't in an accepted chat, because asking again uses up the one message", async () => {
+      const s = setup();
+      s.load(pages([[1]]));
+      const key = chatKeys.conversation(SLUG, CONVERSATION);
+      s.qc.setQueryData(key, { id: CONVERSATION, state: "REQUEST_SENT", canSend: true } as ChatConversationDto);
+      await s.sync.send(SLUG, CONVERSATION, "Asking again", "client-key-1");
+      expect(s.invalidated(key)).toBe(true);
+
+      s.qc.setQueryData(key, { id: CONVERSATION, state: "CLOSED", canSend: true } as ChatConversationDto);
+      await s.sync.send(SLUG, CONVERSATION, "Asking again", "client-key-closed");
+      expect(s.invalidated(key)).toBe(true);
+
+      // An accepted chat doesn't change by being written in, so a busy one isn't read again per message.
+      s.qc.setQueryData(key, { id: CONVERSATION, state: "ACCEPTED", canSend: true } as ChatConversationDto);
+      await s.sync.send(SLUG, CONVERSATION, "Chatting", "client-key-2");
+      expect(s.invalidated(key)).toBe(false);
     });
 
     it("fetches rather than seeds when a send lands in a thread nothing has loaded", async () => {

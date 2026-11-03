@@ -6,7 +6,7 @@ import { byMembership, rateLimit } from "../../middleware/rateLimit";
 import { requireChatEligible, requireFeature, requireMember } from "../../middleware/tenant";
 import { noContent, ok, route } from "../../middleware/validate";
 import { blockMember, listMyBlocks, unblockMember } from "../../services/chat/blocks.service";
-import { acceptRequest, declineRequest, getBadge, getConversation, listConversations, listMessages, markRead, sendDirect, sendMessage, setMute, type ChatActor } from "../../services/chat/chat.service";
+import { acceptRequest, declineRequest, findDirectThread, getBadge, getConversation, listConversations, listMessages, markRead, sendDirect, sendMessage, setMute, type ChatActor } from "../../services/chat/chat.service";
 import { reportMessage } from "../../services/chat/reports.service";
 
 const actorOf = (req: Request): ChatActor => ({ userId: req.auth!.userId, membership: req.membership! });
@@ -23,6 +23,7 @@ export function chatRoutes(ctx: AppContext): Router {
 
   // Direct threads need `messaging`. Read per kind in the services, except here where the kind is already known.
   router.post("/chat/direct", requireFeature("messaging"), sendLimits, route({ body: chatDirectCreateSchema }, async ({ req, res, body }) => ok(res, await sendDirect(ctx, req.tenantCtx!, actorOf(req), body), 201)));
+  router.get("/chat/direct/:membershipId", requireFeature("messaging"), readLimit, route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => ok(res, await findDirectThread(ctx, req.tenantCtx!, actorOf(req), params.membershipId))));
   router.get("/chat/conversations", route({ query: chatConversationsQuerySchema }, async ({ req, res, query }) => res.json(await listConversations(ctx, req.tenantCtx!, actorOf(req), query))));
   router.get("/chat/conversations/:id", route({ params: idParamsSchema }, async ({ req, res, params }) => ok(res, await getConversation(ctx, req.tenantCtx!, actorOf(req), params.id))));
   router.get("/chat/conversations/:id/messages", route({ params: idParamsSchema, query: chatMessagesQuerySchema }, async ({ req, res, params, query }) => res.json(await listMessages(ctx, req.tenantCtx!, actorOf(req), params.id, query))));

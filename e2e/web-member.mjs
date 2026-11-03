@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { reconnect, runJob, scriptBusiness, scriptFeatures, scriptMembership, scriptTenant } from "./lib.mjs";
+import { dropFrames, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
-const BASE = "http://localhost:5173";
+const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
 const SHOTS = process.env.SHOTS ?? fileURLToPath(new URL("./screenshots/", import.meta.url));
 mkdirSync(SHOTS, { recursive: true });
@@ -314,15 +314,15 @@ try {
     if (current !== active || tinted !== active) throw new Error(`More on ${where}: aria-current ${current}, tinted ${tinted}, expected ${active}`);
   };
 
-  await step("phone layout: every section opens, with Funding behind More", async () => {
+  await step("phone layout: every section opens, with Events and Funding behind More", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const bar = page.locator('nav[aria-label="Main"]:visible');
     if ((await bar.locator("a").count()) !== 4) throw new Error("the bottom bar should show four sections, then More");
     const sections = [
       ["Feed", /\/app\/feed$/, "text=Welcome to the official Demo University alumni network"],
+      ["Messages", /\/app\/messages$/, "main >> text=Messages"],
       ["Jobs", /\/app\/jobs$/, "text=Backend Engineer (Node.js)"],
       ["Directory", /\/app\/directory$/, 'input[placeholder="Name, company, role"]'],
-      ["Events", /\/app\/events$/, "text=Mumbai alumni coffee meetup"],
     ];
     for (const [label, url, content] of sections) {
       await bar.locator(`a:has-text("${label}")`).click();
@@ -334,7 +334,13 @@ try {
     await moreButton.click();
     await page.waitForSelector('[role="dialog"] >> text=Switch institution');
     if (!(await moreButton.getAttribute("class")).split(" ").includes("text-primary")) throw new Error("More isn't highlighted while its sheet is open");
-    if (await page.locator('[role="dialog"] a[aria-current="page"]').count()) throw new Error("a sheet link shows as current on Events, which is on the bar");
+    if (await page.locator('[role="dialog"] a[aria-current="page"]').count()) throw new Error("a sheet link shows as current on Directory, which is on the bar");
+    await page.click('[role="dialog"] a:has-text("Events")');
+    await page.waitForURL(/\/app\/events$/);
+    await page.waitForSelector("text=Mumbai alumni coffee meetup");
+    await expectMoreActive(true, "Events");
+
+    await moreButton.click();
     await page.click('[role="dialog"] a:has-text("Funding")');
     await page.waitForURL(/\/app\/funding$/);
     await page.waitForSelector("text=Alumni raising capital and alumni investing in them");
@@ -502,6 +508,255 @@ try {
     await tryAgain.click();
     await events.waitFor();
     await tenant.stop();
+  });
+
+  await step("two members message each other live: request, accept, replies, a report and a block", async () => {
+    // Seeded members with no thread between them. mobile-web.mjs uses a different pair, so the two scripts can run in either order.
+    const desktop = { viewport: { width: 1280, height: 900 } };
+    const contextA = await signedInContext(browser, BASE, "+919100000004", desktop); // Meera Iyer
+    const contextB = await signedInContext(browser, BASE, "+919100000006", desktop); // Sneha Kulkarni
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    for (const p of [pageA, pageB]) p.setDefaultTimeout(15000);
+    const app = `${BASE}/t/demo-university/app`;
+    const log = (p) => p.locator('[role="log"]');
+    const live = { timeout: 8000 };
+
+    // B waits on Requests, so the request has to arrive there live.
+    await pageB.goto(`${app}/messages`);
+    await pageB.getByRole("tab", { name: "Requests" }).click();
+    await pageB.waitForSelector("text=No message requests");
+    const badgeB = pageB.locator('nav[aria-label="Main"]:visible a[href$="/app/messages"]');
+    if (await badgeB.getAttribute("aria-label")) throw new Error(`B starts with something waiting: ${await badgeB.getAttribute("aria-label")}`);
+
+    // A asks from B's profile. The first message goes as a request, and nothing more can follow it until B answers.
+    await pageA.goto(`${app}/directory`);
+    await pageA.fill('input[placeholder="Name, company, role"]', "Sneha");
+    await pageA.click("text=Sneha Kulkarni");
+    await pageA.getByRole("link", { name: "Message this member" }).click();
+    await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
+    await pageA.waitForSelector("text=Your first message is a request");
+    const asked = `Hello Sneha, could I ask about Seattle? ${unique}`;
+    await pageA.getByLabel("Write a message").fill(asked);
+    await pageA.getByRole("button", { name: "Send message" }).click();
+    await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    await pageA.waitForSelector("text=Request sent");
+    await log(pageA).getByText(asked).waitFor();
+    if (await pageA.getByLabel("Write a message").count()) throw new Error("the requester can write more before an answer");
+    await shot("10a-chat-request-sent");
+
+    // B: the badge and the Requests tab change with no reload.
+    await pageB.locator('nav[aria-label="Main"]:visible a[aria-label="Messages, 1 unread"]').waitFor(live);
+    const request = pageB.locator('[role="tabpanel"] a', { hasText: "Meera Iyer" });
+    await request.waitFor(live);
+    await request.click();
+    await log(pageB).getByText(asked).waitFor();
+    await pageB.getByRole("button", { name: "Accept request" }).click();
+    const boxB = pageB.getByLabel("Write a message");
+    await boxB.waitFor();
+
+    // A can write once B accepts, with no reload, and messages go both ways live.
+    const boxA = pageA.getByLabel("Write a message");
+    await boxA.waitFor(live);
+    const fromA = `How is the weather over there? ${unique}`;
+    await boxA.fill(fromA);
+    // An IME (Indian-language keyboards among them) uses Enter to pick a word, so Enter mid-composition must not send.
+    await boxA.evaluate((el) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, cancelable: true })));
+    await pageA.waitForTimeout(300);
+    if ((await boxA.inputValue()) !== fromA) throw new Error("Enter during IME composition sent the message");
+    await boxA.press("Enter");
+    await log(pageB).getByText(fromA).waitFor(live);
+    const fromB = `Rainy, as ever.\nAsk away! ${unique}`;
+    await boxB.fill(fromB);
+    await pageB.getByRole("button", { name: "Send message" }).click();
+    await log(pageA).getByText(`Ask away! ${unique}`).waitFor(live);
+    // Late socket echoes and responses have had time to land, and each message is still one bubble on each side.
+    await pageA.waitForTimeout(1500);
+    for (const [p, who] of [
+      [pageA, "A"],
+      [pageB, "B"],
+    ]) {
+      for (const text of [asked, fromA, `Ask away! ${unique}`]) {
+        const bubbles = await log(p).getByText(text).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text}"`);
+      }
+    }
+    await shot("10b-chat-thread");
+    await pageB.screenshot({ path: `${SHOTS}/10c-chat-thread-b.png` });
+
+    // A thread open in a background tab marks nothing read: A's badge counts B's next message until A's tab is in front again.
+    const setVisible = (p, visible) =>
+      p.evaluate((v) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (v ? "visible" : "hidden") });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, visible);
+    const badgeA = pageA.locator('nav[aria-label="Main"]:visible a[href$="/app/messages"]');
+    await setVisible(pageA, false);
+    const unseen = `Still there? ${unique}`;
+    await boxB.fill(unseen);
+    await boxB.press("Enter");
+    await log(pageA).getByText(unseen).waitFor(live);
+    await pageA.locator('nav[aria-label="Main"]:visible a[aria-label="Messages, 1 unread"]').waitFor(live);
+    await pageA.waitForTimeout(2000);
+    if ((await badgeA.getAttribute("aria-label")) !== "Messages, 1 unread") throw new Error("a thread in a background tab was marked read");
+    await setVisible(pageA, true);
+    await pageA.waitForFunction(() => !document.querySelector('nav[aria-label="Main"] a[href$="/app/messages"][aria-label]'), undefined, live);
+
+    // A send that fails stays in the thread with Try again, which sends it under the same key. One refused for going too
+    // fast goes back in the box to send later.
+    const sendUrl = /\/api\/v1\/t\/demo-university\/chat\/conversations\/[0-9a-f-]+\/messages$/;
+    const sentKeys = [];
+    let reply = 503;
+    await pageA.route(sendUrl, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      sentKeys.push(route.request().postDataJSON().clientKey);
+      if (reply === null) return route.fallback();
+      const code = reply === 429 ? "RATE_LIMITED" : "INTERNAL";
+      return route.fulfill({ status: reply, contentType: "application/json", body: JSON.stringify({ error: { code, message: `e2e ${code}` } }) });
+    });
+    const retried = `Sent at the second try ${unique}`;
+    await boxA.fill(retried);
+    await boxA.press("Enter");
+    const tryAgain = pageA.getByRole("button", { name: "Try again" });
+    await tryAgain.waitFor();
+    if (await boxA.inputValue()) throw new Error("a failed send left its words in the box as well as in the thread");
+    reply = null;
+    await tryAgain.click();
+    await log(pageB).getByText(retried).waitFor(live);
+    await tryAgain.waitFor({ state: "detached" });
+    if (sentKeys.length !== 2 || sentKeys[0] !== sentKeys[1]) throw new Error(`Try again didn't reuse the client key: ${sentKeys.join(", ")}`);
+    if ((await log(pageA).getByText(retried).count()) !== 1) throw new Error("a retried message isn't exactly one bubble");
+    reply = 429;
+    const tooFast = `One more thing ${unique}`;
+    await boxA.fill(tooFast);
+    await boxA.press("Enter");
+    await pageA.waitForSelector("text=You're sending messages quickly");
+    if ((await boxA.inputValue()) !== tooFast) throw new Error("a send refused for going too fast lost its words");
+    if (await log(pageA).getByText(tooFast).count()) throw new Error("a send refused for going too fast stayed in the thread");
+    await pageA.unroute(sendUrl);
+
+    // The thread failing to refetch in the background keeps the screen and the draft, and so does leaving and coming back.
+    const draft = `Half-written thought ${unique}`;
+    await boxA.fill(draft);
+    const thread = await scriptConversation(pageA, "demo-university", pageA.url().split("/").pop());
+    thread.answer(503, "INTERNAL");
+    await thread.refetch();
+    if ((await boxA.inputValue()) !== draft) throw new Error("a failed refetch of the thread lost the draft");
+    if (!(await log(pageA).getByText(fromA).isVisible())) throw new Error("a failed refetch of the thread replaced it");
+    thread.answer(null);
+    await thread.stop();
+    await pageA.click('nav[aria-label="Main"]:visible >> text=Feed');
+    await pageA.waitForURL(/\/app\/feed$/);
+    await pageA.goBack();
+    await boxA.waitFor();
+    if ((await boxA.inputValue()) !== draft) throw new Error("leaving the thread and coming back lost the draft");
+    await boxA.fill("");
+
+    // A reports B's message. The dialog says what admins will see, and a second report counts as done, not as an error.
+    const reportB = async () => {
+      const bubble = log(pageA).locator("div.group", { hasText: `Ask away! ${unique}` });
+      await bubble.hover();
+      await bubble.getByRole("button", { name: "Report message" }).click();
+      const dialog = pageA.locator('[role="dialog"]', { hasText: "Report message" });
+      await dialog.getByText("Admins will see this message and up to 10 around it.").waitFor();
+      await dialog.getByRole("button", { name: "Send report" }).click();
+      await dialog.waitFor({ state: "detached" });
+    };
+    await reportB();
+    await reportB();
+    await pageA.waitForSelector("text=You have already reported this message");
+    if (await log(pageA).locator("div.group", { hasText: fromA }).getByRole("button", { name: "Report message" }).count()) throw new Error("a member can report their own message");
+
+    // A blocks B. B's next message looks sent to B and never reaches A, even after A unblocks.
+    await pageA.getByRole("button", { name: "Conversation options" }).click();
+    await pageA.locator('[role="dialog"]', { hasText: "Conversation options" }).getByRole("button", { name: "Block member" }).click();
+    await pageA.locator('[role="dialog"]', { hasText: "Block Sneha Kulkarni?" }).getByRole("button", { name: "Block member" }).click();
+    await pageA.waitForSelector("text=You blocked Sneha Kulkarni");
+    if (await boxA.count()) throw new Error("the blocker can still write");
+    const whileBlocked = `Are you still there? ${unique}`;
+    await boxB.fill(whileBlocked);
+    await boxB.press("Enter");
+    await log(pageB).getByText(whileBlocked).waitFor();
+    await pageB.waitForTimeout(3000);
+    if (await pageB.getByRole("button", { name: "Try again" }).count()) throw new Error("a message to a member who blocked you looked failed");
+    if (await log(pageB).getByText("Sending…").count()) throw new Error("a message to a member who blocked you is stuck sending");
+    if ((await log(pageB).getByText(whileBlocked).count()) !== 1) throw new Error("the blocked member's message isn't exactly one bubble on their side");
+    if (await log(pageA).getByText(whileBlocked).count()) throw new Error("a blocked member's message reached the blocker");
+    await pageA.getByRole("button", { name: "Unblock member" }).click();
+    await boxA.waitFor();
+    // A reload mounts the layout and the thread together, and the thread must still count as open: a message the live
+    // connection loses is fetched as soon as the next one shows the gap, not only once A leaves and comes back.
+    const lost = `Lost on the way ${unique}`;
+    const socket = await dropFrames(pageA, lost);
+    await pageA.reload();
+    await log(pageA).getByText(fromA).waitFor();
+    if (await log(pageA).getByText(whileBlocked).count()) throw new Error("unblocking brought back a message sent while blocked");
+    await socket.opened();
+    await boxB.fill(lost);
+    await boxB.press("Enter");
+    await log(pageB).getByText(lost).waitFor();
+    await log(pageB).getByText("Sending…").waitFor({ state: "detached" });
+    const afterLost = `And the one after it ${unique}`;
+    await boxB.fill(afterLost);
+    await boxB.press("Enter");
+    await log(pageA).getByText(afterLost).waitFor(live);
+    await log(pageA).getByText(lost).waitFor(live);
+    if (!socket.dropped()) throw new Error("the live connection never carried the message meant to be lost, so the gap went untested");
+
+    // On a phone the thread takes the screen: no header or bottom bar, and the composer in view.
+    await pageA.setViewportSize({ width: 390, height: 844 });
+    if (await pageA.locator('nav[aria-label="Main"]:visible').count()) throw new Error("the bottom bar shows over a thread on a phone");
+    // The thread sizes itself from the visual viewport, which reports the new size a moment after it changes.
+    const inView = await pageA
+      .waitForFunction(() => document.querySelector('[aria-label="Write a message"]')?.getBoundingClientRect().bottom <= window.innerHeight, undefined, { timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!inView) throw new Error(`the composer is off screen on a phone: ${JSON.stringify(await boxA.boundingBox())}`);
+    await pageA.getByRole("link", { name: "Back to messages" }).click();
+    await pageA.waitForURL(/\/app\/messages$/);
+    await pageA.locator('[role="tabpanel"] a', { hasText: "Sneha Kulkarni" }).waitFor();
+    await pageA.screenshot({ path: `${SHOTS}/10d-chat-inbox-phone.png` });
+    await contextA.close();
+    await contextB.close();
+  });
+
+  await step("a current pupil sees no Messages, even with messaging switched on", async () => {
+    const context = await signedInContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 } }); // Ira Banerjee, demo-school
+    const pupil = await context.newPage();
+    pupil.setDefaultTimeout(15000);
+    const chatCalls = [];
+    pupil.on("request", (r) => {
+      if (/\/api\/v1\/t\/[^/]+\/chat\//.test(r.url())) chatCalls.push(new URL(r.url()).pathname);
+    });
+    // Schools start with messaging off. On here, so only the pupil rule can be what hides it.
+    const features = await scriptFeatures(pupil, "demo-school");
+    features.only("feed", "messaging", "jobs", "directory", "events", "businesses", "funding");
+    await pupil.goto(`${BASE}/t/demo-school/app/feed`);
+    const bar = pupil.locator('nav[aria-label="Main"]:visible');
+    await bar.locator("a").first().waitFor();
+    const shown = (await bar.locator("a").allInnerTexts()).map((text) => text.split("\n").pop().trim());
+    if (shown.includes("Messages")) throw new Error(`a pupil's bottom bar offers Messages: ${shown.join(", ")}`);
+    await pupil.click('nav[aria-label="Main"] >> button:has-text("More")');
+    await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
+    if (await pupil.locator('[role="dialog"] a:has-text("Messages")').count()) throw new Error("a pupil's More sheet offers Messages");
+    await pupil.keyboard.press("Escape");
+    await pupil.goto(`${BASE}/t/demo-school/app/messages`);
+    await pupil.waitForSelector("text=Messages aren't available");
+    if (chatCalls.length) throw new Error(`a pupil's app called the chat API: ${chatCalls.join(", ")}`);
+    await features.stop();
+    await context.close();
+  });
+
+  await step("a chat notice in the bell opens its thread, and one this member can't open says so with a way back", async () => {
+    const removed = await scriptNotification(page, "demo-university", { type: "CHAT_MESSAGE_REMOVED", data: { conversationId: "00000000-0000-4000-8000-0000000000aa", messageId: "00000000-0000-4000-8000-0000000000ab" }, title: "An admin removed a message you sent" });
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    await page.click('a[aria-label^="Notifications"]');
+    await page.click("text=An admin removed a message you sent");
+    await page.waitForURL("**/t/demo-university/app/messages/00000000-0000-4000-8000-0000000000aa");
+    await page.waitForSelector("text=This conversation isn't available");
+    await page.getByRole("link", { name: "Back to messages" }).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/app\/messages$/);
+    await removed.stop();
   });
 
   await step("notifications page, notification settings + sign out", async () => {

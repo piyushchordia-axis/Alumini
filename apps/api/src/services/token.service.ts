@@ -5,7 +5,7 @@ import { AppError } from "../lib/errors";
 import { opaqueToken, sha256 } from "../lib/random";
 import { rooms } from "../realtime/rooms";
 import { keys } from "../redis/keys";
-import { findUserById } from "../repositories/users.repo";
+import { deletePushTokensForUser, findUserById } from "../repositories/users.repo";
 
 export interface SessionMeta {
   userAgent?: string;
@@ -102,7 +102,12 @@ export async function revokeSession(ctx: AppContext, sid: string, userId: string
   ctx.realtime.disconnect(rooms.session(sid));
 }
 
+/**
+ * Signs the user out everywhere, and forgets their devices' push tokens: a phone signed out this way, perhaps lost, must not
+ * go on showing their notifications (chat ones name people) on its lock screen. Each device registers again at sign-in.
+ */
 export async function revokeAllSessions(ctx: AppContext, userId: string): Promise<void> {
+  await deletePushTokensForUser(ctx.db, userId);
   const sids = await ctx.redis.smembers(keys.userSessions(userId));
   for (const sid of sids) await revokeSessionById(ctx, sid, userId);
   await ctx.redis.del(keys.userSessions(userId));

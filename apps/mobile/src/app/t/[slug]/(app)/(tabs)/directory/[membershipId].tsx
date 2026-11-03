@@ -2,6 +2,7 @@ import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Text, View } from "react-native";
+import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
 import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -16,8 +17,12 @@ export default function MemberProfileScreen() {
   const router = useRouter();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
   if (profile.isLoading) return <Spinner />;
-  if (profile.error || !profile.data) return <LoadError error={profile.error ?? "Not found"} onRetry={() => void profile.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  // Only with nothing to show: a refetch failing in the background keeps the profile on screen.
+  if (!profile.data) return <LoadError error={profile.error ?? "Not found"} onRetry={() => void profile.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const m = profile.data;
+  // Blocking doesn't depend on messages being on: an institution may switch them off in the middle of an incident.
+  const canBlock = m.id !== membership.id && membership.chatEligible;
+  const chatOn = canBlock && tenant.settings.features.messaging;
   return (
     <Screen>
       <Card>
@@ -39,6 +44,7 @@ export default function MemberProfileScreen() {
           </Muted>
         </View>
         {m.id === membership.id && <Button title="Edit my profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />}
+        {chatOn && m.canMessage && <MessageMemberButton slug={slug} member={m} />}
         {m.bio && <Text style={{ color: "#1e293b", lineHeight: 21 }}>{m.bio}</Text>}
         {m.interests.length > 0 && (
           <Row>
@@ -61,6 +67,11 @@ export default function MemberProfileScreen() {
           </Text>
         ))}
         <Muted>Member since {formatDate(m.memberSince)}</Muted>
+        {canBlock && (
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
+            <ProfileBlockButton slug={slug} member={m} />
+          </View>
+        )}
       </Card>
     </Screen>
   );

@@ -3,8 +3,10 @@ import type { JobName, JobPayloads } from "./definitions";
 
 export interface EnqueueOptions {
   /**
-   * Deduplicates: a job with the same id that is still waiting, delayed or active is not added again. Use "-" as the
-   * separator (BullMQ reserves ":").
+   * Deduplicates. BullMQ won't add a job whose id it still holds, and that includes a finished job it hasn't dropped yet: up
+   * to 24 hours after completing and 7 days after failing (BullJobQueue). So a constant id on work that repeats stops it
+   * running again, and MemoryJobQueue, which dedupes only while a job is pending, won't show that in a test. For repeating
+   * work, put a time bucket in the id, as queueConversationPush does. Use "-" as the separator (BullMQ reserves ":").
    */
   jobId?: string;
   delayMs?: number;

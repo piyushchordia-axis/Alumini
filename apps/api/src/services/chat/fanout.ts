@@ -1,9 +1,11 @@
 import { isCurrentPupil } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient, Tx } from "../../db/client";
+import type { JobPayloads } from "../../jobs/definitions";
 import { toChatMessageDto } from "../../dto/chat.dto";
 import { afterCommit } from "../../lib/transaction";
 import { rooms } from "../../realtime/rooms";
+import { keys } from "../../redis/keys";
 import { findBlockersAmong, findDeliveryCandidate, insertNextMessage, listDeliveryCandidates, thawParticipants, updateParticipant, type ChatMessageRow, type ChatSender, type ConversationRow, type DeliveryCandidate } from "../../repositories/chat.repo";
 
 export interface ChatRecipient {
@@ -58,6 +60,29 @@ export async function publishRemoved(ctx: AppContext, db: DbClient, tenantSlug: 
   });
 }
 
+/** How a conversation's message pushes bunch up: `windowMs` for a burst to settle, then one push per recipient per `quietSec`. */
+export interface ChatPushWindow {
+  windowMs: number;
+  quietSec: number;
+}
+
+export const DIRECT_PUSH_WINDOW: ChatPushWindow = { windowMs: 5_000, quietSec: 120 };
+
+/**
+ * Queues the look at who hasn't read a conversation. Messages in one bucket share an id, and the id changes every bucket
+ * because BullMQ holds on to a finished job's id, so a constant one would stop pushes for a day (see EnqueueOptions). It runs
+ * at the end of the next bucket, because at the end of this one a message sent just before it would beat the reader's read.
+ */
+export async function queueConversationPush(ctx: Pick<AppContext, "jobs">, input: { tenantId: string; conversationId: string }, window: ChatPushWindow = DIRECT_PUSH_WINDOW, now = Date.now()): Promise<void> {
+  const bucket = Math.floor(now / window.windowMs);
+  await ctx.jobs.enqueue("chat.pushConversation", { ...input, quietSec: window.quietSec }, { jobId: `chatpush-${input.conversationId}-${bucket}`, delayMs: (bucket + 2) * window.windowMs - now });
+}
+
+/** Queues a push about something other than a message, once `db`'s work has committed. */
+export async function queuePushEvent(ctx: AppContext, db: DbClient, event: JobPayloads["chat.pushEvent"]): Promise<void> {
+  await afterCommit(ctx, db, () => ctx.jobs.enqueue("chat.pushEvent", event));
+}
+
 export interface AppendInput {
   tenantSlug: string;
   /** Locked by the caller. */
@@ -71,6 +96,10 @@ export interface AppendInput {
   withheld?: boolean;
   /** It's a request the others haven't accepted, so they're told something arrived and not what it says. */
   isRequest?: boolean;
+  /** Defaults to a direct chat's. */
+  pushWindow?: ChatPushWindow;
+  /** No push for this message, because the caller is telling them another way. */
+  noPush?: boolean;
 }
 
 /**
@@ -102,8 +131,16 @@ export async function appendMessage(ctx: AppContext, tx: Tx, input: AppendInput)
     const payload = (viewer: string | null) => ({ tenantSlug, conversationId: conversation.id, message: toChatMessageDto(row, sender, viewer) });
     if (own.length > 0) ctx.realtime.emit(toRooms(own), "chat:message", payload(senderId));
     if (others.length === 0) return;
-    if (input.isRequest) ctx.realtime.emit(toRooms(others), "chat:changed", { tenantSlug, conversationId: conversation.id });
-    else ctx.realtime.emit(toRooms(others), "chat:message", payload(null));
+    const ids = { tenantId: conversation.tenantId, conversationId: conversation.id };
+    if (input.isRequest) {
+      ctx.realtime.emit(toRooms(others), "chat:changed", { tenantSlug, conversationId: conversation.id });
+      if (!input.noPush) await ctx.jobs.enqueue("chat.pushEvent", { ...ids, kind: "CHAT_REQUEST", actorMembershipId: senderId });
+    } else {
+      ctx.realtime.emit(toRooms(others), "chat:message", payload(null));
+      if (!input.noPush) await queueConversationPush(ctx, ids, input.pushWindow);
+    }
   });
+  // Writing a message reads the thread, as the read position above says, so the next one from the other side is news again.
+  if (senderId) await afterCommit(ctx, tx, () => ctx.redis.del(keys.chatPushQuiet(conversation.id, senderId)));
   return row;
 }

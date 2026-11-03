@@ -23,6 +23,8 @@ export interface RequestOptions {
   body?: unknown;
   formData?: FormData;
   auth?: boolean;
+  /** Aborting gives up on the request, which then fails as a network error. */
+  signal?: AbortSignal;
 }
 
 export function buildQuery(query?: QueryParams): string {
@@ -71,6 +73,7 @@ export class ApiCore {
         method: opts.method ?? "GET",
         headers,
         body: opts.formData ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
+        ...(opts.signal ? { signal: opts.signal } : {}),
       });
     } catch (err) {
       throw new ApiClientError(0, "NETWORK_ERROR", "Could not reach the server. Check your connection.", err);

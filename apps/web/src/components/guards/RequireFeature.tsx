@@ -1,5 +1,5 @@
 import type { TenantFeature } from "@illuminize/shared";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useMatch } from "react-router-dom";
 import { EmptyState, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { homePath, SECTION_LINKS, type SectionLink } from "@/lib/sections";
@@ -19,6 +19,26 @@ export function RequireFeature({ feature }: { feature: TenantFeature }) {
       description={`${tenant.shortName ?? tenant.name} has switched this section off.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
     />
+  );
+}
+
+/** Messages need the institution's switch and a member who isn't a current pupil, and the second of those isn't a section being off. */
+export function RequireChat() {
+  const { tenant, membership } = useMembership();
+  // Blocked members stay open with messages off, as blocking does on the API: switching messages off in the middle of an
+  // incident mustn't take away the way to block someone, or to see who's blocked.
+  const onBlocked = !!useMatch("/t/:slug/app/messages/blocked");
+  if (membership.chatEligible && (tenant.settings.features.messaging || onBlocked)) return <Outlet />;
+  return (
+    // Messages fill the window edge to edge on a phone, so this needs its own margin there.
+    <div className="max-md:p-4">
+      <EmptyState
+        icon="🔒"
+        title="Messages aren't available"
+        description={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}
+        action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
+      />
+    </div>
   );
 }
 

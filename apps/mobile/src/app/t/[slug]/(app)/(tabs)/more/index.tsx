@@ -20,12 +20,12 @@ function HubRow({ icon, label, danger, onPress }: { icon: string; label: string;
 
 /** Everything that doesn't fit on the tab bar: the same items as the web's More sheet, minus the web-only admin console. */
 export default function MoreScreen() {
-  const { tenant } = useMembership();
+  const { tenant, membership } = useMembership();
   const router = useRouter();
   const setLast = useTenantStore((s) => s.setLastTenantSlug);
   const signOut = useSignOut();
   const slug = tenant.slug;
-  const { overflow } = splitSections(tenant.settings.features);
+  const { overflow } = splitSections(tenant.settings.features, membership.chatEligible);
   return (
     <Screen>
       <Card>

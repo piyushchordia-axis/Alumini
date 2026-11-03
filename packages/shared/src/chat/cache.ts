@@ -16,6 +16,8 @@ export interface OutboxEntry {
   error?: string;
   /** Sending it again with the same key can work: the network or the server failed, not the request. */
   retryable?: boolean;
+  /** The API's error code, so a screen can tell "slow down" from a refusal. */
+  code?: string;
   createdAt: string;
 }
 
@@ -92,8 +94,8 @@ export function removeFromOutbox(outbox: OutboxEntry[] | undefined, clientKey: s
   return list.filter((e) => e.clientKey !== clientKey);
 }
 
-export function markOutboxFailed(outbox: OutboxEntry[] | undefined, clientKey: string, error: string, retryable: boolean): OutboxEntry[] {
-  return (outbox ?? []).map((e) => (e.clientKey === clientKey ? { ...e, status: "failed" as const, error, retryable } : e));
+export function markOutboxFailed(outbox: OutboxEntry[] | undefined, clientKey: string, error: string, retryable: boolean, code?: string): OutboxEntry[] {
+  return (outbox ?? []).map((e) => (e.clientKey === clientKey ? { ...e, status: "failed" as const, error, retryable, ...(code ? { code } : {}) } : e));
 }
 
 /** A row of a thread, keyed so a bubble keeps its identity when its send is confirmed. */

@@ -11,18 +11,67 @@ async function call(method, path, body, token) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(`${method} ${path} → ${res.status} ${JSON.stringify(json)}`);
+  if (!res.ok) throw Object.assign(new Error(`${method} ${path} → ${res.status} ${JSON.stringify(json)}`), { status: res.status, error: json?.error });
   return json?.data;
 }
 
-let platformToken = null;
+/** Asks for a code. Another script run moments ago may have asked for this phone, which then waits a minute; the wait costs no code. */
+async function requestOtp(phone) {
+  try {
+    return await call("POST", "/auth/otp/request", { phone });
+  } catch (err) {
+    const wait = err.error?.code === "OTP_COOLDOWN" ? Number(err.error.details?.retryAfterSec ?? 60) : 0;
+    if (!wait || wait > 90) throw err;
+    await new Promise((resolve) => setTimeout(resolve, (wait + 1) * 1000));
+    return call("POST", "/auth/otp/request", { phone });
+  }
+}
+
+const sessions = new Map();
+/**
+ * Signs someone in through the API with the development OTP, once per run: every code requested counts against a limit
+ * of 20 an hour for the whole machine, shared by every e2e script, and each phone also waits a minute between codes.
+ */
+export function apiSession(phone) {
+  if (!sessions.has(phone)) {
+    sessions.set(
+      phone,
+      (async () => {
+        const otp = await requestOtp(phone);
+        if (!otp.devCode) throw new Error("The API did not return a development OTP; run it with OTP_PROVIDER=console");
+        return call("POST", "/auth/otp/verify", { phone, code: otp.devCode });
+      })(),
+    );
+  }
+  return sessions.get(phone);
+}
+
 /** Signs in as the platform admin through the console OTP (development only: the API returns the code). */
-async function platformAdmin() {
-  if (platformToken) return platformToken;
-  const otp = await call("POST", "/auth/otp/request", { phone: PLATFORM_ADMIN });
-  if (!otp.devCode) throw new Error("The API did not return a development OTP; run it with OTP_PROVIDER=console");
-  platformToken = (await call("POST", "/auth/otp/verify", { phone: PLATFORM_ADMIN, code: otp.devCode })).accessToken;
-  return platformToken;
+const platformAdmin = async () => (await apiSession(PLATFORM_ADMIN)).accessToken;
+
+/**
+ * A browser context for the web app, already signed in as this member without going through the login screen. Only the
+ * first page load reads it, so a reload doesn't undo the app's own token refreshes.
+ */
+export async function signedInContext(browser, origin, phone, options = {}) {
+  const s = await apiSession(phone);
+  const auth = { state: { accessToken: s.accessToken, refreshToken: s.refreshToken, user: s.user, memberships: s.memberships }, version: 0 };
+  return browser.newContext({ ...options, storageState: { cookies: [], origins: [{ origin, localStorage: [{ name: "illuminize.auth", value: JSON.stringify(auth) }] }] } });
+}
+
+/**
+ * The same for the Expo app's web export, which keeps its session in AsyncStorage, localStorage on the web: the tokens
+ * under keys of their own, and who is signed in under illuminize.auth.
+ */
+export async function signedInMobileContext(browser, origin, phone, options = {}) {
+  const s = await apiSession(phone);
+  const auth = { state: { isAuthenticated: true, user: s.user, memberships: s.memberships }, version: 0 };
+  const localStorage = [
+    { name: "illuminize.auth", value: JSON.stringify(auth) },
+    { name: "illuminize.access", value: s.accessToken },
+    { name: "illuminize.refresh", value: s.refreshToken },
+  ];
+  return browser.newContext({ ...options, storageState: { cookies: [], origins: [{ origin, localStorage }] } });
 }
 
 /** Runs a scheduled per-institution job now ("celebrations" or "digest"), as the platform console's job runner does. */
@@ -82,6 +131,9 @@ export const scriptTenant = (page, slug) => scriptGet(page, `/tenants/${slug}`, 
 /** A business listing: stale after 30 seconds, and a 5xx is tried three times, about 3 seconds in all. */
 export const scriptBusiness = (page, slug, id) => scriptGet(page, `/t/${slug}/businesses/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
 
+/** A chat thread's details (not its messages): stale after 30 seconds, and a 5xx is tried three times. */
+export const scriptConversation = (page, slug, id) => scriptGet(page, `/t/${slug}/chat/conversations/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
+
 /**
  * Serves the institution with only some sections on. No demo institution has one off, and this needs no admin sign-in.
  * Only the app sees this: the API still has everything on. It takes effect on the next page load.
@@ -111,4 +163,36 @@ export async function scriptNotification(page, slug, { type, data, title }) {
     return fulfillJson(route, 200, { data: [row], nextCursor: null });
   });
   return { stop: () => page.unroute(url) };
+}
+
+/**
+ * Puts the page's live connection through a proxy that loses any server frame containing `text`, as a flaky network would.
+ * Set it up before the page connects (a reload does). `opened()` waits until the connection is up and has had a moment to
+ * join its rooms, and `dropped()` says whether a frame was actually lost, so a script can't pass without testing the gap.
+ * The proxy stays for the page's life, passing everything else through.
+ */
+export async function dropFrames(page, text) {
+  const url = /\/socket\.io\//;
+  let open = false;
+  let dropped = 0;
+  await page.routeWebSocket(url, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((frame) => {
+      if (typeof frame === "string" && frame.startsWith("40")) open = true;
+      if (typeof frame === "string" && frame.includes(text)) {
+        dropped += 1;
+        return;
+      }
+      ws.send(frame);
+    });
+  });
+  return {
+    opened: async () => {
+      for (let i = 0; i < 150 && !open; i++) await page.waitForTimeout(100);
+      if (!open) throw new Error("the live connection didn't open");
+      // The server joins the member's rooms just after the connection opens.
+      await page.waitForTimeout(1500);
+    },
+    dropped: () => dropped > 0,
+  };
 }

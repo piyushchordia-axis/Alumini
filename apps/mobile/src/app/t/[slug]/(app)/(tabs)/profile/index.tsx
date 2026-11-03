@@ -31,7 +31,7 @@ export default function MyProfileScreen() {
     }, [qc]),
   );
   const confirmDelete = () =>
-    Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. It cannot be undone.", [
+    Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. Messages you sent stay in other people's chats, shown as from a Deleted member. It cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",

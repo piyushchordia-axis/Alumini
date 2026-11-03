@@ -400,6 +400,11 @@ export interface ChatDirectResultDto {
   message: ChatMessageDto;
 }
 
+/** The thread with a member, if this member's own inbox lists one. Null says nothing about whether the other member has one. */
+export interface ChatDirectLookupDto {
+  conversationId: string | null;
+}
+
 export interface ChatBadgeDto {
   /** Conversations with something unread, not messages. */
   unread: number;

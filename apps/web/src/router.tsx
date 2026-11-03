@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { RequireAuth } from "@/components/guards/RequireAuth";
-import { AppHomeRedirect, RequireFeature } from "@/components/guards/RequireFeature";
+import { AppHomeRedirect, RequireChat, RequireFeature } from "@/components/guards/RequireFeature";
 import { RequireMembership } from "@/components/guards/RequireMembership";
 import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
@@ -26,6 +26,10 @@ import { JobFormPage } from "@/routes/t/JobFormPage";
 import { JobsPage } from "@/routes/t/JobsPage";
 import { LandingPage } from "@/routes/t/LandingPage";
 import { LoginPage } from "@/routes/t/LoginPage";
+import { BlockedMembersPage } from "@/routes/t/BlockedMembersPage";
+import { ChatThreadRoute } from "@/routes/t/ChatThreadPage";
+import { MessagesPage, NoConversationPane } from "@/routes/t/MessagesPage";
+import { NewConversationPage } from "@/routes/t/NewConversationPage";
 import { MemberProfilePage } from "@/routes/t/MemberProfilePage";
 import { MyContentPage } from "@/routes/t/MyContentPage";
 import { MyProfilePage } from "@/routes/t/MyProfilePage";
@@ -35,6 +39,7 @@ import { PendingApprovalPage } from "@/routes/t/PendingApprovalPage";
 import { PostDetailPage } from "@/routes/t/PostDetailPage";
 import { RegisterPage } from "@/routes/t/RegisterPage";
 import { adminRoutes, platformRoutes } from "@/router.admin";
+import type { AppRouteHandle } from "@/lib/routeHandle";
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +71,22 @@ export const router = createBrowserRouter([
                       { path: "feed", element: <FeedPage /> },
                       { path: "feed/:postId", element: <PostDetailPage /> },
                       { path: "digest", element: <DigestPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequireChat />,
+                    children: [
+                      {
+                        path: "messages",
+                        element: <MessagesPage />,
+                        handle: { fullHeight: true } satisfies AppRouteHandle,
+                        children: [
+                          { index: true, element: <NoConversationPane /> },
+                          { path: "new", element: <NewConversationPage />, handle: { immersive: true } satisfies AppRouteHandle },
+                          { path: "blocked", element: <BlockedMembersPage /> },
+                          { path: ":conversationId", element: <ChatThreadRoute />, handle: { immersive: true } satisfies AppRouteHandle },
+                        ],
+                      },
                     ],
                   },
                   {

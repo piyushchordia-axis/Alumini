@@ -1,4 +1,4 @@
-import { CONFIGURABLE_CATEGORIES, NOTIFICATION_CATEGORY_INFO, type NotificationLevel, type NotificationPrefsDto, type NotificationPrefsUpdate } from "@illuminize/shared";
+import { NOTIFICATION_CATEGORY_INFO, visibleNotificationCategories, type NotificationLevel, type NotificationPrefsDto, type NotificationPrefsUpdate } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -45,7 +45,7 @@ function Toggle({ label, description, checked, disabled, onChange }: { label: st
 }
 
 export function NotificationSettingsPage() {
-  const { tenant, isTenantAdmin } = useMembership();
+  const { tenant, membership, isTenantAdmin } = useMembership();
   const slug = tenant.slug;
   const qc = useQueryClient();
   const prefs = useQuery({ queryKey: qk.notificationPrefs(slug), queryFn: () => api.notifications.prefs(slug) });
@@ -67,7 +67,7 @@ export function NotificationSettingsPage() {
   if (prefs.isLoading) return <Loading />;
   if (prefs.error || !prefs.data) return <ErrorBox error={prefs.error ?? "Not found"} />;
   const p = prefs.data;
-  const categories = CONFIGURABLE_CATEGORIES.filter((c) => isTenantAdmin || !NOTIFICATION_CATEGORY_INFO[c].adminOnly);
+  const categories = visibleNotificationCategories({ features: tenant.settings.features, chatEligible: membership.chatEligible, isTenantAdmin });
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Notification settings" subtitle={`For ${tenant.name}. Account notices (approvals, moderation decisions) always reach you.`} />

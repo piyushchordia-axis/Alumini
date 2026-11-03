@@ -90,26 +90,32 @@ export function ChipSelect<T extends string>({ label, options, value, onChange, 
  */
 export const toggleState = (on: boolean) => ({ "aria-selected": on, "aria-pressed": on }) as { "aria-selected": boolean };
 
-export function Chip({ label, active, onPress, color }: { label: string; active?: boolean; onPress?: () => void; color?: string }) {
+/** `tall` makes it a full 44-point target, for a choice that matters, such as a report's reason. */
+export function Chip({ label, active, onPress, color, tall = false }: { label: string; active?: boolean; onPress?: () => void; color?: string; tall?: boolean }) {
   const theme = useTheme();
   const c = color ?? theme.primary;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, active ? { backgroundColor: c, borderColor: c } : null]}>
+    <Pressable onPress={onPress} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, tall ? styles.chipTall : null, active ? { backgroundColor: c, borderColor: c } : null]}>
       <Text style={[styles.chipText, active ? { color: "#fff" } : null]}>{label}</Text>
     </Pressable>
   );
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+export function Tabs<T extends string>({ tabs, value, onChange, tall = false }: { tabs: { value: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; tall?: boolean }) {
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
       {/* Labels stay on one line: tabs share the width when they fit and scroll sideways when they don't. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
         {tabs.map((t) => (
-          <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, value === t.value ? styles.tabActive : null]}>
+          <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, tall ? styles.tabTall : null, value === t.value ? styles.tabActive : null]}>
             <Text numberOfLines={1} style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>
               {t.label}
             </Text>
+            {t.count !== undefined && (
+              <View style={styles.tabCount}>
+                <Text style={styles.tabCountText}>{t.count > 99 ? "99+" : t.count}</Text>
+              </View>
+            )}
           </Pressable>
         ))}
       </ScrollView>
@@ -230,10 +236,14 @@ const styles = StyleSheet.create({
   hint: { color: colors.muted, fontSize: 12 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   chipText: { fontSize: 13, color: colors.text },
+  chipTall: { minHeight: 44, justifyContent: "center", paddingHorizontal: 14 },
   tabs: { backgroundColor: "#e2e8f0", borderRadius: radius.md, padding: 3, overflow: "hidden" },
-  tab: { flexGrow: 1, paddingVertical: 8, paddingHorizontal: spacing.md, alignItems: "center", borderRadius: 9 },
+  tab: { flexGrow: 1, paddingVertical: 8, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, borderRadius: 9 },
+  tabTall: { minHeight: 44 },
   tabActive: { backgroundColor: "#fff" },
   tabText: { fontSize: 13, fontWeight: "600", color: colors.muted },
+  tabCount: { backgroundColor: "#cbd5e1", borderRadius: radius.full, paddingHorizontal: 6, minWidth: 18, alignItems: "center" },
+  tabCountText: { fontSize: 11, fontWeight: "700", color: colors.text },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, alignSelf: "flex-start" },
   badgeText: { fontSize: 11, fontWeight: "600" },

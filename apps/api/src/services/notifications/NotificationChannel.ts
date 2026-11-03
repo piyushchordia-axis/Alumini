@@ -18,6 +18,16 @@ export interface PushMessage {
   data?: Record<string, unknown>;
   sound?: "default";
   channelId?: string;
+  /** Seconds Expo and the platforms keep trying to reach a device that's off. Left out, it's up to a month. */
+  ttl?: number;
+}
+
+/** One push to all of a user's devices, for what has no stored notification behind it. */
+export interface PushItem {
+  userId: string;
+  title: string;
+  body?: string;
+  data: Record<string, unknown>;
 }
 
 /**
@@ -27,6 +37,7 @@ export interface PushMessage {
 export interface PushChannel {
   readonly name: string;
   prepare(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<PushMessage[]>;
+  prepareFor(items: PushItem[], context: DeliveryContext): Promise<PushMessage[]>;
   sendBatch(batch: PushMessage[]): Promise<void>;
   /** prepare + sendBatch in one go, logging failures. */
   deliver(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<void>;

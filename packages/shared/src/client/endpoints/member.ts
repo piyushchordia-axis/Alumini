@@ -9,6 +9,7 @@ import type {
   ChatBadgeDto,
   ChatBlockDto,
   ChatConversationDto,
+  ChatDirectLookupDto,
   ChatDirectResultDto,
   ChatMessageDto,
   ChatReportDto,
@@ -103,11 +104,13 @@ export function chatEndpoints(core: ApiCore) {
   return {
     /** Sends to a member, opening the thread if there isn't one: the first message goes as a request. */
     direct: (slug: string, input: ChatDirectCreateInput) => core.data<ChatDirectResultDto>({ method: "POST", path: "/chat/direct", tenantSlug: slug, body: input }),
+    directThread: (slug: string, membershipId: string) => core.data<ChatDirectLookupDto>({ path: `/chat/direct/${membershipId}`, tenantSlug: slug }),
     conversations: (slug: string, query?: Partial<ChatConversationsQuery>) => core.request<CursorPage<ChatConversationDto>>({ path: "/chat/conversations", tenantSlug: slug, query: q(query) }),
     conversation: (slug: string, id: string) => core.data<ChatConversationDto>({ path: `/chat/conversations/${id}`, tenantSlug: slug }),
     /** Newest first by `cursor`, or oldest first after `afterSeq`, where `nextCursor` means more came after this page than it holds. */
     messages: (slug: string, id: string, query?: Partial<ChatMessagesQuery>) => core.request<CursorPage<ChatMessageDto>>({ path: `/chat/conversations/${id}/messages`, tenantSlug: slug, query: q(query) }),
-    send: (slug: string, id: string, input: ChatMessageCreateInput) => core.data<ChatMessageDto>({ method: "POST", path: `/chat/conversations/${id}/messages`, tenantSlug: slug, body: input }),
+    send: (slug: string, id: string, input: ChatMessageCreateInput, options?: { signal?: AbortSignal }) =>
+      core.data<ChatMessageDto>({ method: "POST", path: `/chat/conversations/${id}/messages`, tenantSlug: slug, body: input, signal: options?.signal }),
     read: (slug: string, id: string, input: ChatReadInput) => core.data<{ lastReadSeq: number }>({ method: "POST", path: `/chat/conversations/${id}/read`, tenantSlug: slug, body: input }),
     mute: (slug: string, id: string, input: ChatMuteInput) => core.data<ChatConversationDto>({ method: "PUT", path: `/chat/conversations/${id}/mute`, tenantSlug: slug, body: input }),
     accept: (slug: string, id: string) => core.data<ChatConversationDto>({ method: "POST", path: `/chat/conversations/${id}/accept`, tenantSlug: slug }),

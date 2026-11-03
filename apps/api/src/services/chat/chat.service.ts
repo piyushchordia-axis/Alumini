@@ -1,4 +1,4 @@
-import type { ChatBadgeDto, ChatConversationDto, ChatConversationsQuery, ChatDirectResultDto, ChatMessageDto, ChatMessagesQuery, CursorPage } from "@illuminize/shared";
+import type { ChatBadgeDto, ChatConversationDto, ChatConversationsQuery, ChatDirectLookupDto, ChatDirectResultDto, ChatMessageDto, ChatMessagesQuery, CursorPage } from "@illuminize/shared";
 import { isCurrentPupil } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient, Tx } from "../../db/client";
@@ -7,10 +7,12 @@ import { AppError } from "../../lib/errors";
 import { afterCommit, runInTransaction } from "../../lib/transaction";
 import { consumeRateLimit } from "../../middleware/rateLimit";
 import { rooms } from "../../realtime/rooms";
+import { keys } from "../../redis/keys";
 import {
   advanceRead,
   blocksBetween,
   changeDirectState,
+  findDirectThreadInInbox,
   findLastVisibleMessages,
   findMessageByClientKey,
   findParticipant,
@@ -32,7 +34,7 @@ import {
 import { findMembershipById } from "../../repositories/memberships.repo";
 import type { MembershipRow, TenantContext, TenantRow } from "../../types/request";
 import { asSeenBy, assertKindEnabled, blockedByYou, chatTenantOf, contactUnavailable, enabledKinds, freshChatTenant, isReachable, peerIdOf, planSend, requestPending, threadView, unreadOf, type ChatTenant } from "./common";
-import { appendMessage, chatRecipientOf, chatRecipients, publishChanged } from "./fanout";
+import { appendMessage, chatRecipientOf, chatRecipients, publishChanged, queuePushEvent } from "./fanout";
 
 export interface ChatActor {
   userId: string;
@@ -80,6 +82,20 @@ export async function listConversations(ctx: AppContext, tenantCtx: TenantContex
   // Status is in the query. Whether someone became a pupil depends on the institution's date, so it's checked here, at the cost of a short page.
   const shown = query.inbox === "REQUESTS" ? page.data.filter((r) => isReachable(tenant, r.peer)) : page.data;
   return { data: shown.map((r) => toConversationDto(tenant, r, last.get(r.conversation.id), now)), nextCursor: page.nextCursor };
+}
+
+/**
+ * The caller's thread with a member, if one of their inboxes lists it, by the same rules as the lists. So someone who asked
+ * gets the same answer whatever became of their request, and someone who declined or was never shown one gets none, which
+ * is what lets a profile offer to open the thread without saying anything the lists don't.
+ */
+export async function findDirectThread(ctx: AppContext, tenantCtx: TenantContext, actor: ChatActor, membershipId: string): Promise<ChatDirectLookupDto> {
+  const tenant = chatTenantOf(tenantCtx);
+  const me = actor.membership.id;
+  const main = await findDirectThreadInInbox(ctx.db, tenant.id, me, membershipId, "MAIN");
+  if (main) return { conversationId: main.conversation.id };
+  const request = await findDirectThreadInInbox(ctx.db, tenant.id, me, membershipId, "REQUESTS");
+  return { conversationId: request && isReachable(tenant, request.peer) ? request.conversation.id : null };
 }
 
 export async function getConversation(ctx: AppContext, tenantCtx: TenantContext, actor: ChatActor, id: string): Promise<ChatConversationDto> {
@@ -144,6 +160,9 @@ async function sendLocked(ctx: AppContext, tx: Tx, tenant: ChatTenant, actor: Ch
 
   const row = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender: actor.membership, body: input.body, clientKey: input.clientKey, withheld: blocks.byOther, isRequest: plan === "REQUEST" });
   if (plan === "ACCEPT" || (settlesAcceptance && !blocks.byOther)) await publishChanged(ctx, tx, tenant.slug, conversation.id, { actorMembershipId: me });
+  // Asking again uses up the one message, so the asker's other devices must stop offering more. Only theirs, and the same
+  // whether or not they're blocked, so it tells them nothing they can't already see.
+  else if (plan === "REQUEST" && !created) await publishChanged(ctx, tx, tenant.slug, conversation.id, { onlyMembershipId: me });
   return row;
 }
 
@@ -208,6 +227,7 @@ export async function markRead(ctx: AppContext, tenantCtx: TenantContext, actor:
   assertKindEnabled(tenant.features, thread.conversation.kind);
   const lastReadSeq = await advanceRead(ctx.db, conversationId, me, seq);
   if (lastReadSeq === undefined) throw AppError.notFound("Conversation not found");
+  await afterCommit(ctx, ctx.db, () => ctx.redis.del(keys.chatPushQuiet(conversationId, me)));
   await afterCommit(ctx, ctx.db, async () => {
     const own = (await chatRecipients(ctx.db, conversationId)).filter((r) => r.membershipId === me);
     if (own.length > 0) ctx.realtime.emit(own.map((r) => rooms.user(r.userId)), "chat:read", { tenantSlug: tenant.slug, conversationId, membershipId: me, lastReadSeq });
@@ -259,7 +279,10 @@ export function acceptRequest(ctx: AppContext, tenantCtx: TenantContext, actor: 
     if (blocks.byMe) throw blockedByYou();
     // Accepted as far as they can tell. Someone who asked and then blocked them doesn't get to learn it.
     if (blocks.byOther) await updateParticipant(tx, conversation.id, me, { withheldState: "ACCEPTED" });
-    else await changeDirectState(tx, conversation.id, { directState: "ACCEPTED" });
+    else {
+      await changeDirectState(tx, conversation.id, { directState: "ACCEPTED" });
+      await queuePushEvent(ctx, tx, { tenantId: tenant.id, conversationId: conversation.id, kind: "CHAT_ACCEPTED", actorMembershipId: me });
+    }
     await publishChanged(ctx, tx, tenant.slug, conversation.id, { actorMembershipId: me });
   });
 }

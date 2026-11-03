@@ -129,6 +129,18 @@ describe("groupMessages", () => {
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
   });
 
+  it("keeps keys unique when a send that failed yesterday sits after today's messages", () => {
+    const yesterday = msg(THEM, "2026-06-14T22:00:00.000Z");
+    const failed: OutboxEntry = { clientKey: "k-failed", conversationId: "c1", body: "Didn't go", status: "failed", createdAt: "2026-06-14T23:50:00.000Z" };
+    const data: ChatMessagePages = { pages: [{ data: [{ ...(msg(THEM, "2026-06-15T09:00:00.000Z").message as ChatMessageDto), seq: 2 }, { ...(yesterday.message as ChatMessageDto), seq: 1 }], nextCursor: null }], pageParams: [undefined] };
+    const rows = groupMessages(threadItems(data, [failed]), ME, NOW, OPTIONS);
+    // The failed one stays last, where Try again is in view, under its own day's label.
+    expect(rows.map((r) => (r.type === "day" ? r.label : r.key))).toEqual(["Yesterday", expect.any(String), "Today", expect.any(String), "Yesterday", "k-failed"]);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
+    // The first label of a day keeps its plain key, so it isn't remounted when older pages load in above it.
+    expect(rows.filter((r) => r.type === "day").map((r) => r.key)).toEqual([expect.stringMatching(/^day-\d+$/), expect.stringMatching(/^day-\d+$/), expect.stringMatching(/^day-\d+-2$/)]);
+  });
+
   it("takes what threadItems gives it", () => {
     const data: ChatMessagePages = { pages: [{ data: [{ ...(msg(ME, "2026-06-15T10:00:30.000Z").message as ChatMessageDto), seq: 2 }, { ...(msg(THEM, "2026-06-15T10:00:00.000Z").message as ChatMessageDto), seq: 1 }], nextCursor: null }], pageParams: [undefined] };
     const rows = groupMessages(threadItems(data, []), ME, NOW, OPTIONS);

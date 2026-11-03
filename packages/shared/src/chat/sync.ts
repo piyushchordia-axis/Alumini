@@ -1,4 +1,4 @@
-import { errorMessage, isTransientError } from "../client/ApiClientError";
+import { ApiClientError, errorMessage, isApiClientError, isTransientError } from "../client/ApiClientError";
 import type { ChatInbox } from "../constants";
 import { CHAT_INBOXES } from "../constants";
 import type { RealtimeClient } from "../realtime/client";
@@ -18,7 +18,8 @@ export interface ChatQueryClient {
 
 export interface ChatSyncApi {
   messages(slug: string, id: string, query: { afterSeq: string; limit: number }): Promise<CursorPage<ChatMessageDto>>;
-  send(slug: string, id: string, input: { body: string; clientKey: string }): Promise<ChatMessageDto>;
+  /** `signal` aborts a send that has waited too long, so a request that never answers doesn't hold up the ones behind it. */
+  send(slug: string, id: string, input: { body: string; clientKey: string }, options?: { signal?: AbortSignal }): Promise<ChatMessageDto>;
 }
 
 export interface ChatSyncOptions {
@@ -32,6 +33,12 @@ export interface ChatSyncOptions {
   /** Refetch limits, so a busy thread doesn't refetch once per message. */
   badgeEveryMs?: number;
   listsEveryMs?: number;
+  /**
+   * How long a send may go unanswered before it counts as failed and can be tried again. Sends to a thread go one at a time,
+   * and fetch sets no limit of its own (React Native's sets none at all), so without this one lost request would hold every
+   * message after it at "Sending…" with no way to retry or discard.
+   */
+  sendTimeoutMs?: number;
 }
 
 export interface ChatSync {
@@ -39,7 +46,10 @@ export interface ChatSync {
   attach(): () => void;
   /** Fetches whatever came after `afterSeq`, or after the newest message held for this thread. */
   fillGap(slug: string, conversationId: string, afterSeq?: number): Promise<void>;
-  /** Shows the message straight away and posts it. Returns the server's copy, or null if it failed, which leaves it in the outbox. */
+  /**
+   * Shows the message straight away and posts it, after any send to the same thread still under way. Returns the server's
+   * copy, or null if it failed, which leaves it in the outbox.
+   */
   send(slug: string, conversationId: string, body: string, clientKey?: string): Promise<ChatMessageDto | null>;
   /** Sends a failed message again under its own key, so the server can tell if the first attempt arrived after all. */
   retry(slug: string, conversationId: string, clientKey: string): Promise<ChatMessageDto | null>;
@@ -59,6 +69,8 @@ export function newClientKey(): string {
 }
 
 const GAP_PAGE_SIZE = 50;
+const SEND_TIMEOUT_MS = 20_000;
+const SEND_TIMED_OUT = "Sending took too long. Check your connection, then try again.";
 
 /**
  * Keeps the chat cache current from live events. One of these runs per app, and screens read the cache. Delivery is at
@@ -189,20 +201,63 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
     }, refillAfterMs);
   };
 
-  const post = async (slug: string, id: string, entry: OutboxEntry): Promise<ChatMessageDto | null> => {
-    qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => addToOutbox(old, entry));
+  /**
+   * Posts one send, failing it as a network error once it has waited `sendTimeoutMs`. The server may still have taken it, which
+   * is safe: trying again sends the same key and gets the original back, and its echo settles the bubble meanwhile.
+   */
+  const sendTimeoutMs = opts.sendTimeoutMs ?? SEND_TIMEOUT_MS;
+  const sendOnce = (slug: string, id: string, entry: OutboxEntry) =>
+    new Promise<ChatMessageDto>((resolve, reject) => {
+      const controller = typeof AbortController === "function" ? new AbortController() : undefined;
+      const timer = setTimeout(() => {
+        controller?.abort();
+        reject(new ApiClientError(0, "NETWORK_ERROR", SEND_TIMED_OUT));
+      }, sendTimeoutMs);
+      api.send(slug, id, { body: entry.body, clientKey: entry.clientKey }, { signal: controller?.signal }).then(
+        (message) => {
+          clearTimeout(timer);
+          resolve(message);
+        },
+        (err: unknown) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      );
+    });
+
+  const deliver = async (slug: string, id: string, entry: OutboxEntry): Promise<ChatMessageDto | null> => {
     try {
-      const message = await api.send(slug, id, { body: entry.body, clientKey: entry.clientKey });
+      const message = await sendOnce(slug, id, entry);
       receive(slug, id, message);
       refreshLists(slug);
+      // Outside an accepted chat a send changes the thread itself: someone asking again has used their one message, and the
+      // screen must stop offering the box. The server tells this member's other devices; this is the one that sent it.
+      const conversationKey = chatKeys.conversation(slug, id);
+      if ((qc.getQueryData(conversationKey) as ChatConversationDto | undefined)?.state !== "ACCEPTED") void qc.invalidateQueries({ queryKey: conversationKey });
       return message;
     } catch (err) {
       const retryable = isTransientError(err);
-      qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => markOutboxFailed(old, entry.clientKey, errorMessage(err), retryable));
+      qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => markOutboxFailed(old, entry.clientKey, errorMessage(err), retryable, isApiClientError(err) ? err.code : undefined));
       // The API refused it, so what the screen believes about this thread is out of date.
       if (!retryable) void qc.invalidateQueries({ queryKey: chatKeys.conversation(slug, id) });
       return null;
     }
+  };
+
+  // One send at a time per thread. Two requests in flight together can reach the server in either order, and the thread
+  // would then show them in the order they landed rather than the order they were written.
+  const inFlight = new Map<string, Promise<unknown>>();
+  const post = (slug: string, id: string, entry: OutboxEntry): Promise<ChatMessageDto | null> => {
+    qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => addToOutbox(old, entry));
+    const key = `${slug}:${id}`;
+    const before = inFlight.get(key);
+    // Nothing ahead of it goes at once, so a lone send isn't held back even a tick.
+    const sent = before ? before.then(() => deliver(slug, id, entry)) : deliver(slug, id, entry);
+    inFlight.set(key, sent);
+    void sent.then(() => {
+      if (inFlight.get(key) === sent) inFlight.delete(key);
+    });
+    return sent;
   };
 
   return {
@@ -238,7 +293,10 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
           refreshBadge(slug);
         }),
         realtime.on("chat:unread", ({ tenantSlug: slug, unread, requests }) => {
-          qc.setQueryData(chatKeys.badge(slug), (): ChatBadgeDto => ({ unread, requests }));
+          const key = chatKeys.badge(slug);
+          qc.setQueryData(key, (): ChatBadgeDto => ({ unread, requests }));
+          // A throttled refetch may have read the counts before this changed them, and would put the old ones back.
+          refetchIfFetching(key);
         }),
         realtime.onReconnect(catchUp),
       ];

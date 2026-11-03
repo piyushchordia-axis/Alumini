@@ -1,6 +1,9 @@
 import { Stack } from "expo-router";
 import { detailHeader, FeatureGate, useAppHeaderOptions } from "@/components/AppHeader";
 
+/** What a screen opened straight from a link, a push or another tab goes back to, with `withAnchor` or on a cold start. */
+export const unstable_settings = { anchor: "index" };
+
 export default function JobsStack() {
   const appHeader = useAppHeaderOptions();
   return (

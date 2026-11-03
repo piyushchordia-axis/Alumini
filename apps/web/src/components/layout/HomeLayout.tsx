@@ -1,24 +1,34 @@
 import { splitSections, type MemberSection } from "@illuminize/shared";
+import { chatBadgeLabel } from "@illuminize/shared/chat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState } from "react";
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Avatar, Modal } from "@/components/ui";
+import { useChatBadge, useChatScope } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
+import { useAppRouteHandle } from "@/lib/routeHandle";
 import { homePath, SECTION_LINKS } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 
 export function HomeLayout() {
   const { tenant, membership, isTenantAdmin } = useMembership();
   const base = `/t/${tenant.slug}/app`;
-  const toLink = (section: MemberSection) => ({ ...SECTION_LINKS[section], to: `${base}/${SECTION_LINKS[section].path}` });
-  const { bar, overflow } = splitSections(tenant.settings.features);
+  const toLink = (section: MemberSection) => ({ ...SECTION_LINKS[section], section, to: `${base}/${SECTION_LINKS[section].path}` });
+  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible);
   const barLinks = bar.map(toLink);
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];
+
+  const chatEnabled = tenant.settings.features.messaging && membership.chatEligible;
+  useChatScope(tenant.slug, chatEnabled);
+  const chatBadge = chatBadgeLabel(useChatBadge(tenant.slug, chatEnabled).data);
+  /** The badge, for the one link that has one. */
+  const badgeFor = (section: MemberSection) => (section === "messages" && chatBadge.count > 0 ? chatBadge : null);
+  const { fullHeight, immersive } = useAppRouteHandle();
 
   const pollInterval = usePollInterval();
   const unread = useQuery({ queryKey: qk.unread(tenant.slug), queryFn: () => api.notifications.unreadCount(tenant.slug), refetchInterval: pollInterval });
@@ -48,8 +58,9 @@ export function HomeLayout() {
   const sheetLinkClass = ({ isActive }: { isActive: boolean }) => clsx(sheetRow, isActive ? "bg-primary/10 text-primary" : "text-slate-700 hover:bg-slate-100");
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    // A full-height screen scrolls inside itself, so the page around it is exactly the window.
+    <div className={clsx("bg-slate-50", fullHeight ? "flex h-dvh flex-col overflow-hidden" : "min-h-full")}>
+      <header className={clsx("sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur", immersive && "max-md:hidden")}>
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
           <NavLink to={homePath(tenant.slug, tenant.settings.features)} className="flex min-w-0 items-center gap-2">
             <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} size="sm" />
@@ -76,15 +87,19 @@ export function HomeLayout() {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
-        <aside className="hidden w-56 shrink-0 md:block">
+      <div className={clsx("mx-auto flex w-full max-w-6xl gap-6", fullHeight ? "min-h-0 flex-1 md:px-4 md:py-6" : "px-4 py-6")}>
+        <aside className={clsx("hidden w-56 shrink-0 md:block", fullHeight && "overflow-y-auto")}>
           <nav className="space-y-1" aria-label="Main">
-            {sections.map((i) => (
-              <NavLink key={i.to} to={i.to} className={linkClass}>
-                <span aria-hidden>{i.icon}</span>
-                {i.label}
-              </NavLink>
-            ))}
+            {sections.map((i) => {
+              const badge = badgeFor(i.section);
+              return (
+                <NavLink key={i.to} to={i.to} className={linkClass} aria-label={badge?.label}>
+                  <span aria-hidden>{i.icon}</span>
+                  {i.label}
+                  {badge && <NavBadge count={badge.count} className="ml-auto" />}
+                </NavLink>
+              );
+            })}
             {sections.length > 0 && <div className="my-3 border-t border-slate-200" />}
             <NavLink to={`${base}/my-content`} className={linkClass}>
               <span aria-hidden>🗂️</span>My posts
@@ -105,20 +120,24 @@ export function HomeLayout() {
             </button>
           </nav>
         </aside>
-        <main className="min-w-0 flex-1 pb-20 md:pb-0">
+        <main className={clsx("min-w-0 flex-1", fullHeight ? clsx("flex min-h-0 flex-col", !immersive && "max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]") : "pb-20 md:pb-0")}>
           <Outlet />
         </main>
       </div>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {barLinks.map((i) => (
-          <NavLink key={i.to} to={i.to} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary" : "text-slate-500")}>
-            <span className="text-lg leading-none" aria-hidden>
-              {i.icon}
-            </span>
-            {i.label}
-          </NavLink>
-        ))}
+      <nav aria-label="Main" className={clsx("fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white md:hidden", immersive && "hidden")} style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {barLinks.map((i) => {
+          const badge = badgeFor(i.section);
+          return (
+            <NavLink key={i.to} to={i.to} aria-label={badge?.label} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary" : "text-slate-500")}>
+              <span className="relative text-lg leading-none" aria-hidden>
+                {i.icon}
+                {badge && <NavBadge count={badge.count} className="absolute -right-3 -top-1.5" />}
+              </span>
+              {i.label}
+            </NavLink>
+          );
+        })}
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
@@ -137,12 +156,16 @@ export function HomeLayout() {
       <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title={tenant.shortName ?? tenant.name}>
         {/* Following any link in the sheet closes it. */}
         <div className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setMoreOpen(false)}>
-          {overflowLinks.map((i) => (
-            <NavLink key={i.to} to={i.to} className={sheetLinkClass}>
-              <span aria-hidden>{i.icon}</span>
-              {i.label}
-            </NavLink>
-          ))}
+          {overflowLinks.map((i) => {
+            const badge = badgeFor(i.section);
+            return (
+              <NavLink key={i.to} to={i.to} className={sheetLinkClass} aria-label={badge?.label}>
+                <span aria-hidden>{i.icon}</span>
+                {i.label}
+                {badge && <NavBadge count={badge.count} className="ml-auto" />}
+              </NavLink>
+            );
+          })}
           <NavLink to={`${base}/my-content`} className={sheetLinkClass}>
             <span aria-hidden>🗂️</span>My posts
           </NavLink>
@@ -163,5 +186,14 @@ export function HomeLayout() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+/** A count on a navigation link. Hidden from screen readers, because the link's own name says it. */
+function NavBadge({ count, className }: { count: number; className?: string }) {
+  return (
+    <span aria-hidden className={clsx("rounded-full bg-red-500 px-1.5 text-[10px] font-semibold leading-4 text-white", className)}>
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

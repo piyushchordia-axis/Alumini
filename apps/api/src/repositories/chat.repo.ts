@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { ChatConversationKind, ChatInbox } from "@illuminize/shared";
 import { CHAT_REPORT_CONTEXT_EACH_SIDE } from "@illuminize/shared";
 import type { DbClient, Tx } from "../db/client";
@@ -187,6 +187,48 @@ export async function listDeliveryCandidates(db: DbClient, conversationId: strin
     .where(and(eq(chatParticipants.conversationId, conversationId), eq(chatParticipants.state, "ACTIVE")));
 }
 
+const notMuted = (now: Date) => or(isNull(chatParticipants.mutedUntil), lte(chatParticipants.mutedUntil, now));
+
+export async function findConversation(db: DbClient, tenantId: string, id: string): Promise<ConversationRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(chatConversations)
+    .where(and(eq(chatConversations.tenantId, tenantId), eq(chatConversations.id, id)))
+    .limit(1);
+  return row;
+}
+
+/** Of these members, those who haven't muted this conversation. */
+export async function findUnmutedParticipants(db: DbClient, conversationId: string, membershipIds: string[], now: Date): Promise<string[]> {
+  if (membershipIds.length === 0) return [];
+  const rows = await db
+    .select({ membershipId: chatParticipants.membershipId })
+    .from(chatParticipants)
+    .where(and(eq(chatParticipants.conversationId, conversationId), inArray(chatParticipants.membershipId, membershipIds), notMuted(now)));
+  return rows.map((r) => r.membershipId);
+}
+
+/**
+ * Of these members, those with something to be pushed about: not muted, and with an unread message that isn't withheld,
+ * removed, or from someone they've blocked. Counting `last_seq` alone would push about all of those.
+ */
+export async function findParticipantsWithNews(db: DbClient, conversationId: string, membershipIds: string[], now: Date): Promise<string[]> {
+  if (membershipIds.length === 0) return [];
+  const hasNews = sql`exists (
+    select 1 from ${chatMessages}
+    where ${chatMessages.conversationId} = ${chatParticipants.conversationId}
+      and ${chatMessages.seq} > greatest(${chatParticipants.lastReadSeq}, ${chatParticipants.joinedSeq})
+      and ${chatMessages.withheld} = false
+      and ${chatMessages.removedAt} is null
+      and not exists (select 1 from ${chatBlocks} where ${chatBlocks.blockerMembershipId} = ${chatParticipants.membershipId} and ${chatBlocks.blockedMembershipId} = ${chatMessages.senderMembershipId})
+  )`;
+  const rows = await db
+    .select({ membershipId: chatParticipants.membershipId })
+    .from(chatParticipants)
+    .where(and(eq(chatParticipants.conversationId, conversationId), inArray(chatParticipants.membershipId, membershipIds), notMuted(now), hasNews));
+  return rows.map((r) => r.membershipId);
+}
+
 // --- Blocks ---
 
 export async function insertBlock(db: DbClient, values: typeof chatBlocks.$inferInsert): Promise<boolean> {
@@ -305,6 +347,29 @@ export async function listThreads(db: DbClient, tenantId: string, viewerMembersh
     .orderBy(desc(sortAt), desc(chatConversations.id))
     .limit(q.limit + 1);
   return buildCursorPage(rows, q.limit, (r) => ({ v: (r.participant.frozenSortAt ?? r.conversation.lastMessageAt).toISOString(), id: r.conversation.id }), (r) => r);
+}
+
+/** The viewer's thread with another member, if this inbox of theirs lists it. */
+export async function findDirectThreadInInbox(db: DbClient, tenantId: string, viewerMembershipId: string, otherMembershipId: string, inbox: ChatInbox): Promise<ThreadRow | undefined> {
+  const { low, high } = directPair(viewerMembershipId, otherMembershipId);
+  const [row] = await db
+    .select(threadColumns(viewerMembershipId))
+    .from(chatParticipants)
+    .innerJoin(chatConversations, eq(chatConversations.id, chatParticipants.conversationId))
+    .leftJoin(memberships, peerJoin(viewerMembershipId))
+    .where(
+      and(
+        eq(chatParticipants.tenantId, tenantId),
+        eq(chatParticipants.membershipId, viewerMembershipId),
+        eq(chatParticipants.state, "ACTIVE"),
+        eq(chatConversations.kind, "DIRECT"),
+        eq(chatConversations.directLowId, low),
+        eq(chatConversations.directHighId, high),
+        inboxCondition(viewerMembershipId, inbox),
+      ),
+    )
+    .limit(1);
+  return row;
 }
 
 /** Everything the badge counts from, one row per thread of this member. */

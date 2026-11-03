@@ -363,6 +363,8 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       expect(await conversationRow(ctx, id)).toMatchObject({ directState: "PENDING", requestCount: 2 });
       expect(ids(await chat(b).list("REQUESTS"))).toEqual([id]);
       expect(realtime.to(b.user.id).map((e) => e.event)).toEqual(["chat:changed"]);
+      // The asker's own devices hear that the thread changed, so a second screen stops offering the box too.
+      expect(realtime.to(a.user.id).map((e) => e.event).sort()).toEqual(["chat:changed", "chat:message"]);
       expect((await chat(a).send(id, "Too soon again")).body.error.code).toBe("CHAT_REQUEST_PENDING");
 
       // Pending and unanswered counts the same: thirty days on, they may ask once more.
@@ -402,6 +404,8 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       expect(await conversationRow(ctx, id)).toMatchObject({ directState: "DECLINED", requestCount: 1, lastSeq: 2 });
       expect(await participantRow(ctx, id, a.membership.id)).toMatchObject({ withheldState: "PENDING", withheldRequestCount: 2 });
       expect(realtime.to(b.user.id)).toEqual([]);
+      // The asker's own devices hear exactly what they would without the block.
+      expect(realtime.to(a.user.id).map((e) => e.event).sort()).toEqual(["chat:changed", "chat:message"]);
       expect((await chat(a).messages(id)).body.data.map((m: ChatMessageDto) => m.body)).toEqual(["Second", "First"]);
       expect((await chat(a).get(id)).body.data).toMatchObject({ state: "REQUEST_SENT", canSend: false });
 
@@ -698,6 +702,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       expect(await conversationRow(ctx, id)).toMatchObject({ directState: "PENDING", requesterMembershipId: b.membership.id, requestCount: 1 });
       expect((await chat(a).list("REQUESTS")).body.data.map((t: ChatConversationDto) => t.id)).toEqual([id]);
       expect(realtime.to(a.user.id).map((e) => e.event)).toEqual(["chat:changed"]);
+      expect(realtime.to(b.user.id).map((e) => e.event).sort()).toEqual(["chat:changed", "chat:message"]);
     });
 
     it("doesn't treat a chat they agreed to by message request as the mentorship's, after one has ended", async () => {

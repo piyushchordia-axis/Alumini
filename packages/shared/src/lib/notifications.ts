@@ -1,13 +1,13 @@
-import type { NotificationType } from "../constants";
+import type { NotificationType, TenantFeatures } from "../constants";
 
 /**
  * What kind of notification a type is, for member preferences. ACCOUNT (membership and moderation outcomes, system
  * notices) is always delivered; the rest each have a level the member chooses.
  */
-export const NOTIFICATION_CATEGORIES = ["ACCOUNT", "ACTIVITY", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"] as const;
+export const NOTIFICATION_CATEGORIES = ["ACCOUNT", "ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 export type ConfigurableCategory = Exclude<NotificationCategory, "ACCOUNT">;
-export const CONFIGURABLE_CATEGORIES: readonly ConfigurableCategory[] = ["ACTIVITY", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"];
+export const CONFIGURABLE_CATEGORIES: readonly ConfigurableCategory[] = ["ACTIVITY", "CHAT", "EVENTS", "ANNOUNCEMENTS", "CELEBRATIONS", "ADMIN"];
 
 export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategory> = {
   MEMBERSHIP_APPROVED: "ACCOUNT",
@@ -39,6 +39,8 @@ export type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 
 export const NOTIFICATION_CATEGORY_INFO: Record<ConfigurableCategory, { label: string; description: string; minLevel: NotificationLevel; adminOnly?: boolean }> = {
   ACTIVITY: { label: "Comments and reactions", description: "When members comment on or react to your posts.", minLevel: "OFF" },
+  // The bell never shows chat, so the lowest level here is the Messages badge alone.
+  CHAT: { label: "Messages", description: "New messages and message requests. Unless you mute a conversation, they show on the Messages badge.", minLevel: "IN_APP" },
   EVENTS: { label: "Events", description: "RSVPs to your events, and changes to events you're going to.", minLevel: "OFF" },
   ANNOUNCEMENTS: { label: "Announcements", description: "Notices from your institution's admins. Always shown in the app.", minLevel: "IN_APP" },
   CELEBRATIONS: { label: "Birthdays and anniversaries", description: "Greetings on your day and wishes from other members.", minLevel: "OFF" },
@@ -88,6 +90,22 @@ export function notificationLevelFor(type: NotificationType, prefs: Notification
   return resolveNotificationPrefs(prefs).categories[category];
 }
 
+/** The categories this member has a choice about here: chat only where they can use it, and admin work only for admins. */
+export function visibleNotificationCategories(input: { features: TenantFeatures; chatEligible: boolean; isTenantAdmin: boolean }): ConfigurableCategory[] {
+  const { features, chatEligible, isTenantAdmin } = input;
+  return CONFIGURABLE_CATEGORIES.filter((c) => {
+    if (NOTIFICATION_CATEGORY_INFO[c].adminOnly && !isTenantAdmin) return false;
+    return c !== "CHAT" || (features.messaging && chatEligible);
+  });
+}
+
+/**
+ * Chat that reaches a device and nowhere else. Outside NOTIFICATION_TYPES, so none of these can ever become a row in the
+ * bell: `notify` won't take them, and the badge on Messages is what counts them.
+ */
+export const CHAT_PUSH_KINDS = ["CHAT_MESSAGE", "CHAT_REQUEST", "CHAT_ACCEPTED", "CHAT_OPENED"] as const;
+export type ChatPushKind = (typeof CHAT_PUSH_KINDS)[number];
+
 /** Where tapping a notification should take the member; each app maps this to its own routes. */
 export type NotificationTarget =
   | { kind: "celebrations" }
@@ -135,8 +153,9 @@ const postTarget: TargetFor = (d) => (d.postId ? { kind: "post", id: d.postId } 
 const eventTarget: TargetFor = (d) => (d.eventId ? { kind: "event", id: d.eventId } : null);
 const profileTarget: TargetFor = () => ({ kind: "profile" });
 const celebrationsTarget: TargetFor = () => ({ kind: "celebrations" });
+const chatTarget: TargetFor = (d) => (d.conversationId ? { kind: "chat", conversationId: d.conversationId } : null);
 
-const TARGETS: Record<NotificationType, TargetFor> = {
+const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   POST_COMMENT: postTarget,
   POST_REACTION: postTarget,
   ANNOUNCEMENT: postTarget,
@@ -156,7 +175,11 @@ const TARGETS: Record<NotificationType, TargetFor> = {
   CONTENT_PENDING: () => ({ kind: "admin", section: "moderation" }),
   REPORT_FILED: () => ({ kind: "admin", section: "reports" }),
   CHAT_REPORT_FILED: () => ({ kind: "admin", section: "chat-reports" }),
-  CHAT_MESSAGE_REMOVED: (d) => (d.conversationId ? { kind: "chat", conversationId: d.conversationId } : null),
+  CHAT_MESSAGE_REMOVED: chatTarget,
+  CHAT_MESSAGE: chatTarget,
+  CHAT_REQUEST: chatTarget,
+  CHAT_ACCEPTED: chatTarget,
+  CHAT_OPENED: chatTarget,
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,
@@ -166,7 +189,7 @@ const TARGETS: Record<NotificationType, TargetFor> = {
  * Resolves a notification (type + data payload, as stored or as sent in a push) to a destination, or null. `type` can be
  * any string a push carried, and hasOwn keeps one like "constructor" from reaching a property of Object.prototype.
  */
-export function notificationTarget(type: NotificationType | string, data: unknown): NotificationTarget | null {
+export function notificationTarget(type: NotificationType | ChatPushKind | string, data: unknown): NotificationTarget | null {
   const d = (data && typeof data === "object" ? data : {}) as NotificationData;
-  return Object.hasOwn(TARGETS, type) ? TARGETS[type as NotificationType](d) : null;
+  return Object.hasOwn(TARGETS, type) ? TARGETS[type as NotificationType | ChatPushKind](d) : null;
 }

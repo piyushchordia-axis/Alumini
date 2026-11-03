@@ -61,11 +61,17 @@ export function groupMessages(items: ThreadItem[], myMembershipId: string, now: 
     return bt.getTime() - at.getTime() <= GROUP_WINDOW_MS && dayNumber(at, timeZone) === dayNumber(bt, timeZone);
   };
   const rows: ChatRow[] = [];
+  // A day can head the list twice: unconfirmed sends come after every server message, so one that failed yesterday follows
+  // today's. Its second label gets its own key, and the first keeps the plain one, so loading older pages doesn't remount it.
+  const daysSeen = new Map<number, number>();
   items.forEach((item, i) => {
     const at = itemTime(item);
     const previous = items[i - 1];
-    if (!previous || dayNumber(itemTime(previous), timeZone) !== dayNumber(at, timeZone)) {
-      rows.push({ type: "day", key: `day-${dayNumber(at, timeZone)}`, label: dayLabel(at, now, timeZone, options.locale) });
+    const day = dayNumber(at, timeZone);
+    if (!previous || dayNumber(itemTime(previous), timeZone) !== day) {
+      const seen = daysSeen.get(day) ?? 0;
+      daysSeen.set(day, seen + 1);
+      rows.push({ type: "day", key: seen === 0 ? `day-${day}` : `day-${day}-${seen + 1}`, label: dayLabel(at, now, timeZone, options.locale) });
     }
     rows.push({
       type: "message",

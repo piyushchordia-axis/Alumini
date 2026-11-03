@@ -26,6 +26,8 @@ export const keys = {
   /** Invitations queued for sending by one institution on one (billing time zone) day. */
   invitesDay: (tenantId: string, day: string) => `invites:day:${tenantId}:${day}`,
   active: (membershipId: string) => `active:${membershipId}`,
+  /** Set while a member has been pushed about a conversation and hasn't read it since. */
+  chatPushQuiet: (conversationId: string, membershipId: string) => `chat:push:quiet:${conversationId}:${membershipId}`,
   /** Sorted set of "ticketId|token" scored by send time, for Expo receipt checks. */
   pushReceipts: () => `push:receipts`,
 } as const;

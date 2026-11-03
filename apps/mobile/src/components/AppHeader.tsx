@@ -56,5 +56,12 @@ export function FeatureGate({ feature, children }: { feature: TenantFeature; chi
   return <>{children}</>;
 }
 
+/** The same for Messages, which also needs a member who isn't a current pupil. */
+export function ChatGate({ children }: { children: ReactNode }) {
+  const { tenant, membership } = useMembership();
+  if (!tenant.settings.features.messaging || !membership.chatEligible) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
+  return <>{children}</>;
+}
+
 /** Shared options for pushed detail screens and modals. */
 export const detailHeader = { headerShown: true, headerTitleStyle: { fontWeight: "700" as const }, headerBackTitle: "Back" };

@@ -1,4 +1,4 @@
-import { CONFIGURABLE_CATEGORIES, NOTIFICATION_CATEGORY_INFO, type NotificationLevel, type NotificationPrefsDto, type NotificationPrefsUpdate } from "@illuminize/shared";
+import { NOTIFICATION_CATEGORY_INFO, visibleNotificationCategories, type NotificationLevel, type NotificationPrefsDto, type NotificationPrefsUpdate } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -38,7 +38,7 @@ function LevelPicker({ label, value, min, onChange }: { label: string; value: No
 }
 
 export default function NotificationSettingsScreen() {
-  const { tenant, isTenantAdmin } = useMembership();
+  const { tenant, membership, isTenantAdmin } = useMembership();
   const slug = tenant.slug;
   const router = useRouter();
   const theme = useTheme();
@@ -61,7 +61,7 @@ export default function NotificationSettingsScreen() {
   if (prefs.isLoading) return <Spinner />;
   if (prefs.error || !prefs.data) return <LoadError error={prefs.error ?? "Not found"} onRetry={() => void prefs.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const p = prefs.data;
-  const categories = CONFIGURABLE_CATEGORIES.filter((c) => isTenantAdmin || !NOTIFICATION_CATEGORY_INFO[c].adminOnly);
+  const categories = visibleNotificationCategories({ features: tenant.settings.features, chatEligible: membership.chatEligible, isTenantAdmin });
   return (
     <Screen>
       <Muted size={13}>For {tenant.name}. Account notices (approvals, moderation decisions) always reach you.</Muted>

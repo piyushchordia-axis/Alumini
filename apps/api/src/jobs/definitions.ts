@@ -1,3 +1,4 @@
+import type { ChatPushKind } from "@illuminize/shared";
 import type { PushMessage } from "../services/notifications/NotificationChannel";
 
 /**
@@ -36,12 +37,16 @@ export interface JobPayloads {
   "digest.tenant": { tenantId: string; weekStart: string; at?: string };
   /** Email the digest to one page of members (each page queues the next). */
   "digest.batch": { tenantId: string; weekStart: string; afterMembershipId?: string | null };
+  /** Tell a conversation's members about messages they still haven't read, at most once per `quietSec` each. Ids only, like every chat job. */
+  "chat.pushConversation": { tenantId: string; conversationId: string; quietSec: number };
+  /** Tell a conversation's members one thing happened to it, other than a message. */
+  "chat.pushEvent": { tenantId: string; conversationId: string; kind: Exclude<ChatPushKind, "CHAT_MESSAGE">; actorMembershipId: string | null };
 }
 
 export type JobName = keyof JobPayloads;
 
-/** Queues are split by workload so slow provider calls (messages) never hold up internal jobs. */
-export const QUEUE_NAMES = ["jobs", "messages"] as const;
+/** Queues are split by workload so slow provider calls (messages) never hold up internal jobs, and chat's volume never pushes other jobs' ids out of what BullMQ retains. */
+export const QUEUE_NAMES = ["jobs", "messages", "chat"] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
 export interface JobPolicy {
@@ -65,4 +70,6 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "celebrations.tenant": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 30_000 } },
   "digest.tenant": { queue: "jobs", attempts: 3, backoff: { type: "exponential", delayMs: 30_000 } },
   "digest.batch": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
+  "chat.pushConversation": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
+  "chat.pushEvent": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
 };

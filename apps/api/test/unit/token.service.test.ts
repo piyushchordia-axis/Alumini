@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { pushTokens } from "../../src/db/schema";
 import { keys } from "../../src/redis/keys";
 import { isSessionAlive, issueSession, revokeAllSessions, revokeSession } from "../../src/services/token.service";
 import { createUnitContext } from "../helpers/unitContext";
@@ -29,12 +30,16 @@ describe("token.service", () => {
 
   it("revokes all sessions for a user", async () => {
     const ctx = createUnitContext();
+    // It also forgets the user's push tokens. push.test.ts checks the rows against a real database; here a recorder is enough.
+    const deletedFrom: unknown[] = [];
+    ctx.db = { delete: (table: unknown) => ({ where: async () => void deletedFrom.push(table) }) } as unknown as typeof ctx.db;
     const a = await issueSession(ctx, user);
     const b = await issueSession(ctx, user);
     await revokeAllSessions(ctx, user.id);
     expect(await isSessionAlive(ctx, a.sid)).toBe(false);
     expect(await isSessionAlive(ctx, b.sid)).toBe(false);
     expect(await ctx.redis.exists(keys.userSessions(user.id))).toBe(0);
+    expect(deletedFrom).toEqual([pushTokens]);
   });
 
   it("rejects tampered and expired access tokens", async () => {

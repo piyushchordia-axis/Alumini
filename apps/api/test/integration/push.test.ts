@@ -1,8 +1,9 @@
+import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { insertNotifications } from "../../src/repositories/notifications.repo";
 import { listPushTokensForUsers, upsertPushToken } from "../../src/repositories/users.repo";
 import { ExpoPushChannel, RECEIPT_DELAY_MS } from "../../src/services/notifications/ExpoPushChannel";
-import { createMembership, createTenant, createUser } from "../helpers/factories";
+import { createMembership, createTenant, createUser, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -79,6 +80,27 @@ describe.skipIf(!dbAvailable)("Expo push channel", () => {
     expect(sent.find((m) => m.data.type === "POST_COMMENT")!.body).toBe("Hi");
   });
 
+  it("prepareFor builds a message per device of each user, with no stored notification behind it", async () => {
+    const { user } = await setup();
+    const other = await createUser(ctx);
+    await upsertPushToken(ctx.db, { userId: other.id, token: "not-an-expo-token", platform: "ANDROID" });
+    const channel = new ExpoPushChannel(ctx.db, ctx.redis, ctx.logger, undefined, fakeExpo({ ticket: () => ({ status: "ok" }) }).impl);
+
+    const items = [
+      { userId: user.id, title: "New message from Asha", data: { type: "CHAT_MESSAGE", conversationId: "c1" } },
+      { userId: other.id, title: "New message request", data: { type: "CHAT_REQUEST", conversationId: "c2" } },
+    ];
+    const messages = await channel.prepareFor(items, { tenantSlug: "push-college" });
+
+    expect(messages.map((m) => m.to).sort()).toEqual([ALIVE, GONE].sort());
+    for (const m of messages) {
+      expect(m).toMatchObject({ title: "New message from Asha", data: { type: "CHAT_MESSAGE", conversationId: "c1", tenantSlug: "push-college" }, sound: "default", channelId: "default" });
+      expect(m.body).toBeUndefined();
+      expect(m.data).not.toHaveProperty("notificationId");
+    }
+    expect(await channel.prepareFor([], { tenantSlug: "push-college" })).toEqual([]);
+  });
+
   it("sends the institution slug for tap routing and drops tokens Expo rejects at send time", async () => {
     const { user, row, recipients } = await setup();
     const expo = fakeExpo({ ticket: (t) => (t === GONE ? { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } } : { status: "ok", id: `t:${t}` }) });
@@ -113,6 +135,19 @@ describe.skipIf(!dbAvailable)("Expo push channel", () => {
     // Processed receipts are not requested again.
     expect(await channel.checkReceipts(later)).toEqual({ checked: 0, removedTokens: 0 });
     expect(expo.receiptRequests).toHaveLength(1);
+  });
+
+  it("forgets every device of someone who signs out everywhere, so a lost phone stops showing their pushes", async () => {
+    const { tenant } = await createTenant(ctx, { slug: "push-logout" });
+    const member = await memberSession(ctx, tenant.id);
+    const other = await memberSession(ctx, tenant.id);
+    await upsertPushToken(ctx.db, { userId: member.user.id, token: ALIVE, platform: "ANDROID" });
+    await upsertPushToken(ctx.db, { userId: member.user.id, token: GONE, platform: "IOS" });
+    await upsertPushToken(ctx.db, { userId: other.user.id, token: "ExponentPushToken[other]", platform: "IOS" });
+
+    await request(ctx.app).post("/api/v1/auth/logout-all").set(member.headers).expect(204);
+    expect(await listPushTokensForUsers(ctx.db, [member.user.id])).toEqual([]);
+    expect((await listPushTokensForUsers(ctx.db, [other.user.id])).map((t) => t.token)).toEqual(["ExponentPushToken[other]"]);
   });
 
   it("runs the receipt check as a scheduled job", async () => {

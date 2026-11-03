@@ -1,4 +1,5 @@
 import { NOTIFICATION_CATEGORY, notificationLevelFor } from "@illuminize/shared";
+import type { AppContext } from "../../context";
 import type { JobHandler } from "../../jobs/JobQueue";
 import { PermanentJobError } from "../../jobs/JobQueue";
 import { findMembershipsByIds } from "../../repositories/memberships.repo";
@@ -7,7 +8,7 @@ import { rooms } from "../../realtime/rooms";
 import { countUnreadByMemberships, findNotificationPrefsByMemberships, findNotificationsByIds } from "../../repositories/notifications.repo";
 import { findTenantById } from "../../repositories/tenants.repo";
 import { PUSH_BATCH_SIZE } from "./ExpoPushChannel";
-import { PushSendError } from "./NotificationChannel";
+import { PushSendError, type PushMessage } from "./NotificationChannel";
 
 /** User rooms per realtime broadcast (each room name rides in the one adapter message). */
 const BROADCAST_ROOMS = 1000;
@@ -62,10 +63,15 @@ export const dispatchNotifications: JobHandler<"notifications.dispatch"> = async
     recipients.map((m) => ({ membershipId: m.id, userId: m.userId })),
     { tenantSlug: tenant.slug },
   );
+  await queuePushBatches(ctx, messages);
+};
+
+/** One job per Expo request, so each can be retried on its own. */
+export async function queuePushBatches(ctx: Pick<AppContext, "jobs">, messages: PushMessage[]): Promise<void> {
   for (let i = 0; i < messages.length; i += PUSH_BATCH_SIZE) {
     await ctx.jobs.enqueue("push.send", { messages: messages.slice(i, i + PUSH_BATCH_SIZE) });
   }
-};
+}
 
 export const sendPushBatch: JobHandler<"push.send"> = async (ctx, { messages }) => {
   if (!ctx.push) return;
