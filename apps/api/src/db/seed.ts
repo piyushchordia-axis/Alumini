@@ -1,16 +1,16 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultFeaturesFor, type MentorArea, type MentorAvailability } from "@illuminize/shared";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createLogger } from "../lib/logger";
 import { runInTransaction } from "../lib/transaction";
-import { reportContextIds, seedDirectThread } from "../repositories/chat.repo";
+import { lockDirectConversation, reportContextIds, seedDirectThread } from "../repositories/chat.repo";
 import { seedGroup } from "../repositories/chatGroups.repo";
 import { createDb, type Db } from "./client";
 import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
-import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, mentorProfiles, mentorships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
+import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, mentorProfiles, mentorships, postComments, postReactions, posts, referralRequests, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -611,6 +611,63 @@ async function seedMentorship(db: Db, tenantId: string, member: (phone: string) 
   });
 }
 
+/**
+ * Referral requests in demo-university: Rahul's and Priya's jobs take them, a request waits for Priya, and Rahul accepted
+ * one, with the chat its acceptance opened. Both requesters are generated members nobody signs in as and who aren't in any
+ * mentorship, so none of the members the e2e journeys sign in as (see seedMentorship) asks, is asked or gets a new thread.
+ * Jobs and generated members come from the other seeds, and whatever is missing is skipped.
+ */
+async function seedReferrals(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(referralRequests).where(eq(referralRequests.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const [rahul, priya] = ["+919100000001", "+919100000002"].map(member) as [string, string];
+  const offered = await db
+    .update(jobs)
+    .set({ canRefer: true })
+    .where(and(eq(jobs.tenantId, tenantId), or(and(eq(jobs.authorMembershipId, rahul), eq(jobs.title, "Backend Engineer (Node.js)")), and(eq(jobs.authorMembershipId, priya), eq(jobs.title, "Associate Product Manager")))))
+    .returning();
+  const backend = offered.find((j) => j.authorMembershipId === rahul);
+  const apm = offered.find((j) => j.authorMembershipId === priya);
+  const phones = ["+91931000005", "+91931000009"];
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, phones)));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const [analyst, engineer] = phones.map((p) => byPhone.get(p));
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    if (apm && analyst) {
+      const note = "I'm a product analyst with two years on consumer apps, and I'd love to be considered for the APM role. Would you be willing to refer me?";
+      await tx.insert(referralRequests).values({ tenantId, jobId: apm.id, jobTitle: apm.title, jobCompany: apm.companyName, posterMembershipId: priya, requesterMembershipId: analyst, note, createdAt: ago(1, 200), updatedAt: ago(1, 200) });
+    }
+    // Only where the two have no thread yet: an accepted referral reuses one, and the seed has no business changing it.
+    if (backend && engineer && !(await lockDirectConversation(tx, tenantId, engineer, rahul))) {
+      const note = "I've spent three years building payment APIs with Node and Postgres. Would you be willing to refer me for the backend role at Zylo Labs?";
+      const [accepted] = await tx
+        .insert(referralRequests)
+        .values({ tenantId, jobId: backend.id, jobTitle: backend.title, jobCompany: backend.companyName, posterMembershipId: rahul, requesterMembershipId: engineer, status: "ACCEPTED", note, respondedAt: ago(3), acceptedAt: ago(3), createdAt: ago(4), updatedAt: ago(3) })
+        .returning({ id: referralRequests.id });
+      const [first] = await seedDirectThread(tx, {
+        tenantId,
+        aId: engineer,
+        bId: rahul,
+        requesterId: engineer,
+        state: "ACCEPTED",
+        origin: { kind: "REFERRAL", id: accepted!.id },
+        messages: [
+          { senderId: engineer, body: note, at: ago(3) },
+          { senderId: rahul, body: "Happy to. Send me your CV and a few lines on the ledger work you've done, and I'll pass it to our hiring lead.", at: ago(2, 600) },
+          { senderId: engineer, body: "Thank you! I've emailed both to you just now.", at: ago(2, 300) },
+        ],
+      });
+      await tx.update(referralRequests).set({ conversationId: first!.conversationId }).where(eq(referralRequests.id, accepted!.id));
+    }
+  });
+}
+
 /** Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. */
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
@@ -628,6 +685,7 @@ export async function seedConnections(db: Db, tenantIds: Record<string, string>,
     await seedChatReport(db, uni);
     await seedChatGroups(db, uni, (phone) => mid("demo-university", phone));
     await seedMentorship(db, uni, (phone) => mid("demo-university", phone));
+    await seedReferrals(db, uni, (phone) => mid("demo-university", phone));
   }
   await seedCurrentPupil(db, tenantIds);
 }

@@ -1,7 +1,7 @@
 import { DELETED_MEMBER_NAME, MENTORSHIP_BOX_LABELS, MENTORSHIP_CONFIRM, mentorshipKeys, mentorshipReportHelp, type MentorshipBox, type MentorshipDto, type MentorshipPageDto } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChatReportDialog } from "@/components/chat/ReportMessageDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -10,6 +10,7 @@ import { MentorshipRow } from "@/components/mentors/MentorshipRow";
 import { Button, EmptyState, LinkButton, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { useRowFocus } from "@/hooks/useRowFocus";
 import { api } from "@/lib/api";
 import { mentorsPath, refreshMentorship, refreshMentorshipAndChat } from "@/lib/mentors";
 import { toast } from "@/stores/uiStore";
@@ -41,14 +42,7 @@ export function MentorshipRequests({ slug, box, onBoxChange, limited = false }: 
   const waiting = useMentorshipList(slug, "received").first?.waiting ?? 0;
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [reporting, setReporting] = useState<MentorshipDto | null>(null);
-  // Once a dialog has closed and handed focus back to the button that opened it, focus moves to the row: the refetch that
-  // follows can take that button away, which would drop a keyboard or screen-reader user's place in the list.
-  const focusRow = useRef<string | null>(null);
-  useEffect(() => {
-    if (!focusRow.current || confirm || reporting) return;
-    document.getElementById(rowId(focusRow.current))?.focus();
-    focusRow.current = null;
-  }, [confirm, reporting]);
+  const focus = useRowFocus(!!confirm || !!reporting);
   // A chat a mentorship opened is a direct one, which needs messaging; the thread itself says if it can't be opened now.
   const chatOn = tenant.settings.features.messaging && membership.chatEligible;
   const directoryOn = tenant.settings.features.directory;
@@ -57,7 +51,7 @@ export function MentorshipRequests({ slug, box, onBoxChange, limited = false }: 
   // stands. The dialog closes and the list refetches behind it.
   const failed = (err: unknown, m: MentorshipDto) => {
     toast.error(errorMessage(err));
-    focusRow.current = m.id;
+    focus.afterDialog(rowId(m.id));
     setConfirm(null);
     void refreshMentorship(qc, slug);
   };
@@ -72,13 +66,13 @@ export function MentorshipRequests({ slug, box, onBoxChange, limited = false }: 
     onError: (err, m) => {
       failed(err, m);
       // No dialog to close first: Accept had focus, and the refetch may take it away.
-      document.getElementById(rowId(m.id))?.focus();
+      focus.now(rowId(m.id));
     },
   });
   const act = useMutation({
     mutationFn: ({ kind, m }: Confirm) => api.mentorship[kind](slug, m.id),
     onSuccess: (_, { kind, m }) => {
-      focusRow.current = m.id;
+      focus.afterDialog(rowId(m.id));
       setConfirm(null);
       void (kind === "end" ? refreshMentorshipAndChat(qc, slug) : refreshMentorship(qc, slug));
       toast.success(DONE[kind]);
@@ -173,7 +167,7 @@ export function MentorshipRequests({ slug, box, onBoxChange, limited = false }: 
         intro={reporting ? mentorshipReportHelp(nameOf(reporting), reporting.status === "REQUESTED") : ""}
         submit={(input) => api.mentorship.report(slug, reporting!.id, input)}
         onDone={() => {
-          if (reporting) focusRow.current = reporting.id;
+          if (reporting) focus.afterDialog(rowId(reporting.id));
           void refreshMentorship(qc, slug);
         }}
         onClose={() => setReporting(null)}

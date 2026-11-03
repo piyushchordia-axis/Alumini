@@ -117,6 +117,73 @@ export function Chip({ label, active, onPress, color, tall = false }: { label: s
   );
 }
 
+/**
+ * One choice, as a checkbox or a radio: 44 points tall, its state in aria-checked, which React Native maps on devices and
+ * react-native-web emits. `hint` says what choosing it does, for a screen reader, when that's written beside it too.
+ */
+export function Choice({
+  kind,
+  label,
+  checked,
+  disabled = false,
+  hint,
+  onPress,
+  style,
+}: {
+  kind: "checkbox" | "radio";
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  hint?: string;
+  onPress: () => void;
+  style?: ViewStyle;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole={kind}
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      aria-checked={checked}
+      aria-disabled={disabled}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.sm,
+          minHeight: 44,
+          borderWidth: 1,
+          borderRadius: radius.md,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          borderColor: checked ? theme.primary : colors.border,
+          backgroundColor: disabled ? colors.bg : checked ? theme.primarySoft : pressed ? colors.bg : colors.card,
+        },
+        style,
+      ]}
+    >
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: kind === "checkbox" ? 5 : 10,
+          borderWidth: 2,
+          borderColor: checked ? theme.primary : disabled ? colors.border : colors.faint,
+          backgroundColor: kind === "checkbox" && checked ? theme.primary : "transparent",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {checked && (kind === "checkbox" ? <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text> : <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />)}
+      </View>
+      {/* Long labels wrap inside their box rather than widening it. */}
+      <Text style={{ flex: 1, fontSize: 14, color: disabled ? colors.faint : colors.text }}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function Tabs<T extends string>({ tabs, value, onChange, tall = false }: { tabs: { value: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; tall?: boolean }) {
   const scroller = useRef<ScrollViewInstance>(null);
   const offsets = useRef(new Map<string, number>());

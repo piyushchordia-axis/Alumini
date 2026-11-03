@@ -1,10 +1,11 @@
-import { and, desc, eq, gt, ilike, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, isNull, ne, not, or, sql, type SQL } from "drizzle-orm";
 import type { JobListQuery } from "@illuminize/shared";
-import type { DbClient } from "../db/client";
+import type { DbClient, Tx } from "../db/client";
 import { jobSeekers, jobs, memberships } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
-import type { MembershipRow } from "../types/request";
+import type { MembershipRow, TenantRow } from "../types/request";
 import { escapeLike, type ModerationPatch } from "./content.common";
+import { notCurrentPupil } from "./memberships.repo";
 
 export type JobRow = typeof jobs.$inferSelect;
 export type JobInsert = typeof jobs.$inferInsert;
@@ -13,10 +14,13 @@ export type JobWithAuthor = { job: JobRow; author: MembershipRow };
 
 export async function listJobs(
   db: DbClient,
-  tenantId: string,
+  tenant: Pick<TenantRow, "id" | "type" | "timezone">,
   q: JobListQuery,
   viewerMembershipId: string,
+  /** Whether this viewer is shown which jobs take referral requests, which decides what the `canRefer` filter matches. */
+  referralsShown: boolean,
 ): Promise<CursorPage<JobWithAuthor>> {
+  const tenantId = tenant.id;
   const conds: SQL[] = [eq(jobs.tenantId, tenantId)];
   if (q.mine) {
     conds.push(eq(jobs.authorMembershipId, viewerMembershipId));
@@ -34,6 +38,11 @@ export async function listJobs(
   if (q.jobType) conds.push(eq(jobs.jobType, q.jobType));
   if (q.remote !== undefined) conds.push(eq(jobs.isRemote, q.remote));
   if (q.location) conds.push(ilike(jobs.location, `%${escapeLike(q.location)}%`));
+  if (q.canRefer !== undefined) {
+    // What the cards say, which is the stored flag only while it's shown, and never for a poster who is a current pupil.
+    const offers = referralsShown ? and(eq(jobs.canRefer, true), notCurrentPupil(tenant, new Date()))! : sql`false`;
+    conds.push(q.canRefer ? offers : not(offers));
+  }
   const cursor = decodeCursor(q.cursor);
   const keyset = keysetCondition(jobs.createdAt, jobs.id, cursor, "desc");
   if (keyset) conds.push(keyset);
@@ -54,6 +63,20 @@ export async function findJobWithAuthor(db: DbClient, tenantId: string, id: stri
     .innerJoin(memberships, eq(memberships.id, jobs.authorMembershipId))
     .where(and(eq(jobs.tenantId, tenantId), eq(jobs.id, id)))
     .limit(1);
+  return row;
+}
+
+/**
+ * The job, held until the transaction ends. A referral request takes it, and so does everything that stops the job taking
+ * requests (closing, deleting, unticking "I can refer"; moderation's own update takes the same lock), so whichever goes second
+ * sees what the first did. No key, so a request's foreign key to it can still be checked.
+ */
+export async function lockJob(tx: Tx, tenantId: string, id: string): Promise<JobRow | undefined> {
+  const [row] = await tx
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), eq(jobs.id, id)))
+    .for("no key update");
   return row;
 }
 

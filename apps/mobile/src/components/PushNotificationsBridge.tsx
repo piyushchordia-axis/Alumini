@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { MENTORSHIP_TYPES } from "@/lib/mentors";
 import { notificationHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
+import { REFERRAL_TYPES, refreshReferrals } from "@/lib/referrals";
 import { useChatStore } from "@/stores/chatStore";
 
 /** Data the API attaches to every push (see ExpoPushChannel). Chat pushes carry `conversationId` and no `notificationId`. */
@@ -82,6 +83,7 @@ export function PushNotificationsBridge() {
           if (data.conversationId) void qc.invalidateQueries({ queryKey: chatKeys.badge(data.tenantSlug) });
           if (data.type === "CHAT_GROUP_INVITE") void qc.invalidateQueries({ queryKey: chatKeys.groupInvites(data.tenantSlug) });
           if (data.type && MENTORSHIP_TYPES.has(data.type)) void qc.invalidateQueries({ queryKey: mentorshipKeys.all(data.tenantSlug) });
+          if (data.type && REFERRAL_TYPES.has(data.type)) void refreshReferrals(qc, data.tenantSlug);
         }),
       );
       subs.push(

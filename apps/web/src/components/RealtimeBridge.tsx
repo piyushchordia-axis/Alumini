@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { chatSync } from "@/lib/chat";
 import { qk } from "@/lib/queryKeys";
 import { realtime } from "@/lib/realtime";
+import { refreshReferrals } from "@/lib/referrals";
 import { useIsAuthenticated } from "@/stores/authStore";
 
 /** Notifications that tell an admin there is something to review. */
@@ -27,6 +28,8 @@ export function RealtimeBridge() {
       }),
       // A request or mentorship changed, on either side, notified or not (a withdrawal tells nobody): lists and pages refetch.
       realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
+      // The same for a referral request: its lists, and the pages of jobs, which say where the viewer's own request stands.
+      realtime.on("referral:changed", (e) => void refreshReferrals(qc, e.tenantSlug)),
       realtime.on("notification:unread", (e) => {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count });
       }),
@@ -39,6 +42,8 @@ export function RealtimeBridge() {
       realtime.onReconnect(() => {
         void qc.invalidateQueries({ queryKey: ["notifications"] });
         void qc.invalidateQueries({ queryKey: ["mentorship"] });
+        void qc.invalidateQueries({ queryKey: ["referrals"] });
+        void qc.invalidateQueries({ queryKey: ["job"] });
       }),
     ];
     return () => offs.forEach((off) => off());

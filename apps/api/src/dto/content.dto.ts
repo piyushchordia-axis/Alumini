@@ -35,7 +35,8 @@ export interface Viewer {
 /** The moderation note is between the admins and the author; other members never receive it. */
 const noteFor = (note: string | null, authorId: string, viewer: Viewer | null) => (viewer && (viewer.isAdmin || viewer.membershipId === authorId) ? note : null);
 
-export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null): JobDto {
+/** `canRefer` is what the referral rules make of the stored flag for this viewer, never the flag itself (see jobs.service). */
+export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null, canRefer: boolean): JobDto {
   return {
     id: job.id,
     title: job.title,
@@ -55,6 +56,7 @@ export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null):
     moderatedAt: iso(job.moderatedAt),
     author: toMemberCardDto(author),
     isMine: author.id === viewer?.membershipId,
+    canRefer,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
   };

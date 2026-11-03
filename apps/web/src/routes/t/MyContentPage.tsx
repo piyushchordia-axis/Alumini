@@ -54,7 +54,8 @@ export function MyContentPage() {
       <Tabs value={tab} onChange={setTab} tabs={tabs.map(({ value, label }) => ({ value, label }))} className="max-w-full sm:w-fit" />
       {active.isLoading && <Loading />}
       {active.error && <ErrorBox error={active.error} />}
-      <div className="grid gap-3">
+      {/* One column that may shrink, so a long job title truncates on a phone rather than widening the page. */}
+      <div className="grid grid-cols-1 gap-3">
         {tab === "posts" && posts.items.map((p) => <PostCard key={p.id} slug={slug} post={p} />)}
         {tab === "jobs" && jobs.items.map((j) => <JobCard key={j.id} slug={slug} job={j} />)}
         {tab === "funding" && funding.items.map((f) => <FundingCard key={f.id} slug={slug} item={f} />)}

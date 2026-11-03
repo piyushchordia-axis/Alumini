@@ -7,6 +7,8 @@ import {
   enabledGroupVisibilities,
   FEATURE_PREREQUISITES,
   mentorshipAvailable,
+  referralsAvailable,
+  referralsEnabled,
   resolveFeatures,
   retypeToSchool,
   SCHOOL_OFF_FEATURES,
@@ -160,7 +162,42 @@ describe("mentorshipAvailable and connectionsAvailable", () => {
     expect(mentorshipAvailable({ ...all, mentorship: false }, true)).toBe(false);
     expect(mentorshipAvailable({ ...all, messaging: false }, true)).toBe(false);
     expect(connectionsAvailable(all, true)).toBe(true);
-    expect(connectionsAvailable({ ...all, mentorship: false }, true)).toBe(false);
+    expect(connectionsAvailable(all, false)).toBe(false);
+  });
+
+  it("count referrals as a connection too, so either one is enough, for a member who isn't a pupil", () => {
+    const all = defaultFeaturesFor("COLLEGE");
+    expect(connectionsAvailable({ ...all, mentorship: false }, true)).toBe(true);
+    expect(connectionsAvailable({ ...all, mentorship: false }, false)).toBe(false);
+    expect(connectionsAvailable({ ...all, jobs: false }, true)).toBe(true);
+    expect(connectionsAvailable({ ...all, mentorship: false, jobs: false }, true)).toBe(false);
+    expect(connectionsAvailable({ ...all, messaging: false }, true)).toBe(false);
+  });
+});
+
+describe("referralsEnabled and referralsAvailable", () => {
+  it("need jobs and messaging, which no key of their own can override", () => {
+    const all = defaultFeaturesFor("COLLEGE");
+    expect(referralsEnabled(all)).toBe(true);
+    expect(referralsEnabled({ ...all, jobs: false })).toBe(false);
+    expect(referralsEnabled({ ...all, messaging: false })).toBe(false);
+    // Mentorship and groups have nothing to do with them.
+    expect(referralsEnabled({ ...all, mentorship: false, groups: false })).toBe(true);
+    expect(TENANT_FEATURES as readonly string[]).not.toContain("referrals");
+  });
+
+  it("start off for schools, which start with messaging off, and come on with messaging there", () => {
+    expect(referralsEnabled(defaultFeaturesFor("SCHOOL"))).toBe(false);
+    expect(referralsEnabled(resolveFeatures("SCHOOL", { feed: true }))).toBe(false);
+    expect(referralsEnabled(resolveFeatures("SCHOOL", { messaging: true }))).toBe(true);
+    for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(referralsEnabled(defaultFeaturesFor(type)), type).toBe(true);
+  });
+
+  it("are never available to a current pupil, whatever is switched on", () => {
+    const all = defaultFeaturesFor("COLLEGE");
+    expect(referralsAvailable(all, true)).toBe(true);
+    expect(referralsAvailable(all, false)).toBe(false);
+    expect(referralsAvailable({ ...all, messaging: false }, true)).toBe(false);
   });
 });
 

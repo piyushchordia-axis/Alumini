@@ -38,6 +38,7 @@ import {
   POST_KINDS,
   PUSH_PLATFORMS,
   REACTION_TYPES,
+  REFERRAL_STATUSES,
   REPORT_REASONS,
   REPORT_STATUSES,
   RSVP_STATUSES,
@@ -88,3 +89,4 @@ export const chatGroupVisibilityEnum = pgEnum("chat_group_visibility", CHAT_GROU
 export const mentorAreaEnum = pgEnum("mentor_area", MENTOR_AREAS);
 export const mentorAvailabilityEnum = pgEnum("mentor_availability", MENTOR_AVAILABILITIES);
 export const mentorshipStatusEnum = pgEnum("mentorship_status", MENTORSHIP_STATUSES);
+export const referralStatusEnum = pgEnum("referral_status", REFERRAL_STATUSES);

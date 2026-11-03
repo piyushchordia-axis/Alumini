@@ -2,7 +2,7 @@ import { DELETED_MEMBER_NAME, MENTORSHIP_BOX_LABELS, MENTORSHIP_CONFIRM, mentors
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { FlatList, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ChatReportSheet } from "@/components/chat/ChatSheets";
@@ -11,6 +11,7 @@ import { MentorshipRow } from "@/components/mentors/MentorCards";
 import { Button, EmptyState, ListEmpty, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { useStatus, type RowStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { chatHref, refreshMentorship, refreshMentorshipAndChat } from "@/lib/mentors";
 import { spacing } from "@/theme";
@@ -20,24 +21,6 @@ const PAGE = 20;
 /** One side's requests and mentorships. Received and sent share this, so the count on Requests reads the list itself. */
 export function useMentorshipList(slug: string, box: MentorshipBox, enabled = true) {
   return useInfiniteList<MentorshipPageDto>(mentorshipKeys.requests(slug, box), (cursor) => api.mentorship.requests(slug, { box, cursor, limit: PAGE }), enabled);
-}
-
-/** A line about what just happened, cleared after a while, as the web app's toasts are. */
-export function useStatus<T = string>(): [T | null, (value: T | null) => void] {
-  const [status, setStatus] = useState<T | null>(null);
-  useEffect(() => {
-    if (!status) return;
-    const timer = setTimeout(() => setStatus(null), 6000);
-    return () => clearTimeout(timer);
-  }, [status]);
-  return [status, setStatus];
-}
-
-/** What just happened to one request, said in its own row, where the member is looking, rather than at the top of a long list. */
-interface RowStatus {
-  id: string;
-  text: string;
-  tone: "info" | "warning";
 }
 
 type Confirm = { kind: "withdraw" | "decline" | "end"; m: MentorshipDto };
@@ -99,7 +82,13 @@ export function MentorshipRequests({
       void (kind === "end" ? refreshMentorshipAndChat(qc, slug) : refreshMentorship(qc, slug));
       say({ id: m.id, text: DONE[kind], tone: "info" });
     },
-    onError: () => void refreshMentorship(qc, slug),
+    // The question asked may no longer stand (someone acted first), so the sheet closes, the row says what went wrong, as the
+    // web app's toast does, and the list refetches behind it.
+    onError: (err, { m }) => {
+      setConfirm(null);
+      say({ id: m.id, text: errorMessage(err), tone: "warning" });
+      void refreshMentorship(qc, slug);
+    },
   });
   const ask = (next: Confirm) => {
     act.reset();
@@ -213,7 +202,6 @@ export function MentorshipRequests({
         confirmLabel={confirmText?.confirm ?? ""}
         destructive
         busy={act.isPending}
-        error={act.error}
         onConfirm={() => confirm && act.mutate(confirm)}
         onCancel={() => setConfirm(null)}
       />

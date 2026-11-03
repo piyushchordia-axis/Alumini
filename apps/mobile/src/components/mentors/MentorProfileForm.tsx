@@ -14,60 +14,15 @@ import {
 } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useFormErrors } from "@/components/forms/useFormErrors";
-import { Button, ErrorText, Input } from "@/components/ui";
-import { colors, radius, spacing, useTheme } from "@/theme";
+import { Button, Choice, ErrorText, Input } from "@/components/ui";
+import { colors, spacing } from "@/theme";
 
 const legend = { fontSize: 13, fontWeight: "600", color: "#334155" } as const;
 const hint = { fontSize: 12, color: colors.muted } as const;
-
-/** One choice, as a checkbox for an area or a radio for availability: 44 points tall, its state in aria-checked. */
-function Choice({ kind, label, checked, disabled = false, onPress }: { kind: "checkbox" | "radio"; label: string; checked: boolean; disabled?: boolean; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole={kind}
-      accessibilityLabel={label}
-      // The ARIA forms, which React Native maps on devices and react-native-web emits.
-      aria-checked={checked}
-      aria-disabled={disabled}
-      style={({ pressed }) => ({
-        // Areas sit two to a row; availability choices are a column, where a basis would set their height instead.
-        ...(kind === "checkbox" ? { flexBasis: "47%", flexGrow: 1 } : null),
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing.sm,
-        minHeight: 44,
-        borderWidth: 1,
-        borderRadius: radius.md,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderColor: checked ? theme.primary : colors.border,
-        backgroundColor: disabled ? colors.bg : checked ? theme.primarySoft : pressed ? colors.bg : colors.card,
-      })}
-    >
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: kind === "checkbox" ? 5 : 10,
-          borderWidth: 2,
-          borderColor: checked ? theme.primary : disabled ? colors.border : colors.faint,
-          backgroundColor: kind === "checkbox" && checked ? theme.primary : "transparent",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {checked && (kind === "checkbox" ? <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text> : <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />)}
-      </View>
-      {/* Long labels wrap inside their box rather than widening it. */}
-      <Text style={{ flex: 1, fontSize: 14, color: disabled ? colors.faint : colors.text }}>{label}</Text>
-    </Pressable>
-  );
-}
+/** Areas sit two to a row; availability choices are a column, where a basis would set their height instead. */
+const twoAcross = { flexBasis: "47%", flexGrow: 1 } as const;
 
 /**
  * What a mentor offers: up to five areas from a fixed list, how often they can meet, and two optional notes. Saving lists
@@ -108,7 +63,7 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
           {MENTOR_AREAS.map((a) => {
             const checked = areas.includes(a);
-            return <Choice key={a} kind="checkbox" label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={full && !checked} onPress={() => toggleArea(a)} />;
+            return <Choice key={a} kind="checkbox" label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={full && !checked} onPress={() => toggleArea(a)} style={twoAcross} />;
           })}
         </View>
         <ErrorText error={errors.areas} />

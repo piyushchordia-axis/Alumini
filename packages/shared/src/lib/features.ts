@@ -26,9 +26,22 @@ export function mentorshipAvailable(features: TenantFeatures, chatEligible: bool
   return features.mentorship && features.messaging && chatEligible;
 }
 
+/**
+ * Whether referral requests are on here. They live inside Jobs and have no key of their own: accepting one opens a private
+ * chat, so they need messaging as well, which is why a school starts with them off.
+ */
+export function referralsEnabled(features: TenantFeatures): boolean {
+  return features.jobs && features.messaging;
+}
+
+/** Whether this member can ask for referrals and offer them here: referrals are on, and they aren't a current pupil. */
+export function referralsAvailable(features: TenantFeatures, chatEligible: boolean): boolean {
+  return referralsEnabled(features) && chatEligible;
+}
+
 /** Whether this member has anything that connects them one to one beyond messages, which is what CONNECTIONS notifications are about. */
 export function connectionsAvailable(features: TenantFeatures, chatEligible: boolean): boolean {
-  return mentorshipAvailable(features, chatEligible);
+  return mentorshipAvailable(features, chatEligible) || referralsAvailable(features, chatEligible);
 }
 
 /** What each key needs: a key reads as off while what it needs is off. One level deep, so a prerequisite has none of its own. */

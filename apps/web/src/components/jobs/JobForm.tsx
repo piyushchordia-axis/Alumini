@@ -1,8 +1,8 @@
-import { JOB_TYPES, JOB_TYPE_LABELS, jobCreateSchema, type JobCreateInput, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
+import { useId, useMemo, useState } from "react";
+import { useForm, useWatch, type Resolver } from "react-hook-form";
 import type { z } from "zod";
 import { Button, Checkbox, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
@@ -23,14 +23,32 @@ function endOfLocalDay(date: string): string {
   return Number.isNaN(d.getTime()) ? date : d.toISOString();
 }
 
-export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; onSubmit: (v: JobCreateInput) => Promise<void>; submitLabel: string }) {
+/**
+ * Posting or editing a job. `offerReferrals` shows "I can refer people for this job", for a member who can use referrals now;
+ * otherwise the job keeps whatever it had, as the API ignores the field then. `waitingReferrals` are the requests waiting
+ * for the poster's answer, which unticking it would close.
+ */
+export function JobForm({
+  initial,
+  onSubmit,
+  submitLabel,
+  offerReferrals = false,
+  waitingReferrals = 0,
+}: {
+  initial?: JobDto;
+  onSubmit: (v: JobCreateInput) => Promise<void>;
+  submitLabel: string;
+  offerReferrals?: boolean;
+  waitingReferrals?: number;
+}) {
   const [serverError, setServerError] = useState<unknown>(null);
+  const referId = useId();
   // The form edits the closing date as a calendar date; it becomes an end-of-day instant when validated.
   const resolver = useMemo<Resolver<JobFormValues, unknown, JobCreateInput>>(() => {
     const zod = zodResolver(jobCreateSchema) as unknown as Resolver<JobFormValues, unknown, JobCreateInput>;
     return (values, context, options) => zod({ ...values, expiresAt: values.expiresAt ? endOfLocalDay(values.expiresAt) : null }, context, options);
   }, []);
-  const { register, handleSubmit, formState, setError } = useForm<JobFormValues, unknown, JobCreateInput>({
+  const { register, handleSubmit, formState, setError, control } = useForm<JobFormValues, unknown, JobCreateInput>({
     resolver,
     defaultValues: {
       title: initial?.title ?? "",
@@ -44,17 +62,23 @@ export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; 
       contactPhone: initial?.contactPhone ?? null,
       salaryRange: initial?.salaryRange ?? null,
       expiresAt: toLocalDate(initial?.expiresAt),
+      canRefer: initial?.canRefer ?? false,
     },
   });
   const e = formState.errors;
   const nullable = { setValueAs: (v: string) => (v ? v : null) };
+  const offered = useWatch({ control, name: "canRefer" });
+  const closesWaiting = offerReferrals && !!initial?.canRefer && waitingReferrals > 0 && !offered;
   return (
     <form
       className="space-y-4"
       onSubmit={handleSubmit(async (v) => {
         setServerError(null);
         try {
-          await onSubmit(v);
+          // Left out unless it was offered, so an edit never changes what the poster couldn't see, and on an edit unless they
+          // changed it: a copy of the job read while referrals were off says false, which saving mustn't store.
+          const sendRefer = offerReferrals && (!initial || v.canRefer !== initial.canRefer);
+          await onSubmit(sendRefer ? v : { ...v, canRefer: undefined });
         } catch (err) {
           if (isApiClientError(err) && Object.keys(err.fieldErrors).length) {
             for (const [p, m] of Object.entries(err.fieldErrors)) setError(p as keyof z.input<typeof jobCreateSchema>, { message: m });
@@ -106,6 +130,20 @@ export function JobForm({ initial, onSubmit, submitLabel }: { initial?: JobDto; 
         <FormField label="Applications close" hint="Optional. The job is hidden from the board after this day." error={e.expiresAt?.message}>
           <Input type="date" min={toLocalDate(new Date().toISOString()) ?? undefined} {...register("expiresAt", nullable)} />
         </FormField>
+        {offerReferrals && (
+          <div className="rounded-lg border border-slate-200 px-3 py-1 sm:col-span-2">
+            <Checkbox {...register("canRefer")} label={CAN_REFER_LABEL} aria-describedby={`${referId}-help${closesWaiting ? ` ${referId}-closes` : ""}`} className="min-h-11 font-medium" />
+            <p id={`${referId}-help`} className="pb-2 text-xs text-slate-500">
+              {CAN_REFER_HELP}
+            </p>
+            {closesWaiting && (
+              // Said as it appears, as on the mobile app: unticking is what brings it up.
+              <p id={`${referId}-closes`} role="alert" className="pb-2 text-xs text-amber-800">
+                {waitingReferralsCloseText(waitingReferrals)}
+              </p>
+            )}
+          </div>
+        )}
       </div>
       {serverError ? <ErrorBox error={serverError} /> : null}
       <Button type="submit" loading={formState.isSubmitting}>

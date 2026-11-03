@@ -2,10 +2,11 @@ import type { ChatConversationDto } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatReports, contentReports, memberships, mentorProfiles, mentorships } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatReports, contentReports, memberships, mentorProfiles, mentorships, referralRequests } from "../../src/db/schema";
 import { acceptedThread, chatApi, createGroup, groupsApi, openRequest, postToGroup, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
+import { askForReferral, postReferralJob, referralsApi } from "../helpers/referrals";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -115,6 +116,26 @@ describe.skipIf(!dbAvailable)("chat between institutions", () => {
     expect(stored).toMatchObject({ status: "REQUESTED", tenantId: one.id });
     expect(await ctx.db.select().from(mentorProfiles).where(eq(mentorProfiles.isActive, false))).toEqual([]);
     expect(await ctx.db.select().from(chatReports)).toEqual([]);
+  });
+
+  it("answers 404 for another institution's jobs and referral requests, through this slug, even to the poster in both", async () => {
+    const { one, two, a, b, outsider } = await twoTenants();
+    const job = await postReferralJob(ctx, one.slug, a);
+    const asked = await askForReferral(ctx, one.slug, b, job.id);
+    const aInTwo: Session = { ...a, membership: await createMembership(ctx, two.id, a.user.id) };
+    for (const member of [outsider, aInTwo]) {
+      const r = referralsApi(ctx, two.slug, member);
+      for (const res of [await r.job(job.id), await r.request(job.id), await r.forJob(job.id), await r.accept(asked.id), await r.decline(asked.id), await r.withdraw(asked.id), await r.report(asked.id), await r.closeJob(job.id), await r.editJob(job.id, { canRefer: false })]) {
+        expect(res.status, res.request.url).toBe(404);
+      }
+      for (const box of ["received", "sent"] as const) expect((await r.mine(box)).body).toMatchObject({ data: [], waiting: 0 });
+      expect((await r.summary()).body.data).toEqual({ received: 0, sent: 0 });
+      expect((await r.jobs({ canRefer: true })).body.data).toEqual([]);
+    }
+    const [stored] = await ctx.db.select().from(referralRequests).where(eq(referralRequests.id, asked.id));
+    expect(stored).toMatchObject({ status: "REQUESTED", tenantId: one.id });
+    expect(await ctx.db.select().from(chatReports)).toEqual([]);
+    expect((await referralsApi(ctx, one.slug, a).summary()).body.data).toEqual({ received: 1, sent: 0 });
   });
 
   it("keeps a mentor profile to the institution it was offered in, for someone in two", async () => {

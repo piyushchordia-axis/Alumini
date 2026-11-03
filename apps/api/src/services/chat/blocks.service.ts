@@ -8,7 +8,9 @@ import { deleteBlock, findBlock, findParticipant, insertBlock, limitLockWait, li
 import { listSharedGroupIds, suppressInvitesFrom } from "../../repositories/chatGroups.repo";
 import { findMembershipById } from "../../repositories/memberships.repo";
 import { applyBlockToMentorships } from "../../repositories/mentorship.repo";
+import { applyBlockToReferrals } from "../../repositories/referrals.repo";
 import { publishBlockOnMentorships } from "../mentorship/events";
+import { publishBlockOnReferrals } from "../referrals/events";
 import type { TenantContext } from "../../types/request";
 import { emitUnread, type ChatActor } from "./chat.service";
 import { publishChanged, publishChangedTo } from "./fanout";
@@ -39,9 +41,11 @@ export async function blockMember(ctx: AppContext, tenantCtx: TenantContext, act
     await limitLockWait(tx);
     // The block goes in under these locks: a send or an invitation holding them has already decided, and the next one will see the block.
     await lockPair(tx, tenantId, me, target.id);
-    // Mentorship requests between them, which take the pair's lock too: this member's to them are withdrawn and theirs to
-    // this member suppressed, silently, so answering one can never meet the block. Before the conversation, as accepting does.
+    // Mentorship and referral requests between them, which take the pair's lock too: this member's to them are withdrawn
+    // and theirs to this member suppressed, silently, so answering one can never meet the block. Before the conversation, as
+    // accepting does.
     await publishBlockOnMentorships(ctx, tx, slug, me, await applyBlockToMentorships(tx, tenantId, me, target.id, new Date()));
+    await publishBlockOnReferrals(ctx, tx, slug, me, await applyBlockToReferrals(tx, tenantId, me, target.id, new Date()));
     const conversation = await lockDirectConversation(tx, tenantId, me, target.id);
     if (!(await insertBlock(tx, { tenantId, blockerMembershipId: me, blockedMembershipId: target.id }))) return;
     // Their invitations waiting for this member go out of sight, and look to them as they did.

@@ -176,6 +176,26 @@ export const MENTORSHIP_REQUEST_WINDOW_DAYS = 30;
 /** Requests waiting and mentorships under way, together, that one mentee may have. */
 export const MENTORSHIP_MAX_OPEN_PER_MENTEE = 5;
 
+/**
+ * REQUESTED: waiting for the job's poster. ACCEPTED: the poster agreed, which opened a chat. DECLINED: the poster said no,
+ * which is final for that job. WITHDRAWN: its sender took it back before an answer. CLOSED: the job stopped taking referral
+ * requests while it waited.
+ */
+export const REFERRAL_STATUSES = ["REQUESTED", "ACCEPTED", "DECLINED", "WITHDRAWN", "CLOSED"] as const;
+export type ReferralStatus = (typeof REFERRAL_STATUSES)[number];
+/** received: requests about this member's own jobs. sent: this member's own requests. Lower case, as it goes in URLs. */
+export const REFERRAL_BOXES = ["received", "sent"] as const;
+export type ReferralBox = (typeof REFERRAL_BOXES)[number];
+/** A request's note, after trimming. The poster reads it, and it becomes the chat's first message if they accept. */
+export const REFERRAL_NOTE_MIN_LENGTH = 10;
+export const REFERRAL_NOTE_MAX_LENGTH = 500;
+/** Requests one member may send about one job, whatever became of them. */
+export const REFERRAL_MAX_REQUESTS_PER_JOB = 3;
+/** Requests waiting for an answer that one member may have at once. */
+export const REFERRAL_MAX_OPEN_PER_REQUESTER = 10;
+/** Requests one job may have waiting for its poster at once, counting only those the poster can see. */
+export const REFERRAL_MAX_WAITING_PER_JOB = 25;
+
 export const EVENT_KINDS = ["CASUAL_MEETUP", "ORGANISED_EVENT"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
@@ -221,6 +241,9 @@ export const NOTIFICATION_TYPES = [
   "MENTORSHIP_ACCEPTED",
   "MENTORSHIP_DECLINED",
   "MENTORSHIP_ENDED",
+  "REFERRAL_REQUESTED",
+  "REFERRAL_ACCEPTED",
+  "REFERRAL_DECLINED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

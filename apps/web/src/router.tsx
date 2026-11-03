@@ -24,9 +24,10 @@ import { FundingPage } from "@/routes/t/FundingPage";
 import { GroupDetailRoute } from "@/routes/t/GroupDetailPage";
 import { GroupFormPage } from "@/routes/t/GroupFormPage";
 import { GroupsPage } from "@/routes/t/GroupsPage";
-import { JobDetailPage } from "@/routes/t/JobDetailPage";
+import { JobDetailRoute } from "@/routes/t/JobDetailPage";
 import { JobFormPage } from "@/routes/t/JobFormPage";
 import { JobsPage } from "@/routes/t/JobsPage";
+import { ReferralRequestRoute } from "@/routes/t/ReferralRequestPage";
 import { LandingPage } from "@/routes/t/LandingPage";
 import { LoginPage } from "@/routes/t/LoginPage";
 import { MentorDetailRoute } from "@/routes/t/MentorDetailPage";
@@ -114,12 +115,14 @@ export const router = createBrowserRouter([
                     ],
                   },
                   {
+                    // Referral requests live inside Jobs: each referral screen says itself when the member can't use them.
                     element: <RequireFeature feature="jobs" />,
                     children: [
                       { path: "jobs", element: <JobsPage /> },
                       { path: "jobs/new", element: <JobFormPage /> },
-                      { path: "jobs/:jobId", element: <JobDetailPage /> },
+                      { path: "jobs/:jobId", element: <JobDetailRoute /> },
                       { path: "jobs/:jobId/edit", element: <JobFormPage /> },
+                      { path: "jobs/:jobId/request-referral", element: <ReferralRequestRoute /> },
                     ],
                   },
                   {

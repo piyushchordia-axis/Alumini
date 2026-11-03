@@ -1,6 +1,6 @@
 import { CHAT_GROUP_MAX_OWNED, MAX_BUSINESS_LISTINGS, type ChatGroupContentDto, type ContentDto, type ContentType, type ModerationItemDto, type ModerationQuery, type PostDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
-import type { DbClient } from "../db/client";
+import type { DbClient, Tx } from "../db/client";
 import { toModerationItemDto } from "../dto/content.dto";
 import { toMemberCardDto } from "../dto/membership.dto";
 import { countOwnedGroups, findGroupById, findGroupWithOwner, setGroupModeration, type ReviewedText } from "../repositories/chatGroups.repo";
@@ -28,6 +28,7 @@ import { getJobForAdmin } from "./jobs.service";
 import { transitionContent, type ContentAction } from "./moderation";
 import { notify } from "./notifications/notification.service";
 import { getCommentForAdmin, getPostForAdmin } from "./posts.service";
+import { closeReferralsForJob } from "./referrals/referrals.service";
 
 interface ModeratableRow {
   id: string;
@@ -44,6 +45,8 @@ interface ModeratableRepo {
   set(db: DbClient, tenantId: string, id: string, patch: ModerationPatch, from: ModeratableRow["moderationStatus"], reviewed?: ReviewedText): Promise<void>;
   /** Throws if the row can't come back from REMOVED. Shares a transaction with the write. */
   beforeRestore?(db: DbClient, tenantId: string, row: ModeratableRow): Promise<void>;
+  /** What has to change with the status, in the transaction that writes it. */
+  duringTransition?(ctx: AppContext, tx: Tx, tenantCtx: TenantContext, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
   afterTransition?(ctx: AppContext, db: DbClient, tenantCtx: TenantContext, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
 }
 
@@ -73,6 +76,10 @@ const REGISTRY: Record<ContentType, ModeratableRepo> = {
       return r && { id: r.id, authorMembershipId: r.authorMembershipId, moderationStatus: r.moderationStatus, title: r.title };
     },
     set: setJobModeration,
+    // Rejected or removed, a job stops taking referral requests and those waiting close. Restoring it revives none of them.
+    duringTransition: async (ctx, tx, tenantCtx, row, _from, to) => {
+      if (to === "REJECTED" || to === "REMOVED") await closeReferralsForJob(ctx, tx, tenantCtx.tenant, row.id);
+    },
   },
   FUNDING: {
     find: async (db, t, id) => {
@@ -181,9 +188,14 @@ export async function moderateContent(
       opts.reviewed,
     );
   };
-  // A check needs its write in the same transaction, or two restores could both find the one free place.
-  if (action === "restore" && repo.beforeRestore) await runInTransaction(ctx, write);
-  else await write(db);
+  // A check needs its write in the same transaction, or two restores could both find the one free place, and so does what
+  // has to change with the status.
+  if ((action === "restore" && repo.beforeRestore) || repo.duringTransition) {
+    await runInTransaction(ctx, async (tx) => {
+      await write(tx);
+      await repo.duringTransition?.(ctx, tx, tenantCtx, row, row.moderationStatus, to);
+    });
+  } else await write(db);
   await repo.afterTransition?.(ctx, db, tenantCtx, row, row.moderationStatus, to);
   await recordAudit(ctx, {
     tenantId,

@@ -98,9 +98,13 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
         </div>
         <p className="mt-2 text-xs text-slate-500">Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.</p>
         <p className="mt-2 text-xs text-slate-500">Mentorship needs Messaging, because accepting a mentee opens a private chat. Turning Messaging off turns Mentorship off too.</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Referral requests in Jobs need Messaging too, because accepting one opens a private chat. They have no switch of their own: members can ask for and give referrals while Jobs and Messaging are both on.
+        </p>
         {tenantType === "SCHOOL" && (
           <p className="mt-2 text-xs text-slate-500">
             {new Intl.ListFormat("en-GB").format(SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]))} {SCHOOL_OFF_FEATURES.length === 1 ? "starts" : "start"} off for schools because members can contact each other privately there. If you turn {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"} on, current pupils still can't use {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"}.
+            {SCHOOL_OFF_FEATURES.includes("messaging") && " Turning Messaging on also opens referral requests in Jobs, which current pupils can't use either."}
           </p>
         )}
       </fieldset>

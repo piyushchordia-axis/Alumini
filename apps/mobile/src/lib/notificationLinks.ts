@@ -1,4 +1,4 @@
-import { notificationTarget } from "@illuminize/shared";
+import { jobsQuery, notificationTarget } from "@illuminize/shared";
 
 /** Screen for a notification (list tap or push tap). Mobile has no admin console, so admin notifications open nothing. */
 export function notificationHref(slug: string, type: string, data: unknown): `/t/${string}` | null {
@@ -25,6 +25,8 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/profile/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
     case "mentorship":
       return `${base}/mentors?tab=requests&box=${t.box}`;
+    case "referral":
+      return `${base}/jobs${jobsQuery("referrals", t.box)}`;
     case "profile":
       return `${base}/profile`;
     case "celebrations":

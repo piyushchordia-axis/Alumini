@@ -24,12 +24,15 @@ export function viewerOf(actor: ContentActor): Viewer {
   return { membershipId: actor.membership.id, isAdmin: viewerFlags(actor, "").isAdmin };
 }
 
-export function assertCanView(actor: ContentActor, status: ModerationStatus, authorMembershipId: string, label: string, authorStatus?: MembershipStatus): void {
+/** Whether the viewer may see the item: moderation rules, and suspended authors' content is hidden from members. */
+export function canView(actor: ContentActor, status: ModerationStatus, authorMembershipId: string, authorStatus?: MembershipStatus): boolean {
   const flags = viewerFlags(actor, authorMembershipId);
   const hiddenAuthor = authorStatus === "SUSPENDED" && !flags.isAuthor && !flags.isAdmin;
-  if (hiddenAuthor || !canViewContent(status, flags)) {
-    throw AppError.notFound(`${label} not found`);
-  }
+  return !hiddenAuthor && canViewContent(status, flags);
+}
+
+export function assertCanView(actor: ContentActor, status: ModerationStatus, authorMembershipId: string, label: string, authorStatus?: MembershipStatus): void {
+  if (!canView(actor, status, authorMembershipId, authorStatus)) throw AppError.notFound(`${label} not found`);
 }
 
 export function assertAuthor(actor: ContentActor, authorMembershipId: string): void {

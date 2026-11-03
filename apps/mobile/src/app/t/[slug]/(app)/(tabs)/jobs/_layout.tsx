@@ -14,6 +14,8 @@ export default function JobsStack() {
         <Stack.Screen name="new" options={{ ...detailHeader, title: "Post a job", presentation: "modal" }} />
         <Stack.Screen name="edit/[jobId]" options={{ ...detailHeader, title: "Edit job", presentation: "modal" }} />
         <Stack.Screen name="seeker" options={{ ...detailHeader, title: "Looking for work", presentation: "modal" }} />
+        {/* Pushed above the job it's about, which is what Back returns to; opened cold, the Jobs list is under it. */}
+        <Stack.Screen name="request-referral/[jobId]" options={{ ...detailHeader, title: "Ask for a referral" }} />
       </Stack>
     </FeatureGate>
   );

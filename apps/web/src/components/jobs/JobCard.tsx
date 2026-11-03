@@ -1,4 +1,4 @@
-import { JOB_TYPE_LABELS, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, type JobDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
@@ -18,6 +18,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobDto }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Badge tone="info">{JOB_TYPE_LABELS[job.jobType]}</Badge>
+          {job.canRefer && !job.isClosed && <Badge tone="success">{CAN_REFER_BADGE}</Badge>}
           {job.isClosed && <Badge>Closed</Badge>}
           <ModerationStatusBadge status={job.moderationStatus} />
         </div>

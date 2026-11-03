@@ -23,6 +23,8 @@ export const jobs = pgTable(
     salaryRange: text("salary_range"),
     isClosed: boolean("is_closed").notNull().default(false),
     expiresAt: timestamp("expires_at", { withTimezone: true, precision: 3 }),
+    /** The poster offers referrals for it. Read through the referral rules, which mask it while referrals are off. */
+    canRefer: boolean("can_refer").notNull().default(false),
     ...moderationColumns(),
     ...timestamps(),
   },

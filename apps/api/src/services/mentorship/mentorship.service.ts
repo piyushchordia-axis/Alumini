@@ -49,6 +49,7 @@ import {
   upsertMentorProfile,
   type MentorshipRow,
 } from "../../repositories/mentorship.repo";
+import { hasAcceptedReferralBetween } from "../../repositories/referrals.repo";
 import type { MembershipRow, TenantContext } from "../../types/request";
 import { recordAuditStrict } from "../audit.service";
 import { blockedByYou, contactUnavailable, freshChatTenant, isReachable, type ChatTenant } from "../chat/common";
@@ -79,12 +80,14 @@ function auditOf(tenantId: string, actor: ContentActor, action: string, target: 
 }
 
 /**
- * Each mentee whose request was declined hears of it, unless it was a request the mentor never saw. `title` says it: by the
- * mentor's name when they declined, and without saying anyone declined when an admin took the mentor off the list.
+ * Each mentee whose request was declined hears of it, a request the mentor never saw included: its sender sees it change
+ * just as the others do, so telling only the rest would show the block. The notice goes to its sender alone, so the mentor
+ * learns nothing of it. `title` says it: by the mentor's name when they declined, and without saying anyone declined when an
+ * admin took the mentor off the list. A report's decline is told the same way as the mentor's own.
  */
 async function notifyDeclined(ctx: AppContext, tx: Tx, tenantId: string, declined: MentorshipRow[], title: string, body: string | null = null): Promise<void> {
   for (const m of declined) {
-    if (m.suppressed || !m.menteeMembershipId) continue;
+    if (!m.menteeMembershipId) continue;
     await notify(ctx, { tenantId, recipientMembershipIds: [m.menteeMembershipId], type: "MENTORSHIP_DECLINED", title, body, data: { mentorshipId: m.id, box: "sent" }, dedupeKey: `mentorship-declined-${m.id}` }, tx);
   }
 }
@@ -113,9 +116,10 @@ export async function saveMyMentorProfile(ctx: AppContext, tenantCtx: TenantCont
 }
 
 /**
- * Stops mentoring. Requests waiting are declined, each mentee told as for any decline, except a request the mentor never saw,
- * which changes the same way and tells nobody. Mentorships under way carry on. Works with mentorship switched off, because
- * it's a way out. A request being sent at the same moment either lands first and is declined here, or sees the mentor gone.
+ * Stops mentoring. Requests waiting are declined, each mentee told as for any decline, the sender of a request the mentor
+ * never saw included, so nothing shows the block. Mentorships under way carry on. Works with mentorship switched off,
+ * because it's a way out. A request being sent at the same moment either lands first and is declined here, or sees the
+ * mentor gone.
  */
 export async function stopMentoring(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor): Promise<void> {
   const tenantId = tenantCtx.tenant.id;
@@ -239,10 +243,11 @@ async function lockForAction(tx: Tx, tenantId: string, me: string, id: string): 
 
 /**
  * Whether something else still connects the pair one to one, so ending this mustn't close their chat: another mentorship
- * under way between them, in either direction. Accepted referrals belong here too once they exist.
+ * under way between them, or a referral one of them accepted for the other, in either direction. A referral is never ended,
+ * so once accepted it keeps a chat open for good.
  */
 async function hasOtherLiveConnection(db: DbClient, tenantId: string, aId: string, bId: string, mentorshipId: string): Promise<boolean> {
-  return hasOtherAcceptedMentorship(db, tenantId, aId, bId, mentorshipId);
+  return (await hasOtherAcceptedMentorship(db, tenantId, aId, bId, mentorshipId)) || (await hasAcceptedReferralBetween(db, tenantId, aId, bId));
 }
 
 interface ActionResult {
@@ -358,9 +363,11 @@ export async function endMentorship(ctx: AppContext, tenantCtx: TenantContext, a
 /**
  * The mentor reports a request's note: admins get a report holding only the note, under the chat report rules: the reporter
  * isn't named in the audit log, admins hear that a report exists and nothing it says, and one the report names is left out.
- * A request still waiting is declined, without telling the mentee. One already declined or withdrawn can be reported too, and
- * stays as it is, because its mentor can still read it: withdrawing mustn't take a note out of reach of a report. Not once it
- * was accepted, when the note is the chat's first message, reported there. Works with mentorship switched off: a way out.
+ * A request still waiting is declined, and its mentee is told exactly as for the mentor declining it, so nothing they see
+ * tells a report from a decline; no decline is audited, though, as that row would name the reporter. One already declined
+ * or withdrawn can be reported too, and stays as it is, telling nobody, because its mentor can still read it: withdrawing
+ * mustn't take a note out of reach of a report. Not once it was accepted, when the note is the chat's first message,
+ * reported there. Works with mentorship switched off: a way out.
  */
 export async function reportMentorshipRequest(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string, input: ChatReportCreateInput): Promise<MentorshipDto> {
   const tenantId = tenantCtx.tenant.id;
@@ -387,7 +394,8 @@ export async function reportMentorshipRequest(ctx: AppContext, tenantCtx: Tenant
     if (!report) throw AppError.conflict("You have already reported this request");
     await recordAuditStrict(tx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } });
     await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A mentorship request was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, row.menteeMembershipId] }, tx);
-    // The mentee's copy changes only if it was waiting, and then just as a decline's would.
+    // The mentee's copy changes only if it was waiting, and then they hear of it just as of a decline.
+    if (waiting) await notifyDeclined(ctx, tx, tenantId, [updated], declinedBy(actor.membership.fullName));
     await publishMentorshipChanged(ctx, tx, tenantCtx.tenant.slug, waiting ? [me, row.menteeMembershipId] : [me]);
     return { row: updated, other: await otherOf(tx, tenantId, row, side) };
   });
@@ -399,9 +407,10 @@ export async function reportMentorshipRequest(ctx: AppContext, tenantCtx: Tenant
 /**
  * Takes a member out of the Mentors list, because a mentor's note can't be reported as chat. Requests waiting for them are
  * declined, or a removed mentor could still accept them, and each mentee is told the request is closed because the mentor
- * isn't taking requests any more: not that the mentor declined it, which they didn't, nor that an admin was involved. They can
- * offer again, and suspension is there for anyone who repeats it. An admin an open chat report names can't do it (see
- * assertNoOpenReportAboutActor): a mentor who reported their request could otherwise be taken off the list for it.
+ * isn't taking requests any more, the sender of one the mentor never saw included: not that the mentor declined it, which
+ * they didn't, nor that an admin was involved. They can offer again, and suspension is there for anyone who repeats it. An
+ * admin an open chat report names can't do it (see assertNoOpenReportAboutActor): a mentor who reported their request could
+ * otherwise be taken off the list for it.
  */
 export async function removeMentorAsAdmin(ctx: AppContext, tenantCtx: TenantContext, actor: MemberAdminActor, membershipId: string): Promise<MentorProfileDto> {
   const tenantId = tenantCtx.tenant.id;

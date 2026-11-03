@@ -5,6 +5,7 @@ import { AppState } from "react-native";
 import { chatSync } from "@/lib/chat";
 import { qk } from "@/lib/queryKeys";
 import { realtime } from "@/lib/realtime";
+import { refreshReferrals } from "@/lib/referrals";
 import { useAuthStore } from "@/stores/authStore";
 
 /**
@@ -25,6 +26,8 @@ export function RealtimeBridge() {
       }),
       // A request or mentorship changed, on either side, notified or not (a withdrawal tells nobody): lists and pages refetch.
       realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
+      // The same for a referral request: its lists, and the pages of jobs, which say where the viewer's own request stands.
+      realtime.on("referral:changed", (e) => void refreshReferrals(qc, e.tenantSlug)),
       realtime.on("notification:unread", (e) => qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count })),
       // One notification sent to many members (an announcement): refetch rather than patch.
       realtime.on("notification:bulk", (e) => {
@@ -35,6 +38,8 @@ export function RealtimeBridge() {
       realtime.onReconnect(() => {
         void qc.invalidateQueries({ queryKey: ["notifications"] });
         void qc.invalidateQueries({ queryKey: ["mentorship"] });
+        void qc.invalidateQueries({ queryKey: ["referrals"] });
+        void qc.invalidateQueries({ queryKey: ["job"] });
       }),
     ];
     return () => offs.forEach((off) => off());

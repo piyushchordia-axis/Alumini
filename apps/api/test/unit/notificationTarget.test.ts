@@ -141,20 +141,43 @@ describe("the CONNECTIONS category", () => {
   const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map((f) => [f, on.includes(f)])) as TenantFeatures;
   const categories = (features: TenantFeatures, chatEligible: boolean) => visibleNotificationCategories({ features, chatEligible, isTenantAdmin: false });
 
-  it("is called Mentorship and referrals, can be turned off, and holds every mentorship notification", () => {
+  it("is called Mentorship and referrals, can be turned off, and holds every mentorship and referral notification", () => {
     expect(NOTIFICATION_CATEGORY_INFO.CONNECTIONS).toMatchObject({ label: "Mentorship and referrals", minLevel: "OFF" });
-    for (const type of ["MENTORSHIP_REQUESTED", "MENTORSHIP_ACCEPTED", "MENTORSHIP_DECLINED", "MENTORSHIP_ENDED"] as const) {
+    expect(NOTIFICATION_CATEGORY_INFO.CONNECTIONS.description).toMatch(/refer/);
+    for (const type of ["MENTORSHIP_REQUESTED", "MENTORSHIP_ACCEPTED", "MENTORSHIP_DECLINED", "MENTORSHIP_ENDED", "REFERRAL_REQUESTED", "REFERRAL_ACCEPTED", "REFERRAL_DECLINED"] as const) {
       expect(NOTIFICATION_CATEGORY[type], type).toBe("CONNECTIONS");
       expect(notificationLevelFor(type, { categories: { CONNECTIONS: "OFF" } }), type).toBe("OFF");
       expect(notificationLevelFor(type, null), type).toBe("IN_APP_PUSH");
     }
   });
 
-  it("shows only while mentorship is on, which needs messaging, for a member who can use it", () => {
+  it("shows while mentorship or referrals are on, both of which need messaging, for a member who can use them", () => {
     expect(categories(only("mentorship", "messaging"), true)).toContain("CONNECTIONS");
     expect(categories(only("mentorship", "messaging"), false)).not.toContain("CONNECTIONS");
     expect(categories(only("mentorship"), true)).not.toContain("CONNECTIONS");
-    expect(categories(only("messaging", "groups", "jobs"), true)).not.toContain("CONNECTIONS");
+    // Referrals alone: jobs and messaging, with mentorship off.
+    expect(categories(only("messaging", "jobs"), true)).toContain("CONNECTIONS");
+    expect(categories(only("messaging", "jobs"), false)).not.toContain("CONNECTIONS");
+    expect(categories(only("jobs"), true)).not.toContain("CONNECTIONS");
+    expect(categories(only("messaging", "groups"), true)).not.toContain("CONNECTIONS");
+  });
+});
+
+describe("referral notifications", () => {
+  it("open the request's own list on Jobs' Referrals tab, received for the poster and sent for the one who asked", () => {
+    expect(notificationTarget("REFERRAL_REQUESTED", { referralId: "r1", jobId: "j1", box: "received" })).toEqual({ kind: "referral", box: "received" });
+    expect(notificationTarget("REFERRAL_DECLINED", { referralId: "r1", box: "sent" })).toEqual({ kind: "referral", box: "sent" });
+  });
+
+  it("fall back to the side each type is usually about, and ignore a box they don't know", () => {
+    expect(notificationTarget("REFERRAL_REQUESTED", {})).toEqual({ kind: "referral", box: "received" });
+    expect(notificationTarget("REFERRAL_DECLINED", { box: "SENT" })).toEqual({ kind: "referral", box: "sent" });
+    expect(notificationTarget("REFERRAL_DECLINED", { box: "__proto__" })).toEqual({ kind: "referral", box: "sent" });
+  });
+
+  it("open the chat an acceptance opened, or the sender's list without one", () => {
+    expect(notificationTarget("REFERRAL_ACCEPTED", { referralId: "r1", conversationId: "c1", box: "sent" })).toEqual({ kind: "chat", conversationId: "c1" });
+    expect(notificationTarget("REFERRAL_ACCEPTED", { referralId: "r1" })).toEqual({ kind: "referral", box: "sent" });
   });
 });
 

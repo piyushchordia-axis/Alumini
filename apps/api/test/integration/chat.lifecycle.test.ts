@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, mentorProfiles, mentorships, notifications, tenants } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, mentorProfiles, mentorships, notifications, referralRequests, tenants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
@@ -13,6 +13,7 @@ import { acceptedThread, ageRequest, chatApi, conversationRow, createGroup, grou
 import { auth, createMembership, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { acceptedMentorship, askMentor, mentorshipApi, NOTE, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
+import { acceptedReferral, askForReferral, postReferralJob, REFERRAL_NOTE, referralsApi } from "../helpers/referrals";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -396,6 +397,72 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
       // Reinstated, they're back in the list with their profile as it was.
       await ctx.db.update(memberships).set({ status: "APPROVED" }).where(eq(memberships.id, a.membership.id));
       expect((await mentorshipApi(ctx, tenant.slug, d).mentors()).body.data.map((r: { member: { id: string } }) => r.member.id)).toEqual([a.membership.id]);
+    });
+  });
+
+  describe("referrals", () => {
+    const referralRow = async (id: string) => (await ctx.db.select().from(referralRequests).where(eq(referralRequests.id, id)))[0]!;
+
+    it("on deletion, withdraws their waiting requests and closes those waiting for them, telling nobody, as their jobs go", async () => {
+      const { tenant, a, b } = await setup();
+      const c = await memberSession(ctx, tenant.id);
+      const aJob = await postReferralJob(ctx, tenant.slug, a);
+      const cJob = await postReferralJob(ctx, tenant.slug, c);
+      const toThem = await askForReferral(ctx, tenant.slug, b, aJob.id);
+      const theirs = await askForReferral(ctx, tenant.slug, a, cJob.id);
+      await ctx.db.delete(notifications);
+      expect((await deleteAccount(a)).status).toBeLessThan(300);
+
+      expect(await referralRow(toThem.id)).toMatchObject({ status: "CLOSED", closedAt: expect.any(Date), posterMembershipId: null, jobId: null, requesterMembershipId: b.membership.id, jobTitle: "Backend Engineer" });
+      expect(await referralRow(theirs.id)).toMatchObject({ status: "WITHDRAWN", requesterMembershipId: null, acceptedAt: null });
+      expect(await ctx.db.select().from(notifications)).toEqual([]);
+      expect((await referralsApi(ctx, tenant.slug, b).mine("sent")).body.data).toEqual([expect.objectContaining({ id: toThem.id, status: "CLOSED", member: null, canWithdraw: false, job: { id: null, title: "Backend Engineer", companyName: "Acme", available: false } })]);
+      expect((await referralsApi(ctx, tenant.slug, c).mine("received")).body).toMatchObject({ waiting: 0, data: [expect.objectContaining({ status: "WITHDRAWN", member: null })] });
+    });
+
+    it("on deletion, keeps an accepted referral and leaves its chat read-only, with what they wrote from a deleted member", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const { referral } = await acceptedReferral(ctx, tenant.slug, a, b);
+      await chat(a).send(referral.conversationId!, "I've passed your CV on");
+      await ctx.db.delete(notifications);
+      expect((await deleteAccount(a)).status).toBeLessThan(300);
+
+      expect(await referralRow(referral.id)).toMatchObject({ status: "ACCEPTED", posterMembershipId: null, jobId: null });
+      expect(await ctx.db.select().from(notifications)).toEqual([]);
+      expect((await referralsApi(ctx, tenant.slug, b).mine("sent")).body.data[0]).toMatchObject({ status: "ACCEPTED", member: null, conversationId: referral.conversationId });
+      expect((await chat(b).get(referral.conversationId!)).body.data).toMatchObject({ peer: null, canSend: false });
+      const messages = (await chat(b).messages(referral.conversationId!)).body.data as ChatMessageDto[];
+      expect(messages.map((m) => [m.body, m.sender?.id ?? null])).toEqual([
+        ["I've passed your CV on", null],
+        [REFERRAL_NOTE, b.membership.id],
+      ]);
+    });
+
+    it("on suspension, hides the poster's job and leaves what waits for it, which its sender can still withdraw", async () => {
+      const { tenant, a, b } = await setup();
+      const job = await postReferralJob(ctx, tenant.slug, a);
+      const waiting = await askForReferral(ctx, tenant.slug, b, job.id);
+      await ctx.db.update(memberships).set({ status: "SUSPENDED" }).where(eq(memberships.id, a.membership.id));
+
+      expect((await referralsApi(ctx, tenant.slug, b).job(job.id)).status).toBe(404);
+      expect((await referralsApi(ctx, tenant.slug, a).mine("received")).body.error.code).toBe("MEMBERSHIP_SUSPENDED");
+      expect((await referralsApi(ctx, tenant.slug, b).mine("sent")).body.data[0]).toMatchObject({ status: "REQUESTED", canWithdraw: true, job: { id: job.id, available: false } });
+      expect((await referralsApi(ctx, tenant.slug, b).withdraw(waiting.id)).status).toBe(200);
+      // Reinstated, their job is back as it was, still taking requests.
+      await ctx.db.update(memberships).set({ status: "APPROVED" }).where(eq(memberships.id, a.membership.id));
+      expect((await referralsApi(ctx, tenant.slug, b).job(job.id)).body.data).toMatchObject({ canRefer: true, myReferral: { id: waiting.id, status: "WITHDRAWN" } });
+    });
+
+    it("on suspension of the one asking, hides what they asked from the poster, refuses accepting it, and hands it back when reinstated", async () => {
+      const { tenant, a, b } = await setup();
+      const job = await postReferralJob(ctx, tenant.slug, a);
+      const waiting = await askForReferral(ctx, tenant.slug, b, job.id);
+      await ctx.db.update(memberships).set({ status: "SUSPENDED" }).where(eq(memberships.id, b.membership.id));
+      expect((await referralsApi(ctx, tenant.slug, a).forJob(job.id)).body).toMatchObject({ data: [], waiting: 0 });
+      expect((await referralsApi(ctx, tenant.slug, a).accept(waiting.id)).body.error.code).toBe("CONTACT_UNAVAILABLE");
+      await ctx.db.update(memberships).set({ status: "APPROVED" }).where(eq(memberships.id, b.membership.id));
+      expect((await referralsApi(ctx, tenant.slug, a).forJob(job.id)).body.waiting).toBe(1);
+      expect((await referralsApi(ctx, tenant.slug, a).accept(waiting.id)).status).toBe(200);
     });
   });
 

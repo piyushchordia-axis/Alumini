@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -22,9 +22,11 @@ const step = async (name, fn) => {
   }
 };
 
-// The groups journey's two members, kept signed in for the mentorship journey, so it costs no extra login: every e2e
-// script shares 20 codes an hour, and a fresh context would start from tokens the first may have rotated since.
+// The groups journey's two members, kept signed in for the mentorship journey, and then for the referral journey, so they
+// cost no extra login: every e2e script shares 20 codes an hour, and a fresh context would start from tokens the first may
+// have rotated since.
 let groupsMembers = null;
+let mentorshipMembers = null;
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(20000);
@@ -189,9 +191,23 @@ try {
     // Selected state must reach the DOM: react-native-web ignores accessibilityState and only emits aria-* props.
     const tab = (name, selected) => page.locator(`[role="tab"][aria-selected="${selected}"]`).getByText(name, { exact: true }).locator("visible=true").first();
     await tab("Openings", true).waitFor();
+    // A job whose poster offers referrals says so on its card.
+    const backend = page.getByRole("button", { name: /^Backend Engineer \(Node\.js\)/ }).locator("visible=true").first();
+    await backend.getByText("Can refer", { exact: true }).waitFor();
+    // Each tab, and on Referrals each list, is in the URL, as a referral notification links to them.
     await tab("Looking for work", false).click();
     await tab("Looking for work", true).waitFor();
+    await page.waitForURL(/\/t\/demo-university\/jobs\?tab=seekers$/);
+    await tab("Referrals", false).click();
+    await page.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals$/);
+    await tab("Received", true).waitFor();
+    await page.getByText("No referral requests yet", { exact: true }).locator("visible=true").first().waitFor();
+    await tab("Sent", false).click();
+    await page.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals&box=sent$/);
+    await page.getByText("You haven't asked for a referral yet", { exact: true }).locator("visible=true").first().waitFor();
     await tab("Openings", false).click();
+    await page.waitForURL(/\/t\/demo-university\/jobs$/);
+    await tab("Openings", true).waitFor();
     await shot("m05-jobs");
   });
 
@@ -1065,10 +1081,11 @@ try {
     if (overflow > 0) throw new Error(`Requests scrolls sideways by ${overflow}px on a phone`);
     await mentee.screenshot({ path: `${SHOTS}/m12i-mentorship-sent.png`, fullPage: true });
 
-    // The bell: the mentee heard their request was accepted and nothing of the report. The mentor's request names nobody, and leads to Received.
+    // The bell: the mentee heard their request was accepted, and of the reported one only that it was declined, as for any
+    // decline. The mentor's request names nobody, and leads to Received.
     await mentee.goto(`${app}/profile/notifications`);
     await shown(mentee.getByText(`${mentorName} accepted your mentorship request`, { exact: true })).waitFor();
-    if (await mentee.getByText("declined your mentorship request", { exact: false }).count()) throw new Error("reporting a request told the mentee it was declined");
+    await shown(mentee.getByText(`${mentorName} declined your mentorship request`, { exact: true })).waitFor();
     await mentor.goto(`${app}/profile/notifications`);
     await shown(mentor.getByText(`${menteeName} ended your mentorship`, { exact: true })).waitFor();
     await shown(mentor.getByText("New mentorship request", { exact: true })).click();
@@ -1087,11 +1104,271 @@ try {
     await mentee.goto(`${app}/directory`);
     await shown(mentee.getByPlaceholder("Name, company, role")).fill(mentorName);
     await shown(mentee.getByRole("button", { name: new RegExp(`^${mentorName}, .*Mentor`) })).getByText("Mentor", { exact: true }).waitFor();
-    await mentorContext.close();
-    await menteeContext.close();
+    await mentor.close();
+    await mentee.close();
+    mentorshipMembers = { mentorContext, menteeContext };
   });
 
-  await step("a current pupil sees no Messages, Groups or Mentors, even with all three switched on", async () => {
+  await step("referrals: a job offered for referral, asked about with a note, accepted into a live chat that opens with the note, a request reported, and one closed with its job", async () => {
+    // The poster is this run's main member, who has no thread with anyone. The mentorship journey's two members ask, signed in
+    // already, so this costs no code: the mentee's request is accepted, so the chat it opens is new; the mentor's is reported
+    // and never accepted, so their ended mentorship chat isn't touched. web-member.mjs uses other members.
+    const ASKER = "+91931000007";
+    const REPORTED = "+91931000006";
+    const nameOf = async (phone) => (await apiSession(phone)).memberships.find((m) => m.tenant.slug === "demo-university").fullName;
+    const [askerName, reportedName] = [await nameOf(ASKER), await nameOf(REPORTED)];
+    const posterName = "Mobile Smoke";
+    const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
+    const kept = mentorshipMembers;
+    mentorshipMembers = null;
+    const askerContext = kept?.menteeContext ?? (await signedInMobileContext(browser, BASE, ASKER, phone));
+    const reportedContext = kept?.mentorContext ?? (await signedInMobileContext(browser, BASE, REPORTED, phone));
+    const poster = page;
+    const asker = await askerContext.newPage();
+    const other = await reportedContext.newPage();
+    asker.setDefaultTimeout(20000);
+    other.setDefaultTimeout(20000);
+    const app = `${BASE}/t/demo-university`;
+    // Screens underneath stay mounted on the web export, so the one on top is the last match.
+    const shown = (locator) => locator.locator("visible=true").last();
+    const log = (p) => shown(p.locator('[role="log"]'));
+    const live = { timeout: 10000 };
+    const tab = (p, name, selected) => shown(p.locator(selected === undefined ? '[role="tab"]' : `[role="tab"][aria-selected="${selected}"]`).getByText(name, { exact: true }));
+    const row = (p, text) => shown(p.locator("article", { hasText: text }));
+    const sentList = /\/t\/demo-university\/jobs\?tab=referrals&box=sent$/;
+    const engineer = `Mobile Referral Engineer ${unique}`;
+    const analyst = `Mobile Referral Analyst ${unique}`;
+
+    // The poster offers referrals on two new jobs. What ticking the box means is said beside it, before anything is posted.
+    const postJob = async (title) => {
+      await poster.goto(`${app}/jobs`);
+      await shown(poster.getByRole("button", { name: "Post a job" })).click();
+      await poster.waitForURL(/\/jobs\/new$/);
+      await shown(poster.getByLabel("Job title *", { exact: true })).fill(title);
+      await shown(poster.getByLabel("Company *", { exact: true })).fill("Smoke Labs");
+      await shown(poster.getByLabel("Description *", { exact: true })).fill("Help us keep the mobile smoke tests green.");
+      await shown(poster.getByText("Members can ask you for a referral with a short note. If you accept, it opens a private chat between you.", { exact: true })).waitFor();
+      const offer = shown(poster.getByRole("checkbox", { name: "I can refer people for this job", exact: true }));
+      if ((await offer.getAttribute("aria-checked")) !== "false") throw new Error("a new job starts out offering referrals");
+      await offer.click();
+      if ((await offer.getAttribute("aria-checked")) !== "true") throw new Error("the referral checkbox doesn't show as ticked");
+      await shown(poster.getByRole("button", { name: "Post job" })).click();
+      await poster.waitForURL(/\/jobs\/[0-9a-f-]{36}$/);
+      await shown(poster.getByRole("heading", { name: title })).waitFor();
+      await shown(poster.getByText("Job published", { exact: true })).waitFor();
+      return poster.url();
+    };
+    const analystPage = await postJob(analyst);
+    const engineerPage = await postJob(engineer);
+    // The poster's own page waits for requests, which have to arrive here live.
+    await shown(poster.getByText("Can refer", { exact: true })).waitFor();
+    await shown(poster.getByRole("heading", { name: "Referral requests", exact: true })).waitFor();
+    await shown(poster.getByText("No referral requests yet", { exact: true })).waitFor();
+    if (await poster.getByRole("link", { name: "Ask for a referral" }).locator("visible=true").count()) throw new Error("a poster is offered Ask for a referral on their own job");
+    await poster.screenshot({ path: `${SHOTS}/m13a-referral-job-posted.png` });
+
+    // The asker finds it under Can refer, which leaves out jobs that take no requests.
+    await asker.goto(`${app}/jobs`);
+    const filter = shown(asker.getByRole("checkbox", { name: "Can refer", exact: true }));
+    await filter.click();
+    if ((await filter.getAttribute("aria-checked")) !== "true") throw new Error("the Can refer filter doesn't show as chosen");
+    const card = shown(asker.getByRole("button", { name: new RegExp(`^${engineer}`) }));
+    await card.getByText("Can refer", { exact: true }).waitFor();
+    await shown(asker.getByText("Backend Engineer (Node.js)", { exact: true })).waitFor();
+    if (await asker.getByText("Summer Intern – Strategy", { exact: true }).locator("visible=true").count()) throw new Error("Can refer lists a job that takes no referral requests");
+    await card.dispatchEvent("click");
+    await asker.waitForURL(engineerPage);
+    await shown(asker.getByText(`${posterName} can refer people for this job. Ask with a short note: if they accept, it opens a private chat between you.`, { exact: true })).waitFor();
+    await shown(asker.getByRole("link", { name: "Ask for a referral" })).click();
+    await asker.waitForURL(/\/jobs\/request-referral\/[0-9a-f-]{36}$/);
+
+    // The form says who reads the note and what becomes of it, and refuses a note too short before sending anything.
+    await shown(asker.getByText(`${posterName} will see this note. If they accept, it becomes the first message of a chat between you, or the latest one if you already chat.`, { exact: true })).waitFor();
+    // By its accessible name, the same on both apps, which leaves out the asterisk shown beside it.
+    const noteBox = shown(asker.getByRole("textbox", { name: "Note to the poster", exact: true }));
+    await noteBox.fill("Hello!");
+    await shown(asker.getByRole("button", { name: "Send request" })).click();
+    await shown(asker.getByText("Write at least 10 characters", { exact: true })).waitFor();
+    // The longest a note may be, so it wraps everywhere it's shown.
+    const sentence = `I build data pipelines in Python and would love your referral for this role, if you think I fit. ${unique}.`;
+    const note = `${Array(4).fill(sentence).join(" ")} Thank you for reading this far and for offering to refer alumni like me.`;
+    if (note.length !== 500) throw new Error(`the test note is ${note.length} characters, not 500`);
+    await noteBox.fill(note);
+    await shown(asker.getByText("500 / 500", { exact: true })).waitFor();
+    // The job failing to refetch in the background keeps the form and the note.
+    const jobGet = await scriptJob(asker, "demo-university", engineerPage.split("/").pop());
+    jobGet.answer(503, "INTERNAL");
+    await jobGet.refetch();
+    if ((await noteBox.inputValue()) !== note) throw new Error("a failed refetch of the job lost the note");
+    jobGet.answer(null);
+    await jobGet.stop();
+    await asker.screenshot({ path: `${SHOTS}/m13b-referral-request-form.png` });
+    await shown(asker.getByRole("button", { name: "Send request" })).click();
+    await asker.waitForURL(sentList);
+    await tab(asker, "Sent", true).waitFor();
+    const sent = row(asker, note);
+    await sent.getByText("Request sent", { exact: true }).waitFor();
+    await sent.getByText(`${engineer} at Smoke Labs`, { exact: true }).waitFor();
+    await sent.getByRole("button", { name: "Withdraw request" }).waitFor();
+
+    // The poster: it arrives live on the job's page, with its note, and says how many wait.
+    const received = row(poster, note);
+    await received.waitFor(live);
+    await received.getByText(askerName, { exact: true }).waitFor();
+    await received.getByText("Waiting for your answer", { exact: true }).waitFor();
+    await shown(poster.getByText("1 waiting", { exact: true })).waitFor();
+
+    // Switched off, what the asker is already in stays theirs to leave: Referrals stays in Jobs with Withdraw, and there's
+    // nothing to ask or answer.
+    const off = await scriptFeatures(asker, "demo-university");
+    off.only("feed", "groups", "mentorship", "jobs", "directory", "events", "businesses", "funding");
+    await asker.goto(`${app}/jobs`);
+    await shown(asker.getByText("Backend Engineer (Node.js)", { exact: true })).waitFor();
+    if (await asker.getByRole("checkbox", { name: "Can refer" }).locator("visible=true").count()) throw new Error("the Can refer filter is offered with referrals switched off");
+    await tab(asker, "Referrals").click();
+    await shown(asker.getByText("has switched referral requests off", { exact: false })).waitFor();
+    await tab(asker, "Sent").click();
+    await sent.getByRole("button", { name: "Withdraw request" }).waitFor();
+    if (await sent.getByRole("link", { name: "Open chat" }).count()) throw new Error("a waiting request offers Open chat");
+    await asker.screenshot({ path: `${SHOTS}/m13c-referrals-switched-off.png` });
+    await off.stop();
+    await asker.goto(`${app}/jobs?tab=referrals&box=sent`);
+    await sent.getByText("Request sent", { exact: true }).waitFor();
+
+    // The mentor asks too, and the poster reports it: it's declined, and their list and bell say so, as for any decline.
+    await other.goto(engineerPage);
+    await shown(other.getByRole("link", { name: "Ask for a referral" })).click();
+    const fromOther = `Please refer me, it would mean a lot to me. ${unique}`;
+    await shown(other.getByRole("textbox", { name: "Note to the poster", exact: true })).fill(fromOther);
+    await shown(other.getByRole("button", { name: "Send request" })).click();
+    await other.waitForURL(sentList);
+    const reported = row(poster, fromOther);
+    await reported.waitFor(live);
+    await shown(poster.getByText("2 waiting", { exact: true })).waitFor();
+    await poster.screenshot({ path: `${SHOTS}/m13d-referral-requests.png`, fullPage: true });
+    await reported.getByRole("button", { name: "Report request" }).click();
+    const reporting = shown(poster.getByRole("dialog", { name: "Report request" }));
+    await reporting.getByText(`Admins will see only the note in this request, and nothing else. The request is declined: ${reportedName} will see it as declined, but won't be told it was reported.`, { exact: true }).waitFor();
+    await reporting.getByRole("button", { name: "Spam", exact: true }).click();
+    await reporting.getByRole("button", { name: "Send report" }).click();
+    await reporting.waitFor({ state: "detached" });
+    // Said in the row it's about.
+    await reported.getByText("Thanks. Admins will take a look.", { exact: true }).waitFor();
+    await reported.getByText("Declined", { exact: true }).waitFor();
+    if (await reported.getByRole("button", { name: "Accept request" }).count()) throw new Error("a reported referral request can still be accepted");
+    if (await reported.getByRole("button", { name: "Report request" }).count()) throw new Error("a reported referral request can be reported again");
+    await row(other, fromOther).getByText("Declined", { exact: true }).waitFor(live);
+
+    // Accepting opens the chat, whose first message is the asker's note, from them.
+    await received.getByRole("button", { name: "Accept request" }).click();
+    await poster.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    const threadId = poster.url().split("/").pop();
+    await log(poster).getByText(note, { exact: true }).waitFor();
+    // The asker's list says so live, and its Open chat goes into the same thread.
+    await sent.getByText("Accepted", { exact: true }).waitFor(live);
+    await sent.getByRole("link", { name: "Open chat", exact: true }).click();
+    await asker.waitForURL(new RegExp(`/messages/${threadId}$`));
+    await log(asker).getByText(note, { exact: true }).waitFor();
+
+    // Messages both ways, live, and each one a single bubble on each side, below the note.
+    const send = async (p, text) => {
+      await shown(p.getByLabel("Write a message")).fill(text);
+      await shown(p.getByRole("button", { name: "Send message" })).click();
+      await log(p).getByText(text).waitFor();
+    };
+    const fromPoster = `Happy to refer you. Send me your CV? ${unique}`;
+    await send(poster, fromPoster);
+    await log(asker).getByText(fromPoster).waitFor(live);
+    const reply = `On its way, thank you! ${unique}`;
+    await send(asker, reply);
+    await log(poster).getByText(reply).waitFor(live);
+    await asker.waitForTimeout(1500);
+    for (const [p, who] of [
+      [poster, "the poster"],
+      [asker, "the asker"],
+    ]) {
+      for (const text of [note, fromPoster, reply]) {
+        const bubbles = await log(p).getByText(text, { exact: true }).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text.slice(0, 40)}…"`);
+      }
+      const top = async (text) => (await log(p).getByText(text, { exact: true }).boundingBox()).y;
+      if (!((await top(note)) < (await top(fromPoster)) && (await top(fromPoster)) < (await top(reply)))) throw new Error(`${who} doesn't see the note as the chat's first message`);
+    }
+    await poster.screenshot({ path: `${SHOTS}/m13e-referral-chat.png` });
+
+    // Closing a job closes what waits on it: the asker asks about the other job, and the poster closes it, warned first.
+    await asker.goto(analystPage);
+    await shown(asker.getByRole("link", { name: "Ask for a referral" })).click();
+    const waitingNote = `Could you refer me for the analyst role as well? ${unique}`;
+    await shown(asker.getByRole("textbox", { name: "Note to the poster", exact: true })).fill(waitingNote);
+    await shown(asker.getByRole("button", { name: "Send request" })).click();
+    await asker.waitForURL(sentList);
+    // Withdrawing asks first, and Cancel leaves the request as it was.
+    await asker.goto(analystPage);
+    await shown(asker.getByText(`You've asked ${posterName} for a referral. Their answer will show in Referrals.`, { exact: true })).waitFor();
+    if (await asker.getByRole("link", { name: "Ask for a referral" }).locator("visible=true").count()) throw new Error("a member waiting on a request is offered Ask for a referral again");
+    await shown(asker.getByRole("button", { name: "Withdraw request" })).click();
+    const withdrawing = asker.getByRole("alertdialog", { name: "Withdraw this request?" });
+    await withdrawing.getByText(`${posterName} can't accept it any more`, { exact: false }).waitFor();
+    await withdrawing.getByRole("button", { name: "Cancel" }).click();
+    await withdrawing.waitFor({ state: "hidden" });
+    await shown(asker.getByRole("link", { name: "See your requests" })).click();
+    await asker.waitForURL(sentList);
+    const closing = row(asker, waitingNote);
+    await closing.getByText("Request sent", { exact: true }).waitFor();
+
+    await poster.goto(analystPage);
+    await row(poster, waitingNote).waitFor();
+    await shown(poster.getByRole("button", { name: "Mark closed" })).click();
+    const confirmClose = poster.getByRole("alertdialog", { name: "Close this job?" });
+    await confirmClose.getByText("1 referral request is waiting for your answer. It will close, and its sender will be told this job is no longer taking referral requests.", { exact: true }).waitFor();
+    await confirmClose.getByRole("button", { name: "Close job" }).click();
+    await confirmClose.waitFor({ state: "hidden" });
+    await shown(poster.getByText("Job closed", { exact: true })).waitFor();
+    await shown(poster.getByText("Closed", { exact: true })).waitFor();
+    await closing.getByText("Closed", { exact: true }).waitFor(live);
+    if (await closing.getByRole("button", { name: "Withdraw request" }).count()) throw new Error("a request closed with its job can still be withdrawn");
+    await sent.getByText("Accepted", { exact: true }).waitFor();
+
+    // The Sent list on a phone, every state in it and a 500-character note, with nothing scrolling sideways.
+    const overflow = await asker.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`Referrals scrolls sideways by ${overflow}px on a phone`);
+    await asker.screenshot({ path: `${SHOTS}/m13f-referrals-sent.png`, fullPage: true });
+
+    // The bell: the asker heard of the acceptance and the closing; the reported member heard of their request only that it
+    // was declined, as for any decline; the poster's notice names nobody and leads to the requests they received.
+    await asker.goto(`${app}/profile/notifications`);
+    await shown(asker.getByText(`${posterName} accepted your referral request`, { exact: true })).waitFor();
+    await shown(asker.getByText("Your referral request was closed", { exact: true })).waitFor();
+    await other.goto(`${app}/profile/notifications`);
+    // From the mentorship journey, so the list has loaded.
+    await shown(other.getByText(`${askerName} ended your mentorship`, { exact: true })).waitFor();
+    await shown(other.getByText(`${posterName} declined your referral request`, { exact: true })).waitFor();
+    await poster.goto(`${app}/profile/notifications`);
+    await shown(poster.getByText("New referral request", { exact: true })).click();
+    await poster.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals&box=received$/);
+    await tab(poster, "Received", true).waitFor();
+    await row(poster, note).getByText("Accepted", { exact: true }).waitFor();
+
+    // The request form opened cold, as from a link, has the Jobs list under it to go back to.
+    await other.goto(`${app}/jobs`);
+    const apm = shown(other.getByRole("button", { name: /^Associate Product Manager/ }));
+    await apm.dispatchEvent("click");
+    await other.waitForURL(/\/jobs\/[0-9a-f-]{36}$/);
+    const apmId = other.url().split("/").pop();
+    await other.goto(`${app}/jobs/request-referral/${apmId}`);
+    await shown(other.getByRole("textbox", { name: "Note to the poster", exact: true })).waitFor();
+    await shown(other.getByLabel(/back$/i)).click();
+    await other.waitForURL(/\/t\/demo-university\/jobs(\?jobId=[0-9a-f-]+)?$/);
+    await tab(other, "Openings", true).waitFor();
+
+    await asker.close();
+    await other.close();
+    await askerContext.close();
+    await reportedContext.close();
+  });
+
+  await step("a current pupil sees no Messages, Groups, Mentors or referrals, even with all of them switched on", async () => {
     const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Ira Banerjee, demo-school
     const pupil = await context.newPage();
     pupil.setDefaultTimeout(20000);
@@ -1134,6 +1411,35 @@ try {
     await pupil.goto(`${BASE}/t/demo-school/profile/my-content`);
     await pupil.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
     if (await pupil.locator('[role="tab"]').getByText("Groups", { exact: true }).locator("visible=true").count()) throw new Error("a pupil's My posts has a Groups tab");
+
+    // Jobs stay open to a pupil, without referrals: no tab, no filter, nothing to tick on the form, and no way to ask, even
+    // with the job served as offering referrals, so only the pupil rule can be what hides it.
+    const onTop = (locator) => locator.locator("visible=true").last();
+    const jobUrl = /\/api\/v1\/t\/demo-school\/jobs\/[0-9a-f-]{36}$/;
+    await pupil.route(jobUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const json = await response.json();
+      return route.fulfill({ response, json: { ...json, data: { ...json.data, canRefer: true } } });
+    });
+    await pupil.goto(`${BASE}/t/demo-school/jobs`);
+    await onTop(pupil.locator('[role="tab"][aria-selected="true"]').getByText("Openings", { exact: true })).waitFor();
+    const analyst = onTop(pupil.getByText("Product Analyst", { exact: true }));
+    await analyst.waitFor();
+    if (await pupil.locator('[role="tab"]').getByText("Referrals", { exact: true }).locator("visible=true").count()) throw new Error("a pupil's Jobs has a Referrals tab");
+    if (await pupil.getByRole("checkbox", { name: "Can refer" }).locator("visible=true").count()) throw new Error("a pupil's Jobs has the Can refer filter");
+    await analyst.dispatchEvent("click");
+    await pupil.waitForURL(/\/t\/demo-school\/jobs\/[0-9a-f-]{36}$/);
+    await onTop(pupil.getByRole("heading", { name: "Product Analyst" })).waitFor();
+    await onTop(pupil.getByText("Can refer", { exact: true })).waitFor();
+    if (await pupil.getByRole("link", { name: "Ask for a referral" }).locator("visible=true").count()) throw new Error("a pupil is offered Ask for a referral");
+    await pupil.goto(pupil.url().replace("/jobs/", "/jobs/request-referral/"));
+    await onTop(pupil.getByText("Referrals aren't available", { exact: true })).waitFor();
+    await pupil.screenshot({ path: `${SHOTS}/m13g-referrals-pupil.png` });
+    await pupil.unroute(jobUrl);
+    await pupil.goto(`${BASE}/t/demo-school/jobs/new`);
+    await onTop(pupil.getByLabel("Job title *", { exact: true })).waitFor();
+    if (await pupil.getByRole("checkbox", { name: "I can refer people for this job" }).locator("visible=true").count()) throw new Error("a pupil's job form offers referrals");
     if (chatCalls.length) throw new Error(`a pupil's app called the chat API: ${chatCalls.join(", ")}`);
     await features.stop();
     await context.close();

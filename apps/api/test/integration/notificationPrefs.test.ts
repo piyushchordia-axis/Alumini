@@ -1,3 +1,4 @@
+import { defaultFeaturesFor } from "@illuminize/shared";
 import { and, eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -8,6 +9,7 @@ import { upsertPushToken } from "../../src/repositories/users.repo";
 import { ExpoPushChannel } from "../../src/services/notifications/ExpoPushChannel";
 import { notify } from "../../src/services/notifications/notification.service";
 import { createTenant, memberSession } from "../helpers/factories";
+import { askForReferral, postReferralJob } from "../helpers/referrals";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -97,6 +99,22 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     }
     const rows = await ctx.db.select().from(notifications);
     expect(rows.map((r) => r.recipientMembershipId)).toEqual(Array(4).fill(loud.membership.id));
+  });
+
+  it("holds referral notifications under CONNECTIONS too, where referrals are all there is of it, with mentorship off", async () => {
+    const { tenant } = await createTenant(ctx, { features: { ...defaultFeaturesFor("COLLEGE"), mentorship: false } });
+    const quiet = await memberSession(ctx, tenant.id);
+    const loud = await memberSession(ctx, tenant.id);
+    const asker = await memberSession(ctx, tenant.id);
+    const off = await request(ctx.app).patch(prefsUrl(tenant.slug)).set(quiet.headers).send({ categories: { CONNECTIONS: "OFF" } });
+    expect(off.body.data.categories.CONNECTIONS).toBe("OFF");
+    for (const poster of [quiet, loud]) await askForReferral(ctx, tenant.slug, asker, (await postReferralJob(ctx, tenant.slug, poster)).id);
+    const rows = await ctx.db.select().from(notifications).where(sql`${notifications.type} = 'REFERRAL_REQUESTED'`);
+    expect(rows.map((r) => r.recipientMembershipId)).toEqual([loud.membership.id]);
+    for (const type of ["REFERRAL_ACCEPTED", "REFERRAL_DECLINED"] as const) {
+      await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: [quiet.membership.id], type, title: "Referral", data: { referralId: "r1", box: "sent" } });
+    }
+    expect(await ctx.db.select().from(notifications).where(eq(notifications.recipientMembershipId, quiet.membership.id))).toEqual([]);
   });
 
   it("drops notifications a member turned off, keeps account notices, and skips push for in-app only", async () => {

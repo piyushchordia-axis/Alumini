@@ -1,4 +1,4 @@
-import type { MentorshipBox, NotificationType, TenantFeatures } from "../constants";
+import type { MentorshipBox, NotificationType, ReferralBox, TenantFeatures } from "../constants";
 import { chatAvailable, connectionsAvailable } from "./features";
 
 /**
@@ -36,6 +36,9 @@ export const NOTIFICATION_CATEGORY: Record<NotificationType, NotificationCategor
   MENTORSHIP_ACCEPTED: "CONNECTIONS",
   MENTORSHIP_DECLINED: "CONNECTIONS",
   MENTORSHIP_ENDED: "CONNECTIONS",
+  REFERRAL_REQUESTED: "CONNECTIONS",
+  REFERRAL_ACCEPTED: "CONNECTIONS",
+  REFERRAL_DECLINED: "CONNECTIONS",
 };
 
 /** OFF: not stored or shown. IN_APP: in the notification list and bell. IN_APP_PUSH: also a push to devices. */
@@ -46,7 +49,7 @@ export const NOTIFICATION_CATEGORY_INFO: Record<ConfigurableCategory, { label: s
   ACTIVITY: { label: "Comments and reactions", description: "When members comment on or react to your posts.", minLevel: "OFF" },
   // The bell never shows chat, so the lowest level here is the Messages badge alone.
   CHAT: { label: "Messages", description: "New messages, message requests and group invitations. Unless you mute a conversation, its messages show on the Messages badge.", minLevel: "IN_APP" },
-  CONNECTIONS: { label: "Mentorship and referrals", description: "Requests to be someone's mentor, and answers to the requests you send.", minLevel: "OFF" },
+  CONNECTIONS: { label: "Mentorship and referrals", description: "Requests to be someone's mentor or to refer them for a job, and answers to the requests you send.", minLevel: "OFF" },
   EVENTS: { label: "Events", description: "RSVPs to your events, and changes to events you're going to.", minLevel: "OFF" },
   ANNOUNCEMENTS: { label: "Announcements", description: "Notices from your institution's admins. Always shown in the app.", minLevel: "IN_APP" },
   CELEBRATIONS: { label: "Birthdays and anniversaries", description: "Greetings on your day and wishes from other members.", minLevel: "OFF" },
@@ -129,6 +132,8 @@ export type NotificationTarget =
   | { kind: "myContent"; tab?: "groups" }
   /** The Mentors section's Requests tab, on the list the request is in: received as the mentor, sent as the mentee. */
   | { kind: "mentorship"; box: MentorshipBox }
+  /** The Jobs section's Referrals tab, on the list the request is in: received as the job's poster, sent as the one asking. */
+  | { kind: "referral"; box: ReferralBox }
   | { kind: "profile" }
   | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
 
@@ -138,7 +143,7 @@ interface NotificationData {
   contentType?: string;
   contentId?: string;
   conversationId?: string;
-  /** Which of the recipient's lists a mentorship is in. */
+  /** Which of the recipient's lists a mentorship or referral request is in. */
   box?: string;
 }
 
@@ -176,6 +181,10 @@ const chatTarget: TargetFor = (d) => (d.conversationId ? { kind: "chat", convers
 const mentorshipTarget =
   (fallback: MentorshipBox): TargetFor =>
   (d) => ({ kind: "mentorship", box: d.box === "received" || d.box === "sent" ? d.box : fallback });
+/** A referral request's own list, the same way. */
+const referralTarget =
+  (fallback: ReferralBox): TargetFor =>
+  (d) => ({ kind: "referral", box: d.box === "received" || d.box === "sent" ? d.box : fallback });
 
 const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   POST_COMMENT: postTarget,
@@ -209,6 +218,11 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   MENTORSHIP_ACCEPTED: (d) => chatTarget(d) ?? mentorshipTarget("sent")(d),
   MENTORSHIP_DECLINED: mentorshipTarget("sent"),
   MENTORSHIP_ENDED: mentorshipTarget("sent"),
+  REFERRAL_REQUESTED: referralTarget("received"),
+  // Into the chat it opened, where the note is already the first message.
+  REFERRAL_ACCEPTED: (d) => chatTarget(d) ?? referralTarget("sent")(d),
+  // Declined by the poster, or closed with its job.
+  REFERRAL_DECLINED: referralTarget("sent"),
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,

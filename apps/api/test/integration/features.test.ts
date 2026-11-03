@@ -2,11 +2,12 @@ import { changedFeatures, defaultFeaturesFor, SCHOOL_OFF_FEATURES, TENANT_FEATUR
 import { and, eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { auditLog, tenantSettings } from "../../src/db/schema";
+import { auditLog, jobs, tenantSettings } from "../../src/db/schema";
 import { seedCore, SEED } from "../../src/db/seed";
 import { runInTransaction } from "../../src/lib/transaction";
 import { chatApi, createGroup, groupsApi } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
+import { askForReferral, postReferralJob, referralsApi } from "../helpers/referrals";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -312,6 +313,74 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
       const [audit] = await ctx.db.select().from(auditLog).where(and(eq(auditLog.tenantId, tenant.id), eq(auditLog.action, "platform.tenant.update")));
       expect((audit?.metadata as { forcedOff: string[] }).forcedOff).toEqual(expect.arrayContaining(["messaging", "groups", "mentorship"]));
       expect((await api().get(`/api/v1/t/${tenant.slug}/mentorship/mentors`).set(member.headers)).status).toBe(403);
+    });
+  });
+
+  describe("referrals, which have no key of their own", () => {
+    it("are off at a school with messaging off and jobs on: canRefer masked and ignored, asking and accepting refused, and the ways out working", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", batchYear: 1990 });
+      const poster = await memberSession(ctx, tenant.id, { batchYear: 2000 });
+      const asker = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+      const other = await memberSession(ctx, tenant.id, { batchYear: 2002 });
+      const save = (features: Partial<TenantFeatures>) => api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ features }).expect(200);
+      const r = (s: { headers: { Authorization: string } }) => referralsApi(ctx, tenant.slug, s);
+      const storedCanRefer = async (id: string) => (await ctx.db.select().from(jobs).where(eq(jobs.id, id)))[0]!.canRefer;
+
+      // Before: with messaging on for a while, a job took requests.
+      await save({ messaging: true });
+      const job = await postReferralJob(ctx, tenant.slug, poster);
+      const waiting = await askForReferral(ctx, tenant.slug, asker, job.id);
+      const toDecline = await askForReferral(ctx, tenant.slug, other, job.id);
+      await save({ messaging: false });
+      expect((await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.settings.features).toMatchObject({ jobs: true, messaging: false });
+      expect(Object.keys((await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.settings.features)).not.toContain("referrals");
+
+      expect((await r(asker).job(job.id)).body.data.canRefer).toBe(false);
+      expect((await r(poster).job(job.id)).body.data.canRefer).toBe(false);
+      expect((await r(asker).jobs()).body.data.map((j: { canRefer: boolean }) => j.canRefer)).toEqual([false]);
+      expect((await r(asker).jobs({ canRefer: true })).body.data).toEqual([]);
+      // Ignored rather than refused, so jobs can still be posted and old ones edited, keeping what they had.
+      const posted = await r(poster).postJob({ title: "Teaching Assistant", canRefer: true });
+      expect(posted.status).toBe(201);
+      expect(await storedCanRefer(posted.body.data.id)).toBe(false);
+      expect((await r(poster).editJob(job.id, { title: "Backend Engineer II", canRefer: false })).status).toBe(200);
+      expect(await storedCanRefer(job.id)).toBe(true);
+
+      const newcomer = await memberSession(ctx, tenant.id, { batchYear: 2003 });
+      for (const res of [await r(newcomer).request(job.id), await r(poster).accept(waiting.id)]) {
+        expect(res.status, res.request.url).toBe(403);
+        expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+      }
+      expect((await r(asker).mine("sent")).body.waiting).toBe(1);
+      expect((await r(asker).summary()).body.data).toEqual({ received: 0, sent: 1 });
+      expect((await r(poster).forJob(job.id)).body.waiting).toBe(2);
+      expect((await r(poster).decline(toDecline.id)).status).toBe(200);
+      expect((await r(poster).report(waiting.id)).status).toBe(200);
+      expect((await r(asker).mine("sent")).body.data[0]).toMatchObject({ id: waiting.id, status: "DECLINED" });
+
+      // On again with messaging, as the admin left it, and the job's own setting comes back with them.
+      await save({ messaging: true });
+      expect((await r(newcomer).job(job.id)).body.data.canRefer).toBe(true);
+      expect((await r(newcomer).request(job.id)).status).toBe(201);
+    });
+
+    it("read off at a school whose row was stripped to {feed: true}, and on wherever jobs and messaging both are", async () => {
+      const stripped = { feed: true };
+      const { tenant: school } = await createTenant(ctx, { type: "SCHOOL", features: stripped });
+      const { tenant: college } = await createTenant(ctx, { type: "COLLEGE", features: stripped });
+      for (const [tenant, on] of [
+        [school, false],
+        [college, true],
+      ] as const) {
+        const poster = await memberSession(ctx, tenant.id, { batchYear: 2000 });
+        const asker = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+        const job = (await referralsApi(ctx, tenant.slug, poster).postJob()).body.data;
+        expect(job.canRefer, tenant.slug).toBe(on);
+        await ctx.db.update(jobs).set({ canRefer: true }).where(eq(jobs.id, job.id));
+        const asked = await referralsApi(ctx, tenant.slug, asker).request(job.id);
+        expect(asked.status, tenant.slug).toBe(on ? 201 : 403);
+      }
     });
   });
 

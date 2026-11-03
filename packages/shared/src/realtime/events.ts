@@ -76,6 +76,15 @@ export interface MentorshipChangedEvent {
   tenantSlug: string;
 }
 
+/**
+ * A referral request this member sent or received changed: refetch their referral lists and the jobs they're about. Like
+ * mentorship:changed it carries nothing else, goes out on every change whether or not anyone is notified, and never reaches a
+ * poster about a request they're never shown.
+ */
+export interface ReferralChangedEvent {
+  tenantSlug: string;
+}
+
 export interface ServerToClientEvents {
   "notification:new": (payload: NotificationEvent) => void;
   "notification:bulk": (payload: BulkNotificationEvent) => void;
@@ -86,6 +95,7 @@ export interface ServerToClientEvents {
   "chat:changed": (payload: ChatChangedEvent) => void;
   "chat:unread": (payload: ChatUnreadEvent) => void;
   "mentorship:changed": (payload: MentorshipChangedEvent) => void;
+  "referral:changed": (payload: ReferralChangedEvent) => void;
   /** The access token used to connect has expired; the server disconnects right after. Refresh and reconnect. */
   "auth:expired": () => void;
 }

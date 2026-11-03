@@ -36,6 +36,8 @@ import type {
   ProfileFieldType,
   ProfileFieldVisibility,
   ReactionType,
+  ReferralBox,
+  ReferralStatus,
   ReportReason,
   ReportStatus,
   RsvpStatus,
@@ -735,8 +737,95 @@ export interface JobDto extends ModerationFields {
   expiresAt: string | null;
   author: MemberCardDto;
   isMine: boolean;
+  /**
+   * Its poster can refer people for it, so members may ask them. Always false while referrals are off here, for a viewer who
+   * is a current pupil, or when the poster is one.
+   */
+  canRefer: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** The viewer's own latest request for a referral on a job, whatever became of it. */
+export interface JobReferralLinkDto {
+  id: string;
+  /** As its sender sees it: a request its poster never saw reads as REQUESTED, like one they haven't answered yet. */
+  status: ReferralStatus;
+  createdAt: string;
+  /** The chat, once accepted. */
+  conversationId: string | null;
+}
+
+/**
+ * Why the viewer couldn't ask a job's poster for a referral again, whatever the job allows: they've asked about it as many
+ * times as anyone may (LIMIT), or they've blocked its poster (YOU_BLOCKED). Never anything the poster did, so a poster who
+ * blocked them reads the same as one who didn't.
+ */
+export type ReferralAskRefusal = "LIMIT" | "YOU_BLOCKED";
+
+/** One job, as its own page shows it: every route that answers with a single job gives this. */
+export interface JobDetailDto extends JobDto {
+  /** The viewer's own latest request for a referral on this job, or null. Always null for its poster. */
+  myReferral: JobReferralLinkDto | null;
+  /**
+   * Set when something of the viewer's own stands in the way of their asking for a referral on this job, so the apps can say
+   * so before a note is written. Null while nothing does, on a job that can't refer (`canRefer` false), and for its poster.
+   */
+  referralAskRefusal: ReferralAskRefusal | null;
+  /** On the poster's own job, the referral requests waiting for their answer that they can see. Null for anyone else. */
+  pendingReferralCount: number | null;
+}
+
+/** The job a referral request is about, from what it said when the request was sent. */
+export interface ReferralJobDto {
+  /** Null once the job has been deleted. */
+  id: string | null;
+  title: string;
+  companyName: string;
+  /** Whether the viewer can open the job's page now: it may since have been deleted, removed or hidden. */
+  available: boolean;
+}
+
+/**
+ * A referral request as one side of it sees it. Its sender's copy depends only on what they did and what the poster did,
+ * so a request the poster never sees reads exactly like one they haven't answered yet, closing with its job included.
+ */
+export interface ReferralDto {
+  id: string;
+  /** received: this member posted the job. sent: they asked. */
+  box: ReferralBox;
+  status: ReferralStatus;
+  job: ReferralJobDto;
+  /** The other member: who asked on a received request, the poster on a sent one. Null once they've deleted their account: show DELETED_MEMBER_NAME. */
+  member: MemberCardDto | null;
+  /** The sender's note, which became the chat's first message if accepted. */
+  note: string;
+  /** The chat an acceptance opened. */
+  conversationId: string | null;
+  createdAt: string;
+  /** When the poster accepted or declined. */
+  respondedAt: string | null;
+  acceptedAt: string | null;
+  /** When it was withdrawn, or closed with its job. */
+  closedAt: string | null;
+  canAccept: boolean;
+  canDecline: boolean;
+  /** On a received request that was never accepted and that this member hasn't reported yet, withdrawn and closed ones included. */
+  canReport: boolean;
+  canWithdraw: boolean;
+}
+
+export interface ReferralPageDto extends CursorPage<ReferralDto> {
+  /** Requests in this list still waiting for an answer, across every page. */
+  waiting: number;
+}
+
+/** What a member still has waiting in referrals, which decides whether the apps keep a way into them while they can't use them. */
+export interface ReferralSummaryDto {
+  /** Requests about their jobs waiting for their answer, as that list shows them. */
+  received: number;
+  /** Their own requests still waiting for an answer. */
+  sent: number;
 }
 
 export interface JobSeekerDto {

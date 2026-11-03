@@ -2,7 +2,7 @@ import { wallPartsInZone } from "@illuminize/shared";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { chatConversations, memberships, mentorships, tenants } from "../../src/db/schema";
+import { chatConversations, jobs, memberships, mentorships, referralRequests, tenants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { lockConversation } from "../../src/repositories/chat.repo";
 import { appendMessage, chatRecipients } from "../../src/services/chat/fanout";
@@ -11,6 +11,7 @@ import { acceptedThread, chatApi, createGroup, groupsApi, type Session } from ".
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
+import { askForReferral, postReferralJob, referralsApi } from "../helpers/referrals";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -180,6 +181,85 @@ describe.skipIf(!dbAvailable)("current pupils", () => {
       await ctx.db.update(memberships).set({ batchYear: thisYear() + 1 }).where(eq(memberships.id, member.membership.id));
       expect((await mentorshipApi(ctx, tenant.slug, alum).requests("received")).body).toMatchObject({ data: [], waiting: 0 });
       const refused = await mentorshipApi(ctx, tenant.slug, alum).accept(asked.id);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error.code).toBe("CONTACT_UNAVAILABLE");
+      expect(await ctx.db.select().from(chatConversations)).toEqual([]);
+    });
+  });
+
+  describe("and referrals", () => {
+    /** A school with messaging on, and jobs on as schools start, so only the pupil rule can be what keeps them out. */
+    async function referralSchool() {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL", features: { messaging: true } });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2000, fullName: "Alum Poster" });
+      const job = await postReferralJob(ctx, tenant.slug, alum);
+      return { tenant, alum, job };
+    }
+    const UNKNOWN = "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81";
+    const storedCanRefer = async (id: string) => (await ctx.db.select().from(jobs).where(eq(jobs.id, id)))[0]!.canRefer;
+
+    for (const rule of RULES) {
+      it(`refuses ${rule.name} asking, accepting and offering, with features on, and leaves them every way out`, async () => {
+        const { tenant, job } = await referralSchool();
+        const pupil = await memberSession(ctx, tenant.id, rule.member());
+        const r = referralsApi(ctx, tenant.slug, pupil);
+        for (const res of [await r.request(job.id), await r.accept(UNKNOWN)]) {
+          expect(res.status, res.request.url).toBe(403);
+          expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+          expect(res.headers["cache-control"]).toBe("no-store");
+        }
+        // No job reads as taking requests to them, and their own tick is ignored.
+        expect((await r.job(job.id)).body.data.canRefer).toBe(false);
+        expect((await r.jobs({ canRefer: true })).body.data).toEqual([]);
+        const posted = await r.postJob({ title: "Tutoring help", canRefer: true });
+        expect(posted.status).toBe(201);
+        expect(posted.body.data.canRefer).toBe(false);
+        expect(await storedCanRefer(posted.body.data.id)).toBe(false);
+        // The ways out answer as they would for anyone, so nobody is stuck with a request.
+        expect((await r.mine("sent")).status).toBe(200);
+        expect((await r.mine("received")).status).toBe(200);
+        expect((await r.summary()).body.data).toEqual({ received: 0, sent: 0 });
+        expect((await r.forJob(posted.body.data.id)).status).toBe(200);
+        for (const res of [await r.withdraw(UNKNOWN), await r.decline(UNKNOWN), await r.report(UNKNOWN)]) expect(res.status, res.request.url).toBe(404);
+        expect(await ctx.db.select().from(referralRequests)).toEqual([]);
+      });
+    }
+
+    for (const rule of RULES) {
+      it(`answers a request to a poster who is ${rule.name.replace(/^a /, "")} CONTACT_UNAVAILABLE, shows none of their jobs taking requests, and leaves them only the ways out of what waits`, async () => {
+        const { tenant, alum } = await referralSchool();
+        const member = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+        const job = await postReferralJob(ctx, tenant.slug, member);
+        expect(job.canRefer).toBe(true);
+        const waiting = await askForReferral(ctx, tenant.slug, alum, job.id);
+        await ctx.db.update(memberships).set(rule.member()).where(eq(memberships.id, member.membership.id));
+
+        const asker = await memberSession(ctx, tenant.id, { batchYear: 2002 });
+        const r = referralsApi(ctx, tenant.slug, asker);
+        expect((await r.job(job.id)).body.data.canRefer).toBe(false);
+        expect((await r.jobs({ canRefer: true })).body.data.map((j: { id: string }) => j.id)).not.toContain(job.id);
+        expect((await r.jobs({ canRefer: false })).body.data.map((j: { id: string }) => j.id)).toContain(job.id);
+        const res = await r.request(job.id);
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("CONTACT_UNAVAILABLE");
+        // What already waits for them can't be accepted, which would open a chat, but can be declined.
+        const theirs = referralsApi(ctx, tenant.slug, member);
+        expect((await theirs.accept(waiting.id)).body.error.code).toBe("FEATURE_DISABLED");
+        expect((await theirs.decline(waiting.id)).status).toBe(200);
+        expect(await ctx.db.select().from(referralRequests)).toHaveLength(1);
+        expect(await ctx.db.select().from(chatConversations)).toEqual([]);
+      });
+    }
+
+    it("hides a waiting request from a requester who has become a pupil, and refuses to accept it", async () => {
+      const { tenant, alum, job } = await referralSchool();
+      const member = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+      const asked = await askForReferral(ctx, tenant.slug, member, job.id);
+      expect((await referralsApi(ctx, tenant.slug, alum).forJob(job.id)).body.waiting).toBe(1);
+      await ctx.db.update(memberships).set({ batchYear: thisYear() + 1 }).where(eq(memberships.id, member.membership.id));
+      expect((await referralsApi(ctx, tenant.slug, alum).forJob(job.id)).body).toMatchObject({ data: [], waiting: 0 });
+      expect((await referralsApi(ctx, tenant.slug, alum).job(job.id)).body.data.pendingReferralCount).toBe(0);
+      const refused = await referralsApi(ctx, tenant.slug, alum).accept(asked.id);
       expect(refused.status).toBe(409);
       expect(refused.body.error.code).toBe("CONTACT_UNAVAILABLE");
       expect(await ctx.db.select().from(chatConversations)).toEqual([]);

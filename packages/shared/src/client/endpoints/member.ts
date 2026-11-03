@@ -1,4 +1,4 @@
-import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, MentorProfileUpsertInput, MentorsQuery, MentorshipRequestCreateInput, MentorshipRequestsQuery, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, MentorProfileUpsertInput, MentorsQuery, MentorshipRequestCreateInput, MentorshipRequestsQuery, NotificationPrefsUpdate, ReferralRequestCreateInput, ReferralRequestsQuery, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
@@ -20,6 +20,7 @@ import type {
   ChatMessageDto,
   ChatReportDto,
   FundingDto,
+  JobDetailDto,
   JobDto,
   JobSeekerDto,
   MemberCardDto,
@@ -43,6 +44,9 @@ import type {
   PostPageDto,
   ReactionEntryDto,
   ReactionSummaryDto,
+  ReferralDto,
+  ReferralPageDto,
+  ReferralSummaryDto,
   ReportDto,
   RsvpSummaryDto,
   UploadResultDto,
@@ -75,13 +79,29 @@ export function directoryEndpoints(core: ApiCore) {
 }
 
 export function jobEndpoints(core: ApiCore) {
+  const referralAction = (name: "accept" | "decline" | "withdraw") => (slug: string, id: string) => core.data<ReferralDto>({ method: "POST", path: `/jobs/referrals/${id}/${name}`, tenantSlug: slug });
   return {
     list: (slug: string, query?: Partial<JobListQuery>) => core.request<CursorPage<JobDto>>({ path: "/jobs", tenantSlug: slug, query: q(query) }),
-    create: (slug: string, input: JobCreateInput) => core.data<JobDto>({ method: "POST", path: "/jobs", tenantSlug: slug, body: input }),
-    get: (slug: string, id: string) => core.data<JobDto>({ path: `/jobs/${id}`, tenantSlug: slug }),
-    update: (slug: string, id: string, input: JobUpdateInput) => core.data<JobDto>({ method: "PATCH", path: `/jobs/${id}`, tenantSlug: slug, body: input }),
+    create: (slug: string, input: JobCreateInput) => core.data<JobDetailDto>({ method: "POST", path: "/jobs", tenantSlug: slug, body: input }),
+    get: (slug: string, id: string) => core.data<JobDetailDto>({ path: `/jobs/${id}`, tenantSlug: slug }),
+    update: (slug: string, id: string, input: JobUpdateInput) => core.data<JobDetailDto>({ method: "PATCH", path: `/jobs/${id}`, tenantSlug: slug, body: input }),
     remove: (slug: string, id: string) => core.request<void>({ method: "DELETE", path: `/jobs/${id}`, tenantSlug: slug }),
-    close: (slug: string, id: string) => core.data<JobDto>({ method: "POST", path: `/jobs/${id}/close`, tenantSlug: slug }),
+    close: (slug: string, id: string) => core.data<JobDetailDto>({ method: "POST", path: `/jobs/${id}/close`, tenantSlug: slug }),
+    referrals: {
+      /** Asks the job's poster for a referral, with a note they'll read. */
+      request: (slug: string, jobId: string, input: ReferralRequestCreateInput) => core.data<ReferralDto>({ method: "POST", path: `/jobs/${jobId}/referrals`, tenantSlug: slug, body: input }),
+      /** The requests about one of the member's own jobs. Only its poster may ask. */
+      forJob: (slug: string, jobId: string, query?: Partial<CursorQuery>) => core.request<ReferralPageDto>({ path: `/jobs/${jobId}/referrals`, tenantSlug: slug, query: q(query) }),
+      /** The member's own requests: received, about their jobs, or sent. Works while referrals are off, as a way out. */
+      mine: (slug: string, query?: Partial<ReferralRequestsQuery>) => core.request<ReferralPageDto>({ path: "/jobs/referrals/mine", tenantSlug: slug, query: q(query) }),
+      /** How many requests wait in each list, even while referrals are off for them. */
+      summary: (slug: string) => core.data<ReferralSummaryDto>({ path: "/jobs/referrals/summary", tenantSlug: slug }),
+      accept: referralAction("accept"),
+      decline: referralAction("decline"),
+      withdraw: referralAction("withdraw"),
+      /** Reports a received request's note to the institution's admins, who see only the note. One still waiting is declined. */
+      report: (slug: string, id: string, input: ChatReportCreateInput) => core.data<ReferralDto>({ method: "POST", path: `/jobs/referrals/${id}/report`, tenantSlug: slug, body: input }),
+    },
     seekers: {
       list: (slug: string, query?: Partial<CursorQuery>) => core.request<CursorPage<JobSeekerDto>>({ path: "/jobs/seekers", tenantSlug: slug, query: q(query) }),
       me: (slug: string) => core.data<JobSeekerDto | null>({ path: "/jobs/seekers/me", tenantSlug: slug }),

@@ -9,6 +9,7 @@ import { keys } from "../../src/redis/keys";
 import { acceptedThread, chatApi, conversationRow, type Session } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { acceptedMentorship, askMentor, comparableMentorship, mentorshipApi, MENTOR_PROFILE, NOTE, offerToMentor } from "../helpers/mentorship";
+import { acceptedReferral } from "../helpers/referrals";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -42,8 +43,20 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       .select()
       .from(notifications)
       .where(and(eq(notifications.recipientMembershipId, s.membership.id), type ? sql`${notifications.type} = ${type}` : undefined));
+  /** Ids and times put aside, so two members' copies of the same thing can be compared whole. */
+  const withoutIdsOrTimes = (value: unknown): unknown =>
+    JSON.parse(
+      JSON.stringify(value)
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<id>")
+        .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, "<time>"),
+    );
+  /** Everything a member has been told, in the bell and live, once what was queued has gone out, ids and times aside. */
+  const toldTo = async (s: Session) => {
+    await ctx.jobs.drain();
+    return withoutIdsOrTimes({ notifications: await noticesTo(s), live: realtime.to(s.user.id).map(({ event, payload }) => ({ event, payload })) });
+  };
   const row = async (id: string) => (await ctx.db.select().from(mentorships).where(eq(mentorships.id, id)))[0]!;
-  const names = (res: { body: { data: MentorCardDto[] } }) => res.body.data.map((c) => c.member.fullName);
+  const names =(res: { body: { data: MentorCardDto[] } }) => res.body.data.map((c) => c.member.fullName);
   /** Until another connection to this database is waiting for a lock, which is how a test knows a request has reached one. */
   const waitForLockWait = async () => {
     for (let i = 0; i < 250; i++) {
@@ -453,21 +466,53 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       expect((await m(mentor).requests("received")).body.waiting).toBe(0);
     });
 
-    it("stopping mentoring declines a suppressed request exactly as a real one, and tells only the real one's sender", async () => {
-      const { tenant, mentor, mentee, m } = await setup();
-      const other = await memberSession(ctx, tenant.id);
+    it("blocking a mentor who blocked you first tells them nothing of your request they never saw", async () => {
+      const { tenant, mentor, mentee } = await setup();
       await offerToMentor(ctx, tenant.slug, mentor);
       await chatApi(ctx, tenant.slug, mentor).block(mentee.membership.id);
       const hidden = await askMentor(ctx, tenant.slug, mentee, mentor.membership.id);
-      const real = await askMentor(ctx, tenant.slug, other, mentor.membership.id);
-      expect((await m(mentor).stop()).status).toBe(204);
-      const view = async (s: Session, id: string) => comparableMentorship(((await m(s).requests("sent")).body.data as MentorshipDto[]).find((r) => r.id === id)!);
-      expect(await view(mentee, hidden.id)).toEqual(await view(other, real.id));
-      expect((await view(other, real.id)).status).toBe("DECLINED");
-      expect(await noticesTo(mentee)).toEqual([]);
-      const [declined] = await noticesTo(other, "MENTORSHIP_DECLINED");
-      expect(declined).toMatchObject({ title: "Mira Mentor declined your mentorship request", data: { mentorshipId: real.id, box: "sent" } });
+      realtime.clear();
+
+      expect((await chatApi(ctx, tenant.slug, mentee).block(mentor.membership.id)).status).toBe(201);
+      expect(await row(hidden.id)).toMatchObject({ status: "ENDED", suppressed: true });
+      // Withdrawn as it would be by hand, which wouldn't tell the mentor either: only the blocker's own lists refresh.
+      expect(realtime.to(mentor.user.id)).toEqual([]);
+      expect(realtime.to(mentee.user.id, "mentorship:changed")).toHaveLength(1);
+      expect(await noticesTo(mentor)).toEqual([]);
     });
+
+    for (const how of ["stopping mentoring", "an admin taking the mentor off the list"] as const) {
+      it(`${how} declines a suppressed request exactly as a real one, telling both senders alike and the mentor nothing of it`, async () => {
+        const { tenant, mentor, mentee, m } = await setup();
+        const other = await memberSession(ctx, tenant.id);
+        const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+        await offerToMentor(ctx, tenant.slug, mentor);
+        await chatApi(ctx, tenant.slug, mentor).block(mentee.membership.id);
+        const hidden = await askMentor(ctx, tenant.slug, mentee, mentor.membership.id);
+        const real = await askMentor(ctx, tenant.slug, other, mentor.membership.id);
+        await ctx.jobs.drain();
+        realtime.clear();
+        const mentorNotices = await noticesTo(mentor);
+
+        const done = how === "stopping mentoring" ? await m(mentor).stop() : await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/mentors/${mentor.membership.id}/remove`).set(admin.headers).send();
+        expect(done.status).toBeLessThan(300);
+        const view = async (s: Session, id: string) => comparableMentorship(((await m(s).requests("sent")).body.data as MentorshipDto[]).find((r) => r.id === id)!);
+        expect(await view(mentee, hidden.id)).toEqual(await view(other, real.id));
+        expect((await view(other, real.id)).status).toBe("DECLINED");
+        // The bell and the live events read the same for both, the one the mentor never saw included: theirs changed as the other's did.
+        expect(await toldTo(mentee)).toEqual(await toldTo(other));
+        expect(realtime.to(mentee.user.id).map((e) => e.event)).toEqual(["mentorship:changed", "notification:new"]);
+        const [declined] = await noticesTo(other, "MENTORSHIP_DECLINED");
+        expect(declined).toMatchObject({
+          ...(how === "stopping mentoring" ? { title: "Mira Mentor declined your mentorship request", body: null } : { title: "Your mentorship request was closed", body: "Mira Mentor isn't taking mentorship requests any more." }),
+          data: { mentorshipId: real.id, box: "sent" },
+        });
+        // Nothing about it reaches the mentor: no notification, no audit row, and no live event but the one their own lists get anyway.
+        expect(await noticesTo(mentor)).toEqual(mentorNotices);
+        expect(await ctx.db.select().from(auditLog).where(eq(auditLog.targetId, hidden.id))).toEqual([]);
+        expect(realtime.to(mentor.user.id).map((e) => e.event)).toEqual(["mentorship:changed"]);
+      });
+    }
   });
 
   describe("accepting", () => {
@@ -678,6 +723,22 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       await m(mentor).end(second.id);
       expect(await conversationRow(ctx, first.conversationId!)).toMatchObject({ directState: "CLOSED" });
     });
+
+    it("keeps the chat open while a referral one of them accepted for the other connects the pair, whichever way round", async () => {
+      for (const order of ["referral first", "mentorship first"] as const) {
+        const { tenant, mentor, mentee, m } = await setup();
+        // The referral goes the other way: the mentee posted a job and the mentor asked.
+        const opened = order === "referral first" ? (await acceptedReferral(ctx, tenant.slug, mentee, mentor)).referral.conversationId : null;
+        const dto = await acceptedMentorship(ctx, tenant.slug, mentor, mentee);
+        if (order === "mentorship first") await acceptedReferral(ctx, tenant.slug, mentee, mentor);
+        const conversationId = dto.conversationId!;
+        if (opened) expect(conversationId).toBe(opened);
+        expect(await conversationRow(ctx, conversationId)).toMatchObject({ origin: order === "referral first" ? "REFERRAL" : "MENTORSHIP", directState: "ACCEPTED" });
+        await m(mentee).end(dto.id);
+        expect(await conversationRow(ctx, conversationId), order).toMatchObject({ directState: "ACCEPTED" });
+        expect((await chatApi(ctx, tenant.slug, mentor).send(conversationId, "Still here for the referral")).status).toBe(201);
+      }
+    });
   });
 
   describe("the ways out", () => {
@@ -708,23 +769,33 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
   });
 
   describe("reporting a request", () => {
-    it("declines it without telling the mentee, and files a report that holds only the note for an eligible admin", async () => {
+    it("declines it, telling the mentee exactly as a decline would, and files a report that holds only the note for an eligible admin", async () => {
       const { tenant, mentor, mentee, m } = await setup();
       const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const declinedMentee = await memberSession(ctx, tenant.id);
       await offerToMentor(ctx, tenant.slug, mentor);
       const asked = await askMentor(ctx, tenant.slug, mentee, mentor.membership.id);
+      const declined = await askMentor(ctx, tenant.slug, declinedMentee, mentor.membership.id);
+      await ctx.jobs.drain();
+      realtime.clear();
       const reported = await m(mentor).report(asked.id, { reason: "INAPPROPRIATE", details: "Not a mentorship request" });
       expect(reported.status).toBe(200);
       expect(reported.body.data).toMatchObject({ status: "DECLINED", canReport: false });
       expect((await m(mentee).requests("sent")).body.data[0]).toMatchObject({ status: "DECLINED" });
-      expect(await noticesTo(mentee)).toEqual([]);
+      // Its sender hears of it in the bell and live exactly as of the mentor declining it, so nothing tells them it was reported.
+      expect((await m(mentor).decline(declined.id)).status).toBe(200);
+      expect(await toldTo(mentee)).toEqual(await toldTo(declinedMentee));
+      expect(realtime.to(mentee.user.id).map((e) => e.event)).toEqual(["mentorship:changed", "notification:new"]);
+      expect(await noticesTo(mentee)).toEqual([
+        expect.objectContaining({ type: "MENTORSHIP_DECLINED", title: "Mira Mentor declined your mentorship request", body: null, data: { mentorshipId: asked.id, box: "sent" }, dedupeKey: `mentorship-declined-${asked.id}` }),
+      ]);
 
       const [report] = await ctx.db.select().from(chatReports);
       expect(report).toMatchObject({ targetKind: "MENTORSHIP_NOTE", targetId: asked.id, conversationId: null, reporterMembershipId: mentor.membership.id, reportedMembershipId: mentee.membership.id, noteSnapshot: NOTE, reason: "INAPPROPRIATE", contextMessageIds: [] });
       const [filed] = await audits("chat_report.file");
       expect(filed).toMatchObject({ actorUserId: null, actorMembershipId: null, targetId: report!.id, metadata: { reason: "INAPPROPRIATE", targetKind: "MENTORSHIP_NOTE" } });
-      // A decline audited by the reporter at the same moment would name them.
-      expect(await audits("mentorship.decline")).toEqual([]);
+      // A decline audited by the reporter at the same moment would name them: only the one declined by hand is.
+      expect((await audits("mentorship.decline")).map((a) => a.targetId)).toEqual([declined.id]);
       const told = await noticesTo(admin, "CHAT_REPORT_FILED");
       expect(told).toHaveLength(1);
       expect(told[0]).toMatchObject({ title: "A mentorship request was reported", body: null, data: { chatReportId: report!.id } });
@@ -779,8 +850,11 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       await offerToMentor(ctx, tenant.slug, mentor);
       const declined = await askMentor(ctx, tenant.slug, other, mentor.membership.id);
       await m(mentor).decline(declined.id);
+      const toldBefore = await toldTo(other);
       expect((await m(mentor).report(declined.id)).status).toBe(200);
       expect(await row(declined.id)).toMatchObject({ status: "DECLINED" });
+      // Its sender heard of the decline, and hears nothing more.
+      expect(await toldTo(other)).toEqual(toldBefore);
 
       const underWay = await acceptedMentorship(ctx, tenant.slug, mentor, mentee);
       expect(underWay.canReport).toBe(false);

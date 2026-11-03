@@ -14,6 +14,8 @@ export const jobCreateSchema = z.object({
   contactPhone: optionalTrimmed(24),
   salaryRange: optionalTrimmed(80),
   expiresAt: isoDateTimeSchema.nullable().optional(),
+  /** "I can refer people for this job". Ignored while referrals are off here, or from a poster who is a current pupil. */
+  canRefer: z.boolean().optional(),
 });
 export type JobCreateInput = z.infer<typeof jobCreateSchema>;
 
@@ -27,6 +29,8 @@ export const jobListQuerySchema = cursorQuerySchema.extend({
   location: z.string().trim().max(80).optional(),
   includeClosed: booleanQuerySchema.optional(),
   mine: booleanQuerySchema.optional(),
+  /** Jobs whose poster can refer people, as the list shows `canRefer`. */
+  canRefer: booleanQuerySchema.optional(),
 });
 export type JobListQuery = z.infer<typeof jobListQuerySchema>;
 

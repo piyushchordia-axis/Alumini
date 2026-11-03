@@ -1,41 +1,80 @@
-import { JOB_TYPE_LABELS } from "@illuminize/shared";
-import { errorMessage } from "@illuminize/shared/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CAN_REFER_BADGE, JOB_DELETED_TEXT, JOB_TYPE_LABELS, waitingReferralsCloseText } from "@illuminize/shared";
+import { fatalQueryError } from "@illuminize/shared/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Linking, Text } from "react-native";
+import { Linking, Text } from "react-native";
+import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
+import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Badge, Body, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
+import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { leaveGroupNotice, useGroupNotice } from "@/lib/groups";
 import { qk } from "@/lib/queryKeys";
+import { refreshReferrals } from "@/lib/referrals";
 import { colors } from "@/theme";
 
 export default function JobDetailScreen() {
+  const { jobId = "" } = useLocalSearchParams<{ jobId: string }>();
+  // Keyed, so nothing from one job (a sheet left open, say) carries into the next.
+  return <JobDetail key={jobId} jobId={jobId} />;
+}
+
+function JobDetail({ jobId }: { jobId: string }) {
   const { tenant } = useMembership();
   const slug = tenant.slug;
-  const { jobId = "" } = useLocalSearchParams<{ jobId: string }>();
   const router = useRouter();
   const qc = useQueryClient();
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const job = useQuery({ queryKey: qk.job(slug, jobId), queryFn: () => api.jobs.get(slug, jobId) });
+  const [confirming, setConfirming] = useState<"close" | "delete" | null>(null);
+  const [status, setStatus] = useStatus();
+  // Such as "Job published", from the form that has gone.
+  useGroupNotice(`job:${jobId}`, setStatus);
+  const job = useJob(slug, jobId);
+  // Closing or deleting a job closes the referral requests waiting on it, so their lists change too.
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["jobs", slug] });
     void qc.invalidateQueries({ queryKey: qk.job(slug, jobId) });
+    void refreshReferrals(qc, slug);
   };
-  const close = useMutation({ mutationFn: () => api.jobs.close(slug, jobId), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
-  const remove = useMutation({ mutationFn: () => api.jobs.remove(slug, jobId), onSuccess: () => { setConfirmingDelete(false); invalidate(); router.back(); } });
-  if (job.isLoading) return <Spinner />;
-  if (job.error || !job.data) return <LoadError error={job.error ?? "Not found"} onRetry={() => void job.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  const close = useMutation({
+    mutationFn: () => api.jobs.close(slug, jobId),
+    onSuccess: () => {
+      setConfirming(null);
+      invalidate();
+      setStatus("Job closed");
+    },
+  });
+  const remove = useMutation({
+    mutationFn: () => api.jobs.remove(slug, jobId),
+    onSuccess: () => {
+      setConfirming(null);
+      invalidate();
+      leaveGroupNotice("jobs", JOB_DELETED_TEXT);
+      router.back();
+    },
+  });
+
+  // Only an answer, or nothing at all to show: a refetch failing in the background keeps the page.
+  const error = fatalQueryError(job);
+  if (error) return <JobUnavailable error={error} onRetry={() => void job.refetch()} />;
+  if (!job.data) return <Spinner />;
   const j = job.data;
+  const waiting = j.pendingReferralCount ?? 0;
+  const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;
   return (
     <Screen>
       <Card>
-        <Text style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{j.title}</Text>
+        <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
+          {j.title}
+        </Text>
         <Muted size={14}>
           {j.companyName}
           {j.location ? ` · ${j.location}` : ""}
@@ -43,6 +82,8 @@ export default function JobDetailScreen() {
         </Muted>
         <Row>
           <Badge label={JOB_TYPE_LABELS[j.jobType]} tone="info" />
+          {/* A closed job takes no requests, whatever its poster offered. */}
+          {j.canRefer && !j.isClosed && <Badge label={CAN_REFER_BADGE} tone="success" />}
           {j.isClosed && <Badge label="Closed" />}
           <ModerationBadge status={j.moderationStatus} />
         </Row>
@@ -60,12 +101,61 @@ export default function JobDetailScreen() {
         {j.isMine && (
           <Row>
             <Button title="Edit" variant="outline" onPress={() => router.push(`/t/${slug}/jobs/edit/${j.id}`)} />
-            {!j.isClosed && <Button title="Mark closed" variant="outline" onPress={() => close.mutate()} loading={close.isPending} />}
-            <Button title="Delete" variant="ghost" onPress={() => setConfirmingDelete(true)} />
-            <ConfirmSheet open={confirmingDelete} title="Delete this job?" confirmLabel="Delete job" destructive busy={remove.isPending} error={remove.error} onConfirm={() => remove.mutate()} onCancel={() => { remove.reset(); setConfirmingDelete(false); }} />
+            {!j.isClosed && (
+              <Button
+                title="Mark closed"
+                variant="outline"
+                loading={close.isPending && !confirming}
+                onPress={() => {
+                  close.reset();
+                  // Asked first only when it would close requests someone is waiting on.
+                  if (closesWaiting) setConfirming("close");
+                  else close.mutate();
+                }}
+              />
+            )}
+            <Button
+              title="Delete"
+              variant="ghost"
+              onPress={() => {
+                remove.reset();
+                setConfirming("delete");
+              }}
+            />
           </Row>
         )}
+        {/* Closing straight away has no sheet to say why it failed. */}
+        {!confirming && <ErrorText error={close.error} />}
+        <StatusLine flush text={status} />
       </Card>
+      {j.isMine ? <JobReferrals slug={slug} job={j} /> : <MyReferral slug={slug} job={j} />}
+      <ConfirmSheet
+        open={confirming === "close"}
+        title="Close this job?"
+        body={closesWaiting}
+        confirmLabel="Close job"
+        busy={close.isPending}
+        error={close.error}
+        onConfirm={() => close.mutate()}
+        onCancel={() => {
+          close.reset();
+          setConfirming(null);
+        }}
+      />
+      <ConfirmSheet
+        open={confirming === "delete"}
+        title="Delete this job?"
+        body={closesWaiting}
+        confirmLabel="Delete job"
+        destructive
+        busy={remove.isPending}
+        error={remove.error}
+        onConfirm={() => remove.mutate()}
+        onCancel={() => {
+          remove.reset();
+          setConfirming(null);
+        }}
+      />
     </Screen>
   );
 }
