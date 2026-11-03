@@ -27,8 +27,10 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
       return `${base}/businesses/${t.id}`;
     case "chat":
       return `${base}/messages/${t.conversationId}`;
+    case "chatGroup":
+      return `${base}/groups?tab=invitations`;
     case "myContent":
-      return `${base}/my-content`;
+      return `${base}/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
     case "profile":
       return `${base}/profile`;
     case "celebrations":

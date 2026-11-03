@@ -28,7 +28,7 @@ export function NewConversationPage() {
   const inbox = `/t/${slug}/app/messages`;
 
   const profile = useQuery({ queryKey: qk.member(slug, to), queryFn: () => api.directory.profile(slug, to), enabled: valid && tenant.settings.features.directory });
-  const existing = useQuery({ queryKey: chatKeys.direct(slug, to), queryFn: () => api.chat.directThread(slug, to), enabled: valid });
+  const existing = useQuery({ queryKey: chatKeys.direct(slug, to), queryFn: () => api.chat.directThread(slug, to), enabled: valid && tenant.settings.features.messaging });
 
   const dk = draftKey(slug, `new:${to}`);
   const setDraft = useChatStore((s) => s.setDraft);
@@ -49,7 +49,9 @@ export function NewConversationPage() {
   if (existingId) return <Navigate to={`${inbox}/${existingId}`} replace />;
 
   const name = profile.data?.fullName ?? "this member";
-  const unavailable = !valid || profile.data?.canMessage === false || (profile.error && isApiClientError(profile.error) && profile.error.status === 404);
+  // Messages can be open for groups alone, with direct messages off: then there's nobody to write to here.
+  const directOff = !tenant.settings.features.messaging;
+  const unavailable = directOff || !valid || profile.data?.canMessage === false || (profile.error && isApiClientError(profile.error) && profile.error.status === 404);
   if (unavailable) {
     return (
       <ChatPane>
@@ -57,8 +59,8 @@ export function NewConversationPage() {
           <>
             <ChatPaneHeader backTo={inbox} title="New message" />
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-              <p className="text-base font-semibold text-slate-800">You can't message this member</p>
-              <p className="max-w-sm text-sm text-slate-500">They can't be contacted here at the moment.</p>
+              <p className="text-base font-semibold text-slate-800">{directOff ? "Private messages aren't available" : "You can't message this member"}</p>
+              <p className="max-w-sm text-sm text-slate-500">{directOff ? `${tenant.shortName ?? tenant.name} has switched private messages off.` : "They can't be contacted here at the moment."}</p>
               <Link to={inbox} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 Back to messages
               </Link>

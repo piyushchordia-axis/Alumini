@@ -42,7 +42,7 @@ export async function deleteAccount(ctx: AppContext, userId: string, ip?: string
   await recordAudit(ctx, { actorUserId: userId, action: "auth.account_deleted", ip, metadata: { phone: user.phoneE164 } });
   await runInTransaction(ctx, async (tx) => {
     await resolveOpenReportsOnListingsOfUser(tx, userId, "auto: author deleted");
-    await prepareChatForAccountDeletion(tx, userId);
+    await prepareChatForAccountDeletion(ctx, tx, userId);
     await deleteUser(tx, userId);
     // Once it's done: a deletion that gives up on a row lock tells them to try again, and they have to still be signed in to.
     await afterCommit(ctx, tx, () => revokeAllSessions(ctx, userId));

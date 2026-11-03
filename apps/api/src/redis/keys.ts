@@ -28,6 +28,8 @@ export const keys = {
   active: (membershipId: string) => `active:${membershipId}`,
   /** Set while a member has been pushed about a conversation and hasn't read it since. */
   chatPushQuiet: (conversationId: string, membershipId: string) => `chat:push:quiet:${conversationId}:${membershipId}`,
+  /** Set once a member has been pushed about one invitation, so a retried job doesn't push it twice. */
+  chatPushInvite: (conversationId: string, membershipId: string, invitedAtMs: number) => `chat:push:invite:${conversationId}:${membershipId}:${invitedAtMs}`,
   /** Sorted set of "ticketId|token" scored by send time, for Expo receipt checks. */
   pushReceipts: () => `push:receipts`,
 } as const;

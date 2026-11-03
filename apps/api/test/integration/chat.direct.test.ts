@@ -302,13 +302,13 @@ describe.skipIf(!dbAvailable)("direct conversations", () => {
       const id = await acceptedThread(ctx, tenant.slug, a, b);
       await chat(a).send(id);
       await chat(a).send(id);
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 1, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 1, requests: 0, invites: 0 });
       expect((await chat(b).get(id)).body.data.unread).toBe(3);
       expect((await chat(b).read(id, 2)).body.data).toEqual({ lastReadSeq: 2 });
       expect((await chat(b).get(id)).body.data.unread).toBe(1);
       expect((await chat(b).read(id, 1)).body.data).toEqual({ lastReadSeq: 2 });
       expect((await chat(b).read(id, 99)).body.data).toEqual({ lastReadSeq: 3 });
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
     });
 
     it("counts conversations rather than messages, and leaves muted ones out until the mute ends", async () => {

@@ -5,7 +5,8 @@ import { Button, Modal, Select, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { toast } from "@/stores/uiStore";
 
-export function ReportButton({ slug, contentType, contentId, className }: { slug: string; contentType: ContentType; contentId: string; className?: string }) {
+/** `label` names the button and the dialog, such as "Report group"; without it the button says "Report", for "Report this content". */
+export function ReportButton({ slug, contentType, contentId, className, label }: { slug: string; contentType: ContentType; contentId: string; className?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason>("SPAM");
   const [details, setDetails] = useState("");
@@ -24,13 +25,13 @@ export function ReportButton({ slug, contentType, contentId, className }: { slug
   };
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Report this content" className={className ?? "text-xs text-slate-400 hover:text-red-600"}>
-        Report
+      <button type="button" onClick={() => setOpen(true)} aria-label={label ? undefined : "Report this content"} className={className ?? "text-xs text-slate-400 hover:text-red-600"}>
+        {label ?? "Report"}
       </button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Report content"
+        title={label ?? "Report content"}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>

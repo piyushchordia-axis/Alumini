@@ -243,8 +243,8 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       expect(ids(requests)).toEqual([conversation.id]);
       expect(requests.body.data[0]).toMatchObject({ state: "REQUEST_RECEIVED", canSend: true, lastMessage: null, peer: { id: a.membership.id } });
       expect(JSON.stringify(requests.body)).not.toContain("distinctive");
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 1 });
-      expect((await chat(a).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 1, invites: 0 });
+      expect((await chat(a).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
     });
 
     it("lets the recipient read it when they open it", async () => {
@@ -269,7 +269,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       expect(answered.body.data).toMatchObject({ state: "REQUEST_DECLINED", canSend: true });
       expect(ids(await chat(b).list())).toEqual([]);
       expect(ids(await chat(b).list("REQUESTS"))).toEqual([]);
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
       expect((await chat(b).get(conversation.id)).status).toBe(200);
       expect((await chat(b).decline(conversation.id)).status).toBe(200);
     });
@@ -424,7 +424,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       await chat(b).unblock(a.membership.id);
       expect((await conversationRow(ctx, conversation.id)).directState).toBe("DECLINED");
       expect(ids(await chat(b).list("REQUESTS"))).toEqual([]);
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
       expect((await chat(b).messages(conversation.id)).body.data).toEqual([]);
 
       // Asking again once unblocked is a real request, and the recipient sees only what wasn't withheld.

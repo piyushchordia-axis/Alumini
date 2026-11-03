@@ -6,6 +6,7 @@ import {
   BUSINESS_CATEGORIES,
   CHAT_CONVERSATION_KINDS,
   CHAT_DIRECT_STATES,
+  CHAT_GROUP_VISIBILITIES,
   CHAT_MESSAGE_KINDS,
   CHAT_ORIGINS,
   CHAT_PARTICIPANT_ROLES,
@@ -80,3 +81,4 @@ export const chatParticipantRoleEnum = pgEnum("chat_participant_role", CHAT_PART
 export const chatMessageKindEnum = pgEnum("chat_message_kind", CHAT_MESSAGE_KINDS);
 export const chatReportTargetKindEnum = pgEnum("chat_report_target_kind", CHAT_REPORT_TARGET_KINDS);
 export const chatReportActionEnum = pgEnum("chat_report_action", CHAT_REPORT_ACTIONS);
+export const chatGroupVisibilityEnum = pgEnum("chat_group_visibility", CHAT_GROUP_VISIBILITIES);

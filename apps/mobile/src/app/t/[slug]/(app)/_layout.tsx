@@ -1,3 +1,4 @@
+import { chatAvailable } from "@illuminize/shared";
 import { fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
@@ -26,7 +27,7 @@ export default function AppLayout() {
   const approved = membership.data?.status === "APPROVED";
   const answeredNotApproved = authed && !approved && (!!membership.data || (!!membership.error && !isTransientError(membership.error)));
   usePushRegistration(authed && approved);
-  useChatScope(slug, authed && approved && !!tenant.data?.settings.features.messaging && !!membership.data?.chatEligible);
+  useChatScope(slug, authed && approved && !!tenant.data && chatAvailable(tenant.data.settings.features, !!membership.data?.chatEligible));
 
   // Remember only institutions the member can open, so the start screen never bounces them back into a waiting or
   // error screen. A network failure or a 5xx is no reason to forget one.

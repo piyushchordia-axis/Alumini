@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { RequireAuth } from "@/components/guards/RequireAuth";
-import { AppHomeRedirect, RequireChat, RequireFeature } from "@/components/guards/RequireFeature";
+import { AppHomeRedirect, RequireChat, RequireFeature, RequireGroups } from "@/components/guards/RequireFeature";
 import { RequireMembership } from "@/components/guards/RequireMembership";
 import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
@@ -21,6 +21,9 @@ import { FeedPage } from "@/routes/t/FeedPage";
 import { FundingDetailPage } from "@/routes/t/FundingDetailPage";
 import { FundingFormPage } from "@/routes/t/FundingFormPage";
 import { FundingPage } from "@/routes/t/FundingPage";
+import { GroupDetailRoute } from "@/routes/t/GroupDetailPage";
+import { GroupFormPage } from "@/routes/t/GroupFormPage";
+import { GroupsPage } from "@/routes/t/GroupsPage";
 import { JobDetailPage } from "@/routes/t/JobDetailPage";
 import { JobFormPage } from "@/routes/t/JobFormPage";
 import { JobsPage } from "@/routes/t/JobsPage";
@@ -87,6 +90,15 @@ export const router = createBrowserRouter([
                           { path: ":conversationId", element: <ChatThreadRoute />, handle: { immersive: true } satisfies AppRouteHandle },
                         ],
                       },
+                    ],
+                  },
+                  {
+                    element: <RequireGroups />,
+                    children: [
+                      { path: "groups", element: <GroupsPage /> },
+                      { path: "groups/new", element: <GroupFormPage /> },
+                      { path: "groups/:groupId", element: <GroupDetailRoute /> },
+                      { path: "groups/:groupId/edit", element: <GroupFormPage /> },
                     ],
                   },
                   {

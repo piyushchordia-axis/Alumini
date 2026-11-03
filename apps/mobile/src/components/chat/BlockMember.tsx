@@ -1,4 +1,5 @@
 import type { ChatMemberDto } from "@illuminize/shared";
+import { BLOCK_EXPLAINED } from "@illuminize/shared/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { View, type ViewStyle } from "react-native";
@@ -30,7 +31,7 @@ export function BlockConfirmSheet({ slug, member, open, onClose, onDone }: { slu
     <ConfirmSheet
       open={open}
       title={`Block ${member.fullName}?`}
-      body="They won't be told. Nothing they send while blocked will reach you, even if you unblock them later. You can unblock them from Blocked members in Messages."
+      body={BLOCK_EXPLAINED}
       confirmLabel="Block member"
       destructive
       busy={block.isPending}

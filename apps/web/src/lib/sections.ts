@@ -12,6 +12,7 @@ export const SECTION_LINKS: Record<MemberSection, SectionLink> = {
   jobs: { path: "jobs", label: "Jobs", icon: "💼" },
   directory: { path: "directory", label: "Directory", icon: "🎓" },
   events: { path: "events", label: "Events", icon: "📅" },
+  groups: { path: "groups", label: "Groups", icon: "👥" },
   businesses: { path: "businesses", label: "Businesses", icon: "🏪" },
   funding: { path: "funding", label: "Funding", icon: "🚀" },
 };

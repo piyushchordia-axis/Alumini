@@ -1,3 +1,4 @@
+import { chatAvailable } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
@@ -23,10 +24,10 @@ export function useChatBadge(slug: string, enabled: boolean) {
   return useQuery({ queryKey: chatKeys.badge(slug), queryFn: () => api.chat.badge(slug), enabled, refetchInterval: pollInterval });
 }
 
-/** Messages is switched on for this institution and this member isn't a current pupil. Nothing about chat is shown or fetched otherwise. */
+/** Messages or groups are switched on for this institution and this member isn't a current pupil. Nothing about chat is shown or fetched otherwise. */
 export function useChatEnabled(): boolean {
   const { tenant, membership } = useMembership();
-  return tenant.settings.features.messaging && membership.chatEligible;
+  return chatAvailable(tenant.settings.features, membership.chatEligible);
 }
 
 /**

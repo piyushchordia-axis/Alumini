@@ -2,8 +2,9 @@ import { notificationTarget } from "@illuminize/shared";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { events, memberships } from "../../src/db/schema";
+import { chatGroups, events, memberships } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
+import { postToGroup } from "../helpers/chat";
 import { createTenant, loginAs, memberSession, auth } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -236,6 +237,89 @@ describe.skipIf(!dbAvailable)("content moderation (ADMIN_APPROVAL)", () => {
     const list = async (scope: string) => (await api().get(`${base}/events?mine=true&scope=${scope}`).set(author.headers)).body.data as Array<{ id: string }>;
     expect(await list("upcoming")).toEqual([]);
     expect((await list("past")).find((e) => e.id === id)).toMatchObject({ moderationStatus: "REMOVED", moderationNote: "Off topic" });
+  });
+
+  describe("a group", () => {
+    async function pendingGroup() {
+      const { tenant } = await createTenant(ctx, { contentModerationMode: "ADMIN_APPROVAL" });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const owner = await memberSession(ctx, tenant.id, { fullName: "Gita Owner" });
+      const member = await memberSession(ctx, tenant.id);
+      const created = await api().post(`${base}/chat/groups`).set(owner.headers).send({ name: "Pune foodies", description: "Where to eat this weekend.", visibility: "OPEN" }).expect(201);
+      return { tenant, base, admin, owner, member, id: created.body.data.id as string };
+    }
+    /** As the admin page does it: approving says which name and description the admin was shown, read from the group's details. */
+    const act = async (base: string, admin: { headers: Record<string, string> }, id: string, action: string, note?: string) => {
+      const shown = action === "approve" ? (await api().get(`${base}/admin/moderation/GROUP/${id}`).set(admin.headers)).body.data : null;
+      return api()
+        .post(`${base}/admin/moderation/GROUP/${id}/${action}`)
+        .set(admin.headers)
+        .send({ ...(note ? { note } : {}), ...(shown ? { reviewed: { name: shown.name, description: shown.description } } : {}) });
+    };
+
+    it("goes through the queue as its name and description, with its owner as author, and nothing about its messages", async () => {
+      const { tenant, base, admin, owner, id } = await pendingGroup();
+      await postToGroup(ctx, tenant, id, owner, "A message admins must never see here");
+      const queue = await api().get(`${base}/admin/moderation?contentType=GROUP`).set(admin.headers);
+      expect(queue.body.total).toBe(1);
+      expect(queue.body.data[0]).toMatchObject({ contentType: "GROUP", id, title: "Pune foodies", excerpt: "Where to eat this weekend.", author: { fullName: "Gita Owner" }, kind: null, isPinned: false });
+      const detail = await api().get(`${base}/admin/moderation/GROUP/${id}`).set(admin.headers);
+      expect(detail.body.data).toEqual({
+        id,
+        name: "Pune foodies",
+        description: "Where to eat this weekend.",
+        approvedName: null,
+        approvedDescription: null,
+        visibility: "OPEN",
+        memberCount: 1,
+        owner: expect.objectContaining({ fullName: "Gita Owner" }),
+        archived: false,
+        moderationStatus: "PENDING",
+        moderationNote: null,
+        moderatedAt: null,
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      });
+      for (const res of [queue, detail, await api().get(`${base}/admin/dashboard`).set(admin.headers)]) expect(JSON.stringify(res.body)).not.toContain("A message admins must never see here");
+      expect((await api().get(`${base}/admin/dashboard`).set(admin.headers)).body.data.pendingContent).toBe(1);
+    });
+
+    it("approved, publishes what the admin saw; rejected, withdraws it and tells the owner, whose notice opens My posts", async () => {
+      const { base, admin, owner, member, id } = await pendingGroup();
+      const approved = await act(base, admin, id, "approve");
+      expect(approved.body.data).toMatchObject({ from: "PENDING", to: "APPROVED", content: { approvedName: "Pune foodies", moderationStatus: "APPROVED" } });
+      const notice = (await api().get(`${base}/notifications`).set(owner.headers)).body.data[0];
+      expect(notice).toMatchObject({ type: "CONTENT_APPROVED", title: "Your group is live", data: { contentType: "GROUP", contentId: id } });
+      expect(notificationTarget(notice.type, notice.data)).toEqual({ kind: "myContent", tab: "groups" });
+      expect((await api().get(`${base}/chat/groups/${id}`).set(member.headers)).status).toBe(200);
+
+      await api().patch(`${base}/chat/groups/${id}`).set(owner.headers).send({ name: "Pune foodies and drinks" }).expect(200);
+      const queued = await api().get(`${base}/admin/moderation?contentType=GROUP`).set(admin.headers);
+      expect(queued.body.data[0]).toMatchObject({ title: "Pune foodies and drinks" });
+      expect((await api().get(`${base}/admin/moderation/GROUP/${id}`).set(admin.headers)).body.data).toMatchObject({ name: "Pune foodies and drinks", approvedName: "Pune foodies" });
+      expect((await act(base, admin, id, "reject", "Keep it about food")).status).toBe(200);
+      const rejected = (await api().get(`${base}/notifications`).set(owner.headers)).body.data[0];
+      expect(rejected).toMatchObject({ type: "CONTENT_REJECTED", title: "Your group was not approved" });
+      expect(notificationTarget(rejected.type, rejected.data)).toEqual({ kind: "myContent", tab: "groups" });
+      expect((await api().get(`${base}/chat/groups/${id}`).set(member.headers)).status).toBe(404);
+    });
+
+    it("reported and removed through its report, freezes the group; an archived one leaves the queue", async () => {
+      const { base, admin, member, id } = await pendingGroup();
+      expect((await act(base, admin, id, "approve")).status).toBe(200);
+      await api().post(`${base}/chat/groups/${id}/join`).set(member.headers).expect(200);
+      await api().post(`${base}/reports`).set(member.headers).send({ contentType: "GROUP", contentId: id, reason: "INAPPROPRIATE" }).expect(201);
+      const reports = await api().get(`${base}/admin/reports`).set(admin.headers);
+      expect(reports.body.data[0]).toMatchObject({ contentType: "GROUP", content: { title: "Pune foodies", moderationStatus: "APPROVED" } });
+      await api().post(`${base}/admin/reports/${reports.body.data[0].id}/resolve`).set(admin.headers).send({ action: "REMOVE_CONTENT", note: "Not for here" }).expect(200);
+      expect((await api().get(`${base}/admin/moderation/GROUP/${id}`).set(admin.headers)).body.data.moderationStatus).toBe("REMOVED");
+      expect((await api().get(`${base}/chat/groups/${id}`).set(member.headers)).status).toBe(404);
+
+      expect((await act(base, admin, id, "restore")).status).toBe(200);
+      await ctx.db.update(chatGroups).set({ archivedAt: new Date() }).where(eq(chatGroups.conversationId, id));
+      expect((await api().get(`${base}/admin/moderation?contentType=GROUP&status=APPROVED`).set(admin.headers)).body.total).toBe(0);
+    });
   });
 
   it("platform admins can moderate without a membership", async () => {

@@ -1,11 +1,24 @@
-import { CHAT_MAX_REQUESTS_PER_PAIR, CHAT_REREQUEST_AFTER_DAYS, isCurrentPupil, resolveFeatures, type ChatConversationDto, type ChatConversationKind, type ChatThreadState, type TenantFeatures } from "@illuminize/shared";
+import {
+  CHAT_GROUP_INVITE_TTL_DAYS,
+  CHAT_MAX_REQUESTS_PER_PAIR,
+  CHAT_REREQUEST_AFTER_DAYS,
+  enabledGroupVisibilities,
+  isCurrentPupil,
+  resolveFeatures,
+  type ChatConversationDto,
+  type ChatConversationGroupDto,
+  type ChatGroupVisibility,
+  type ChatThreadState,
+  type TenantFeatures,
+} from "@illuminize/shared";
 import type { DbClient } from "../../db/client";
 import { AppError } from "../../lib/errors";
-import type { ConversationRow, ParticipantRow, ThreadRow } from "../../repositories/chat.repo";
+import { GROUP_KIND_OF, type ChatGroupRow, type ChatThreadKind, type ConversationRow, type ParticipantRow, type ThreadRow } from "../../repositories/chat.repo";
 import { findTenantWithSettingsById } from "../../repositories/tenants.repo";
 import type { TenantContext, TenantRow } from "../../types/request";
 
 export type ChatTenant = TenantRow & { features: TenantFeatures };
+export type { ChatThreadKind };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -15,18 +28,102 @@ export function chatTenantOf(tenantCtx: TenantContext): ChatTenant {
 
 /** The institution as it is right now, for anything that sends: the request's copy can be 300 seconds old. */
 export async function freshChatTenant(db: DbClient, tenantId: string): Promise<ChatTenant> {
+  const tenant = await chatTenantById(db, tenantId);
+  if (tenant.status !== "ACTIVE") throw AppError.forbidden("This institution is not active", "TENANT_INACTIVE");
+  return tenant;
+}
+
+/** The institution as it is now, whatever its status, for what has to happen even in a suspended one, like an account's deletion. */
+export async function chatTenantById(db: DbClient, tenantId: string): Promise<ChatTenant> {
   const row = await findTenantWithSettingsById(db, tenantId);
-  if (!row || row.tenant.status !== "ACTIVE") throw AppError.forbidden("This institution is not active", "TENANT_INACTIVE");
+  if (!row) throw AppError.forbidden("This institution is not active", "TENANT_INACTIVE");
   return { ...row.tenant, features: resolveFeatures(row.tenant.type, row.settings.features) };
 }
 
-/** Which conversation kinds this institution has switched on. Groups arrive with their own feature. */
-export function enabledKinds(features: TenantFeatures): ChatConversationKind[] {
-  return features.messaging ? ["DIRECT"] : [];
+/**
+ * Which kinds of thread this institution has switched on. Direct threads need `messaging`, open groups `groups`, and
+ * invite-only groups both, because an invite-only group of two is a private chat.
+ */
+export function enabledKinds(features: TenantFeatures): ChatThreadKind[] {
+  return [...(features.messaging ? (["DIRECT"] as const) : []), ...enabledGroupVisibilities(features).map((v) => GROUP_KIND_OF[v])];
 }
 
-export function assertKindEnabled(features: TenantFeatures, kind: ChatConversationKind): void {
-  if (!enabledKinds(features).includes(kind)) throw AppError.forbidden("Messaging is switched off for this institution", "FEATURE_DISABLED");
+export function threadKindOf(conversation: Pick<ConversationRow, "kind">, group: Pick<ChatGroupRow, "visibility"> | null): ChatThreadKind {
+  if (conversation.kind === "DIRECT") return "DIRECT";
+  if (!group) throw new Error("A group conversation without its group");
+  return GROUP_KIND_OF[group.visibility];
+}
+
+const KIND_OFF: Record<ChatThreadKind, string> = {
+  DIRECT: "Messaging is switched off for this institution",
+  OPEN_GROUP: "Groups are switched off for this institution",
+  INVITE_ONLY_GROUP: "Invite-only groups need messaging, which is switched off for this institution",
+};
+
+export function assertKindEnabled(features: TenantFeatures, kind: ChatThreadKind): void {
+  if (!enabledKinds(features).includes(kind)) throw AppError.forbidden(KIND_OFF[kind], "FEATURE_DISABLED");
+}
+
+export function assertGroupEnabled(features: TenantFeatures, visibility: ChatGroupVisibility): void {
+  assertKindEnabled(features, GROUP_KIND_OF[visibility]);
+}
+
+// --- Groups ---
+
+/** Members may see it: an admin approved it and hasn't since rejected or removed it. An edit waiting for review leaves it so. */
+export const isGroupLive = (g: Pick<ChatGroupRow, "approvedAt" | "moderationStatus">): boolean => !!g.approvedAt && (g.moderationStatus === "APPROVED" || g.moderationStatus === "PENDING");
+
+/** Messages can be sent in it. An archived group, or one moderation has frozen or not yet let out, is read-only. */
+export const groupSendable = (g: Pick<ChatGroupRow, "approvedAt" | "moderationStatus" | "archivedAt">): boolean => isGroupLive(g) && !g.archivedAt;
+
+/**
+ * Who may invite: the owner, or in an open group anyone in it. Never while an edit waits for review, because inviting is how
+ * a group grows, and never once it's archived.
+ */
+export const mayInvite = (g: Pick<ChatGroupRow, "moderationStatus" | "archivedAt" | "visibility">, isOwner: boolean): boolean => g.moderationStatus === "APPROVED" && !g.archivedAt && (isOwner || g.visibility === "OPEN");
+
+const INVITE_TTL_MS = CHAT_GROUP_INVITE_TTL_DAYS * DAY_MS;
+
+/** The oldest invitation still counted as waiting at `now`. */
+export const inviteCutoff = (now: Date): Date => new Date(now.getTime() - INVITE_TTL_MS);
+
+/** An invitation waiting for an answer, delivered or not. */
+export const inviteOutstanding = (p: Pick<ParticipantRow, "state" | "invitedAt">, now: Date): boolean => p.state === "INVITED" && !!p.invitedAt && p.invitedAt > inviteCutoff(now);
+
+/** An invitation its invitee can see. */
+export const inviteVisible = (p: Pick<ParticipantRow, "state" | "invitedAt" | "inviteSuppressed">, now: Date): boolean => inviteOutstanding(p, now) && !p.inviteSuppressed;
+
+/**
+ * The owner removed them and nobody has let them back in since. An invitation overwrites their state, so it's the separate
+ * mark that says so, and only an invitation they can see gets them past it.
+ */
+export const wasRemoved = (p: Pick<ParticipantRow, "state" | "removedAt">): boolean => p.state === "REMOVED" || !!p.removedAt;
+
+/**
+ * Whether a member may know a group exists. Its owner always. Otherwise only while it's live: then anyone in it, and while
+ * it isn't archived, anyone for an open group or the invitee of an invite-only one. Everyone else gets a 404, never a 403,
+ * on every route, so an invite-only group can't be confirmed by asking about it.
+ */
+export function canSeeGroup(group: Pick<ChatGroupRow, "ownerMembershipId" | "approvedAt" | "moderationStatus" | "archivedAt" | "visibility">, participant: Pick<ParticipantRow, "state" | "invitedAt" | "inviteSuppressed"> | null | undefined, membershipId: string, now: Date): boolean {
+  if (group.ownerMembershipId === membershipId) return true;
+  if (!isGroupLive(group)) return false;
+  if (participant?.state === "ACTIVE") return true;
+  if (group.archivedAt) return false;
+  return group.visibility === "OPEN" || (!!participant && inviteVisible(participant, now));
+}
+
+/**
+ * The name a member sees: always the approved one, so unreviewed words never reach anyone but their author. The owner sees
+ * their own until it has first been approved, which is the only time nobody else can see the group at all.
+ */
+export function shownGroupText(group: Pick<ChatGroupRow, "name" | "description" | "approvedName" | "approvedDescription">, isOwner: boolean): { name: string; description: string | null } {
+  if (group.approvedName !== null) return { name: group.approvedName, description: group.approvedDescription };
+  return isOwner ? { name: group.name, description: group.description } : { name: "", description: null };
+}
+
+export function toConversationGroupDto(group: ChatGroupRow, membershipId: string): ChatConversationGroupDto {
+  const isOwner = group.ownerMembershipId === membershipId;
+  return { name: shownGroupText(group, isOwner).name, visibility: group.visibility, memberCount: group.memberCount, archived: !!group.archivedAt, isOwner };
 }
 
 export function peerIdOf(conversation: Pick<ConversationRow, "directLowId" | "directHighId">, membershipId: string): string | null {

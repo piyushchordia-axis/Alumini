@@ -162,6 +162,20 @@
       "when": 1793631616443,
       "tag": "0022_chat_message_removed",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793687819544,
+      "tag": "0023_wave2_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793701956534,
+      "tag": "0024_group_removed_at",
+      "breakpoints": true
     }
   ]
 }

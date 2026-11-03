@@ -1,5 +1,5 @@
-import { splitSections, type MemberSection } from "@illuminize/shared";
-import { chatBadgeLabel } from "@illuminize/shared/chat";
+import { chatAvailable, splitSections, type MemberSection } from "@illuminize/shared";
+import { chatBadgeLabel, groupsBadgeLabel, type ChatBadgeLabel } from "@illuminize/shared/chat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState } from "react";
@@ -23,11 +23,18 @@ export function HomeLayout() {
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];
 
-  const chatEnabled = tenant.settings.features.messaging && membership.chatEligible;
+  const chatEnabled = chatAvailable(tenant.settings.features, membership.chatEligible);
   useChatScope(tenant.slug, chatEnabled);
-  const chatBadge = chatBadgeLabel(useChatBadge(tenant.slug, chatEnabled).data);
-  /** The badge, for the one link that has one. */
-  const badgeFor = (section: MemberSection) => (section === "messages" && chatBadge.count > 0 ? chatBadge : null);
+  const badgeData = useChatBadge(tenant.slug, chatEnabled).data;
+  const badges: Partial<Record<MemberSection, ChatBadgeLabel>> = { messages: chatBadgeLabel(badgeData), groups: groupsBadgeLabel(badgeData) };
+  /** The badge on a section's link, for the sections that have one. */
+  const badgeFor = (section: MemberSection) => {
+    const badge = badges[section];
+    return badge && badge.count > 0 ? badge : null;
+  };
+  // On a phone a section in the sheet has its badge there, so More says there's something inside.
+  const moreBadges = overflow.map(badgeFor).filter((b): b is ChatBadgeLabel => b !== null);
+  const moreCount = moreBadges.reduce((sum, b) => sum + b.count, 0);
   const { fullHeight, immersive } = useAppRouteHandle();
 
   const pollInterval = usePollInterval();
@@ -144,10 +151,11 @@ export function HomeLayout() {
           aria-haspopup="dialog"
           aria-expanded={moreOpen}
           aria-current={onSheetRoute ? "true" : undefined}
+          aria-label={moreCount > 0 ? `More, ${moreBadges.map((b) => b.label).join(", ")}` : undefined}
           className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", moreOpen || onSheetRoute ? "text-primary" : "text-slate-500")}
         >
-          <span className="text-lg leading-none" aria-hidden>
-            ☰
+          <span className="relative text-lg leading-none" aria-hidden>
+            ☰{moreCount > 0 && <NavBadge count={moreCount} className="absolute -right-3 -top-1.5" />}
           </span>
           More
         </button>

@@ -32,6 +32,8 @@ export const ERROR_CODES = [
   "CONTACT_UNAVAILABLE",
   "CHAT_BLOCKED_BY_YOU",
   "CHAT_REQUEST_PENDING",
+  /** A group's own send limit, shared by everyone in it, as opposed to RATE_LIMITED, which is the member's own. */
+  "CHAT_GROUP_BUSY",
   "NEEDS_ANOTHER_ADMIN",
   "INTERNAL",
 ] as const;

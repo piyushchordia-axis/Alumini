@@ -3,6 +3,7 @@ import { boolean, check, index, integer, pgTable, primaryKey, text, timestamp, u
 import {
   chatConversationKindEnum,
   chatDirectStateEnum,
+  chatGroupVisibilityEnum,
   chatMessageKindEnum,
   chatOriginEnum,
   chatParticipantRoleEnum,
@@ -12,7 +13,7 @@ import {
   reportReasonEnum,
   reportStatusEnum,
 } from "./enums";
-import { jsonValue, tenantScoped, timestamps } from "./helpers";
+import { jsonValue, moderationColumns, tenantScoped, timestamps } from "./helpers";
 import { memberships } from "./memberships";
 import { users } from "./users";
 
@@ -79,14 +80,80 @@ export const chatParticipants = pgTable(
     withheldRequestedAt: timestamp("withheld_requested_at", { withTimezone: true, precision: 3 }),
     withheldRequestCount: integer("withheld_request_count"),
     invitedByMembershipId: uuid("invited_by_membership_id").references(() => memberships.id, { onDelete: "set null" }),
+    /**
+     * An invitation its invitee never sees: they blocked or declined whoever sent it. Declining sets it too, rather than
+     * removing the row, so to the inviter every invitation looks the same until it's accepted.
+     */
     inviteSuppressed: boolean("invite_suppressed").notNull().default(false),
+    /** When the latest invitation was sent. It lapses CHAT_GROUP_INVITE_TTL_DAYS later. */
+    invitedAt: timestamp("invited_at", { withTimezone: true, precision: 3 }),
+    /** When they last became ACTIVE in a group. Ownership passes to whoever has been in longest. */
+    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 3 }),
+    /**
+     * Set when a group's owner removed them, and cleared only when they're let back in through an invitation they could see.
+     * Kept apart from `state`, which an invitation overwrites, so one they never saw, declined or let lapse can't open the
+     * door that the removal closed.
+     */
+    removedAt: timestamp("removed_at", { withTimezone: true, precision: 3 }),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.conversationId, t.membershipId] }),
     index("chat_participants_member_state_idx").on(t.membershipId, t.state),
     index("chat_participants_invited_by_idx").on(t.invitedByMembershipId),
+    uniqueIndex("chat_participants_one_owner_uq").on(t.conversationId).where(sql`${t.role} = 'OWNER' and ${t.state} = 'ACTIVE'`),
   ],
+);
+
+/**
+ * A group's own details, apart from its conversation so the moderation view can read them without touching anything about
+ * its messages. Members only ever see `approved_name` and `approved_description`: an edit waits there for review while the
+ * room carries on. `approved_at` is set while an admin's approval stands, and a rejection clears it.
+ */
+export const chatGroups = pgTable(
+  "chat_groups",
+  {
+    conversationId: uuid("conversation_id")
+      .primaryKey()
+      .references(() => chatConversations.id, { onDelete: "cascade" }),
+    ...tenantScoped(),
+    name: text("name").notNull(),
+    description: text("description"),
+    approvedName: text("approved_name"),
+    approvedDescription: text("approved_description"),
+    /** Never changes: opening an invite-only group would show its history to anyone. */
+    visibility: chatGroupVisibilityEnum("visibility").notNull(),
+    ownerMembershipId: uuid("owner_membership_id").references(() => memberships.id, { onDelete: "set null" }),
+    /** ACTIVE participants, kept under the conversation's lock, which is where the cap is checked. */
+    memberCount: integer("member_count").notNull().default(0),
+    ...moderationColumns(),
+    approvedAt: timestamp("approved_at", { withTimezone: true, precision: 3 }),
+    archivedAt: timestamp("archived_at", { withTimezone: true, precision: 3 }),
+    ...timestamps(),
+  },
+  (t) => [
+    index("chat_groups_tenant_visibility_created_idx").on(t.tenantId, t.visibility, t.createdAt),
+    index("chat_groups_owner_idx").on(t.ownerMembershipId),
+  ],
+);
+
+/**
+ * Who declined whose invitation or message request, and when. Across every group and direct thread, so declining one
+ * invitation keeps that person's next ones away for a while, wherever they come from.
+ */
+export const chatInviteDeclines = pgTable(
+  "chat_invite_declines",
+  {
+    declinerMembershipId: uuid("decliner_membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    inviterMembershipId: uuid("inviter_membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    ...tenantScoped(),
+    declinedAt: timestamp("declined_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.declinerMembershipId, t.inviterMembershipId] }), index("chat_invite_declines_inviter_idx").on(t.inviterMembershipId)],
 );
 
 /** Kept out of content_types and moderation_items on purpose: anything in that view is readable by admins. */

@@ -1,15 +1,16 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultFeaturesFor } from "@illuminize/shared";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createLogger } from "../lib/logger";
 import { runInTransaction } from "../lib/transaction";
 import { reportContextIds, seedDirectThread } from "../repositories/chat.repo";
+import { seedGroup } from "../repositories/chatGroups.repo";
 import { createDb, type Db } from "./client";
 import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
 import { sql } from "drizzle-orm";
-import { businessListings, chatConversations, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
+import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, postComments, postReactions, posts, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
 export interface SeedResult {
   tenantIds: Record<string, string>;
@@ -495,6 +496,65 @@ async function seedChatReport(db: Db, tenantId: string): Promise<void> {
   });
 }
 
+/**
+ * Two groups in demo-university, with none of the members the e2e journeys sign in as (Meera, Sneha, Arjun and Vikram), so
+ * nothing here changes what those journeys see: an open group with a short history, and an invite-only one with a
+ * pending invitation for a generated member nobody signs in as.
+ */
+async function seedChatGroups(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chatGroups).where(eq(chatGroups.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, ["+91931000001", "+91931000002", "+91931000003", "+91931000004"])));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const [imran, ritu, aisha, aarav] = ["+91931000001", "+91931000002", "+91931000003", "+91931000004"].map((p) => byPhone.get(p));
+  const [rahul, priya] = ["+919100000001", "+919100000002"].map(member) as [string, string];
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const present = <T extends { id: string | undefined }>(rows: T[]) => rows.filter((r): r is T & { id: string } => !!r.id);
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await seedGroup(tx, {
+      tenantId,
+      name: "London & UK alumni",
+      description: "For DemoU alumni living in or passing through the UK: meetups, flat hunting and job leads.",
+      visibility: "OPEN",
+      members: present([
+        { id: priya, joinedAt: ago(40) },
+        { id: rahul, joinedAt: ago(38) },
+        { id: imran, joinedAt: ago(30) },
+        { id: ritu, joinedAt: ago(21) },
+      ]),
+      messages: [
+        { senderId: priya, body: "Welcome, everyone! Say hello and tell us where in the UK you are.", at: ago(38, 30) },
+        { senderId: rahul, body: "Mumbai, but in London twice a year for work. Happy to meet up when I'm over.", at: ago(37) },
+        ...(imran ? [{ senderId: imran, body: "Manchester here. Anyone up north?", at: ago(29) }] : []),
+        ...(ritu ? [{ senderId: ritu, body: "Just moved to Leeds for a master's. Any tips on finding a flat?", at: ago(20) }] : []),
+        { senderId: priya, body: "Pub meetup near King's Cross on the last Friday of the month. All welcome.", at: ago(3, 90) },
+      ],
+    });
+    await seedGroup(tx, {
+      tenantId,
+      name: "Batch of 2012 reunion committee",
+      description: "Planning the 15-year reunion: venue, dates and who's bringing the old photos.",
+      visibility: "INVITE_ONLY",
+      members: present([
+        { id: rahul, joinedAt: ago(25) },
+        { id: priya, joinedAt: ago(25) },
+        { id: aisha, joinedAt: ago(14) },
+      ]),
+      messages: [
+        { senderId: rahul, body: "Shall we aim for December? The campus auditorium is free on the 14th.", at: ago(24) },
+        { senderId: priya, body: "December works if we fix it soon. I'll book flights early.", at: ago(23, 200) },
+        ...(aisha ? [{ senderId: aisha, body: "I can put together a slideshow from the batch photos.", at: ago(13) }] : []),
+      ],
+      invited: present([{ id: aarav, at: ago(2) }]),
+    });
+  });
+}
+
 /** Someone still at school, who shows that private contact stays closed to current pupils even with messaging on. */
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
@@ -510,6 +570,7 @@ export async function seedConnections(db: Db, tenantIds: Record<string, string>,
     const mid = seededMember(m);
     await seedChatThreads(db, uni, (phone) => mid("demo-university", phone));
     await seedChatReport(db, uni);
+    await seedChatGroups(db, uni, (phone) => mid("demo-university", phone));
   }
   await seedCurrentPupil(db, tenantIds);
 }

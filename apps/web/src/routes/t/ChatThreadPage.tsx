@@ -1,7 +1,8 @@
-import type { ChatConversationDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, groupMessages, newClientKey, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
+import { chatKeys, conversationTitle, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import clsx from "clsx";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BlockConfirmDialog, BlockMemberButton } from "@/components/chat/BlockMemberButton";
@@ -15,15 +16,15 @@ import { Button, Loading } from "@/components/ui";
 import { useDocumentVisible, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
-import { chatSync, inboxFromParams, inboxQuery, isMuted, patchConversation, peerName } from "@/lib/chat";
-import { formatDate } from "@/lib/format";
+import { chatSync, inboxFromParams, inboxQuery, isMuted, patchConversation } from "@/lib/chat";
+import { formatDate, pluralize } from "@/lib/format";
+import { groupPath, groupsPath, refreshGroup } from "@/lib/groups";
 import { useRealtimeStatus } from "@/lib/realtime";
 import { draftKey, useChatStore } from "@/stores/chatStore";
 import { toast } from "@/stores/uiStore";
 
 const PAGE_SIZE = 30;
 const READ_AFTER_MS = 800;
-const SLOW_DOWN = "You're sending messages quickly. Wait a moment, then send again.";
 
 /** Remounts per thread, so nothing about one conversation (scroll position, a half-open dialog) carries into the next. */
 export function ChatThreadRoute() {
@@ -85,6 +86,8 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   useOpenConversation(slug, id);
 
   const conversation = useQuery({ queryKey: chatKeys.conversation(slug, id), queryFn: () => api.chat.conversation(slug, id) });
+  // A group's own details, for the one thing only they say: why its owner can't send yet. Shared with its details screen.
+  const group = useQuery({ queryKey: chatKeys.group(slug, id), queryFn: () => api.chat.groups.get(slug, id), enabled: !!conversation.data?.group && !conversation.data.canSend });
   const messages = useInfiniteQuery({
     queryKey: chatKeys.messages(slug, id),
     queryFn: ({ pageParam }) => api.chat.messages(slug, id, { cursor: pageParam, limit: PAGE_SIZE }),
@@ -136,8 +139,9 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   /** What became of a send that didn't go. Too many too fast puts the words back to send later, if the box is free for them. */
   const settleFailure = (clientKey: string, text: string) => {
     const failed = qc.getQueryData<OutboxEntry[]>(outboxKey)?.find((e) => e.clientKey === clientKey);
-    if (failed?.code !== "RATE_LIMITED") return;
-    setNotice(SLOW_DOWN);
+    const notice = sendLimitNotice(failed?.code);
+    if (!notice) return;
+    setNotice(notice);
     if (!useChatStore.getState().drafts[dk]) {
       chatSync.discard(slug, id, clientKey);
       setDraft(dk, text);
@@ -166,7 +170,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   const inboxHref = `/t/${slug}/app/messages${inboxQuery(inboxFromParams(params))}`;
   // Only an answer, or nothing at all to show: a refetch that fails in the background keeps the thread and the draft on screen.
   const error = fatalQueryError(conversation);
-  if (error) return <ThreadUnavailable error={error} backTo={inboxHref} onRetry={() => void conversation.refetch()} />;
+  if (error) return <ThreadUnavailable slug={slug} id={id} groupsOn={tenant.settings.features.groups} error={error} backTo={inboxHref} onRetry={() => void conversation.refetch()} />;
   if (!conversation.data) {
     return (
       <ChatPane>
@@ -181,12 +185,18 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   }
 
   const c = conversation.data;
-  const name = peerName(c.peer);
+  const name = conversationTitle(c);
   const muted = isMuted(c, now);
   const profileHref = c.peer && tenant.settings.features.directory ? `/t/${slug}/app/directory/${c.peer.id}` : null;
   const composer = (keyboardOpen: boolean, intro?: string) => <ChatComposer draftKey={dk} onSend={send} notice={notice ?? intro} keyboardOpen={keyboardOpen} autoFocus />;
+  const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : muted ? "Muted" : undefined;
 
   const footer = (keyboardOpen: boolean): ReactNode => {
+    if (c.group) {
+      if (c.canSend) return composer(keyboardOpen);
+      if (c.group.archived) return <Panel title="This group has been archived">You can read it, but nobody can send messages in it any more.</Panel>;
+      return <GroupClosedPanel group={group.data} />;
+    }
     if (!c.peer) return <Panel title="This member deleted their account">You can read the conversation, but not reply.</Panel>;
     if (c.blockedByMe)
       return (
@@ -256,15 +266,25 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
             title={name}
             member={c.peer}
             profileHref={profileHref}
-            subtitle={muted ? "Muted" : undefined}
+            subtitle={subtitle}
             actions={
-              <button type="button" aria-label="Conversation options" onClick={() => setOptionsOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
-                  <circle cx="5" cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
-                </svg>
-              </button>
+              <>
+                {c.group && (
+                  <Link to={groupPath(slug, c.id)} aria-label="Group details" title="Group details" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 11v5M12 8h.01" />
+                    </svg>
+                  </Link>
+                )}
+                <button type="button" aria-label="Conversation options" onClick={() => setOptionsOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+                    <circle cx="5" cy="12" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="19" cy="12" r="2" />
+                  </svg>
+                </button>
+              </>
             }
           />
           {loadingFirst ? (
@@ -281,7 +301,9 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
           ) : (
             <MessageList
               rows={rows}
-              label={`Messages with ${name}`}
+              label={c.group ? `Messages in ${name}` : `Messages with ${name}`}
+              me={me}
+              showSenders={!!c.group}
               hasOlder={!!messages.hasNextPage}
               loadingOlder={messages.isFetchingNextPage}
               loadOlder={() => void messages.fetchNextPage()}
@@ -309,17 +331,62 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   );
 }
 
-/** A thread that can't be opened says so and offers a way back, and never blanks the app. */
-function ThreadUnavailable({ error, backTo, onRetry }: { error: unknown; backTo: string; onRetry: () => void }) {
+/**
+ * Why the owner of a group can't send in it: only an owner reaches its thread while moderation keeps it from everyone else.
+ * Members never see these, because to them such a group isn't there at all.
+ */
+function GroupClosedPanel({ group }: { group: ChatGroupDto | undefined }) {
+  switch (group?.review?.moderationStatus) {
+    case "PENDING":
+      return <Panel title="Waiting for an admin to approve this group">Nobody else can see it yet. Messages can be sent once it's approved.</Panel>;
+    case "REJECTED":
+      return <Panel title="An admin didn't approve this group">Members can't see it, and nobody can send messages in it. You can edit it from Group details and send it for review again.</Panel>;
+    case "REMOVED":
+      return <Panel title="An admin removed this group">Members can't see it, and nobody can send messages in it.</Panel>;
+    default:
+      return <Panel title="You can't send messages here right now">You can still read the conversation.</Panel>;
+  }
+}
+
+/** What a group thread this member can't open says about why, from the group's own details where they may see those. */
+function groupUnavailable(group: ChatGroupDto): { title: string; text: string } | null {
+  switch (group.myState) {
+    case "LEFT":
+      return { title: "You left this group", text: group.canJoin ? "Join it again to read and send messages." : "You'd need a new invitation to read it again." };
+    case "REMOVED":
+      return { title: "You were removed from this group", text: "You'd need a new invitation to read it again." };
+    case "INVITED":
+      return { title: "You've been invited to this group", text: "Accept the invitation to read and send messages." };
+    case null:
+      return group.canJoin ? { title: "You're not in this group", text: "Join it to read and send messages." } : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * A thread that can't be opened says so and offers a way back, and never blanks the app. A group this member has left, been
+ * removed from or not joined says which, if they may still see the group at all; an invite-only one they've left reads like
+ * anything else that isn't there.
+ */
+function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slug: string; id: string; groupsOn: boolean; error: unknown; backTo: string; onRetry: () => void }) {
+  const qc = useQueryClient();
   const answered = isApiClientError(error) && !isTransientError(error);
   const off = isApiClientError(error) && error.code === "FEATURE_DISABLED";
-  const title = off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened";
-  const text = off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.";
+  const missing = isApiClientError(error) && error.status === 404;
+  const lookup = useQuery({ queryKey: chatKeys.group(slug, id), queryFn: () => api.chat.groups.get(slug, id), enabled: groupsOn && missing, retry: false });
+  const join = useMutation({ mutationFn: () => api.chat.groups.join(slug, id), onSuccess: (group) => void refreshGroup(qc, slug, group), onError: (err) => toast.error(errorMessage(err)) });
+  // Fresh from the server only: a copy cached while they were in it would say they still are.
+  const group = missing && lookup.data && !lookup.isFetching ? lookup.data : null;
+  const about = group ? groupUnavailable(group) : null;
+  const title = about?.title ?? (off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened");
+  const text = about?.text ?? (off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.");
+  const action = "inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
   return (
     <ChatPane>
       {() => (
         <>
-          <ChatPaneHeader backTo={backTo} title="Conversation" />
+          <ChatPaneHeader backTo={backTo} title={about && group ? group.name : "Conversation"} />
           <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
             <div className="text-3xl" aria-hidden>
               💬
@@ -332,7 +399,22 @@ function ThreadUnavailable({ error, backTo, onRetry }: { error: unknown; backTo:
                   Retry loading
                 </Button>
               )}
-              <Link to={backTo} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              {group?.myState !== "INVITED" && group?.canJoin && (
+                <Button className="min-h-11" onClick={() => join.mutate()} loading={join.isPending}>
+                  Join group
+                </Button>
+              )}
+              {group?.myState === "INVITED" && (
+                <Link to={groupsPath(slug, "invitations")} className={clsx(action, "bg-primary text-white hover:opacity-90")}>
+                  See invitation
+                </Link>
+              )}
+              {group && about && (
+                <Link to={groupPath(slug, id)} className={clsx(action, "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}>
+                  Group details
+                </Link>
+              )}
+              <Link to={backTo} className={clsx(action, about ? "text-slate-600 hover:bg-slate-100" : "bg-primary text-white hover:opacity-90")}>
                 Back to messages
               </Link>
             </div>

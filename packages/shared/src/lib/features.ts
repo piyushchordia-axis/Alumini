@@ -1,8 +1,22 @@
-import { TENANT_FEATURES, type TenantFeature, type TenantFeatures, type TenantType } from "../constants";
+import { TENANT_FEATURES, type ChatGroupVisibility, type TenantFeature, type TenantFeatures, type TenantType } from "../constants";
 import { wallPartsInZone } from "./time";
 
 /** Keys that start off for schools and that retyping an institution to SCHOOL forces off. Its admin can turn them on. */
-export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = ["messaging"];
+export const SCHOOL_OFF_FEATURES: readonly TenantFeature[] = ["messaging", "groups"];
+
+/**
+ * The kinds of group these switches allow. Open groups need `groups`. An invite-only group of two is a private chat, so it
+ * needs `messaging` as well. Switching either off hides what it no longer allows and deletes nothing.
+ */
+export function enabledGroupVisibilities(features: TenantFeatures): ChatGroupVisibility[] {
+  if (!features.groups) return [];
+  return features.messaging ? ["OPEN", "INVITE_ONLY"] : ["OPEN"];
+}
+
+/** Whether this member has a Messages inbox here: direct chats or groups are on, and they aren't a current pupil. */
+export function chatAvailable(features: TenantFeatures, chatEligible: boolean): boolean {
+  return (features.messaging || features.groups) && chatEligible;
+}
 
 /** What each key needs: a key reads as off while what it needs is off. One level deep, so a prerequisite has none of its own. */
 export const FEATURE_PREREQUISITES: Readonly<Partial<Record<TenantFeature, TenantFeature>>> = {};

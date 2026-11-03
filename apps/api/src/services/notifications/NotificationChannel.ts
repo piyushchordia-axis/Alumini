@@ -38,6 +38,8 @@ export interface PushChannel {
   readonly name: string;
   prepare(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<PushMessage[]>;
   prepareFor(items: PushItem[], context: DeliveryContext): Promise<PushMessage[]>;
+  /** prepareFor, kept apart per item, in the items' order, so a caller can tell whose devices a batch reaches. */
+  prepareEach(items: PushItem[], context: DeliveryContext): Promise<PushMessage[][]>;
   sendBatch(batch: PushMessage[]): Promise<void>;
   /** prepare + sendBatch in one go, logging failures. */
   deliver(rows: NotificationRow[], recipients: NotificationRecipient[], context: DeliveryContext): Promise<void>;

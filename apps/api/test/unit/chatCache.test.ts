@@ -37,6 +37,7 @@ function message(seq: number, overrides: Partial<ChatMessageDto> = {}): ChatMess
     sender: { id: THEM, fullName: "Them", avatarUrl: null },
     body: `Message ${seq}`,
     removed: false,
+    redacted: false,
     meta: null,
     clientKey: null,
     createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, seq)).toISOString(),
@@ -342,7 +343,7 @@ describe("createChatSync", () => {
     it("refreshes the lists and the badge", () => {
       const s = setup();
       s.qc.setQueryData(chatKeys.list(SLUG, "MAIN"), { pages: [], pageParams: [] });
-      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0 });
+      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0, invites: 0 });
       s.load(pages([[1]]));
       s.live(message(2));
       expect(s.invalidated(chatKeys.list(SLUG, "MAIN"))).toBe(true);
@@ -468,7 +469,7 @@ describe("createChatSync", () => {
       vi.useFakeTimers();
       const s = setup();
       s.load(pages([[2, 1]]));
-      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0 });
+      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0, invites: 0 });
       s.qc.setQueryData(chatKeys.list(SLUG, "MAIN"), { pages: [{ data: ["newest"], nextCursor: "c" }, { data: ["older"], nextCursor: null }], pageParams: [undefined, "c"] });
       s.qc.setQueryData(chatKeys.conversation(SLUG, CONVERSATION), { id: CONVERSATION });
 
@@ -687,6 +688,17 @@ describe("createChatSync", () => {
       expect(s.api.messages).toHaveBeenCalledWith(SLUG, CONVERSATION, { afterSeq: "0", limit: 50 });
     });
 
+    it("chat:changed reads an open group thread's loaded pages again, since rows already shown may read differently now", async () => {
+      const s = setup();
+      s.load(pages([[2, 1]]));
+      s.qc.setQueryData(chatKeys.conversation(SLUG, CONVERSATION), { id: CONVERSATION, kind: "GROUP" } as ChatConversationDto);
+      s.realtime.fire("chat:changed", { tenantSlug: SLUG, conversationId: CONVERSATION });
+      await flush();
+      expect(s.invalidated(s.key)).toBe(true);
+      // Not a gap fill, which would only add rows after the last one and never revisit those on screen.
+      expect(s.api.messages).not.toHaveBeenCalled();
+    });
+
     it("chat:changed marks a loaded thread stale when it isn't on screen, and fetches nothing yet", async () => {
       const s = setup({ active: { slug: SLUG, conversationId: "another" } });
       s.load(pages([[1]]));
@@ -698,27 +710,27 @@ describe("createChatSync", () => {
 
     it("chat:unread sets the badge directly", () => {
       const s = setup();
-      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 3, requests: 1 });
-      expect(s.qc.getQueryData<ChatBadgeDto>(chatKeys.badge(SLUG))).toEqual({ unread: 3, requests: 1 });
+      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 3, requests: 1, invites: 2 });
+      expect(s.qc.getQueryData<ChatBadgeDto>(chatKeys.badge(SLUG))).toEqual({ unread: 3, requests: 1, invites: 2 });
       expect(s.invalidated(chatKeys.badge(SLUG))).toBe(false);
     });
 
     it("chat:unread refetches when a badge fetch is in flight, because it read the counts before they changed", async () => {
       const s = setup();
       const key = chatKeys.badge(SLUG);
-      s.qc.setQueryData(key, { unread: 1, requests: 0 });
+      s.qc.setQueryData(key, { unread: 1, requests: 0, invites: 0 });
       const responses: Array<(dto: ChatBadgeDto) => void> = [];
       const observer = new QueryObserver(s.qc, { queryKey: key, queryFn: () => new Promise<ChatBadgeDto>((resolve) => responses.push(resolve)) });
       const unsubscribe = observer.subscribe(() => undefined);
       await vi.waitFor(() => expect(responses.length).toBe(1));
 
-      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 0, requests: 0 });
-      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0 });
+      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 0, requests: 0, invites: 0 });
+      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0, invites: 0 });
       await vi.waitFor(() => expect(responses.length).toBe(2));
-      responses[0]!({ unread: 1, requests: 0 });
-      responses[1]!({ unread: 0, requests: 0 });
+      responses[0]!({ unread: 1, requests: 0, invites: 0 });
+      responses[1]!({ unread: 0, requests: 0, invites: 0 });
       await vi.waitFor(() => expect(s.qc.getQueryState(key)?.fetchStatus).toBe("idle"));
-      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0 });
+      expect(s.qc.getQueryData(key)).toEqual({ unread: 0, requests: 0, invites: 0 });
       unsubscribe();
     });
 
@@ -726,11 +738,40 @@ describe("createChatSync", () => {
       const s = setup();
       s.qc.setQueryData(chatKeys.conversation(SLUG, CONVERSATION), { id: CONVERSATION });
       s.qc.setQueryData(chatKeys.list(SLUG, "REQUESTS"), { pages: [], pageParams: [] });
-      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0 });
+      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0, invites: 0 });
       s.realtime.fire("chat:changed", { tenantSlug: SLUG, conversationId: CONVERSATION });
       expect(s.invalidated(chatKeys.conversation(SLUG, CONVERSATION))).toBe(true);
       expect(s.invalidated(chatKeys.list(SLUG, "REQUESTS"))).toBe(true);
       expect(s.invalidated(chatKeys.badge(SLUG))).toBe(true);
+    });
+
+    it("chat:changed about a group refetches its details, its members and the Groups lists too, and no other group", () => {
+      const s = setup();
+      const other = "c2";
+      for (const key of [chatKeys.group(SLUG, CONVERSATION), chatKeys.groupMembers(SLUG, CONVERSATION), chatKeys.group(SLUG, other), chatKeys.groupList(SLUG, "DISCOVER"), chatKeys.groupInvites(SLUG)]) s.qc.setQueryData(key, {});
+      s.realtime.fire("chat:changed", { tenantSlug: SLUG, conversationId: CONVERSATION });
+      expect(s.invalidated(chatKeys.group(SLUG, CONVERSATION))).toBe(true);
+      expect(s.invalidated(chatKeys.groupMembers(SLUG, CONVERSATION))).toBe(true);
+      expect(s.invalidated(chatKeys.groupList(SLUG, "DISCOVER"))).toBe(true);
+      expect(s.invalidated(chatKeys.groupInvites(SLUG))).toBe(true);
+      expect(s.invalidated(chatKeys.group(SLUG, other))).toBe(false);
+    });
+
+    it("chat:unread refetches Invitations when the number waiting changed, and only then", () => {
+      const s = setup();
+      s.qc.setQueryData(chatKeys.badge(SLUG), { unread: 0, requests: 0, invites: 1 });
+      s.qc.setQueryData(chatKeys.groupInvites(SLUG), {});
+      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 2, requests: 0, invites: 1 });
+      expect(s.invalidated(chatKeys.groupInvites(SLUG))).toBe(false);
+      s.realtime.fire("chat:unread", { tenantSlug: SLUG, membershipId: ME, unread: 2, requests: 0, invites: 2 });
+      expect(s.invalidated(chatKeys.groupInvites(SLUG))).toBe(true);
+    });
+
+    it("a reconnect refetches the Groups lists, which may have missed an invitation", () => {
+      const s = setup();
+      s.qc.setQueryData(chatKeys.groupList(SLUG, "MINE"), {});
+      s.realtime.reconnect();
+      expect(s.invalidated(chatKeys.groupList(SLUG, "MINE"))).toBe(true);
     });
 
     it("chat:read moves the read position forward on another device and never back", () => {

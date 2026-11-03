@@ -43,6 +43,15 @@ describe.skipIf(!dbAvailable)("tenant admin settings + branding", () => {
     expect(audit.body.total).toBe(1);
   });
 
+  it("tells members whether their content waits for an admin, so a form can say so before it's sent", async () => {
+    const { tenant } = await createTenant(ctx);
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    const mode = async () => (await api().get(`/api/v1/tenants/${tenant.slug}`)).body.data.settings.contentModerationMode;
+    expect(await mode()).toBe("AUTO_APPROVE");
+    await api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ contentModerationMode: "ADMIN_APPROVAL" }).expect(200);
+    expect(await mode()).toBe("ADMIN_APPROVAL");
+  });
+
   it("updates branding visible on the public tenant page", async () => {
     const { tenant } = await createTenant(ctx);
     const base = `/api/v1/t/${tenant.slug}`;

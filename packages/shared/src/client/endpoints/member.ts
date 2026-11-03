@@ -1,4 +1,4 @@
-import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, NotificationPrefsUpdate, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
@@ -11,6 +11,11 @@ import type {
   ChatConversationDto,
   ChatDirectLookupDto,
   ChatDirectResultDto,
+  ChatGroupDto,
+  ChatGroupInviteDto,
+  ChatGroupInviteResultDto,
+  ChatGroupMemberDto,
+  ChatMemberDto,
   ChatMessageDto,
   ChatReportDto,
   FundingDto,
@@ -120,6 +125,24 @@ export function chatEndpoints(core: ApiCore) {
     block: (slug: string, membershipId: string) => core.data<ChatBlockDto>({ method: "POST", path: "/chat/blocks", tenantSlug: slug, body: { membershipId } }),
     unblock: (slug: string, membershipId: string) => core.request<void>({ method: "DELETE", path: `/chat/blocks/${membershipId}`, tenantSlug: slug }),
     report: (slug: string, messageId: string, input: ChatReportCreateInput) => core.data<ChatReportDto>({ method: "POST", path: `/chat/messages/${messageId}/report`, tenantSlug: slug, body: input }),
+    groups: {
+      /** DISCOVER (open groups, searchable by name), MINE or OWNED. */
+      list: (slug: string, query?: Partial<ChatGroupsQuery>) => core.request<CursorPage<ChatGroupDto>>({ path: "/chat/groups", tenantSlug: slug, query: q(query) }),
+      create: (slug: string, input: ChatGroupCreateInput) => core.data<ChatGroupDto>({ method: "POST", path: "/chat/groups", tenantSlug: slug, body: input }),
+      invites: (slug: string, query?: Partial<CursorQuery>) => core.request<CursorPage<ChatGroupInviteDto>>({ path: "/chat/groups/invites", tenantSlug: slug, query: q(query) }),
+      get: (slug: string, id: string) => core.data<ChatGroupDto>({ path: `/chat/groups/${id}`, tenantSlug: slug }),
+      update: (slug: string, id: string, input: Pick<ChatGroupUpdateInput, "name" | "description">) => core.data<ChatGroupDto>({ method: "PATCH", path: `/chat/groups/${id}`, tenantSlug: slug, body: input }),
+      archive: (slug: string, id: string) => core.data<ChatGroupDto>({ method: "PATCH", path: `/chat/groups/${id}`, tenantSlug: slug, body: { archived: true } }),
+      members: (slug: string, id: string, query?: Partial<CursorQuery>) => core.request<CursorPage<ChatGroupMemberDto>>({ path: `/chat/groups/${id}/members`, tenantSlug: slug, query: q(query) }),
+      inviteCandidates: (slug: string, id: string, query?: Partial<ChatGroupCandidatesQuery>) => core.data<ChatMemberDto[]>({ path: `/chat/groups/${id}/invite-candidates`, tenantSlug: slug, query: q(query) }),
+      join: (slug: string, id: string) => core.data<ChatGroupDto>({ method: "POST", path: `/chat/groups/${id}/join`, tenantSlug: slug }),
+      /** Answers nothing, because an invite-only group is gone from view the moment its member leaves. */
+      leave: (slug: string, id: string) => core.request<void>({ method: "POST", path: `/chat/groups/${id}/leave`, tenantSlug: slug }),
+      invite: (slug: string, id: string, membershipIds: string[]) => core.data<ChatGroupInviteResultDto>({ method: "POST", path: `/chat/groups/${id}/invites`, tenantSlug: slug, body: { membershipIds } }),
+      accept: (slug: string, id: string) => core.data<ChatGroupDto>({ method: "POST", path: `/chat/groups/${id}/invites/accept`, tenantSlug: slug }),
+      decline: (slug: string, id: string) => core.request<void>({ method: "POST", path: `/chat/groups/${id}/invites/decline`, tenantSlug: slug }),
+      removeMember: (slug: string, id: string, membershipId: string) => core.request<void>({ method: "DELETE", path: `/chat/groups/${id}/members/${membershipId}`, tenantSlug: slug }),
+    },
   };
 }
 

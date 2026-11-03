@@ -44,13 +44,44 @@ export function formatAmountRange(min: number | null, max: number | null, curren
   return `up to ${formatMoneyMinor(max, currency)}`;
 }
 
+export function pluralize(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * Whether a character is punctuation, a symbol or an emoji rather than the start of a word. The web app asks whether it's a
+ * letter or a digit with \p{L} and \p{N}; this asks the other way round, by code point, so it needs no regular expression
+ * feature that one JavaScript engine has and another may not, and a name in any script still has its initials.
+ */
+function isSymbol(ch: string): boolean {
+  const c = ch.codePointAt(0) ?? 0;
+  return (
+    c > 0xffff || // beyond the basic plane: emoji, mostly
+    /[!-/:-@[-`{-~]/.test(ch) || // ASCII punctuation and symbols
+    (c >= 0xa0 && c <= 0xbf) || // Latin-1 punctuation and signs
+    c === 0xd7 ||
+    c === 0xf7 ||
+    (c >= 0x300 && c <= 0x36f) || // combining marks, which belong to the character before
+    (c >= 0x2000 && c <= 0x2bff) || // punctuation, arrows, maths, shapes, dingbats and other symbols, the zero-width joiner too
+    (c >= 0x3000 && c <= 0x303f) || // CJK punctuation
+    (c >= 0xfe00 && c <= 0xfe0f) || // variation selectors, which turn a character into an emoji
+    (c >= 0xfe30 && c <= 0xfe4f) ||
+    (c >= 0xff00 && c <= 0xff0f)
+  );
+}
+
 export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
+  return (
+    name
+      .split(/\s+/)
+      // Words, not symbols: "London & UK alumni" is "LU", not "L&", and "🏃 Morning runners" is "MR", as on the web app.
+      // Whole characters, never half of one: an emoji is two UTF-16 units, and the first alone draws as a broken glyph.
+      .map((part) => Array.from(part)[0])
+      .filter((first): first is string => first !== undefined && !isSymbol(first))
+      .slice(0, 2)
+      .map((first) => first.toUpperCase())
+      .join("")
+  );
 }
 
 /** Builds an E.164 number from a dial code and a national number. */

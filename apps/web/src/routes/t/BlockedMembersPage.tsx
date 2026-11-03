@@ -1,4 +1,5 @@
-import { chatKeys } from "@illuminize/shared/chat";
+import { chatAvailable } from "@illuminize/shared";
+import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { Link } from "react-router-dom";
 import { BlockMemberButton } from "@/components/chat/BlockMemberButton";
 import { Avatar, Button, EmptyState, ErrorBox, LoadMore, Loading } from "@/components/ui";
@@ -11,8 +12,8 @@ export function BlockedMembersPage() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
   const list = useInfiniteList(chatKeys.blocks(slug), (cursor) => api.chat.blocks(slug, { cursor, limit: 30 }));
-  // With messages off this is all that's left of them, so there's no inbox to go back to.
-  const messagingOn = tenant.settings.features.messaging;
+  // With messages and groups off this is all that's left of them, so there's no inbox to go back to.
+  const messagingOn = chatAvailable(tenant.settings.features, true);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-1 border-b border-slate-200 px-1 py-1.5 sm:px-3">
@@ -26,7 +27,7 @@ export function BlockedMembersPage() {
         <h2 className="flex min-h-11 items-center px-1 text-base font-semibold text-slate-900">Blocked members</h2>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <p className="mb-4 text-sm text-slate-500">Blocked members aren't told. Nothing they send reaches you, and unblocking doesn't bring back what they sent while blocked.</p>
+        <p className="mb-4 text-sm text-slate-500">{BLOCKED_LIST_EXPLAINED}</p>
         {list.isLoading ? (
           <Loading />
         ) : list.error && list.items.length === 0 ? (

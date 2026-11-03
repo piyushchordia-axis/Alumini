@@ -16,7 +16,14 @@ export const moderationQuerySchema = pageQuerySchema.extend({
 });
 export type ModerationQuery = z.infer<typeof moderationQuerySchema>;
 
-export const moderationActionSchema = z.object({ note: optionalTrimmed(500) });
+export const moderationActionSchema = z.object({
+  note: optionalTrimmed(500),
+  /**
+   * The name and description the admin approved, as shown to them. Required to approve a group, whose owner can change
+   * both while it waits: approving publishes them to its members, so it's refused if they no longer match.
+   */
+  reviewed: z.object({ name: z.string().max(500), description: z.string().max(5000).nullable() }).optional(),
+});
 export type ModerationActionInput = z.infer<typeof moderationActionSchema>;
 
 export const contentRefParamsSchema = z.object({

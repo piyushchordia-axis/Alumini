@@ -1,4 +1,4 @@
-import { peerName, type ChatRow } from "@illuminize/shared/chat";
+import { messageSenderName, systemLineText, type ChatRow } from "@illuminize/shared/chat";
 import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { colors, radius, spacing, useTheme } from "@/theme";
@@ -12,6 +12,7 @@ export interface MessageActions {
 }
 
 const REMOVED = "This message was removed";
+const HIDDEN = "Hidden because you blocked this member";
 
 /** A day's label between messages. */
 export function DayRow({ label }: { label: string }) {
@@ -29,29 +30,56 @@ export function DayRow({ label }: { label: string }) {
  * wrapped. Tapping it shows its time and, for someone else's message, Report message; screen readers get the report as an
  * action on the message itself.
  */
-export const MessageRow = memo(function MessageRow({ row, actions, selected, onSelect }: { row: MessageRowData; actions: MessageActions; selected: boolean; onSelect: () => void }) {
+export const MessageRow = memo(function MessageRow({
+  row,
+  me,
+  showSenders = false,
+  actions,
+  selected,
+  onSelect,
+}: {
+  row: MessageRowData;
+  /** This member's id, so a system line about them reads "You". */
+  me: string;
+  /** In a group, where there are more than two people, each run of messages says whose it is. */
+  showSenders?: boolean;
+  actions: MessageActions;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const theme = useTheme();
   const { item, mine, startsGroup, endsGroup, timeLabel } = row;
   const message = item.message;
   const pending = item.pending;
 
   if (message?.kind === "SYSTEM") {
+    // A group's lines are about one member and name nobody themselves, so the name goes in front.
+    const line = showSenders ? systemLineText(message, !message.redacted && message.sender?.id === me) : message.body;
     return (
       <Text style={{ textAlign: "center", fontSize: 12, color: colors.muted, marginVertical: spacing.md, paddingHorizontal: spacing.lg }}>
-        {message.body} <Text style={{ color: colors.faint }}>· {timeLabel}</Text>
+        {line} <Text style={{ color: colors.faint }}>· {timeLabel}</Text>
       </Text>
     );
   }
 
   const removed = !!message?.removed;
+  // Someone this member blocked, in a group: nothing they wrote, and no name beyond "Blocked member".
+  const hidden = !!message?.redacted && !removed;
   const failed = pending?.status === "failed";
-  const reportable = !!message && !mine && !removed;
-  const who = mine ? "You" : peerName(message?.sender);
-  const text = removed ? REMOVED : (message?.body ?? pending?.body ?? "");
+  const reportable = !!message && !mine && !removed && !message.redacted;
+  const who = mine ? "You" : message ? messageSenderName(message) : "";
+  const text = removed ? REMOVED : hidden ? HIDDEN : (message?.body ?? pending?.body ?? "");
+  const muted = removed || hidden;
   const state = pending ? (failed ? "not sent" : "sending") : timeLabel;
 
   return (
     <View style={{ alignItems: mine ? "flex-end" : "flex-start", marginTop: startsGroup ? spacing.md : 2, paddingHorizontal: spacing.md }}>
+      {showSenders && !mine && startsGroup && (
+        // The bubble's own name says who for screen readers.
+        <Text accessible={false} aria-hidden numberOfLines={1} style={{ maxWidth: "85%", fontSize: 12, fontWeight: "600", color: colors.muted, marginBottom: 2, paddingHorizontal: spacing.xs }}>
+          {who}
+        </Text>
+      )}
       <Pressable
         onPress={onSelect}
         accessibilityLabel={`${who}: ${text}, ${state}`}
@@ -63,7 +91,7 @@ export const MessageRow = memo(function MessageRow({ row, actions, selected, onS
         style={[
           // At least 44 points tall, because tapping a bubble is the way to Report message.
           { maxWidth: "85%", minHeight: 44, justifyContent: "center", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
-          removed
+          muted
             ? { borderWidth: 1, borderStyle: "dashed", borderColor: "#cbd5e1", backgroundColor: colors.card }
             : mine
               ? { backgroundColor: theme.primary, opacity: pending && !failed ? 0.7 : 1, borderWidth: failed ? 2 : 0, borderColor: colors.danger }
@@ -71,7 +99,7 @@ export const MessageRow = memo(function MessageRow({ row, actions, selected, onS
           endsGroup ? (mine ? { borderBottomRightRadius: 6 } : { borderBottomLeftRadius: 6 }) : null,
         ]}
       >
-        <Text selectable={!removed} style={{ fontSize: 15, lineHeight: 21, color: removed ? colors.muted : mine ? "#fff" : colors.text, fontStyle: removed ? "italic" : "normal" }}>
+        <Text selectable={!muted} style={{ fontSize: 15, lineHeight: 21, color: muted ? colors.muted : mine ? "#fff" : colors.text, fontStyle: muted ? "italic" : "normal" }}>
           {text}
         </Text>
       </Pressable>

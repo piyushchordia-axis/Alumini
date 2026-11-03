@@ -1,7 +1,12 @@
-import { MAX_BUSINESS_LISTINGS, type ContentDto, type ContentType, type ModerationItemDto, type ModerationQuery, type PostDto } from "@illuminize/shared";
+import { CHAT_GROUP_MAX_OWNED, MAX_BUSINESS_LISTINGS, type ChatGroupContentDto, type ContentDto, type ContentType, type ModerationItemDto, type ModerationQuery, type PostDto } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
 import { toModerationItemDto } from "../dto/content.dto";
+import { toMemberCardDto } from "../dto/membership.dto";
+import { countOwnedGroups, findGroupById, findGroupWithOwner, setGroupModeration, type ReviewedText } from "../repositories/chatGroups.repo";
+import { lockMembership } from "../repositories/memberships.repo";
+import { chatTenantOf } from "./chat/common";
+import { announceGroupChange } from "./chat/groups.service";
 import { AppError } from "../lib/errors";
 import { buildPage, type Page } from "../lib/pagination";
 import { runInTransaction } from "../lib/transaction";
@@ -26,7 +31,8 @@ import { getCommentForAdmin, getPostForAdmin } from "./posts.service";
 
 interface ModeratableRow {
   id: string;
-  authorMembershipId: string;
+  /** Null for a group nobody is left to own. */
+  authorMembershipId: string | null;
   moderationStatus: ModerationPatch["moderationStatus"];
   title: string;
   postId?: string;
@@ -34,10 +40,11 @@ interface ModeratableRow {
 
 interface ModeratableRepo {
   find(db: DbClient, tenantId: string, id: string): Promise<ModeratableRow | undefined>;
-  set(db: DbClient, tenantId: string, id: string, patch: ModerationPatch): Promise<void>;
+  /** `from` is what the admin acted on, and `reviewed` what they read, if the action carried it. */
+  set(db: DbClient, tenantId: string, id: string, patch: ModerationPatch, from: ModeratableRow["moderationStatus"], reviewed?: ReviewedText): Promise<void>;
   /** Throws if the row can't come back from REMOVED. Shares a transaction with the write. */
   beforeRestore?(db: DbClient, tenantId: string, row: ModeratableRow): Promise<void>;
-  afterTransition?(ctx: AppContext, db: DbClient, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
+  afterTransition?(ctx: AppContext, db: DbClient, tenantCtx: TenantContext, row: ModeratableRow, from: ModeratableRow["moderationStatus"], to: ModeratableRow["moderationStatus"]): Promise<void>;
 }
 
 const REGISTRY: Record<ContentType, ModeratableRepo> = {
@@ -54,7 +61,7 @@ const REGISTRY: Record<ContentType, ModeratableRepo> = {
       return r && { id: r.comment.id, authorMembershipId: r.comment.authorMembershipId, moderationStatus: r.comment.moderationStatus, title: r.comment.body.slice(0, 80), postId: r.comment.postId };
     },
     set: setCommentModeration,
-    afterTransition: async (_ctx, db, row, from, to) => {
+    afterTransition: async (_ctx, db, _tenantCtx, row, from, to) => {
       if (!row.postId) return;
       if (from === "APPROVED" && to === "REMOVED") await adjustCommentCount(db, row.postId, -1);
       if (from === "REMOVED" && to === "APPROVED") await adjustCommentCount(db, row.postId, 1);
@@ -89,10 +96,37 @@ const REGISTRY: Record<ContentType, ModeratableRepo> = {
     set: setBusinessModeration,
     // A removed listing frees a place under the member's cap, which may have been taken since.
     beforeRestore: async (db, t, row) => {
-      if (!(await hasRoomForBusiness(db, t, row.authorMembershipId))) {
+      if (row.authorMembershipId && !(await hasRoomForBusiness(db, t, row.authorMembershipId))) {
         throw AppError.conflict(`This member already has ${MAX_BUSINESS_LISTINGS} business listings. One has to go before this one can be restored.`);
       }
     },
+  },
+  // Its name and description, never its messages. The statement that changes its status also publishes or withdraws what
+  // members see (see setGroupModeration), so the room and its review can't disagree.
+  GROUP: {
+    find: async (db, t, id) => {
+      const r = await findGroupById(db, t, id);
+      return r && { id: r.conversationId, authorMembershipId: r.ownerMembershipId, moderationStatus: r.moderationStatus, title: r.name };
+    },
+    // Approving publishes the name and description to every member, and the owner can change both while the group waits
+    // without its status moving, so an approval says what it approves and is refused if that's no longer what the group
+    // says. Restoring needs nothing: a removed group can't be edited, so it comes back with the text that was approved.
+    set: async (db, t, id, patch, from, reviewed) => {
+      const publishing = patch.moderationStatus === "APPROVED" && from !== "REMOVED";
+      if (publishing && !reviewed) throw AppError.badRequest("Open the group's details, check its name and description, then approve it.");
+      if (!(await setGroupModeration(db, t, id, patch, from, publishing ? reviewed : undefined))) throw AppError.conflict("This group changed while you were looking at it. Reload it and try again.");
+    },
+    // A removed group doesn't count towards its owner's cap, so they may have started others since.
+    beforeRestore: async (db, t, row) => {
+      if (!row.authorMembershipId) return;
+      await lockMembership(db, t, row.authorMembershipId);
+      if ((await countOwnedGroups(db, t, row.authorMembershipId)) >= CHAT_GROUP_MAX_OWNED) {
+        throw AppError.conflict(`This member already owns ${CHAT_GROUP_MAX_OWNED} groups. One has to be archived before this one can be restored.`);
+      }
+    },
+    // Whatever an admin decided changes what its members and invitees can see, so all of them hear, those it now hides it
+    // from included: that's how a removed group leaves their inbox. The hint says nothing of what was decided.
+    afterTransition: (ctx, db, tenantCtx, row) => announceGroupChange(ctx, db, chatTenantOf(tenantCtx), row.id, { evenIfHidden: true, invitees: true }),
   },
 };
 
@@ -123,7 +157,7 @@ export async function moderateContent(
   id: string,
   action: ContentAction,
   note?: string | null,
-  opts: { skipReportResolution?: boolean } = {},
+  opts: { skipReportResolution?: boolean; reviewed?: ReviewedText } = {},
 ): Promise<ModerationResult> {
   const { db } = ctx;
   const repo = REGISTRY[contentType];
@@ -133,17 +167,24 @@ export async function moderateContent(
   const to = transitionContent(row.moderationStatus, action);
   const write = async (tx: DbClient) => {
     if (action === "restore") await repo.beforeRestore?.(tx, tenantId, row);
-    await repo.set(tx, tenantId, id, {
-      moderationStatus: to,
-      moderatedByUserId: actor.userId,
-      moderatedAt: new Date(),
-      moderationNote: note ?? null,
-    });
+    await repo.set(
+      tx,
+      tenantId,
+      id,
+      {
+        moderationStatus: to,
+        moderatedByUserId: actor.userId,
+        moderatedAt: new Date(),
+        moderationNote: note ?? null,
+      },
+      row.moderationStatus,
+      opts.reviewed,
+    );
   };
   // A check needs its write in the same transaction, or two restores could both find the one free place.
   if (action === "restore" && repo.beforeRestore) await runInTransaction(ctx, write);
   else await write(db);
-  await repo.afterTransition?.(ctx, db, row, row.moderationStatus, to);
+  await repo.afterTransition?.(ctx, db, tenantCtx, row, row.moderationStatus, to);
   await recordAudit(ctx, {
     tenantId,
     actorUserId: actor.userId,
@@ -155,7 +196,7 @@ export async function moderateContent(
     ip: actor.ip,
   });
   const n = AUTHOR_NOTIFICATIONS[action];
-  if (n) {
+  if (n && row.authorMembershipId) {
     const label = contentLabel(contentType);
     await notify(ctx, {
       tenantId,
@@ -196,7 +237,32 @@ export async function getContentForAdmin(ctx: AppContext, tenantCtx: TenantConte
       return getEventForAdmin(ctx, tenantCtx, actor, id);
     case "BUSINESS":
       return getBusinessForAdmin(ctx, tenantCtx, actor, id);
+    case "GROUP":
+      return getGroupForAdmin(ctx, tenantCtx.tenant.id, id);
   }
+}
+
+/** What an admin reviews of a group: what its owner submitted and what members see now. Its messages are never part of it. */
+async function getGroupForAdmin(ctx: AppContext, tenantId: string, id: string): Promise<ChatGroupContentDto> {
+  const found = await findGroupWithOwner(ctx.db, tenantId, id);
+  if (!found) throw AppError.notFound("Group not found");
+  const { group, owner } = found;
+  return {
+    id: group.conversationId,
+    name: group.name,
+    description: group.description,
+    approvedName: group.approvedName,
+    approvedDescription: group.approvedDescription,
+    visibility: group.visibility,
+    memberCount: group.memberCount,
+    owner: owner ? toMemberCardDto(owner) : null,
+    archived: !!group.archivedAt,
+    moderationStatus: group.moderationStatus,
+    moderationNote: group.moderationNote,
+    moderatedAt: group.moderatedAt?.toISOString() ?? null,
+    createdAt: group.createdAt.toISOString(),
+    updatedAt: group.updatedAt.toISOString(),
+  };
 }
 
 /** Id of the stand-in membership the admin routes give platform admins who are not members. */

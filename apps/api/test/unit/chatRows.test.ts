@@ -10,7 +10,7 @@ const NOW = new Date("2026-06-15T12:00:00.000Z");
 let seq = 0;
 function msg(sender: string | null, at: string, overrides: Partial<ChatMessageDto> = {}): ThreadItem {
   seq += 1;
-  const message: ChatMessageDto = { id: `id-${seq}`, conversationId: "c1", seq, kind: "TEXT", sender: sender ? { id: sender, fullName: sender, avatarUrl: null } : null, body: "Text", removed: false, meta: null, clientKey: null, createdAt: at, ...overrides };
+  const message: ChatMessageDto = { id: `id-${seq}`, conversationId: "c1", seq, kind: "TEXT", sender: sender ? { id: sender, fullName: sender, avatarUrl: null } : null, body: "Text", removed: false, redacted: false, meta: null, clientKey: null, createdAt: at, ...overrides };
   return { key: message.clientKey ?? message.id, message, pending: null };
 }
 const pending = (at: string, clientKey = "k1"): ThreadItem => {

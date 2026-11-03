@@ -19,8 +19,10 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
       return `${base}/businesses/${t.id}`;
     case "chat":
       return `${base}/messages/${t.conversationId}`;
+    case "chatGroup":
+      return `${base}/groups?tab=invitations`;
     case "myContent":
-      return `${base}/profile/my-content`;
+      return `${base}/profile/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
     case "profile":
       return `${base}/profile`;
     case "celebrations":

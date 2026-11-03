@@ -5,7 +5,16 @@ import { useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
-const FEATURE_LABELS: Record<TenantFeature, string> = { feed: "Community feed", jobs: "Jobs", funding: "Funding", events: "Events & meetups", directory: "Member directory", businesses: "Business directory", messaging: "Messaging" };
+const FEATURE_LABELS: Record<TenantFeature, string> = {
+  feed: "Community feed",
+  jobs: "Jobs",
+  funding: "Funding",
+  events: "Events & meetups",
+  directory: "Member directory",
+  businesses: "Business directory",
+  messaging: "Messaging",
+  groups: "Groups",
+};
 
 export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
   const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
@@ -48,7 +57,7 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
             <option value="ADMIN_APPROVAL">Admin must approve members</option>
           </Select>
         </FormField>
-        <FormField label="Content moderation" hint="Applies to posts, jobs, funding, events and businesses. Comments are never held.">
+        <FormField label="Content moderation" hint="Applies to posts, jobs, funding, events, businesses, and groups' names and descriptions. Comments and messages are never held.">
           <Select value={contentModerationMode} onChange={(e) => setContentModerationMode(e.target.value as (typeof APPROVAL_MODES)[number])}>
             <option value="AUTO_APPROVE">Publish immediately</option>
             <option value="ADMIN_APPROVAL">Admin must approve before publishing</option>
@@ -74,6 +83,7 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
             <Checkbox key={f} checked={features[f]} onChange={(e) => setFeatures({ ...features, [f]: e.target.checked })} label={FEATURE_LABELS[f]} />
           ))}
         </div>
+        <p className="mt-2 text-xs text-slate-500">Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.</p>
         {tenantType === "SCHOOL" && (
           <p className="mt-2 text-xs text-slate-500">
             {new Intl.ListFormat("en-GB").format(SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]))} {SCHOOL_OFF_FEATURES.length === 1 ? "starts" : "start"} off for schools because members can contact each other privately there. If you turn {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"} on, current pupils still can't use {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"}.

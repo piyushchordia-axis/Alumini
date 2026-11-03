@@ -40,7 +40,9 @@ export interface JobPayloads {
   /** Tell a conversation's members about messages they still haven't read, at most once per `quietSec` each. Ids only, like every chat job. */
   "chat.pushConversation": { tenantId: string; conversationId: string; quietSec: number };
   /** Tell a conversation's members one thing happened to it, other than a message. */
-  "chat.pushEvent": { tenantId: string; conversationId: string; kind: Exclude<ChatPushKind, "CHAT_MESSAGE">; actorMembershipId: string | null };
+  "chat.pushEvent": { tenantId: string; conversationId: string; kind: Exclude<ChatPushKind, "CHAT_MESSAGE" | "CHAT_GROUP_INVITE">; actorMembershipId: string | null };
+  /** Tell members they've been invited to a group. They aren't in it, so this names them rather than reading its participants. */
+  "chat.pushGroupInvite": { tenantId: string; conversationId: string; inviteeMembershipIds: string[] };
 }
 
 export type JobName = keyof JobPayloads;
@@ -72,4 +74,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "digest.batch": { queue: "jobs", attempts: 5, backoff: { type: "exponential", delayMs: 10_000 } },
   "chat.pushConversation": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "chat.pushEvent": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
+  "chat.pushGroupInvite": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
 };

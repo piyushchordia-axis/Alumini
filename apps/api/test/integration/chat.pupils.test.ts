@@ -7,7 +7,7 @@ import { runInTransaction } from "../../src/lib/transaction";
 import { lockConversation } from "../../src/repositories/chat.repo";
 import { appendMessage, chatRecipients } from "../../src/services/chat/fanout";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
-import { acceptedThread, chatApi, type Session } from "../helpers/chat";
+import { acceptedThread, chatApi, createGroup, groupsApi, type Session } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -64,6 +64,63 @@ describe.skipIf(!dbAvailable)("current pupils", () => {
           expect(res.headers["cache-control"]).toBe("no-store");
         }
         expect((await me(tenant.slug, pupil)).body.data.chatEligible).toBe(false);
+      });
+    }
+  });
+
+  describe("and groups", () => {
+    /** A school with groups and messaging both on, so only the pupil rule can be what keeps them out. */
+    async function groupSchool() {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL", features: { messaging: true, groups: true } });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2000 });
+      const open = await createGroup(ctx, tenant.slug, alum, { name: "Old boys and girls" });
+      const closed = await createGroup(ctx, tenant.slug, alum, { name: "Committee", visibility: "INVITE_ONLY" });
+      return { tenant, alum, open, closed };
+    }
+
+    for (const rule of RULES) {
+      it(`refuse every group route to ${rule.name}, with groups on`, async () => {
+        const { tenant, alum, open, closed } = await groupSchool();
+        const pupil = await memberSession(ctx, tenant.id, rule.member());
+        const g = groupsApi(ctx, tenant.slug, pupil);
+        for (const id of [open.id, closed.id]) {
+          for (const res of [await g.list(), await g.create({ name: "Our class", visibility: "OPEN" }), await g.invites(), await g.get(id), await g.members(id), await g.candidates(id), await g.join(id), await g.leave(id), await g.invite(id, [alum.membership.id]), await g.accept(id), await g.decline(id), await g.edit(id, { name: "Renamed" }), await g.remove(id, alum.membership.id)]) {
+            expect(res.status, res.request.url).toBe(403);
+            expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+            expect(res.headers["cache-control"]).toBe("no-store");
+          }
+          // Reporting goes through content reports, which pupils can use for other things, so a group answers as if it didn't exist.
+          expect((await g.report(id)).status).toBe(404);
+        }
+      });
+    }
+
+    it("never shows a pupil as someone to invite, and refuses inviting one", async () => {
+      const { tenant, alum, open } = await groupSchool();
+      const pupil = await memberSession(ctx, tenant.id, { batchYear: thisYear() + 1 });
+      const candidates = (await groupsApi(ctx, tenant.slug, alum).candidates(open.id)).body.data as Array<{ id: string }>;
+      expect(candidates.map((m) => m.id)).not.toContain(pupil.membership.id);
+      const res = await groupsApi(ctx, tenant.slug, alum).invite(open.id, [pupil.membership.id]);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("CONTACT_UNAVAILABLE");
+    });
+
+    for (const rule of RULES) {
+      it(`stop delivering to a member who becomes a pupil by ${rule.name}, who can't send there either`, async () => {
+        const { tenant, alum, open } = await groupSchool();
+        const member = await memberSession(ctx, tenant.id, { batchYear: 2001 });
+        await groupsApi(ctx, tenant.slug, member).join(open.id);
+        await chatApi(ctx, tenant.slug, alum).send(open.id, "Delivered");
+        expect(realtime.to(member.user.id, "chat:message").map((e) => (e.payload as { message: { body: string } }).message.body)).toContain("Delivered");
+
+        await ctx.db.update(memberships).set(rule.member()).where(eq(memberships.id, member.membership.id));
+        expect((await chatRecipients(ctx.db, open.id)).map((r) => r.membershipId)).toEqual([alum.membership.id]);
+        realtime.clear();
+        await chatApi(ctx, tenant.slug, alum).send(open.id, "Not delivered");
+        expect(realtime.to(member.user.id)).toEqual([]);
+        const refused = await chatApi(ctx, tenant.slug, member).send(open.id, "From a pupil");
+        expect(refused.status).toBe(403);
+        expect(refused.body.error.code).toBe("FEATURE_DISABLED");
       });
     }
   });

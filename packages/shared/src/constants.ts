@@ -83,6 +83,36 @@ export const CHAT_MAX_REQUESTS_PER_PAIR = 3;
 export const CHAT_REPORT_CONTEXT_EACH_SIDE = 5;
 /** How clients show a message or thread whose other member deleted their account. */
 export const DELETED_MEMBER_NAME = "Deleted member";
+/** How a group shows someone this member has blocked, in place of their name and words. */
+export const BLOCKED_MEMBER_NAME = "Blocked member";
+
+/** OPEN: any member can find and join it, with the whole history. INVITE_ONLY: only invitees see it, from when they join. Fixed at creation. */
+export const CHAT_GROUP_VISIBILITIES = ["OPEN", "INVITE_ONLY"] as const;
+export type ChatGroupVisibility = (typeof CHAT_GROUP_VISIBILITIES)[number];
+/** What creating a group says about each choice, on both apps. */
+export const CHAT_GROUP_VISIBILITY_INFO: Record<ChatGroupVisibility, { label: string; description: string }> = {
+  OPEN: { label: "Open group", description: "Any member can find and join this group, and new members see the whole conversation." },
+  INVITE_ONLY: { label: "Invite-only group", description: "Only people you invite can see this group. New members see messages from when they join." },
+};
+/** DISCOVER: open groups to find. MINE: groups the member is in. OWNED: groups they own, with how moderation left them. */
+export const CHAT_GROUP_SCOPES = ["DISCOVER", "MINE", "OWNED"] as const;
+export type ChatGroupScope = (typeof CHAT_GROUP_SCOPES)[number];
+/** What a group's system line is about. Its member is the message's sender. */
+export const CHAT_GROUP_EVENTS = ["JOINED", "LEFT", "REMOVED", "OWNER_CHANGED", "ARCHIVED"] as const;
+export type ChatGroupEvent = (typeof CHAT_GROUP_EVENTS)[number];
+export const CHAT_GROUP_NAME_MIN_LENGTH = 3;
+export const CHAT_GROUP_NAME_MAX_LENGTH = 80;
+export const CHAT_GROUP_DESCRIPTION_MAX_LENGTH = 500;
+export const CHAT_GROUP_MAX_MEMBERS = 500;
+/** Invitations a group may have waiting at once. */
+export const CHAT_GROUP_MAX_PENDING_INVITES = 100;
+/** Groups one member may own, not counting archived or removed ones. */
+export const CHAT_GROUP_MAX_OWNED = 20;
+export const CHAT_GROUP_INVITES_PER_CALL = 25;
+/** An invitation lapses after this long, accepted or not. */
+export const CHAT_GROUP_INVITE_TTL_DAYS = 30;
+/** How long declining someone's invitation or message request keeps their invitations away. */
+export const CHAT_INVITE_DECLINE_DAYS = 30;
 
 export const EVENT_KINDS = ["CASUAL_MEETUP", "ORGANISED_EVENT"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -93,7 +123,8 @@ export type RsvpStatus = (typeof RSVP_STATUSES)[number];
 export const REACTION_TYPES = ["LIKE", "LOVE", "CELEBRATE", "INSIGHTFUL"] as const;
 export type ReactionType = (typeof REACTION_TYPES)[number];
 
-export const CONTENT_TYPES = ["POST", "COMMENT", "JOB", "FUNDING", "EVENT", "BUSINESS"] as const;
+/** GROUP is a group's name and description, never its messages: chat stays out of moderation. */
+export const CONTENT_TYPES = ["POST", "COMMENT", "JOB", "FUNDING", "EVENT", "BUSINESS", "GROUP"] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
 export const REPORT_REASONS = ["SPAM", "HARASSMENT", "INAPPROPRIATE", "MISINFORMATION", "OTHER"] as const;
@@ -183,7 +214,7 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const MAX_INVITE_IMPORT_ROWS = 500;
 export const INVITE_TTL_DAYS = 90;
 
-export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging"] as const;
+export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging", "groups"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
 
@@ -297,6 +328,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   FUNDING: "Funding listing",
   EVENT: "Event",
   BUSINESS: "Business listing",
+  GROUP: "Group",
 };
 
 export const TENANT_TYPE_LABELS: Record<TenantType, string> = {

@@ -5,7 +5,7 @@ import { sendInvitationBatch } from "../services/invitations.service";
 import { fanoutAnnouncement } from "../services/announcements.service";
 import { engagementTick, runCelebrations } from "../services/celebrations.service";
 import { runDigest, sendDigestBatch } from "../services/digest.service";
-import { pushConversation, pushEvent } from "../services/chat/push";
+import { pushConversation, pushEvent, pushGroupInvite } from "../services/chat/push";
 import type { JobHandlers } from "./JobQueue";
 
 /** The one registry of job handlers; every name in JobPayloads must have one (the type enforces it). */
@@ -26,4 +26,5 @@ export const jobHandlers: JobHandlers = {
   "digest.batch": sendDigestBatch,
   "chat.pushConversation": pushConversation,
   "chat.pushEvent": pushEvent,
+  "chat.pushGroupInvite": pushGroupInvite,
 };

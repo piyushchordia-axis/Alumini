@@ -1,5 +1,5 @@
-import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, chatMuteUntil, conversationPreview, formatChatTime, isMuted, isMutedUntilTurnedOn, peerName, unsentRemainder } from "@illuminize/shared/chat";
-import { chatMuteSchema } from "@illuminize/shared";
+import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, groupsBadgeLabel, chatMuteUntil, conversationPreview, conversationTitle, formatChatTime, isMuted, isMutedUntilTurnedOn, messageSenderName, peerName, systemLineText, unsentRemainder } from "@illuminize/shared/chat";
+import { BLOCKED_MEMBER_NAME, DELETED_MEMBER_NAME, chatMuteSchema, type ChatConversationGroupDto, type ChatLastMessageDto } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
@@ -35,12 +35,25 @@ describe("chatMuteUntil", () => {
 describe("chatBadgeLabel", () => {
   it("says nothing extra with nothing waiting, or before it has loaded", () => {
     expect(chatBadgeLabel(undefined)).toEqual({ count: 0, label: "Messages" });
-    expect(chatBadgeLabel({ unread: 0, requests: 0 })).toEqual({ count: 0, label: "Messages" });
+    expect(chatBadgeLabel({ unread: 0, requests: 0, invites: 0 })).toEqual({ count: 0, label: "Messages" });
   });
 
-  it("counts threads with something unread and requests waiting", () => {
-    expect(chatBadgeLabel({ unread: 2, requests: 1 })).toEqual({ count: 3, label: "Messages, 3 unread" });
-    expect(chatBadgeLabel({ unread: 0, requests: 1 })).toEqual({ count: 1, label: "Messages, 1 unread" });
+  it("counts threads with something unread and requests waiting, and never group invitations", () => {
+    expect(chatBadgeLabel({ unread: 2, requests: 1, invites: 4 })).toEqual({ count: 3, label: "Messages, 3 unread" });
+    expect(chatBadgeLabel({ unread: 0, requests: 1, invites: 0 })).toEqual({ count: 1, label: "Messages, 1 unread" });
+    expect(chatBadgeLabel({ unread: 0, requests: 0, invites: 2 })).toEqual({ count: 0, label: "Messages" });
+  });
+});
+
+describe("groupsBadgeLabel", () => {
+  it("names the Groups entry plainly with no invitations, or before it has loaded", () => {
+    expect(groupsBadgeLabel(undefined)).toEqual({ count: 0, label: "Groups" });
+    expect(groupsBadgeLabel({ unread: 5, requests: 2, invites: 0 })).toEqual({ count: 0, label: "Groups" });
+  });
+
+  it("counts invitations waiting, one or several", () => {
+    expect(groupsBadgeLabel({ unread: 0, requests: 0, invites: 1 })).toEqual({ count: 1, label: "Groups, 1 invitation" });
+    expect(groupsBadgeLabel({ unread: 3, requests: 0, invites: 2 })).toEqual({ count: 2, label: "Groups, 2 invitations" });
   });
 });
 
@@ -68,13 +81,62 @@ describe("thread labels shared by both apps", () => {
   });
 
   it("keeps a request's words out of the inbox until it's opened", () => {
-    const lastMessage = { seq: 1, body: "Hello there", mine: false, createdAt: NOW.toISOString() };
-    expect(conversationPreview({ state: "REQUEST_RECEIVED", lastMessage })).toBe("Wants to send you a message");
-    expect(conversationPreview({ state: "REQUEST_SENT", lastMessage: { ...lastMessage, mine: true } })).toBe("Request sent");
-    expect(conversationPreview({ state: "ACCEPTED", lastMessage })).toBe("Hello there");
-    expect(conversationPreview({ state: "ACCEPTED", lastMessage: { ...lastMessage, mine: true } })).toBe("You: Hello there");
-    expect(conversationPreview({ state: "ACCEPTED", lastMessage: { ...lastMessage, body: null } })).toBe("This message was removed");
-    expect(conversationPreview({ state: "CLOSED", lastMessage: null })).toBe("Conversation closed");
+    const lastMessage: ChatLastMessageDto = { seq: 1, kind: "TEXT", body: "Hello there", mine: false, sender: null, redacted: false, createdAt: NOW.toISOString() };
+    const direct = { group: null };
+    expect(conversationPreview({ ...direct, state: "REQUEST_RECEIVED", lastMessage })).toBe("Wants to send you a message");
+    expect(conversationPreview({ ...direct, state: "REQUEST_SENT", lastMessage: { ...lastMessage, mine: true } })).toBe("Request sent");
+    expect(conversationPreview({ ...direct, state: "ACCEPTED", lastMessage })).toBe("Hello there");
+    expect(conversationPreview({ ...direct, state: "ACCEPTED", lastMessage: { ...lastMessage, mine: true } })).toBe("You: Hello there");
+    expect(conversationPreview({ ...direct, state: "ACCEPTED", lastMessage: { ...lastMessage, body: null } })).toBe("This message was removed");
+    expect(conversationPreview({ ...direct, state: "CLOSED", lastMessage: null })).toBe("Conversation closed");
+  });
+
+  describe("in a group", () => {
+    const group: ChatConversationGroupDto = { name: "Weekend runners", visibility: "OPEN", memberCount: 3, archived: false, isOwner: false };
+    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null };
+    const last = (overrides: Partial<ChatLastMessageDto>): ChatLastMessageDto => ({ seq: 4, kind: "TEXT", body: "See you at seven", mine: false, sender: priya, redacted: false, createdAt: NOW.toISOString(), ...overrides });
+    const preview = (overrides: Partial<ChatLastMessageDto>) => conversationPreview({ state: "ACCEPTED", group, lastMessage: last(overrides) });
+
+    it("says who wrote it, and You for the member's own", () => {
+      expect(preview({})).toBe("Priya Sharma: See you at seven");
+      expect(preview({ mine: true, sender: { id: "m-me", fullName: "Me", avatarUrl: null } })).toBe("You: See you at seven");
+      expect(preview({ sender: null })).toBe(`${DELETED_MEMBER_NAME}: See you at seven`);
+      expect(preview({ body: null })).toBe("This message was removed");
+    });
+
+    it("reads a system line on from the member it's about", () => {
+      expect(preview({ kind: "SYSTEM", body: "joined the group" })).toBe("Priya Sharma joined the group");
+      expect(preview({ kind: "SYSTEM", body: "left the group", mine: true })).toBe("You left the group");
+      expect(preview({ kind: "SYSTEM", body: "left the group", sender: null })).toBe(`${DELETED_MEMBER_NAME} left the group`);
+      expect(preview({ kind: "SYSTEM", body: "is now the group's owner", mine: true })).toBe("You are now the group's owner");
+    });
+
+    it("puts the verb in the member's own form in their own system lines, and nowhere else", () => {
+      const line = (body: string, mine: boolean, sender: typeof priya | null = priya, redacted = false) => systemLineText({ body, sender, redacted }, mine);
+      expect(line("is now the group's owner", true)).toBe("You are now the group's owner");
+      expect(line("was removed from the group", true)).toBe("You were removed from the group");
+      expect(line("archived the group", true)).toBe("You archived the group");
+      expect(line("is now the group's owner", false)).toBe("Priya Sharma is now the group's owner");
+      expect(line("was removed from the group", false, null)).toBe(`${DELETED_MEMBER_NAME} was removed from the group`);
+      expect(line("joined the group", false, null, true)).toBe(`${BLOCKED_MEMBER_NAME} joined the group`);
+    });
+
+    it("never shows a blocked member's words or name", () => {
+      const redacted = preview({ sender: null, body: null, redacted: true });
+      expect(redacted).toBe("Message from a blocked member");
+      expect(redacted).not.toContain("Priya");
+      expect(preview({ kind: "SYSTEM", body: "joined the group", sender: null, redacted: true })).toBe(`${BLOCKED_MEMBER_NAME} joined the group`);
+    });
+  });
+
+  it("names a thread and a message's sender, standing in for members who are gone or blocked", () => {
+    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null };
+    expect(conversationTitle({ peer: priya, group: null })).toBe("Priya Sharma");
+    expect(conversationTitle({ peer: null, group: null })).toBe(DELETED_MEMBER_NAME);
+    expect(conversationTitle({ peer: null, group: { name: "Weekend runners", visibility: "OPEN", memberCount: 2, archived: false, isOwner: true } })).toBe("Weekend runners");
+    expect(messageSenderName({ sender: priya, redacted: false })).toBe("Priya Sharma");
+    expect(messageSenderName({ sender: null, redacted: false })).toBe(DELETED_MEMBER_NAME);
+    expect(messageSenderName({ sender: null, redacted: true })).toBe(BLOCKED_MEMBER_NAME);
   });
 });
 

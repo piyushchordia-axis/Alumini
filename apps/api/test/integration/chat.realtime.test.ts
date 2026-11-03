@@ -11,7 +11,7 @@ import { chatMessages, memberships } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { lockConversation } from "../../src/repositories/chat.repo";
 import { appendMessage, chatRecipients, publishRemoved } from "../../src/services/chat/fanout";
-import { acceptedThread, chatApi, newKey, openRequest, type Session } from "../helpers/chat";
+import { acceptedThread, chatApi, createGroup, groupsApi, newKey, openRequest, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { connect, next, openSockets, startServer, waitForRoom, type Harness } from "../helpers/realtimeHarness";
 import { isDatabaseAvailable } from "../helpers/testContext";
@@ -117,7 +117,7 @@ describe.skipIf(!dbAvailable)("chat over real sockets", () => {
     const unread = next<ChatUnreadEvent>(recipient, "chat:unread");
     await chat(b).decline(conversation.id);
     await changed;
-    expect(await unread).toEqual({ tenantSlug: tenant.slug, membershipId: b.membership.id, unread: 0, requests: 0 });
+    expect(await unread).toEqual({ tenantSlug: tenant.slug, membershipId: b.membership.id, unread: 0, requests: 0, invites: 0 });
     await settle();
     expect(requester).toEqual([]);
   });
@@ -132,7 +132,7 @@ describe.skipIf(!dbAvailable)("chat over real sockets", () => {
     const unread = next<ChatUnreadEvent>(otherDevice, "chat:unread");
     await chat(b).read(id, 2);
     expect(await read).toEqual({ tenantSlug: tenant.slug, conversationId: id, membershipId: b.membership.id, lastReadSeq: 2 });
-    expect(await unread).toEqual({ tenantSlug: tenant.slug, membershipId: b.membership.id, unread: 0, requests: 0 });
+    expect(await unread).toEqual({ tenantSlug: tenant.slug, membershipId: b.membership.id, unread: 0, requests: 0, invites: 0 });
     await settle();
     expect(sender).toEqual([]);
   });
@@ -262,6 +262,161 @@ describe.skipIf(!dbAvailable)("chat over real sockets", () => {
     expect(peer).toEqual([]);
     expect(sender.connected).toBe(true);
     expect(await h.ctx.db.select().from(chatMessages).where(eq(chatMessages.body, "Forged"))).toEqual([]);
+  });
+
+  describe("in a group", () => {
+    /** An open group a owns, with b and c in it, and d in the institution but not the group. */
+    async function groupSetup() {
+      const s = await setup();
+      const c = await memberSession(h.ctx, s.tenant.id);
+      const d = await memberSession(h.ctx, s.tenant.id);
+      const groups = (m: Session) => groupsApi(h.ctx, s.tenant.slug, m);
+      const group = await createGroup(h.ctx, s.tenant.slug, s.a, { name: "Live room" });
+      for (const m of [s.b, c]) await groups(m).join(group.id);
+      return { ...s, c, d, groups, group };
+    }
+    const events = (log: Array<{ event: string; payload: unknown }>, name: string) => log.filter((e) => e.event === name).map((e) => e.payload);
+
+    it("delivers a message to every member and the sender's other devices, and to nobody outside it, gone from it, or who blocked the sender", async () => {
+      const { tenant, a, b, c, d, chat, groups, group } = await groupSetup();
+      const leaver = await memberSession(h.ctx, tenant.id);
+      await groups(leaver).join(group.id);
+      await groups(leaver).leave(group.id);
+      await chat(c).block(b.membership.id);
+      const atOwner = await live(a);
+      const senderDevice = await live(b);
+      const blocker = heard(await live(c));
+      const outsider = heard(await live(d));
+      const gone = heard(await live(leaver));
+
+      const atA = next<ChatMessageEvent>(atOwner, "chat:message");
+      const echo = next<ChatMessageEvent>(senderDevice, "chat:message");
+      const key = newKey();
+      const sent = await chat(b).send(group.id, "For the room", key);
+      expect(await atA).toMatchObject({ tenantSlug: tenant.slug, conversationId: group.id, message: { body: "For the room", sender: { id: b.membership.id }, clientKey: null, redacted: false } });
+      expect((await echo).message).toEqual(sent.body.data);
+      await settle();
+      expect(blocker).toEqual([]);
+      expect(outsider).toEqual([]);
+      expect(gone).toEqual([]);
+    });
+
+    it("tells a member who leaves or is removed on their own devices, and everyone still in it, and keeps their badge right", async () => {
+      const { a, b, c, chat, groups, group } = await groupSetup();
+      const leaving = await live(b);
+      const staying = heard(await live(a));
+      const leftChanged = next<ChatChangedEvent>(leaving, "chat:changed");
+      const leftBadge = next<ChatUnreadEvent>(leaving, "chat:unread");
+      await groups(b).leave(group.id);
+      expect(await leftChanged).toMatchObject({ conversationId: group.id });
+      expect(await leftBadge).toMatchObject({ membershipId: b.membership.id, unread: 0 });
+      await settle();
+      expect(events(staying, "chat:changed")).toEqual([expect.objectContaining({ conversationId: group.id })]);
+      expect(events(staying, "chat:message")).toEqual([expect.objectContaining({ message: expect.objectContaining({ kind: "SYSTEM", meta: { event: "LEFT" }, sender: expect.objectContaining({ id: b.membership.id }) }) })]);
+
+      const removed = await live(c);
+      const removedChanged = next<ChatChangedEvent>(removed, "chat:changed");
+      await groups(a).remove(group.id, c.membership.id);
+      expect(await removedChanged).toMatchObject({ conversationId: group.id });
+      // Gone from it, so a message after that is no longer theirs to hear.
+      const after = heard(removed);
+      await chat(a).send(group.id, "After they went");
+      await settle();
+      expect(events(after, "chat:message")).toEqual([]);
+    });
+
+    it("tells an invitee alone, with their badge, and nobody anything when the invitation is suppressed", async () => {
+      const { tenant, a, b, d, groups, group } = await groupSetup();
+      const member = heard(await live(b));
+      const invitee = await live(d);
+      const changed = next<ChatChangedEvent>(invitee, "chat:changed");
+      const badge = next<ChatUnreadEvent>(invitee, "chat:unread");
+      await groups(a).invite(group.id, [d.membership.id]);
+      expect(await changed).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      expect(await badge).toEqual({ tenantSlug: tenant.slug, membershipId: d.membership.id, unread: 0, requests: 0, invites: 1 });
+
+      const accepted = next<ChatUnreadEvent>(invitee, "chat:unread");
+      await groups(d).accept(group.id);
+      expect((await accepted).invites).toBe(0);
+      await settle();
+      expect(events(member, "chat:unread")).toEqual([]);
+
+      const blocker = await memberSession(h.ctx, tenant.id);
+      await chatApi(h.ctx, tenant.slug, blocker).block(a.membership.id);
+      const nothing = heard(await live(blocker));
+      await groups(a).invite(group.id, [blocker.membership.id]);
+      await settle();
+      expect(nothing).toEqual([]);
+    });
+
+    it("tells its members when an admin removes it, though they can no longer open it, and again when it's restored", async () => {
+      const { tenant, b, group } = await groupSetup();
+      const admin = await memberSession(h.ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const member = await live(b);
+      const removed = next<ChatChangedEvent>(member, "chat:changed");
+      await request(h.ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${group.id}/remove`).set(admin.headers).send({ note: "Off topic" }).expect(200);
+      expect(await removed).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      const restored = next<ChatChangedEvent>(member, "chat:changed");
+      await request(h.ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${group.id}/restore`).set(admin.headers).send({}).expect(200);
+      expect(await restored).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+    });
+
+    it("tells members and invitees when a published edit renames it, and the new owner when a suspension hands it over", async () => {
+      const { tenant, a, b, d, groups, group } = await groupSetup();
+      await groups(a).invite(group.id, [d.membership.id]);
+      const member = await live(b);
+      const invitee = await live(d);
+      const atMember = next<ChatChangedEvent>(member, "chat:changed");
+      const atInvitee = next<ChatChangedEvent>(invitee, "chat:changed");
+      // Approved at once here, so what everyone sees changes with it.
+      expect((await groups(a).edit(group.id, { name: "Live room, renamed" })).body.data.review).toMatchObject({ moderationStatus: "APPROVED" });
+      expect(await atMember).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      expect(await atInvitee).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+
+      const admin = await memberSession(h.ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const handedOver = next<ChatChangedEvent>(member, "chat:changed");
+      const suspended = await request(h.ctx.app).post(`/api/v1/t/${tenant.slug}/admin/members/${a.membership.id}/suspend`).set(admin.headers).send({ reason: "Testing" });
+      expect(suspended.status).toBeLessThan(300);
+      expect(await handedOver).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      expect((await groups(b).get(group.id)).body.data).toMatchObject({ isOwner: true });
+    });
+
+    it("tells a waiting invitee when the group is archived, with their invitations counted down", async () => {
+      const { tenant, a, d, groups, group } = await groupSetup();
+      await groups(a).invite(group.id, [d.membership.id]);
+      const invitee = await live(d);
+      const changed = next<ChatChangedEvent>(invitee, "chat:changed");
+      const badge = next<ChatUnreadEvent>(invitee, "chat:unread");
+      await groups(a).archive(group.id);
+      expect(await changed).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      expect(await badge).toMatchObject({ membershipId: d.membership.id, invites: 0 });
+    });
+
+    it("tells only the blocker's own devices about each group they share with whoever they block or unblock", async () => {
+      const { tenant, b, c, chat, group } = await groupSetup();
+      const blockerDevice = await live(c);
+      const blocked = heard(await live(b));
+      const blocking = next<ChatChangedEvent>(blockerDevice, "chat:changed");
+      await chat(c).block(b.membership.id);
+      expect(await blocking).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      const unblocking = next<ChatChangedEvent>(blockerDevice, "chat:changed");
+      await chat(c).unblock(b.membership.id);
+      expect(await unblocking).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      await settle();
+      expect(blocked).toEqual([]);
+    });
+
+    it("keeps a joining member's inbox, and everyone's member count, current", async () => {
+      const { tenant, a, d, groups, group } = await groupSetup();
+      const joiner = heard(await live(d));
+      const owner = await live(a);
+      const ownerChanged = next<ChatChangedEvent>(owner, "chat:changed");
+      await groups(d).join(group.id);
+      expect(await ownerChanged).toEqual({ tenantSlug: tenant.slug, conversationId: group.id });
+      await settle();
+      expect(events(joiner, "chat:changed")).toEqual([{ tenantSlug: tenant.slug, conversationId: group.id }]);
+      expect(events(joiner, "chat:message")).toEqual([expect.objectContaining({ message: expect.objectContaining({ kind: "SYSTEM", meta: { event: "JOINED" } }) })]);
+    });
   });
 });
 

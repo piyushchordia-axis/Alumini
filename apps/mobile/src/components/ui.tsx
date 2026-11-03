@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type TextInputProps, type ViewStyle } from "react-native";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
@@ -102,12 +102,37 @@ export function Chip({ label, active, onPress, color, tall = false }: { label: s
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange, tall = false }: { tabs: { value: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; tall?: boolean }) {
+  const scroller = useRef<ScrollViewInstance>(null);
+  const offsets = useRef(new Map<string, number>());
+  const pressed = useRef(false);
+  // The chosen tab in view when a link chose it, even one past the edge of a narrow screen. A tab the member pressed is
+  // already in view, and the row stays where they left it.
+  const reveal = (x: number | undefined) => {
+    if (x !== undefined) scroller.current?.scrollTo({ x: Math.max(0, x - spacing.lg), animated: false });
+  };
+  useEffect(() => {
+    if (!pressed.current) reveal(offsets.current.get(value));
+    pressed.current = false;
+  }, [value]);
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
       {/* Labels stay on one line: tabs share the width when they fit and scroll sideways when they don't. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView ref={scroller} horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
         {tabs.map((t) => (
-          <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" aria-selected={value === t.value} style={[styles.tab, tall ? styles.tabTall : null, value === t.value ? styles.tabActive : null]}>
+          <Pressable
+            key={t.value}
+            onPress={() => {
+              pressed.current = t.value !== value;
+              onChange(t.value);
+            }}
+            onLayout={(e) => {
+              offsets.current.set(t.value, e.nativeEvent.layout.x);
+              if (t.value === value) reveal(e.nativeEvent.layout.x);
+            }}
+            accessibilityRole="tab"
+            aria-selected={value === t.value}
+            style={[styles.tab, tall ? styles.tabTall : null, value === t.value ? styles.tabActive : null]}
+          >
             <Text numberOfLines={1} style={[styles.tabText, value === t.value ? { color: colors.text } : null]}>
               {t.label}
             </Text>

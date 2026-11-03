@@ -88,7 +88,7 @@ export function MyProfilePage() {
           <Button
             variant="danger"
             onClick={async () => {
-              if (!confirm("Delete your Illuminize account and all your memberships? Messages you sent stay in other people's chats, shown as from a Deleted member. This cannot be undone.")) return;
+              if (!confirm("Delete your Illuminize account and all your memberships? Messages you sent stay in other people's chats and groups, shown as from a Deleted member, and groups you own pass to the member who has been in them longest. This cannot be undone.")) return;
               await api.me.deleteAccount();
               qc.clear();
               navigate("/");

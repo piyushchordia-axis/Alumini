@@ -1,7 +1,9 @@
 import {
   applyFeatureChange,
   changedFeatures,
+  chatAvailable,
   defaultFeaturesFor,
+  enabledGroupVisibilities,
   FEATURE_PREREQUISITES,
   resolveFeatures,
   retypeToSchool,
@@ -64,6 +66,54 @@ describe("the messaging key", () => {
     const { features, forcedOff } = retypeToSchool("COLLEGE", {});
     expect(features.messaging).toBe(false);
     expect(forcedOff).toContain("messaging");
+  });
+});
+
+describe("the groups key", () => {
+  it("starts off for schools and on everywhere else", () => {
+    expect(defaultFeaturesFor("SCHOOL").groups).toBe(false);
+    for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(defaultFeaturesFor(type).groups, type).toBe(true);
+    expect(SCHOOL_OFF_FEATURES).toContain("groups");
+  });
+
+  it("reads off for a school whose row doesn't mention it, on for anyone else's, and on where a school's admin turned it on", () => {
+    expect(resolveFeatures("SCHOOL", { feed: true, messaging: true }).groups).toBe(false);
+    expect(resolveFeatures("COLLEGE", { feed: true }).groups).toBe(true);
+    expect(resolveFeatures("SCHOOL", { groups: true }).groups).toBe(true);
+  });
+
+  it("isn't switched on at a school by a partial change to another key, messaging included", () => {
+    expect(applyFeatureChange("SCHOOL", { feed: true }, { messaging: true }).features.groups).toBe(false);
+  });
+
+  it("is forced off by retyping to a school, alongside messaging", () => {
+    const { features, forcedOff } = retypeToSchool("COLLEGE", {});
+    expect(features.groups).toBe(false);
+    expect(forcedOff).toEqual(expect.arrayContaining(["messaging", "groups"]));
+  });
+
+  it("stands on its own: switching messaging off leaves groups on, and the other way round", () => {
+    expect(applyFeatureChange("COLLEGE", {}, { messaging: false }).features).toMatchObject({ messaging: false, groups: true });
+    expect(applyFeatureChange("COLLEGE", {}, { groups: false }).features).toMatchObject({ messaging: true, groups: false });
+  });
+});
+
+describe("enabledGroupVisibilities", () => {
+  it("allows open groups on groups alone, and invite-only ones only with messaging as well", () => {
+    expect(enabledGroupVisibilities({ ...defaultFeaturesFor("COLLEGE") })).toEqual(["OPEN", "INVITE_ONLY"]);
+    expect(enabledGroupVisibilities({ ...defaultFeaturesFor("COLLEGE"), messaging: false })).toEqual(["OPEN"]);
+    expect(enabledGroupVisibilities({ ...defaultFeaturesFor("COLLEGE"), groups: false })).toEqual([]);
+    expect(enabledGroupVisibilities(defaultFeaturesFor("SCHOOL"))).toEqual([]);
+  });
+});
+
+describe("chatAvailable", () => {
+  it("is on with either chat switch, for a member who isn't a pupil", () => {
+    const off = { ...defaultFeaturesFor("COLLEGE"), messaging: false, groups: false };
+    expect(chatAvailable({ ...off, messaging: true }, true)).toBe(true);
+    expect(chatAvailable({ ...off, groups: true }, true)).toBe(true);
+    expect(chatAvailable(off, true)).toBe(false);
+    expect(chatAvailable(defaultFeaturesFor("COLLEGE"), false)).toBe(false);
   });
 });
 

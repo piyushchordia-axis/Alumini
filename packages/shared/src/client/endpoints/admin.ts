@@ -8,6 +8,7 @@ import type {
   InvitationsQuery,
   MembershipProfileUpdate,
   MembershipRole,
+  ModerationActionInput,
   ModerationQuery,
   ProfileFieldCreateInput,
   ProfileFieldUpdateInput,
@@ -49,8 +50,9 @@ export function adminEndpoints(core: ApiCore) {
     moderation: {
       list: (slug: string, query?: Partial<ModerationQuery>) => core.request<Page<ModerationItemDto>>({ ...p(slug, "/moderation"), query: q(query) }),
       get: (slug: string, contentType: ContentType, id: string) => core.data<ContentDto>(p(slug, `/moderation/${contentType}/${id}`)),
-      act: (slug: string, contentType: ContentType, id: string, action: ModerationAction, note?: string | null) =>
-        core.data<ModerationResultDto>({ method: "POST", ...p(slug, `/moderation/${contentType}/${id}/${action}`), body: { note: note ?? null } }),
+      /** `reviewed` is the name and description an admin approving a group was shown, which the API requires for that. */
+      act: (slug: string, contentType: ContentType, id: string, action: ModerationAction, note?: string | null, reviewed?: ModerationActionInput["reviewed"]) =>
+        core.data<ModerationResultDto>({ method: "POST", ...p(slug, `/moderation/${contentType}/${id}/${action}`), body: { note: note ?? null, ...(reviewed ? { reviewed } : {}) } }),
       pin: (slug: string, postId: string) => core.data<PostDto>({ method: "POST", ...p(slug, `/moderation/POST/${postId}/pin`) }),
       unpin: (slug: string, postId: string) => core.data<PostDto>({ method: "POST", ...p(slug, `/moderation/POST/${postId}/unpin`) }),
     },

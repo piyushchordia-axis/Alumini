@@ -2,8 +2,8 @@ import type { ChatConversationDto } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatReports, memberships } from "../../src/db/schema";
-import { acceptedThread, chatApi, openRequest, type Session } from "../helpers/chat";
+import { chatBlocks, chatConversations, chatReports, contentReports, memberships } from "../../src/db/schema";
+import { acceptedThread, chatApi, createGroup, groupsApi, openRequest, postToGroup, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -54,7 +54,61 @@ describe.skipIf(!dbAvailable)("chat between institutions", () => {
     expect(await ctx.db.select().from(chatReports)).toEqual([]);
     expect(await ctx.db.select().from(chatConversations).where(eq(chatConversations.tenantId, two.id))).toEqual([]);
     expect((await api.list()).body.data).toEqual([]);
-    expect((await api.badge()).body.data).toEqual({ unread: 0, requests: 0 });
+    expect((await api.badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
+  });
+
+  it("answers 404 for another institution's group, open or invite-only, on every group route and through content reports", async () => {
+    const { one, two, a, b, outsider } = await twoTenants();
+    const groups = groupsApi(ctx, two.slug, outsider);
+    for (const visibility of ["OPEN", "INVITE_ONLY"] as const) {
+      const group = await createGroup(ctx, one.slug, a, { name: `Group ${visibility}`, visibility });
+      await groupsApi(ctx, one.slug, a).invite(group.id, [b.membership.id]);
+      for (const res of [
+        await groups.get(group.id),
+        await groups.members(group.id),
+        await groups.candidates(group.id),
+        await groups.join(group.id),
+        await groups.leave(group.id),
+        await groups.invite(group.id, [a.membership.id]),
+        await groups.accept(group.id),
+        await groups.decline(group.id),
+        await groups.remove(group.id, a.membership.id),
+        await groups.edit(group.id, { name: "Hijacked" }),
+        await groups.archive(group.id),
+        await groups.report(group.id),
+        await chatApi(ctx, two.slug, outsider).get(group.id),
+        await chatApi(ctx, two.slug, outsider).messages(group.id),
+        await chatApi(ctx, two.slug, outsider).send(group.id, "From another institution"),
+        await chatApi(ctx, two.slug, outsider).read(group.id, 1),
+        await chatApi(ctx, two.slug, outsider).mute(group.id, null),
+      ]) {
+        expect(res.status, `${visibility} ${res.request.url}`).toBe(404);
+      }
+      // Even a message id from it, reported through this institution, isn't there.
+      const said = await postToGroup(ctx, one, group.id, a, "Said in one");
+      expect((await chatApi(ctx, two.slug, outsider).report(said.id)).status).toBe(404);
+      // Nor can its own owner invite someone from another institution into it.
+      expect((await groupsApi(ctx, one.slug, a).invite(group.id, [outsider.membership.id])).status).toBe(404);
+    }
+    expect((await groups.list()).body.data).toEqual([]);
+    expect((await groups.invites()).body.data).toEqual([]);
+    expect((await chatApi(ctx, two.slug, outsider).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
+    expect(await ctx.db.select().from(contentReports)).toEqual([]);
+  });
+
+  it("gives one person in two institutions separate groups and invitations", async () => {
+    const one = (await createTenant(ctx)).tenant;
+    const two = (await createTenant(ctx)).tenant;
+    const a = await memberSession(ctx, one.id);
+    const b = await memberSession(ctx, one.id);
+    const bInTwo: Session = { ...b, membership: await createMembership(ctx, two.id, b.user.id) };
+    const group = await createGroup(ctx, one.slug, a, { visibility: "INVITE_ONLY" });
+    await groupsApi(ctx, one.slug, a).invite(group.id, [b.membership.id]);
+    expect((await groupsApi(ctx, one.slug, b).invites()).body.data).toHaveLength(1);
+    expect((await groupsApi(ctx, two.slug, bInTwo).invites()).body.data).toEqual([]);
+    expect((await chatApi(ctx, two.slug, bInTwo).badge()).body.data.invites).toBe(0);
+    expect((await groupsApi(ctx, two.slug, bInTwo).accept(group.id)).status).toBe(404);
+    expect((await groupsApi(ctx, one.slug, b).accept(group.id)).status).toBe(200);
   });
 
   it("refuses a member of neither institution outright", async () => {

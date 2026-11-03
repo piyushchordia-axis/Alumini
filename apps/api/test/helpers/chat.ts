@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull } from "drizzle-orm";
 import request from "supertest";
-import type { ChatConversationDto, ChatDirectResultDto, ChatMessageDto } from "@illuminize/shared";
+import type { ChatConversationDto, ChatDirectResultDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
 import { chatConversations, chatParticipants } from "../../src/db/schema";
+import { runInTransaction } from "../../src/lib/transaction";
+import { lockConversation, type ChatMessageRow } from "../../src/repositories/chat.repo";
+import { appendMessage } from "../../src/services/chat/fanout";
 import { createMembership, createUser, type memberSession } from "./factories";
 import type { TestContext } from "./testContext";
 
@@ -36,6 +39,47 @@ export function chatApi(ctx: TestContext, slug: string, member: Pick<Session, "h
     unblock: (membershipId: string) => api().delete(url(`/blocks/${membershipId}`)).set(member.headers),
     report: (messageId: string, body: Record<string, unknown> = { reason: "HARASSMENT" }) => api().post(url(`/messages/${messageId}/report`)).set(member.headers).send(body),
   };
+}
+
+/** The group routes of one institution, as one member. */
+export function groupsApi(ctx: TestContext, slug: string, member: Pick<Session, "headers">) {
+  const url = (path: string) => `/api/v1/t/${slug}/chat/groups${path}`;
+  const api = () => request(ctx.app);
+  return {
+    list: (query: Record<string, unknown> = {}) => api().get(url("")).query(query).set(member.headers),
+    create: (body: Record<string, unknown>) => api().post(url("")).set(member.headers).send(body),
+    invites: () => api().get(url("/invites")).set(member.headers),
+    get: (id: string) => api().get(url(`/${id}`)).set(member.headers),
+    edit: (id: string, body: Record<string, unknown>) => api().patch(url(`/${id}`)).set(member.headers).send(body),
+    archive: (id: string) => api().patch(url(`/${id}`)).set(member.headers).send({ archived: true }),
+    members: (id: string) => api().get(url(`/${id}/members`)).set(member.headers),
+    candidates: (id: string, q?: string) => api().get(url(`/${id}/invite-candidates`)).query(q ? { q } : {}).set(member.headers),
+    join: (id: string) => api().post(url(`/${id}/join`)).set(member.headers).send(),
+    leave: (id: string) => api().post(url(`/${id}/leave`)).set(member.headers).send(),
+    invite: (id: string, membershipIds: string[]) => api().post(url(`/${id}/invites`)).set(member.headers).send({ membershipIds }),
+    accept: (id: string) => api().post(url(`/${id}/invites/accept`)).set(member.headers).send(),
+    decline: (id: string) => api().post(url(`/${id}/invites/decline`)).set(member.headers).send(),
+    remove: (id: string, membershipId: string) => api().delete(url(`/${id}/members/${membershipId}`)).set(member.headers),
+    report: (id: string) => api().post(`/api/v1/t/${slug}/reports`).set(member.headers).send({ contentType: "GROUP", contentId: id, reason: "SPAM" }),
+  };
+}
+
+/** Starts a group and returns it as its owner sees it. */
+export async function createGroup(ctx: TestContext, slug: string, owner: Session, body: { name?: string; description?: string | null; visibility?: "OPEN" | "INVITE_ONLY" } = {}): Promise<ChatGroupDto> {
+  const res = await groupsApi(ctx, slug, owner).create({ name: "Weekend runners", visibility: "OPEN", ...body });
+  if (res.status !== 201) throw new Error(`POST /chat/groups failed: ${res.status} ${JSON.stringify(res.body)}`);
+  return res.body.data as ChatGroupDto;
+}
+
+/**
+ * Puts a message in a group as if its sender had sent it, through the same append every send uses. For tests about who
+ * sees what, which don't need the send route's own rules.
+ */
+export async function postToGroup(ctx: TestContext, tenant: { id: string; slug: string }, conversationId: string, sender: Session, body: string): Promise<ChatMessageRow> {
+  return runInTransaction(ctx, async (tx) => {
+    const conversation = await lockConversation(tx, tenant.id, conversationId);
+    return appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation: conversation!, sender: sender.membership, body, clientKey: newKey() });
+  });
 }
 
 /** Sends a first message and returns the thread. */

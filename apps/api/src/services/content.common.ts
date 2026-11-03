@@ -49,14 +49,14 @@ export function statusAfterEdit(tenantCtx: TenantContext, actor: ContentActor, c
   return statusAfterAuthorEdit(current, tenantCtx.settings.contentModerationMode, actor.membership);
 }
 
-const LABELS: Record<ContentType, string> = { POST: "post", COMMENT: "comment", JOB: "job", FUNDING: "funding listing", EVENT: "event", BUSINESS: "business listing" };
+const LABELS: Record<ContentType, string> = { POST: "post", COMMENT: "comment", JOB: "job", FUNDING: "funding listing", EVENT: "event", BUSINESS: "business listing", GROUP: "group" };
 
 /** Audit + admin notification after content is created or edited into PENDING. */
 export async function afterContentWrite(
   ctx: AppContext,
   tenantCtx: TenantContext,
   actor: ContentActor,
-  input: { contentType: ContentType; id: string; title: string; status: ModerationStatus; action: "create" | "update" | "delete" | "close" | "cancel" },
+  input: { contentType: ContentType; id: string; title: string; status: ModerationStatus; action: "create" | "update" | "delete" | "close" | "cancel" | "archive" },
 ): Promise<void> {
   await recordAudit(ctx, {
     tenantId: tenantCtx.tenant.id,

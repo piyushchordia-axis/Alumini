@@ -131,7 +131,7 @@ try {
     await shot("m04d-poll");
   });
 
-  await step("every section opens its own screen, with Events and Funding behind More", async () => {
+  await step("every section opens its own screen, with Events, Groups and Funding behind More", async () => {
     if ((await page.locator('a[role="tab"]').locator("visible=true").count()) !== 5) throw new Error("the tab bar should show four sections, then More");
     const moreColor = () => barTab("More").evaluate((el) => getComputedStyle(el).color);
     const moreColorOnFeed = await moreColor();
@@ -142,13 +142,14 @@ try {
       ["Jobs", "jobs", page.getByText("Backend Engineer (Node.js)")],
       ["Directory", "directory", page.getByPlaceholder("Name, company, role")],
       ["Events", "events", page.getByText("Mumbai alumni coffee meetup")],
+      ["Groups", "groups", page.getByRole("link", { name: /^London & UK alumni/ })],
       ["Funding", "funding", page.getByText("Seeking funding", { exact: true })],
     ];
     for (const [label, path, content] of sections) {
       await openSection(label);
       await page.waitForURL(`**/t/demo-university/${path}`);
       await content.locator("visible=true").first().waitFor();
-      if (label === "Funding" || label === "Events") continue;
+      if (label === "Funding" || label === "Events" || label === "Groups") continue;
       await selectedBarTab(label).waitFor();
       if (await selectedBarTab("More").count()) throw new Error(`More shows as selected on ${label}`);
     }
@@ -653,7 +654,166 @@ try {
     await contextB.close();
   });
 
-  await step("a current pupil sees no Messages, even with messaging switched on", async () => {
+  await step("groups: an open group found in Discover and joined, live messages both ways, an invitation accepted from Invitations, leaving, archiving", async () => {
+    // Two seeded members in no group, thread or invitation of the seed's, and in neither script's direct-message pair.
+    const OWNER = "+91931000006";
+    const JOINER = "+91931000007";
+    const nameOf = async (phone) => (await apiSession(phone)).memberships.find((m) => m.tenant.slug === "demo-university").fullName;
+    const [ownerName, joinerName] = [await nameOf(OWNER), await nameOf(JOINER)];
+    const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
+    const ownerContext = await signedInMobileContext(browser, BASE, OWNER, phone);
+    const joinerContext = await signedInMobileContext(browser, BASE, JOINER, phone);
+    const owner = await ownerContext.newPage();
+    const joiner = await joinerContext.newPage();
+    for (const p of [owner, joiner]) p.setDefaultTimeout(20000);
+    const app = `${BASE}/t/demo-university`;
+    // Screens underneath stay mounted on the web export, so the one on top is the last match.
+    const shown = (locator) => locator.locator("visible=true").last();
+    const log = (p) => shown(p.locator('[role="log"]'));
+    const live = { timeout: 10000 };
+    const openName = `Mobile runners ${unique}`;
+    const closedName = `Mobile committee ${unique}`;
+    const threadId = (p) => /\/messages\/([0-9a-f-]{36})$/.exec(p.url())[1];
+    const send = async (p, text) => {
+      await shown(p.getByLabel("Write a message")).fill(text);
+      await shown(p.getByRole("button", { name: "Send message" })).click();
+      await log(p).getByText(text).waitFor();
+    };
+    const createGroup = async (name, choice) => {
+      await owner.goto(`${app}/groups`);
+      await shown(owner.getByRole("link", { name: "Create group" })).click();
+      await owner.waitForURL(/\/groups\/new$/);
+      // Before anything is sent: what each choice means, and that it's for good.
+      await shown(owner.getByText("You can't change this after the group is created.")).waitFor();
+      await shown(owner.getByText("Any member can find and join this group, and new members see the whole conversation.")).waitFor();
+      await shown(owner.getByText("Only people you invite can see this group. New members see messages from when they join.")).waitFor();
+      await shown(owner.getByLabel("Group name", { exact: true })).fill(name);
+      await shown(owner.getByLabel("Description", { exact: true })).fill(`Made by the mobile smoke run ${unique}.`);
+      const radio = shown(owner.getByRole("radio", { name: choice, exact: true }));
+      await radio.click();
+      if ((await radio.getAttribute("aria-checked")) !== "true") throw new Error(`"${choice}" doesn't show as chosen`);
+      await shown(owner.getByRole("button", { name: "Create group" })).click();
+      await owner.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+      await shown(owner.getByLabel("Write a message")).waitFor();
+      return threadId(owner);
+    };
+
+    // An open group, with a message from before the second member arrives: they get the whole history.
+    const openId = await createGroup(openName, "Open group");
+    const before = `Who's in for Sunday? ${unique}`;
+    await send(owner, before);
+    await owner.screenshot({ path: `${SHOTS}/m11a-group-created.png` });
+
+    // The second member finds it in Discover, opens its preview and joins.
+    await joiner.goto(`${app}/groups`);
+    await shown(joiner.getByLabel("Search groups")).fill(openName);
+    await shown(joiner.getByRole("link", { name: new RegExp(`^${openName}`) })).click();
+    await joiner.waitForURL(new RegExp(`/groups/${openId}$`));
+    await shown(joiner.getByText(ownerName, { exact: true })).waitFor();
+    await joiner.screenshot({ path: `${SHOTS}/m11b-group-preview.png` });
+    await shown(joiner.getByRole("button", { name: "Join group" })).click();
+    await joiner.waitForURL(new RegExp(`/messages/${openId}$`));
+    await log(joiner).getByText(before).waitFor();
+    await log(owner).getByText(`${joinerName} joined the group`).waitFor(live);
+
+    // Live both ways, each message under its sender's name, and exactly one bubble each side.
+    const fromJoiner = `Count me in ${unique}`;
+    await send(joiner, fromJoiner);
+    await log(owner).getByText(fromJoiner).waitFor(live);
+    const fromOwner = `Great, 6am at the gate ${unique}`;
+    await send(owner, fromOwner);
+    await log(joiner).getByText(fromOwner).waitFor(live);
+    await owner.waitForTimeout(1500);
+    for (const [p, who] of [
+      [owner, "the owner"],
+      [joiner, "the joiner"],
+    ]) {
+      for (const text of [before, fromJoiner, fromOwner]) {
+        const bubbles = await log(p).getByText(text).count();
+        if (bubbles !== 1) throw new Error(`${who} shows ${bubbles} bubbles for "${text}"`);
+      }
+    }
+    await log(owner).getByText(joinerName, { exact: true }).first().waitFor();
+    await log(joiner).getByText(ownerName, { exact: true }).first().waitFor();
+    await owner.screenshot({ path: `${SHOTS}/m11c-group-thread.png` });
+
+    // An invite-only group. What was said before the invitee joins stays out of their view.
+    const closedId = await createGroup(closedName, "Invite-only group");
+    const early = `Before anyone else is here ${unique}`;
+    await send(owner, early);
+    // The invitee waits on a tab, where the badge shows. Groups is behind More, so More carries it.
+    await joiner.goto(`${app}/feed`);
+    const more = (p) => p.locator('a[role="tab"]').filter({ hasText: "More" }).locator("visible=true").first();
+    await more(joiner).waitFor();
+    if (await more(joiner).getAttribute("aria-label")) throw new Error(`the joiner starts with something behind More: ${await more(joiner).getAttribute("aria-label")}`);
+    await shown(owner.getByRole("link", { name: "Group details" })).click();
+    await owner.waitForURL(new RegExp(`/groups/${closedId}$`));
+    await shown(owner.getByRole("button", { name: "Invite members" })).click();
+    const inviting = shown(owner.getByRole("dialog", { name: "Invite members" }));
+    await inviting.getByLabel("Search members").fill(joinerName);
+    const candidate = inviting.getByRole("checkbox", { name: joinerName, exact: true });
+    await candidate.click();
+    if ((await candidate.getAttribute("aria-checked")) !== "true") throw new Error("the chosen member doesn't show as chosen");
+    await owner.screenshot({ path: `${SHOTS}/m11d-group-invite.png` });
+    await inviting.getByRole("button", { name: "Send invitation" }).click();
+    await inviting.waitFor({ state: "detached" });
+    await shown(owner.getByText("Invitation sent", { exact: true })).waitFor();
+
+    // The invitee's badge arrives live, named for what it counts, and the invitation waits under Invitations.
+    await joiner.locator('a[role="tab"][aria-label="More, Groups, 1 invitation"]').locator("visible=true").first().waitFor(live);
+    await more(joiner).click();
+    await shown(joiner.getByRole("link", { name: "Groups, 1 invitation", exact: true })).click();
+    await joiner.waitForURL(/\/groups$/);
+    await shown(joiner.locator('[role="tab"]').getByText("Invitations", { exact: true })).click();
+    await joiner.waitForURL(/\/groups\?tab=invitations$/);
+    await shown(joiner.getByText(`Invited by ${ownerName}`, { exact: false })).waitFor();
+    await joiner.screenshot({ path: `${SHOTS}/m11e-group-invitation.png` });
+    await shown(joiner.getByRole("button", { name: "Accept invitation" })).click();
+    await joiner.waitForURL(new RegExp(`/messages/${closedId}$`));
+    await log(joiner).getByText("You joined the group").waitFor();
+    if (await log(joiner).getByText(early).count()) throw new Error("an invite-only group showed a new member what was said before they joined");
+    await joiner.waitForFunction(() => !document.querySelector('a[role="tab"][aria-label^="More, Groups"]'), undefined, live);
+
+    // Leaving, through the confirm sheet. The owner sees it live, and the group is gone for the one who left.
+    await owner.goto(`${app}/messages/${closedId}`);
+    await log(owner).getByText(`${joinerName} joined the group`).waitFor();
+    await shown(joiner.getByRole("link", { name: "Group details" })).click();
+    await joiner.waitForURL(new RegExp(`/groups/${closedId}$`));
+    await shown(joiner.getByRole("button", { name: "Leave group" })).click();
+    const leaving = joiner.getByRole("alertdialog", { name: "Leave this group?" });
+    await leaving.getByRole("button", { name: "Cancel" }).click();
+    await leaving.waitFor({ state: "hidden" });
+    await shown(joiner.getByRole("button", { name: "Leave group" })).click();
+    await leaving.getByRole("button", { name: "Leave group" }).click();
+    await joiner.waitForURL(/\/groups\?tab=mine$/);
+    await log(owner).getByText(`${joinerName} left the group`).waitFor(live);
+    await shown(joiner.getByRole("link", { name: new RegExp(`^${openName}`) })).waitFor();
+    if (await joiner.getByRole("link", { name: new RegExp(`^${closedName}`) }).locator("visible=true").count()) throw new Error("an invite-only group stayed in My groups after leaving it");
+    await joiner.goto(`${app}/messages/${closedId}`);
+    await shown(joiner.getByText("This conversation isn't available")).waitFor();
+
+    // Archiving the open group leaves it readable and closed: the member's open thread says so live.
+    await joiner.goto(`${app}/messages/${openId}`);
+    await log(joiner).getByText(fromOwner).waitFor();
+    await owner.goto(`${app}/groups/${openId}`);
+    await shown(owner.getByRole("button", { name: "Archive group" })).click();
+    await owner.getByRole("alertdialog", { name: "Archive this group?" }).getByRole("button", { name: "Archive group" }).click();
+    await shown(owner.getByText("Archived", { exact: true })).waitFor();
+    await shown(joiner.getByText("This group has been archived")).waitFor(live);
+    if (await joiner.getByLabel("Write a message").locator("visible=true").count()) throw new Error("an archived group still offers its members a message box");
+    await joiner.screenshot({ path: `${SHOTS}/m11f-group-archived.png` });
+
+    // The owner's groups are in My posts.
+    await owner.goto(`${app}/profile/my-content`);
+    await shown(owner.locator('[role="tab"]').getByText("Groups", { exact: true })).click();
+    await shown(owner.getByRole("link", { name: new RegExp(`^${openName}`) })).waitFor();
+    await shown(owner.getByRole("link", { name: new RegExp(`^${closedName}`) })).waitFor();
+    await owner.screenshot({ path: `${SHOTS}/m11g-my-posts-groups.png` });
+    await ownerContext.close();
+    await joinerContext.close();
+  });
+
+  await step("a current pupil sees no Messages or Groups, even with both switched on", async () => {
     const context = await signedInMobileContext(browser, BASE, "+919100000026", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); // Ira Banerjee, demo-school
     const pupil = await context.newPage();
     pupil.setDefaultTimeout(20000);
@@ -661,9 +821,9 @@ try {
     pupil.on("request", (r) => {
       if (/\/api\/v1\/t\/[^/]+\/chat\//.test(r.url())) chatCalls.push(new URL(r.url()).pathname);
     });
-    // Schools start with messaging off. On here, so only the pupil rule can be what hides it.
+    // Schools start with messaging and groups off. On here, so only the pupil rule can be what hides them.
     const features = await scriptFeatures(pupil, "demo-school");
-    features.only("feed", "messaging", "jobs", "directory", "events", "businesses", "funding");
+    features.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
     await pupil.goto(`${BASE}/t/demo-school/feed`);
     const bar = pupil.locator('a[role="tab"]').locator("visible=true");
     await bar.filter({ hasText: "More" }).first().waitFor();
@@ -671,13 +831,24 @@ try {
     if (shown.join() !== "Feed,Jobs,Directory,Events,More") throw new Error(`a pupil's tab bar shows ${shown.join(", ")}`);
     await bar.filter({ hasText: "More" }).first().click();
     await pupil.getByRole("link", { name: "Switch institution", exact: true }).locator("visible=true").first().waitFor();
-    if (await pupil.getByRole("link", { name: "Messages", exact: true }).locator("visible=true").count()) throw new Error("a pupil's More hub offers Messages");
-    // The inbox sends them home; a thread or a new conversation says Messages aren't available.
+    for (const section of ["Messages", "Groups"]) {
+      if (await pupil.getByRole("link", { name: section, exact: true }).locator("visible=true").count()) throw new Error(`a pupil's More hub offers ${section}`);
+    }
+    // The inbox and the Groups lists send them home; a thread, a new conversation or a group says it isn't available.
     await pupil.goto(`${BASE}/t/demo-school/messages`);
+    await pupil.waitForURL("**/t/demo-school/feed");
+    await pupil.goto(`${BASE}/t/demo-school/groups`);
     await pupil.waitForURL("**/t/demo-school/feed");
     await pupil.goto(`${BASE}/t/demo-school/messages/00000000-0000-4000-8000-000000000001`);
     await pupil.getByText("Messages aren't available").locator("visible=true").first().waitFor();
     await pupil.screenshot({ path: `${SHOTS}/m10d-chat-pupil.png` });
+    for (const path of ["groups/00000000-0000-4000-8000-000000000001", "groups/new"]) {
+      await pupil.goto(`${BASE}/t/demo-school/${path}`);
+      await pupil.getByText("Groups aren't available").locator("visible=true").first().waitFor();
+    }
+    await pupil.goto(`${BASE}/t/demo-school/profile/my-content`);
+    await pupil.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
+    if (await pupil.locator('[role="tab"]').getByText("Groups", { exact: true }).locator("visible=true").count()) throw new Error("a pupil's My posts has a Groups tab");
     if (chatCalls.length) throw new Error(`a pupil's app called the chat API: ${chatCalls.join(", ")}`);
     await features.stop();
     await context.close();

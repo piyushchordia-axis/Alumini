@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
-const BASE = "http://localhost:5173";
+const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
 const SHOTS = process.env.SHOTS ?? fileURLToPath(new URL("./screenshots/", import.meta.url));
 mkdirSync(SHOTS, { recursive: true });
@@ -129,6 +129,7 @@ try {
     await open();
     if (!(await businesses.isChecked())) throw new Error("the Business directory switch should start on");
     if (!(await page.locator('label:has-text("Messaging") input').isChecked())) throw new Error("the Messaging switch should start on outside schools");
+    if (!(await page.locator('label:has-text("Groups") input').isChecked())) throw new Error("the Groups switch should start on outside schools");
     sentFeatures(await save(), undefined);
     await page.waitForSelector("text=Settings saved");
 
@@ -428,11 +429,13 @@ try {
     await page.waitForSelector("text=Platform console");
   });
 
-  await step("messaging starts off at a school, with the reason shown", async () => {
+  await step("messaging and groups start off at a school, with the reason shown", async () => {
     await page.goto(`${BASE}/t/demo-school/admin/settings`);
     await page.waitForSelector("text=New member approval");
     if (await page.locator('label:has-text("Messaging") input').isChecked()) throw new Error("the Messaging switch should start off at a school");
-    await page.waitForSelector("text=current pupils still can't use it");
+    if (await page.locator('label:has-text("Groups") input').isChecked()) throw new Error("the Groups switch should start off at a school");
+    await page.waitForSelector("text=Messaging and Groups start off for schools");
+    await page.waitForSelector("text=current pupils still can't use them");
     await shot("p05b-school-settings");
   });
 

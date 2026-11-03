@@ -66,21 +66,20 @@ export class ExpoPushChannel implements PushChannel {
 
   /** Builds one Expo message per device of each item's user. */
   async prepareFor(items: PushItem[], context: DeliveryContext): Promise<PushMessage[]> {
+    return (await this.prepareEach(items, context)).flat();
+  }
+
+  async prepareEach(items: PushItem[], context: DeliveryContext): Promise<PushMessage[][]> {
     if (items.length === 0) return [];
     const tokens = await listPushTokensForUsers(this.db, [...new Set(items.map((i) => i.userId))]);
-    if (tokens.length === 0) return [];
     const tokensByUser = new Map<string, string[]>();
     for (const t of tokens) {
       if (!isExpoToken(t.token)) continue;
       tokensByUser.set(t.userId, [...(tokensByUser.get(t.userId) ?? []), t.token]);
     }
-    const messages: PushMessage[] = [];
-    for (const item of items) {
-      for (const token of tokensByUser.get(item.userId) ?? []) {
-        messages.push({ to: token, title: item.title, body: item.body, data: { ...item.data, tenantSlug: context.tenantSlug }, sound: "default", channelId: "default" });
-      }
-    }
-    return messages;
+    return items.map((item) =>
+      (tokensByUser.get(item.userId) ?? []).map((token) => ({ to: token, title: item.title, body: item.body, data: { ...item.data, tenantSlug: context.tenantSlug }, sound: "default" as const, channelId: "default" })),
+    );
   }
 
   /** Prepares and sends in batches of 100, logging failures (used outside the job queue, e.g. scripts and tests). */

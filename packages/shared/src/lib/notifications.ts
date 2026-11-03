@@ -1,4 +1,5 @@
 import type { NotificationType, TenantFeatures } from "../constants";
+import { chatAvailable } from "./features";
 
 /**
  * What kind of notification a type is, for member preferences. ACCOUNT (membership and moderation outcomes, system
@@ -40,7 +41,7 @@ export type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 export const NOTIFICATION_CATEGORY_INFO: Record<ConfigurableCategory, { label: string; description: string; minLevel: NotificationLevel; adminOnly?: boolean }> = {
   ACTIVITY: { label: "Comments and reactions", description: "When members comment on or react to your posts.", minLevel: "OFF" },
   // The bell never shows chat, so the lowest level here is the Messages badge alone.
-  CHAT: { label: "Messages", description: "New messages and message requests. Unless you mute a conversation, they show on the Messages badge.", minLevel: "IN_APP" },
+  CHAT: { label: "Messages", description: "New messages, message requests and group invitations. Unless you mute a conversation, its messages show on the Messages badge.", minLevel: "IN_APP" },
   EVENTS: { label: "Events", description: "RSVPs to your events, and changes to events you're going to.", minLevel: "OFF" },
   ANNOUNCEMENTS: { label: "Announcements", description: "Notices from your institution's admins. Always shown in the app.", minLevel: "IN_APP" },
   CELEBRATIONS: { label: "Birthdays and anniversaries", description: "Greetings on your day and wishes from other members.", minLevel: "OFF" },
@@ -95,7 +96,7 @@ export function visibleNotificationCategories(input: { features: TenantFeatures;
   const { features, chatEligible, isTenantAdmin } = input;
   return CONFIGURABLE_CATEGORIES.filter((c) => {
     if (NOTIFICATION_CATEGORY_INFO[c].adminOnly && !isTenantAdmin) return false;
-    return c !== "CHAT" || (features.messaging && chatEligible);
+    return c !== "CHAT" || chatAvailable(features, chatEligible);
   });
 }
 
@@ -103,7 +104,7 @@ export function visibleNotificationCategories(input: { features: TenantFeatures;
  * Chat that reaches a device and nowhere else. Outside NOTIFICATION_TYPES, so none of these can ever become a row in the
  * bell: `notify` won't take them, and the badge on Messages is what counts them.
  */
-export const CHAT_PUSH_KINDS = ["CHAT_MESSAGE", "CHAT_REQUEST", "CHAT_ACCEPTED", "CHAT_OPENED"] as const;
+export const CHAT_PUSH_KINDS = ["CHAT_MESSAGE", "CHAT_REQUEST", "CHAT_ACCEPTED", "CHAT_OPENED", "CHAT_GROUP_INVITE"] as const;
 export type ChatPushKind = (typeof CHAT_PUSH_KINDS)[number];
 
 /** Where tapping a notification should take the member; each app maps this to its own routes. */
@@ -115,7 +116,10 @@ export type NotificationTarget =
   | { kind: "funding"; id: string }
   | { kind: "business"; id: string }
   | { kind: "chat"; conversationId: string }
-  | { kind: "myContent" }
+  /** The Groups section. Only ever its Invitations tab, because an invitation is all a push about a group can be. */
+  | { kind: "chatGroup"; view: "invitations" }
+  /** My posts, on one of its tabs when it matters which. */
+  | { kind: "myContent"; tab?: "groups" }
   | { kind: "profile" }
   | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
 
@@ -142,6 +146,9 @@ function contentTarget(d: NotificationData): NotificationTarget | null {
       return { kind: "business", id: d.contentId };
     case "COMMENT":
       return d.postId ? { kind: "post", id: d.postId } : null;
+    // A notice about a group's review is its owner's, and My posts is where they see it, with the admin's note.
+    case "GROUP":
+      return { kind: "myContent", tab: "groups" };
     default:
       return null;
   }
@@ -166,7 +173,7 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   // The author can still open a rejected item, and its page shows the admin's note.
   CONTENT_REJECTED: (d) => contentTarget(d) ?? { kind: "myContent" },
   // A removed item's page 404s even for its author, so go to My posts, which lists it. A removed comment's post is still there.
-  CONTENT_REMOVED: (d) => (d.contentType === "COMMENT" && d.postId ? { kind: "post", id: d.postId } : { kind: "myContent" }),
+  CONTENT_REMOVED: (d) => (d.contentType === "COMMENT" && d.postId ? { kind: "post", id: d.postId } : d.contentType === "GROUP" ? { kind: "myContent", tab: "groups" } : { kind: "myContent" }),
   MEMBERSHIP_APPROVED: profileTarget,
   MEMBERSHIP_REJECTED: profileTarget,
   MEMBERSHIP_SUSPENDED: profileTarget,
@@ -180,6 +187,8 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   CHAT_REQUEST: chatTarget,
   CHAT_ACCEPTED: chatTarget,
   CHAT_OPENED: chatTarget,
+  // Not into the group: the invitee isn't in it yet, and an invite-only one answers them 404 until they accept.
+  CHAT_GROUP_INVITE: () => ({ kind: "chatGroup", view: "invitations" }),
   CELEBRATION: celebrationsTarget,
   CELEBRATION_WISH: celebrationsTarget,
   SYSTEM: contentTarget,

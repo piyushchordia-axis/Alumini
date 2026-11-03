@@ -6,12 +6,12 @@ import { auditLog, chatBlocks, chatConversations, chatMessages, chatParticipants
 import { SEEDED_REPORTED_CHAT_BODY, seedConnections, seedCore, seedMembers } from "../../src/db/seed";
 import { createApp } from "../../src/app";
 import { runInTransaction } from "../../src/lib/transaction";
-import { lockPair } from "../../src/repositories/chat.repo";
+import { lockPair, type ChatMessageRow } from "../../src/repositories/chat.repo";
 import { chatRecipientOf, chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
 import { capturingLogger } from "../helpers/capturingLogger";
-import { acceptedThread, ageRequest, chatApi, conversationRow, openRequest, participantRow, type Session } from "../helpers/chat";
+import { acceptedThread, ageRequest, chatApi, conversationRow, createGroup, groupsApi, openRequest, participantRow, postToGroup, type Session } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -92,7 +92,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       expect(view.unread).toBe(0);
       expect(view.lastMessage!.body).toBe("Before the block");
       expect(view.lastMessageAt).toBe(beforeRow.lastMessageAt);
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
       expect(bodies(await chat(b).messages(id))).not.toContain("Withheld one");
       expect(bodies(await chat(b).messages(id, { afterSeq: 2 }))).toEqual([]);
       const list = (await chat(b).list()).body.data as ChatConversationDto[];
@@ -234,7 +234,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       expect(stored!.withheld).toBe(true);
       expect(realtime.to(b.user.id)).toEqual([]);
       for (const inbox of ["MAIN", "REQUESTS"] as const) expect((await chat(b).list(inbox)).body.data).toEqual([]);
-      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0 });
+      expect((await chat(b).badge()).body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
       expect(bodies(await chat(b).messages(row.id))).toEqual([]);
     });
 
@@ -335,7 +335,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       expect(await participantRow(ctx, id, b.membership.id)).toMatchObject({ withheldState: null, withheldRequestedAt: null, withheldRequestCount: null });
       expect(realtime.to(a.user.id).map((e) => e.event)).toEqual(["chat:changed"]);
       expect((await chat(a).list("REQUESTS")).body.data.map((t: ChatConversationDto) => t.id)).toEqual([id]);
-      expect((await chat(a).badge()).body.data).toEqual({ unread: 0, requests: 1 });
+      expect((await chat(a).badge()).body.data).toEqual({ unread: 0, requests: 1, invites: 0 });
       expect((await chat(a).get(id)).body.data).toMatchObject({ state: "REQUEST_RECEIVED", unread: 1 });
       expect(bodies(await chat(a).messages(id))).toEqual(["A real request", "A note"]);
     });
@@ -708,9 +708,25 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
     it("refuses every thread route", async () => {
       const { a, b, chat, id } = await offThread();
       const api = chat(a);
-      for (const res of [await api.direct(b.membership.id), await api.list(), await api.list("REQUESTS"), await api.get(id), await api.messages(id), await api.send(id), await api.read(id, 1), await api.mute(id, null), await api.accept(id), await api.decline(id)]) {
+      for (const res of [await api.direct(b.membership.id), await api.get(id), await api.messages(id), await api.send(id), await api.read(id, 1), await api.mute(id, null), await api.accept(id), await api.decline(id)]) {
         expect(res.status, res.request.url).toBe(403);
         expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+      }
+    });
+
+    it("leaves direct threads out of the inbox while groups keep it open, and closes it once groups are off too", async () => {
+      const { a, chat, tenant } = await offThread();
+      for (const inbox of ["MAIN", "REQUESTS"] as const) {
+        const res = await chat(a).list(inbox);
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([]);
+      }
+      await ctx.db.update(tenantSettings).set({ features: { messaging: false, groups: false } }).where(eq(tenantSettings.tenantId, tenant.id));
+      await invalidateTenantCache(ctx, tenant.slug);
+      for (const inbox of ["MAIN", "REQUESTS"] as const) {
+        const res = await chat(a).list(inbox);
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe("FEATURE_DISABLED");
       }
     });
 
@@ -722,7 +738,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       expect((await chat(a).report(messageId)).status).toBe(201);
       const badge = await chat(a).badge();
       expect(badge.status).toBe(200);
-      expect(badge.body.data).toEqual({ unread: 0, requests: 0 });
+      expect(badge.body.data).toEqual({ unread: 0, requests: 0, invites: 0 });
     });
 
     it("reads the setting fresh for a send, even when the cached institution still says on", async () => {
@@ -820,19 +836,62 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
     it("excludes what's redacted for the reporter in a group, and refuses reporting it", async () => {
       const { tenant, a, b, chat } = await setup();
       const c = await memberSession(ctx, tenant.id);
-      // No group routes yet: this is how slice 9's rooms will look to the frozen list.
-      const [room] = await ctx.db.insert(chatConversations).values({ tenantId: tenant.id, kind: "GROUP", origin: "GROUP", lastSeq: 5, lastMessageAt: new Date() }).returning();
-      await ctx.db.insert(chatParticipants).values([a, b, c].map((m) => ({ conversationId: room!.id, membershipId: m.membership.id, tenantId: tenant.id })));
+      const room = await createGroup(ctx, tenant.slug, c, { name: "Reading room" });
+      for (const m of [a, b]) await groupsApi(ctx, tenant.slug, m).join(room.id);
       const senders = [c, b, c, b, c];
-      const rows = await ctx.db.insert(chatMessages).values(senders.map((m, i) => ({ tenantId: tenant.id, conversationId: room!.id, seq: i + 1, senderMembershipId: m.membership.id, body: `Room ${i}` }))).returning();
-      const sorted = rows.sort((x, y) => x.seq - y.seq);
-      await ctx.db.insert(chatBlocks).values({ tenantId: tenant.id, blockerMembershipId: a.membership.id, blockedMembershipId: b.membership.id });
+      const rows: ChatMessageRow[] = [];
+      for (const [i, m] of senders.entries()) rows.push(await postToGroup(ctx, tenant, room.id, m, `Room ${i}`));
+      await chat(a).block(b.membership.id);
 
-      const res = await chat(a).report(sorted[2]!.id);
+      const res = await chat(a).report(rows[2]!.id);
       expect(res.status).toBe(201);
       const { contextMessageIds } = await reportRow(res.body.data.id);
-      expect(contextMessageIds).toEqual([sorted[0]!.id, sorted[2]!.id, sorted[4]!.id]);
-      expect((await chat(a).report(sorted[1]!.id)).status).toBe(404);
+      // Everything around it but what B wrote, the line saying B joined included.
+      const thread = (await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, room.id))).sort((x, y) => x.seq - y.seq);
+      expect(contextMessageIds).toEqual(thread.filter((m) => m.senderMembershipId !== b.membership.id).map((m) => m.id));
+      expect(contextMessageIds).toContain(rows[0]!.id);
+      expect(contextMessageIds).not.toContain(rows[1]!.id);
+      expect((await chat(a).report(rows[1]!.id)).status).toBe(404);
+    });
+
+    it("in an invite-only group, excludes what came before the reporter joined", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const room = await createGroup(ctx, tenant.slug, b, { name: "Committee", visibility: "INVITE_ONLY" });
+      const before = await postToGroup(ctx, tenant, room.id, b, "Before A was invited");
+      await groupsApi(ctx, tenant.slug, b).invite(room.id, [a.membership.id]);
+      await groupsApi(ctx, tenant.slug, a).accept(room.id);
+      const target = await postToGroup(ctx, tenant, room.id, b, "After A joined");
+
+      const res = await chat(a).report(target.id);
+      expect(res.status).toBe(201);
+      const { contextMessageIds } = await reportRow(res.body.data.id);
+      expect(contextMessageIds).not.toContain(before.id);
+      expect(contextMessageIds).toContain(target.id);
+      expect((await chat(a).report(before.id)).status).toBe(404);
+    });
+
+    it("refuses reporting in a group moderation has hidden, which its members can't read", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const room = await createGroup(ctx, tenant.slug, b, { name: "Soon gone" });
+      await groupsApi(ctx, tenant.slug, a).join(room.id);
+      const said = await postToGroup(ctx, tenant, room.id, b, "Something");
+      await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${room.id}/remove`).set(admin.headers).send({ note: "Off topic" }).expect(200);
+      expect((await chat(a).report(said.id)).status).toBe(404);
+      await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${room.id}/restore`).set(admin.headers).send({}).expect(200);
+      expect((await chat(a).report(said.id)).status).toBe(201);
+    });
+
+    it("shows an admin a group message and its context through the same audited view", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const room = await createGroup(ctx, tenant.slug, b, { name: "Open room" });
+      await groupsApi(ctx, tenant.slug, a).join(room.id);
+      const target = await postToGroup(ctx, tenant, room.id, b, "Reported group words");
+      const filed = await chat(a).report(target.id);
+      const view = await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/chat-reports/${filed.body.data.id}/view`).set(admin.headers).send();
+      expect(view.status).toBe(200);
+      expect(view.body.data.messages.find((m: { isTarget: boolean }) => m.isTarget)).toMatchObject({ body: "Reported group words", sender: { id: b.membership.id } });
     });
 
     it("keeps a blocked sender's earlier messages in a 1:1, where the history isn't redacted", async () => {
@@ -973,7 +1032,9 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       const usage = await ctx.db.execute<{ table_name: string }>(sql`select table_name from information_schema.view_table_usage where view_name = 'moderation_items'`);
       const tables = usage.rows.map((r) => r.table_name);
       expect(tables.length).toBeGreaterThan(0);
-      for (const table of ["chat_messages", "chat_conversations", "chat_participants", "chat_reports", "chat_blocks"]) expect(tables).not.toContain(table);
+      // Groups are in it, through their own table, which holds a name and a description and nothing anyone said.
+      expect(tables).toContain("chat_groups");
+      for (const table of ["chat_messages", "chat_conversations", "chat_participants", "chat_reports", "chat_blocks", "chat_invite_declines"]) expect(tables).not.toContain(table);
     });
 
     it("chat messages can't be filed through content reports", async () => {
@@ -1015,7 +1076,8 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
 
     it("has threads with real, gapless seq values in the university, and one pending request", async () => {
       const { uni } = await seed();
-      const threads = await ctx.db.select().from(chatConversations).where(eq(chatConversations.tenantId, uni));
+      // Groups are seeded too, and chat.groups checks those.
+      const threads = await ctx.db.select().from(chatConversations).where(and(eq(chatConversations.tenantId, uni), eq(chatConversations.kind, "DIRECT")));
       expect(threads.length).toBeGreaterThanOrEqual(3);
       expect(threads.filter((t) => t.directState === "PENDING")).toHaveLength(1);
       for (const thread of threads) {

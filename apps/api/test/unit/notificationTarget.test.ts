@@ -36,11 +36,16 @@ describe("notificationTarget", () => {
     expect(NOTIFICATION_CATEGORY.CHAT_MESSAGE_REMOVED).toBe("ACCOUNT");
   });
 
-  it("opens the thread from every chat push, and from nothing else without a conversation", () => {
-    for (const kind of CHAT_PUSH_KINDS) {
+  it("opens the thread from every chat push about a conversation the member is in, and from nothing else without one", () => {
+    for (const kind of CHAT_PUSH_KINDS.filter((k) => k !== "CHAT_GROUP_INVITE")) {
       expect(notificationTarget(kind, { conversationId: "c1", tenantSlug: "demo" }), kind).toEqual({ kind: "chat", conversationId: "c1" });
       expect(notificationTarget(kind, {}), kind).toBeNull();
     }
+  });
+
+  it("opens Invitations from a group invitation, never the group, which the invitee isn't in yet", () => {
+    expect(notificationTarget("CHAT_GROUP_INVITE", { conversationId: "g1", tenantSlug: "demo" })).toEqual({ kind: "chatGroup", view: "invitations" });
+    expect(notificationTarget("CHAT_GROUP_INVITE", {})).toEqual({ kind: "chatGroup", view: "invitations" });
   });
 
   it("routes Wave 1 notifications", () => {
@@ -51,9 +56,15 @@ describe("notificationTarget", () => {
 
   it("sends a removed item to My posts, because its page 404s for the author", () => {
     for (const contentType of ["POST", "JOB", "FUNDING", "EVENT", "BUSINESS"]) {
-      expect(notificationTarget("CONTENT_REMOVED", { contentType, contentId: "x1", status: "REMOVED" })).toEqual({ kind: "myContent" });
+      expect(notificationTarget("CONTENT_REMOVED", { contentType, contentId: "x1", status: "REMOVED" })).toStrictEqual({ kind: "myContent" });
     }
     expect(notificationTarget("CONTENT_REMOVED", { contentType: "COMMENT", contentId: "c1" })).toEqual({ kind: "myContent" });
+  });
+
+  it("sends a group's owner to the Groups tab of My posts for its review, never into its conversation", () => {
+    for (const type of ["CONTENT_APPROVED", "CONTENT_REJECTED", "CONTENT_REMOVED"] as const) {
+      expect(notificationTarget(type, { contentType: "GROUP", contentId: "g1", status: "APPROVED" }), type).toStrictEqual({ kind: "myContent", tab: "groups" });
+    }
   });
 
   it("keeps a rejected item on its own page, which its author can still open", () => {
@@ -111,6 +122,9 @@ describe("the CHAT category", () => {
     const categories = (features: TenantFeatures, chatEligible: boolean) => visibleNotificationCategories({ features, chatEligible, isTenantAdmin: false });
     expect(categories(only("messaging"), true)).toContain("CHAT");
     expect(categories(only("messaging"), false)).not.toContain("CHAT");
+    // Group messages and invitations push under it too.
+    expect(categories(only("groups"), true)).toContain("CHAT");
+    expect(categories(only("groups"), false)).not.toContain("CHAT");
     expect(categories(only("feed"), true)).not.toContain("CHAT");
     expect(categories(only(), false)).not.toContain("CHAT");
   });

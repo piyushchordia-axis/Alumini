@@ -32,16 +32,22 @@ export function isMutedUntilTurnedOn(until: string | null | undefined): boolean 
 }
 
 export interface ChatBadgeLabel {
-  /** Threads with something unread plus requests waiting, or 0 when there's nothing to show. */
+  /** What the badge counts, or 0 when there's nothing to show. */
   count: number;
-  /** The accessible name of the Messages link or tab. */
+  /** The accessible name of the link or tab it sits on. */
   label: string;
 }
 
-/** The Messages badge, the same on both apps. */
+/** The Messages badge, the same on both apps: threads with something unread plus requests waiting. */
 export function chatBadgeLabel(badge: ChatBadgeDto | undefined): ChatBadgeLabel {
   const count = (badge?.unread ?? 0) + (badge?.requests ?? 0);
   return { count, label: count > 0 ? `Messages, ${count} unread` : "Messages" };
+}
+
+/** The Groups badge, the same on both apps: invitations waiting for an answer. */
+export function groupsBadgeLabel(badge: ChatBadgeDto | undefined): ChatBadgeLabel {
+  const count = badge?.invites ?? 0;
+  return { count, label: count > 0 ? `Groups, ${count} ${count === 1 ? "invitation" : "invitations"}` : "Groups" };
 }
 
 /**

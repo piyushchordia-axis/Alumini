@@ -4,8 +4,11 @@ import type {
   BillingModel,
   CelebrationKind,
   ChatConversationKind,
+  ChatGroupVisibility,
   ChatMessageKind,
   ChatOrigin,
+  ChatParticipantRole,
+  ChatParticipantState,
   ChatReportAction,
   ChatReportTargetKind,
   ContentType,
@@ -70,6 +73,8 @@ export interface TenantSummaryDto {
 
 export interface TenantPublicSettings {
   memberApprovalMode: ApprovalMode;
+  /** Whether members' posts, listings and groups wait for an admin, so a form can say so before it's sent. Admins' never do. */
+  contentModerationMode: ApprovalMode;
   allowSelfRegistration: boolean;
   minBatchYear: number;
   maxBatchYear: number;
@@ -348,11 +353,17 @@ export interface ChatMessageDto {
   /** Position in the conversation. Order by this, never by time. A member can see gaps, which aren't missing messages. */
   seq: number;
   kind: ChatMessageKind;
-  /** Null once the sender has deleted their account: show DELETED_MEMBER_NAME. */
+  /** Null once the sender has deleted their account: show DELETED_MEMBER_NAME. Null too when `redacted`. */
   sender: ChatMemberDto | null;
-  /** Null when an admin removed the message. */
+  /** Null when an admin removed the message, and on a redacted TEXT message. A SYSTEM line keeps its fixed text. */
   body: string | null;
   removed: boolean;
+  /**
+   * Sent in a group by someone this member has blocked: show BLOCKED_MEMBER_NAME, and nothing they wrote. Only ever true for
+   * the member who blocked them; everyone else, the sender included, sees the message as it is.
+   */
+  redacted: boolean;
+  /** A SYSTEM line's `event` (ChatGroupEvent), which is about its sender. */
   meta: Record<string, unknown> | null;
   /** The client's own key for the send, on the sender's copy only, so it can settle its optimistic row. */
   clientKey: string | null;
@@ -367,24 +378,48 @@ export type ChatThreadState = "REQUEST_SENT" | "REQUEST_RECEIVED" | "REQUEST_DEC
 
 export interface ChatLastMessageDto {
   seq: number;
-  /** Null when an admin removed the message. */
+  kind: ChatMessageKind;
+  /** Null when an admin removed the message, or it's redacted for this member. */
   body: string | null;
   mine: boolean;
+  /**
+   * Who sent it, in a group, where a preview names them. Always null in a direct thread, where `mine` says all there is to
+   * say, and null for a deleted or blocked member.
+   */
+  sender: ChatMemberDto | null;
+  /** From someone this member blocked, in a group: see ChatMessageDto.redacted. */
+  redacted: boolean;
   createdAt: string;
+}
+
+/** A group thread's own details, as an inbox row and a thread header need them. */
+export interface ChatConversationGroupDto {
+  /** The name an admin approved, which is all members ever see. Its owner sees their own until it's first approved. */
+  name: string;
+  visibility: ChatGroupVisibility;
+  memberCount: number;
+  /** Read-only for its members, and gone from Discover. */
+  archived: boolean;
+  isOwner: boolean;
 }
 
 export interface ChatConversationDto {
   id: string;
   kind: ChatConversationKind;
   origin: ChatOrigin;
-  /** Null once the other member has deleted their account: show DELETED_MEMBER_NAME. */
+  /** Null once the other member has deleted their account: show DELETED_MEMBER_NAME. Always null in a group. */
   peer: ChatMemberDto | null;
+  /** A group's details, or null in a direct thread. A group's state is always ACCEPTED. */
+  group: ChatConversationGroupDto | null;
   state: ChatThreadState;
   canSend: boolean;
   /** When this member may next ask, for a thread they can't send in until then. Null if they can't. */
   canRerequestAt: string | null;
   blockedByMe: boolean;
-  /** 0 while this member has the other blocked. */
+  /**
+   * 0 while this member has the other blocked. In a group, the messages since they last read, not counting system lines,
+   * removed messages or anything from someone they blocked.
+   */
   unread: number;
   /** How far they've read of what they can see. */
   lastReadSeq: number;
@@ -409,6 +444,82 @@ export interface ChatBadgeDto {
   /** Conversations with something unread, not messages. */
   unread: number;
   requests: number;
+  /** Group invitations waiting for an answer. They belong on Groups, not Messages. */
+  invites: number;
+}
+
+/** What a group's owner submitted and what moderation made of it. Only ever sent to its owner. */
+export interface ChatGroupReviewDto extends ModerationFields {
+  name: string;
+  description: string | null;
+  /** Whether members can see the group: an admin has approved it and hasn't since rejected or removed it. */
+  shownToMembers: boolean;
+}
+
+/**
+ * A group as one member sees it. Members only ever get the name and description an admin approved, never an edit waiting
+ * for review, and nothing here says whether one is waiting.
+ */
+export interface ChatGroupDto {
+  /** Its conversation's id, which its thread opens with. */
+  id: string;
+  /** The approved name. Its owner sees their own until it's first approved. */
+  name: string;
+  description: string | null;
+  visibility: ChatGroupVisibility;
+  memberCount: number;
+  /** Null once nobody is left to own it. */
+  owner: ChatMemberDto | null;
+  archived: boolean;
+  /** Null for someone who has never been in it, including anyone with an invitation they can't see. */
+  myState: ChatParticipantState | null;
+  isOwner: boolean;
+  canSend: boolean;
+  canJoin: boolean;
+  canInvite: boolean;
+  canEdit: boolean;
+  canLeave: boolean;
+  createdAt: string;
+  /** Its owner's only. */
+  review: ChatGroupReviewDto | null;
+}
+
+export interface ChatGroupMemberDto {
+  member: ChatMemberDto;
+  role: ChatParticipantRole;
+  isMe: boolean;
+  /** This member blocked them, which hides their messages here. Never says who blocked whom the other way. */
+  blockedByMe: boolean;
+}
+
+export interface ChatGroupInviteDto {
+  group: ChatGroupDto;
+  /** Null if they've since deleted their account. */
+  invitedBy: ChatMemberDto | null;
+  invitedAt: string;
+}
+
+/** The same whichever invitations were delivered, because one that wasn't must look exactly like one that was. */
+export interface ChatGroupInviteResultDto {
+  /** Members asked who weren't in the group already. */
+  invited: number;
+}
+
+/** A group as an admin reviews it: its name and description, never its messages. */
+export interface ChatGroupContentDto extends ModerationFields {
+  id: string;
+  /** What its owner last submitted, which is what's under review. */
+  name: string;
+  description: string | null;
+  /** What members see while that is reviewed, or null if it has never been approved. */
+  approvedName: string | null;
+  approvedDescription: string | null;
+  visibility: ChatGroupVisibility;
+  memberCount: number;
+  owner: MemberCardDto | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ChatBlockDto {
@@ -835,7 +946,7 @@ export interface PostPageDto extends CursorPage<PostDto> {
   pinned?: PostDto[];
 }
 
-export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto | BusinessDto;
+export type ContentDto = JobDto | FundingDto | PostDto | CommentDto | EventDto | BusinessDto | ChatGroupContentDto;
 
 export interface TenantCountsDto {
   approvedMembers: number;

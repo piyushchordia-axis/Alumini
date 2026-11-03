@@ -18,8 +18,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function NewConversationScreen() {
   const enabled = useChatEnabled();
+  const { tenant } = useMembership();
   const { to = "" } = useLocalSearchParams<{ to?: string }>();
-  if (!enabled) return <ChatOff />;
+  // Messages can be open for groups alone, with direct messages off: then there's nobody to write to here.
+  if (!enabled || !tenant.settings.features.messaging) return <ChatOff />;
   return <NewConversation key={to} to={to} />;
 }
 

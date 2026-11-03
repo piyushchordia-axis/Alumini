@@ -1,14 +1,17 @@
 import type { TenantFeatures } from "../constants";
+import { chatAvailable } from "./features";
 
 type SectionRule = (features: TenantFeatures, chatEligible: boolean) => boolean;
 
 /** The member app's sections in priority order. Each has a rule, not a feature key, because a section can depend on several keys. */
 const SECTION_RULES = {
   feed: (f) => f.feed,
-  messages: (f, chatEligible) => f.messaging && chatEligible,
+  // Group threads live in the inbox too, so either switch gives a member one.
+  messages: (f, chatEligible) => chatAvailable(f, chatEligible),
   jobs: (f) => f.jobs,
   directory: (f) => f.directory,
   events: (f) => f.events,
+  groups: (f, chatEligible) => f.groups && chatEligible,
   businesses: (f) => f.businesses,
   funding: (f) => f.funding,
 } satisfies Record<string, SectionRule>;

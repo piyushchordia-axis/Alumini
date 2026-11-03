@@ -1,9 +1,8 @@
-import type { ChatRow } from "@illuminize/shared/chat";
+import { messageSenderName, systemLineText, type ChatRow } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { memo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui";
 import { useChatScroll } from "@/hooks/useChatScroll";
-import { peerName } from "@/lib/chat";
 
 type MessageRow = Extract<ChatRow, { type: "message" }>;
 
@@ -25,6 +24,8 @@ export function MessageList({
   loadOlder,
   actions,
   before,
+  me,
+  showSenders = false,
 }: {
   rows: ChatRow[];
   label: string;
@@ -34,6 +35,10 @@ export function MessageList({
   actions: MessageActions;
   /** Shown above the first message, such as how a request works. */
   before?: ReactNode;
+  /** This member's id, so a system line about them reads "You". */
+  me: string;
+  /** In a group, where there are more than two people, each run of messages says whose it is. */
+  showSenders?: boolean;
 }) {
   const messages = rows.filter((r): r is MessageRow => r.type === "message");
   const last = messages.at(-1);
@@ -58,7 +63,7 @@ export function MessageList({
                 <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-500">{row.label}</span>
               </div>
             ) : (
-              <Bubble key={row.key} row={row} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
+              <Bubble key={row.key} row={row} me={me} showSenders={showSenders} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
             ),
           )}
         </div>
@@ -72,32 +77,41 @@ export function MessageList({
   );
 }
 
-const Bubble = memo(function Bubble({ row, actions, selected, onSelect }: { row: MessageRow; actions: MessageActions; selected: boolean; onSelect: () => void }) {
+const Bubble = memo(function Bubble({ row, me, showSenders, actions, selected, onSelect }: { row: MessageRow; me: string; showSenders: boolean; actions: MessageActions; selected: boolean; onSelect: () => void }) {
   const { item, mine, startsGroup, endsGroup, timeLabel } = row;
   const message = item.message;
   const pending = item.pending;
 
   if (message?.kind === "SYSTEM") {
+    // A group's lines are about one member and name nobody themselves, so the name goes in front.
+    const text = showSenders ? systemLineText(message, !message.redacted && message.sender?.id === me) : message.body;
     return (
-      <p className="my-3 text-center text-xs text-slate-500">
-        {message.body} <span className="text-slate-400">· {timeLabel}</span>
+      <p className="my-3 px-4 text-center text-xs text-slate-500 [overflow-wrap:anywhere]">
+        {text} <span className="text-slate-400">· {timeLabel}</span>
       </p>
     );
   }
 
   const removed = !!message?.removed;
+  // Someone this member blocked, in a group: nothing they wrote, and no name beyond "Blocked member".
+  const hidden = !!message?.redacted && !removed;
   const failed = pending?.status === "failed";
-  const reportable = !!message && !mine && !removed;
-  const who = mine ? "You" : peerName(message?.sender);
+  const reportable = !!message && !mine && !removed && !message.redacted;
+  const who = mine ? "You" : message ? messageSenderName(message) : "";
 
   return (
     <div className={clsx("group flex flex-col", mine ? "items-end" : "items-start", startsGroup ? "mt-3" : "mt-0.5")}>
+      {showSenders && !mine && startsGroup && (
+        <span aria-hidden className="mb-0.5 max-w-[85%] truncate px-3 text-xs font-medium text-slate-500 sm:max-w-[75%]">
+          {who}
+        </span>
+      )}
       <div className="relative max-w-[85%] sm:max-w-[75%]">
         <div
           onClick={onSelect}
           className={clsx(
             "whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-snug [overflow-wrap:anywhere]",
-            removed
+            removed || hidden
               ? "border border-dashed border-slate-300 bg-white italic text-slate-500"
               : mine
                 ? clsx("bg-primary text-white", pending && !failed && "opacity-70", failed && "ring-2 ring-red-500 ring-offset-1")
@@ -106,7 +120,7 @@ const Bubble = memo(function Bubble({ row, actions, selected, onSelect }: { row:
           )}
         >
           <span className="sr-only">{who}: </span>
-          {removed ? "This message was removed" : (message?.body ?? pending?.body)}
+          {removed ? "This message was removed" : hidden ? "Hidden because you blocked this member" : (message?.body ?? pending?.body)}
         </div>
         {reportable && (
           // Beside the bubble rather than under it, so a thread doesn't get taller for a control most people never use.

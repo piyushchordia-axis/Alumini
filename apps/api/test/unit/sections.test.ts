@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map((f) => [f, on.includes(f)])) as TenantFeatures;
 
 describe("MEMBER_SECTIONS", () => {
-  it("is in priority order, which isn't the order of the feature keys", () => {
-    expect(MEMBER_SECTIONS).toEqual(["feed", "messages", "jobs", "directory", "events", "businesses", "funding"]);
+  it("is in priority order, which isn't the order of the feature keys, with Groups after Events", () => {
+    expect(MEMBER_SECTIONS).toEqual(["feed", "messages", "jobs", "directory", "events", "groups", "businesses", "funding"]);
   });
 });
 
@@ -16,16 +16,22 @@ describe("splitSections", () => {
     expect(splitSections(only("feed", "jobs", "directory", "events", "businesses"), false)).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["businesses"] });
   });
 
-  it("puts Messages second, which pushes Events behind More, with everything enabled for a member who can use it", () => {
-    expect(splitSections(only(...TENANT_FEATURES), true)).toEqual({ bar: ["feed", "messages", "jobs", "directory"], overflow: ["events", "businesses", "funding"] });
+  it("puts Messages second, which pushes Events and Groups behind More, with everything enabled for a member who can use it", () => {
+    expect(splitSections(only(...TENANT_FEATURES), true)).toEqual({ bar: ["feed", "messages", "jobs", "directory"], overflow: ["events", "groups", "businesses", "funding"] });
   });
 
-  it("leaves Messages out for a member who can't use it, even with messaging on, and everything moves up", () => {
+  it("leaves Messages and Groups out for a member who can't use them, even with both on, and everything moves up", () => {
     expect(splitSections(only(...TENANT_FEATURES), false)).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["businesses", "funding"] });
   });
 
-  it("leaves Messages out with messaging off, even for a member who could use it", () => {
+  it("leaves Messages out with messaging and groups off, even for a member who could use it", () => {
     expect(splitSections(only("feed", "jobs", "directory", "events", "businesses", "funding"), true)).toEqual({ bar: ["feed", "jobs", "directory", "events"], overflow: ["businesses", "funding"] });
+  });
+
+  it("shows Messages for groups alone, because group threads are in the inbox, alongside Groups itself", () => {
+    expect(splitSections(only("feed", "groups"), true)).toEqual({ bar: ["feed", "messages", "groups"], overflow: [] });
+    expect(splitSections(only("feed", "messaging"), true)).toEqual({ bar: ["feed", "messages"], overflow: [] });
+    expect(splitSections(only("feed", "groups"), false)).toEqual({ bar: ["feed"], overflow: [] });
   });
 
   it("brings Businesses onto the bar ahead of Funding when a section above it is off", () => {
@@ -45,16 +51,17 @@ describe("splitSections", () => {
   });
 
   // A table rather than a loop over the keys: a section can have another name than its key, or depend on several.
-  it.each<[MemberSection, TenantFeature]>([
-    ["feed", "feed"],
-    ["messages", "messaging"],
-    ["jobs", "jobs"],
-    ["directory", "directory"],
-    ["events", "events"],
-    ["businesses", "businesses"],
-    ["funding", "funding"],
-  ])("shows %s when %s is on, and no other section", (section, feature) => {
-    expect(splitSections(only(feature), true).bar).toEqual([section]);
+  it.each<[TenantFeature, MemberSection[]]>([
+    ["feed", ["feed"]],
+    ["messaging", ["messages"]],
+    ["groups", ["messages", "groups"]],
+    ["jobs", ["jobs"]],
+    ["directory", ["directory"]],
+    ["events", ["events"]],
+    ["businesses", ["businesses"]],
+    ["funding", ["funding"]],
+  ])("with only %s on, shows %j and no other section", (feature, sections) => {
+    expect(splitSections(only(feature), true).bar).toEqual(sections);
   });
 });
 
@@ -68,9 +75,10 @@ describe("homeSection", () => {
     expect(homeSection(only("funding", "directory"))).toBe("directory");
   });
 
-  it("never lands on Messages, even when it comes first", () => {
+  it("never lands on Messages or Groups, even when they come first", () => {
     expect(homeSection(only("messaging", "jobs"))).toBe("jobs");
     expect(homeSection(only("messaging"))).toBeNull();
+    expect(homeSection(only("groups", "messaging"))).toBeNull();
     expect(homeSection(only(...TENANT_FEATURES))).toBe("feed");
   });
 

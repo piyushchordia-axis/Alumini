@@ -63,6 +63,8 @@ export interface ChatUnreadEvent {
   /** Conversations with something unread, not messages. */
   unread: number;
   requests: number;
+  /** Group invitations waiting for an answer. */
+  invites: number;
 }
 
 export interface ServerToClientEvents {

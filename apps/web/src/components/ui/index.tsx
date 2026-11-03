@@ -46,9 +46,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 });
 
-export function LinkButton({ to, variant = "primary", size = "md", className, children }: { to: string; variant?: Variant; size?: Size; className?: string; children: ReactNode }) {
+export function LinkButton({ to, state, variant = "primary", size = "md", className, children }: { to: string; state?: unknown; variant?: Variant; size?: Size; className?: string; children: ReactNode }) {
   return (
-    <Link to={to} className={clsx("inline-flex items-center justify-center gap-2 rounded-lg font-medium transition", variantClass[variant], sizeClass[size], className)}>
+    <Link to={to} state={state} className={clsx("inline-flex items-center justify-center gap-2 rounded-lg font-medium transition", variantClass[variant], sizeClass[size], className)}>
       {children}
     </Link>
   );

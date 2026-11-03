@@ -20,6 +20,7 @@ import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "
 import type { AuthContext, MembershipRow, TenantContext } from "../types/request";
 import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit, recordAuditStrict } from "./audit.service";
+import { handOverGroupsOf } from "./chat/groups.service";
 import { notify, notifyTenantAdmins } from "./notifications/notification.service";
 
 interface Actor extends AuthContext {
@@ -259,6 +260,7 @@ export async function adminTransition(
         statusChangedAt: new Date(),
         statusChangedByUserId: actor.userId,
       }))!;
+      if (next === "SUSPENDED") await handOverGroupsOf(ctx, tx, tenant.id, target.id);
       return { target, user, next, row };
     }),
   );

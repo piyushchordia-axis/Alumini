@@ -1,4 +1,16 @@
-import { BUSINESS_CATEGORY_LABELS, CONTENT_TYPES, CONTENT_TYPE_LABELS, MODERATION_STATUSES, MODERATION_STATUS_LABELS, type ContentDto, type ContentType, type ModerationItemDto, type ModerationStatus } from "@illuminize/shared";
+import {
+  BUSINESS_CATEGORY_LABELS,
+  CHAT_GROUP_VISIBILITY_INFO,
+  CONTENT_TYPES,
+  CONTENT_TYPE_LABELS,
+  MODERATION_STATUSES,
+  MODERATION_STATUS_LABELS,
+  type ChatGroupContentDto,
+  type ContentDto,
+  type ContentType,
+  type ModerationItemDto,
+  type ModerationStatus,
+} from "@illuminize/shared";
 import { errorMessage, type ModerationAction } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -26,12 +38,38 @@ function contentLink(slug: string, item: ModerationItemDto): string | null {
       return `${base}/events/${item.id}`;
     case "BUSINESS":
       return `${base}/businesses/${item.id}`;
+    // A group's page would be its members' conversation, which admins don't get to open.
+    case "GROUP":
     case "COMMENT":
       return null;
   }
 }
 
+function GroupPreview({ content }: { content: ChatGroupContentDto }) {
+  const editing = content.approvedName !== null && (content.approvedName !== content.name || content.approvedDescription !== content.description);
+  return (
+    <div className="space-y-1 text-sm text-slate-800">
+      <p className="font-medium">{content.name}</p>
+      <p className="text-slate-500">
+        {CHAT_GROUP_VISIBILITY_INFO[content.visibility].label} · {content.memberCount} {content.memberCount === 1 ? "member" : "members"}
+        {content.owner ? ` · owned by ${content.owner.fullName}` : ""}
+      </p>
+      {content.description && <p className="whitespace-pre-line">{content.description}</p>}
+      {editing && (
+        <div className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-white p-2 text-slate-600">
+          <p className="text-xs font-medium text-slate-500">Until you decide, members see what was approved before:</p>
+          <p className="font-medium">{content.approvedName}</p>
+          {content.approvedDescription && <p className="whitespace-pre-line">{content.approvedDescription}</p>}
+        </div>
+      )}
+      <p className="text-xs text-slate-500">Chat messages are never shown here: only a group's name and description are reviewed.</p>
+    </div>
+  );
+}
+
 function ContentPreview({ content }: { content: ContentDto }) {
+  // First: a group has a description too, and it's a different thing to review.
+  if ("visibility" in content && "memberCount" in content) return <GroupPreview content={content} />;
   // Before the description check below: a business has one too, and an admin also needs what the list doesn't show.
   if ("category" in content) {
     return (
@@ -77,13 +115,31 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
     void invalidateTenant(qc, slug);
   };
   const act = useMutation({
-    mutationFn: (v: { action: ModerationAction; note?: string }) => api.admin.moderation.act(slug, item.contentType, item.id, v.action, v.note),
+    mutationFn: (v: { action: ModerationAction; note?: string; reviewed?: { name: string; description: string | null } }) => api.admin.moderation.act(slug, item.contentType, item.id, v.action, v.note, v.reviewed),
     onSuccess: (r) => {
       refresh();
       toast.success(`${CONTENT_TYPE_LABELS[item.contentType]} ${r.to.toLowerCase()}`);
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      toast.error(errorMessage(e));
+      // Most often a group its owner changed meanwhile: show what it says now.
+      if (expanded) void full.refetch();
+    },
   });
+  const shownGroup = full.data && "visibility" in full.data && "memberCount" in full.data ? full.data : null;
+  /**
+   * Approving a group publishes its name and description to its members, so it approves what this admin can see on screen:
+   * the first press opens the details if they're closed, and the API refuses if the group has changed since.
+   */
+  const approve = () => {
+    if (item.contentType !== "GROUP") return act.mutate({ action: "approve" });
+    if (!expanded || !shownGroup) {
+      setExpanded(true);
+      toast.info("Check the group's name and description, then approve it.");
+      return;
+    }
+    act.mutate({ action: "approve", reviewed: { name: shownGroup.name, description: shownGroup.description } });
+  };
   const pin = useMutation({
     mutationFn: (pinned: boolean) => (pinned ? api.admin.moderation.pin(slug, item.id) : api.admin.moderation.unpin(slug, item.id)),
     onSuccess: () => {
@@ -98,7 +154,8 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
+        {/* The whole width on a phone, with the actions below, or a long item reads as a narrow column. */}
+        <div className="min-w-0 flex-1 max-sm:basis-full">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="info">{CONTENT_TYPE_LABELS[item.contentType]}</Badge>
             {item.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
@@ -127,7 +184,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
         </div>
         <div className="flex flex-wrap gap-2">
           {(s === "PENDING" || s === "REJECTED") && (
-            <Button size="sm" onClick={() => act.mutate({ action: "approve" })} loading={act.isPending}>
+            <Button size="sm" onClick={approve} loading={act.isPending}>
               Approve
             </Button>
           )}

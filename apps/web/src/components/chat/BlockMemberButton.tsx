@@ -1,4 +1,5 @@
 import type { ChatMemberDto } from "@illuminize/shared";
+import { BLOCK_EXPLAINED } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -34,7 +35,7 @@ export function BlockConfirmDialog({ slug, member, open, onClose, onDone }: { sl
     <ConfirmDialog
       open={open}
       title={`Block ${member.fullName}?`}
-      body="They won't be told. Nothing they send while blocked will reach you, even if you unblock them later. You can unblock them from Blocked members in Messages."
+      body={BLOCK_EXPLAINED}
       confirmLabel="Block member"
       destructive
       busy={block.isPending}
@@ -52,6 +53,7 @@ export function BlockMemberButton({
   variant = "outline",
   size = "sm",
   className,
+  onDone,
 }: {
   slug: string;
   member: Member;
@@ -59,9 +61,11 @@ export function BlockMemberButton({
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
   className?: string;
+  /** After an unblock goes through. */
+  onDone?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const unblock = useBlockChange(slug, member);
+  const unblock = useBlockChange(slug, member, onDone);
   return (
     <>
       <Button variant={blocked ? "outline" : variant} size={size} className={clsx("min-h-11", className)} loading={unblock.isPending} onClick={() => (blocked ? unblock.mutate(false) : setConfirming(true))}>

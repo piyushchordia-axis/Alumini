@@ -26,6 +26,8 @@ const HIDE = { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: 
 
 /** The thread on screen is the one this push is about, whether or not the app is in front. */
 function isOpenThread(data: PushData): boolean {
+  // An invitation is to a group the member isn't in yet, so it's news even with that group's thread on screen saying so.
+  if (data.type === "CHAT_GROUP_INVITE") return false;
   const active = activeChat(useChatStore.getState().focus);
   return !!data.conversationId && data.conversationId === active?.conversationId && data.tenantSlug === active.slug;
 }
@@ -76,6 +78,7 @@ export function PushNotificationsBridge() {
           void qc.invalidateQueries({ queryKey: qk.notifications(data.tenantSlug) });
           // The live connection normally gets there first; a push is the hint when it hasn't.
           if (data.conversationId) void qc.invalidateQueries({ queryKey: chatKeys.badge(data.tenantSlug) });
+          if (data.type === "CHAT_GROUP_INVITE") void qc.invalidateQueries({ queryKey: chatKeys.groupInvites(data.tenantSlug) });
         }),
       );
       subs.push(

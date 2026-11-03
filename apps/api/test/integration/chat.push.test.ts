@@ -1,17 +1,17 @@
 import { CHAT_PUSH_KINDS, notificationTarget, type ChatMessageDto } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatMessages, chatParticipants, memberships, notifications, outboundMessages, tenantSettings, tenants } from "../../src/db/schema";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { chatBlocks, chatGroups, chatMessages, chatParticipants, memberships, notifications, outboundMessages, pushTokens, tenantSettings, tenants, users as usersTable } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { keys } from "../../src/redis/keys";
 import { upsertPushToken } from "../../src/repositories/users.repo";
-import { DIRECT_PUSH_WINDOW, queueConversationPush } from "../../src/services/chat/fanout";
+import { DIRECT_PUSH_WINDOW, GROUP_PUSH_WINDOW, queueConversationPush } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { CHAT_PUSH_TTL_SEC } from "../../src/services/chat/push";
-import { ExpoPushChannel } from "../../src/services/notifications/ExpoPushChannel";
+import { ExpoPushChannel, PUSH_BATCH_SIZE } from "../../src/services/notifications/ExpoPushChannel";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
-import { acceptedThread, chatApi, conversationRow, openRequest, type Session } from "../helpers/chat";
+import { acceptedThread, chatApi, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
 import { createTenant, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -27,9 +27,12 @@ interface Pushed {
 function fakeExpo() {
   const sent: Pushed[] = [];
   let failures = 0;
+  let calls = 0;
+  const failing = new Set<number>();
   const impl = (async (_url: string | URL | Request, init?: RequestInit) => {
-    if (failures > 0) {
-      failures -= 1;
+    calls += 1;
+    if (failures > 0 || failing.delete(calls)) {
+      if (failures > 0) failures -= 1;
       return new Response("Service unavailable", { status: 503 });
     }
     const batch = JSON.parse(String(init?.body)) as Pushed[];
@@ -40,7 +43,11 @@ function fakeExpo() {
   const failNext = (n: number) => {
     failures = n;
   };
-  return { sent, impl, failNext };
+  /** Only the `n`th request from now gets a 503, so the ones before it go through. */
+  const failRequest = (n: number) => {
+    failing.add(calls + n);
+  };
+  return { sent, impl, failNext, failRequest };
 }
 
 const ORIGIN_ID = "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81";
@@ -136,6 +143,25 @@ describe.skipIf(!dbAvailable)("chat push", () => {
       const { failed } = await runJobs();
       expect(failed).toEqual([]);
       expect(pushedTo(b)).toHaveLength(1);
+    });
+
+    it("lets everyone go again when looking up their devices fails before anything was sent, so the retry still tells them", async () => {
+      const { tenant, a, b, chat } = await setup();
+      const id = await acceptedThread(ctx, tenant.slug, a, b);
+      await start();
+      // As a pool or lock timeout would, before the first batch.
+      const lookup = vi.spyOn(ctx.push!, "prepareEach").mockRejectedValueOnce(new Error("timeout exceeded when trying to connect"));
+      try {
+        await chat(a).send(id, "Hello");
+        await ctx.jobs.drain({ includeDelayed: true, maxJobs: 1 });
+        expect(expo.sent).toEqual([]);
+        expect(await ctx.redis.get(keys.chatPushQuiet(id, b.membership.id))).toBeNull();
+        const { failed } = await runJobs();
+        expect(failed).toEqual([]);
+        expect(pushedTo(b)).toHaveLength(1);
+      } finally {
+        lookup.mockRestore();
+      }
     });
 
     it("gives up after its attempts, leaving the next message free to push", async () => {
@@ -607,6 +633,257 @@ describe.skipIf(!dbAvailable)("chat push", () => {
     });
   });
 
+  describe("a group's messages", () => {
+    /** An open group Asha owns, with Bilal and Chitra in it, all with phones. */
+    async function groupRoom(options: Parameters<typeof createTenant>[1] = {}) {
+      const s = await setup(options);
+      const c = await memberSession(ctx, s.tenant.id, { fullName: "Chitra Iyer" });
+      await upsertPushToken(ctx.db, { userId: c.user.id, token: tokenOf(c), platform: "ANDROID" });
+      const group = await createGroup(ctx, s.tenant.slug, s.a, { name: "Weekend runners" });
+      for (const m of [s.b, c]) await groupsApi(ctx, s.tenant.slug, m).join(group.id);
+      return { ...s, c, group };
+    }
+    /** As the admin page does it: an approval says which name and description it approves. */
+    const moderate = async (slug: string, admin: Session, id: string, action: string) => {
+      const [g] = await ctx.db.select().from(chatGroups).where(eq(chatGroups.conversationId, id));
+      const reviewed = action === "approve" ? { reviewed: { name: g!.name, description: g!.description } } : {};
+      const res = await request(ctx.app).post(`/api/v1/t/${slug}/admin/moderation/GROUP/${id}/${action}`).set(admin.headers).send(reviewed);
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    };
+
+    it("bunch up over 30 seconds into one push each, titled with the group's approved name, with nobody's name or words", async () => {
+      const { tenant, a, b, c, chat, group } = await groupRoom();
+      await start();
+      ctx.jobs.history.length = 0;
+      const before = Date.now();
+      for (const body of ["Secret one", "Secret two", "Secret three"]) await chat(a).send(group.id, body);
+      const after = Date.now();
+
+      const job = ctx.jobs.history.find((h) => h.name === "chat.pushConversation")!;
+      expect(job.data).toEqual({ tenantId: tenant.id, conversationId: group.id, quietSec: GROUP_PUSH_WINDOW.quietSec });
+      expect(GROUP_PUSH_WINDOW).toEqual({ windowMs: 30_000, quietSec: 600 });
+      const [, bucket] = /^chatpush-[0-9a-f-]+-(\d+)$/.exec(job.opts!.jobId!)!;
+      const runsAt = (Number(bucket) + 2) * 30_000;
+      expect(job.opts!.delayMs!).toBeGreaterThanOrEqual(runsAt - after);
+      expect(job.opts!.delayMs!).toBeLessThanOrEqual(runsAt - before);
+      expect(job.opts!.delayMs!).toBeGreaterThan(30_000);
+      expect(ctx.jobs.peek("chat.pushConversation")).toHaveLength(1);
+
+      await runJobs();
+      expect(pushedTo(a)).toEqual([]);
+      for (const m of [b, c]) {
+        expect(pushedTo(m)).toEqual([{ to: tokenOf(m), title: "New message in Weekend runners", data: { type: "CHAT_MESSAGE", conversationId: group.id, tenantSlug: tenant.slug }, sound: "default", channelId: "default", ttl: CHAT_PUSH_TTL_SEC }]);
+      }
+      expect(JSON.stringify([expo.sent, ctx.jobs.history])).not.toContain("Secret");
+      expect(JSON.stringify(expo.sent)).not.toContain("Asha");
+    });
+
+    it("stay quiet for 600 seconds towards a member who hasn't read them, and reading ends that early", async () => {
+      const { a, b, chat, group } = await groupRoom();
+      await start();
+      const quietKey = keys.chatPushQuiet(group.id, b.membership.id);
+      await chat(a).send(group.id, "One");
+      await runJobs();
+      expect(await ctx.redis.ttl(quietKey)).toBeGreaterThan(500);
+      expect(await ctx.redis.ttl(quietKey)).toBeLessThanOrEqual(600);
+      const two = await chat(a).send(group.id, "Two");
+      await runJobs();
+      expect(pushedTo(b)).toHaveLength(1);
+      await chat(b).read(group.id, (two.body.data as ChatMessageDto).seq);
+      expect(await ctx.redis.get(quietKey)).toBeNull();
+      await chat(a).send(group.id, "Three");
+      await runJobs();
+      expect(pushedTo(b)).toHaveLength(2);
+    });
+
+    it("never use a name still waiting for review", async () => {
+      const { tenant, a, b, chat } = await setup({ contentModerationMode: "ADMIN_APPROVAL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const group = await createGroup(ctx, tenant.slug, a, { name: "Weekend runners" });
+      await moderate(tenant.slug, admin, group.id, "approve");
+      await groupsApi(ctx, tenant.slug, b).join(group.id);
+      await groupsApi(ctx, tenant.slug, a).edit(group.id, { name: "Unreviewed name" });
+      await start();
+      await chat(a).send(group.id, "Hello");
+      await runJobs();
+      expect(pushedTo(b).map((p) => p.title)).toEqual(["New message in Weekend runners"]);
+      expect(JSON.stringify(expo.sent)).not.toContain("Unreviewed");
+    });
+
+    it("say nothing to a member who blocked the sender, about a system line, or once moderation has hidden the group", async () => {
+      const { tenant, a, b, c, chat, group } = await groupRoom();
+      await chat(c).block(a.membership.id);
+      await start();
+      await chat(a).send(group.id, "Blocked by Chitra");
+      await runJobs();
+      expect(expo.sent.map((p) => p.to)).toEqual([tokenOf(b)]);
+
+      // A member joining is a line in the thread, not news.
+      ctx.jobs.history.length = 0;
+      await groupsApi(ctx, tenant.slug, await memberSession(ctx, tenant.id)).join(group.id);
+      expect(ctx.jobs.history.filter((h) => h.name.startsWith("chat."))).toEqual([]);
+
+      await chat(b).read(group.id, 99);
+      await start();
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      await chat(a).send(group.id, "Queued before the removal");
+      await moderate(tenant.slug, admin, group.id, "remove");
+      await runJobs();
+      // Its owner hears of the removal as a notice, which is no chat push.
+      expect(expo.sent.map((p) => p.data.type)).toEqual(["CONTENT_REMOVED"]);
+    });
+
+    it("reach nobody twice when a later batch fails and the job is retried, and reach everyone it missed", async () => {
+      const { tenant, a, chat } = await setup();
+      const group = await createGroup(ctx, tenant.slug, a, { name: "Big room" });
+      const count = PUSH_BATCH_SIZE + 5;
+      const users = await ctx.db
+        .insert(usersTable)
+        .values(Array.from({ length: count }, (_, i) => ({ phoneE164: `+9177${String(i).padStart(8, "0")}`, phoneRegion: "IN" })))
+        .returning({ id: usersTable.id });
+      const members = await ctx.db
+        .insert(memberships)
+        .values(users.map((u, i) => ({ tenantId: tenant.id, userId: u.id, status: "APPROVED" as const, role: "MEMBER" as const, fullName: `Runner ${i}`, batchYear: 2010, professionType: "EMPLOYED" as const, statusChangedAt: new Date() })))
+        .returning({ id: memberships.id });
+      await ctx.db.insert(pushTokens).values(users.map((u) => ({ userId: u.id, token: `ExponentPushToken[${u.id}]`, platform: "ANDROID" as const })));
+      await ctx.db.insert(chatParticipants).values(members.map((m) => ({ conversationId: group.id, membershipId: m.id, tenantId: tenant.id, state: "ACTIVE" as const, role: "MEMBER" as const, joinedAt: new Date() })));
+      await ctx.db.update(chatGroups).set({ memberCount: count + 1 }).where(eq(chatGroups.conversationId, group.id));
+      await start();
+
+      // The first batch goes, the second fails, and the job runs again.
+      expo.failRequest(2);
+      await chat(a).send(group.id, "Everyone, once");
+      const { failed } = await runJobs();
+      expect(failed).toEqual([]);
+      const perToken = new Map<string, number>();
+      for (const p of expo.sent) perToken.set(p.to, (perToken.get(p.to) ?? 0) + 1);
+      expect(perToken.size).toBe(count);
+      expect([...perToken.values()].every((n) => n === 1)).toBe(true);
+    });
+  });
+
+  describe("a group invitation", () => {
+    async function invited(visibility: "OPEN" | "INVITE_ONLY" = "INVITE_ONLY") {
+      const s = await setup();
+      const group = await createGroup(ctx, s.tenant.slug, s.a, { name: "Reunion committee", visibility });
+      const groups = (m: Session) => groupsApi(ctx, s.tenant.slug, m);
+      return { ...s, group, groups };
+    }
+
+    it("says only that they were invited, naming neither the group nor who asked, goes straight out, and opens Invitations", async () => {
+      const { tenant, b, group, groups, a } = await invited();
+      await start();
+      ctx.jobs.history.length = 0;
+      expect((await groups(a).invite(group.id, [b.membership.id])).status).toBe(201);
+      const job = ctx.jobs.history.find((h) => h.name === "chat.pushGroupInvite")!;
+      expect(job.data).toEqual({ tenantId: tenant.id, conversationId: group.id, inviteeMembershipIds: [b.membership.id] });
+      expect(job.opts).toBeUndefined();
+      await ctx.jobs.drain();
+
+      expect(expo.sent).toEqual([{ to: tokenOf(b), title: "You've been invited to a group", data: { type: "CHAT_GROUP_INVITE", conversationId: group.id, tenantSlug: tenant.slug }, sound: "default", channelId: "default", ttl: CHAT_PUSH_TTL_SEC }]);
+      expect(JSON.stringify([expo.sent, ctx.jobs.history])).not.toMatch(/Asha|Reunion/);
+      expect(notificationTarget("CHAT_GROUP_INVITE", expo.sent[0]!.data)).toEqual({ kind: "chatGroup", view: "invitations" });
+      expect(await ctx.db.select().from(notifications)).toEqual([]);
+    });
+
+    it("is queued for an invitation held back by a block or a decline just as for any other, and pushes nothing for it", async () => {
+      const { tenant, a, b, group, groups, chat } = await invited();
+      const c = await memberSession(ctx, tenant.id);
+      const d = await memberSession(ctx, tenant.id);
+      for (const m of [c, d]) await upsertPushToken(ctx.db, { userId: m.user.id, token: tokenOf(m), platform: "IOS" });
+      await chat(b).block(a.membership.id);
+      const earlier = await createGroup(ctx, tenant.slug, a, { name: "Earlier room", visibility: "INVITE_ONLY" });
+      await groups(a).invite(earlier.id, [c.membership.id]);
+      await groups(c).decline(earlier.id);
+      await start();
+      ctx.jobs.history.length = 0;
+
+      // The same answer, and the same job, whether the invitation reaches its invitee or not: nothing the inviter could
+      // time or see sets the two apart.
+      const answers = [];
+      for (const m of [b, c, d]) answers.push((await groups(a).invite(group.id, [m.membership.id])).body);
+      expect(answers[0]).toEqual(answers[2]);
+      expect(answers[1]).toEqual(answers[2]);
+      expect(ctx.jobs.history.filter((h) => h.name.startsWith("chat.")).map((h) => [h.name, (h.data as { inviteeMembershipIds: string[] }).inviteeMembershipIds])).toEqual([
+        ["chat.pushGroupInvite", [b.membership.id]],
+        ["chat.pushGroupInvite", [c.membership.id]],
+        ["chat.pushGroupInvite", [d.membership.id]],
+      ]);
+      await runJobs();
+      expect(expo.sent.map((p) => p.to)).toEqual([tokenOf(d)]);
+    });
+
+    it("says nothing once it's been declined, answered, hidden by a block, or its group archived before the job runs", async () => {
+      const { tenant, a, b, group, groups, chat } = await invited("OPEN");
+      const more = await Promise.all([1, 2, 3].map(() => memberSession(ctx, tenant.id)));
+      for (const m of more) await upsertPushToken(ctx.db, { userId: m.user.id, token: tokenOf(m), platform: "IOS" });
+      const [declines, accepts, blocks] = more as [Session, Session, Session];
+      await start();
+      await groups(a).invite(group.id, [b.membership.id, declines.membership.id, accepts.membership.id, blocks.membership.id]);
+      await groups(declines).decline(group.id);
+      await groups(accepts).accept(group.id);
+      await chat(blocks).block(a.membership.id);
+      await runJobs();
+      expect(expo.sent.map((p) => p.to)).toEqual([tokenOf(b)]);
+
+      const other = await createGroup(ctx, tenant.slug, a, { name: "Archived soon" });
+      await start();
+      await groups(a).invite(other.id, [b.membership.id]);
+      await groups(a).archive(other.id);
+      await runJobs();
+      expect(expo.sent).toEqual([]);
+    });
+
+    it("respects the CHAT preference, and drops once the institution is suspended", async () => {
+      const { tenant, a, b, group, groups } = await invited();
+      await request(ctx.app).patch(`/api/v1/t/${tenant.slug}/notification-prefs`).set(b.headers).send({ categories: { CHAT: "IN_APP" } }).expect(200);
+      await start();
+      await groups(a).invite(group.id, [b.membership.id]);
+      await runJobs();
+      expect(expo.sent).toEqual([]);
+
+      const c = await memberSession(ctx, tenant.id);
+      await upsertPushToken(ctx.db, { userId: c.user.id, token: tokenOf(c), platform: "IOS" });
+      await groups(a).invite(group.id, [c.membership.id]);
+      await ctx.db.update(tenants).set({ status: "SUSPENDED" }).where(eq(tenants.id, tenant.id));
+      await runJobs();
+      expect(expo.sent).toEqual([]);
+    });
+
+    it("lets its invitees go again when looking up their devices fails, so the retry still tells them", async () => {
+      const { a, b, group, groups } = await invited();
+      await start();
+      const lookup = vi.spyOn(ctx.push!, "prepareEach").mockRejectedValueOnce(new Error("Query read timeout"));
+      try {
+        await groups(a).invite(group.id, [b.membership.id]);
+        const { failed } = await runJobs();
+        expect(failed).toEqual([]);
+        expect(pushedTo(b)).toHaveLength(1);
+      } finally {
+        lookup.mockRestore();
+      }
+    });
+
+    it("pushes each invitation once, even when its job is retried or runs again", async () => {
+      const { tenant, a, b, group, groups } = await invited();
+      const c = await memberSession(ctx, tenant.id);
+      await upsertPushToken(ctx.db, { userId: c.user.id, token: tokenOf(c), platform: "IOS" });
+      await start();
+      expo.failNext(1);
+      ctx.jobs.history.length = 0;
+      await groups(a).invite(group.id, [b.membership.id, c.membership.id]);
+      const { failed } = await runJobs();
+      expect(failed).toEqual([]);
+      expect(expo.sent.map((p) => p.to).sort()).toEqual([tokenOf(b), tokenOf(c)].sort());
+
+      // The same job again, as a worker that stalled after sending might run it: the invitations were told already.
+      const job = ctx.jobs.history.find((h) => h.name === "chat.pushGroupInvite")!;
+      await ctx.jobs.enqueue("chat.pushGroupInvite", job.data as { tenantId: string; conversationId: string; inviteeMembershipIds: string[] });
+      await runJobs();
+      expect(expo.sent).toHaveLength(2);
+    });
+  });
+
   it("gives every push a destination when it's tapped, through the routing both apps share", async () => {
     const { tenant, a, b, chat } = await setup();
     const { conversation } = await openRequest(ctx, tenant.slug, a, b.membership.id);
@@ -622,8 +899,15 @@ describe.skipIf(!dbAvailable)("chat push", () => {
     await runJobs();
     await chat(b).accept(second.conversation.id);
     await runJobs();
+    // From someone B hasn't declined: B's decline of A's request keeps A's invitations away from B.
+    const room = await createGroup(ctx, tenant.slug, other, { name: "Room", visibility: "INVITE_ONLY" });
+    await groupsApi(ctx, tenant.slug, other).invite(room.id, [b.membership.id]);
+    await runJobs();
 
     expect(new Set(expo.sent.map((p) => p.data.type))).toEqual(new Set(CHAT_PUSH_KINDS));
-    for (const push of expo.sent) expect(notificationTarget(String(push.data.type), push.data)).toEqual({ kind: "chat", conversationId: push.data.conversationId });
+    for (const push of expo.sent) {
+      const target = push.data.type === "CHAT_GROUP_INVITE" ? { kind: "chatGroup", view: "invitations" } : { kind: "chat", conversationId: push.data.conversationId };
+      expect(notificationTarget(String(push.data.type), push.data)).toEqual(target);
+    }
   });
 });

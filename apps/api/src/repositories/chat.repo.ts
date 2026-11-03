@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
-import type { ChatConversationKind, ChatInbox } from "@illuminize/shared";
+import type { ChatGroupVisibility, ChatInbox, TenantFeatures } from "@illuminize/shared";
 import { CHAT_REPORT_CONTEXT_EACH_SIDE } from "@illuminize/shared";
 import type { DbClient, Tx } from "../db/client";
-import { chatBlocks, chatConversations, chatMessages, chatParticipants, memberships, tenants } from "../db/schema";
+import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, memberships, tenantSettings, tenants } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, parseCursorSeq, type CursorPage } from "../lib/pagination";
 import type { MembershipRow, TenantRow } from "../types/request";
 
@@ -12,9 +12,30 @@ export type ParticipantRow = typeof chatParticipants.$inferSelect;
 export type ChatMessageRow = typeof chatMessages.$inferSelect;
 export type ChatMessageInsert = typeof chatMessages.$inferInsert;
 export type ChatBlockRow = typeof chatBlocks.$inferSelect;
+export type ChatGroupRow = typeof chatGroups.$inferSelect;
 export type ChatSender = Pick<MembershipRow, "id" | "fullName" | "avatarUrl">;
 
+/** What an institution's switches turn on: direct threads, and each kind of group, which need different switches. */
+export type ChatThreadKind = "DIRECT" | "OPEN_GROUP" | "INVITE_ONLY_GROUP";
+
+export const GROUP_KIND_OF: Record<ChatGroupVisibility, ChatThreadKind> = { OPEN: "OPEN_GROUP", INVITE_ONLY: "INVITE_ONLY_GROUP" };
+
 export const senderColumns = { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl };
+
+/** A group members may see: an admin approved it and hasn't since rejected or removed it. An edit waiting for review leaves it so. */
+export const groupLive = (): SQL => and(isNotNull(chatGroups.approvedAt), inArray(chatGroups.moderationStatus, ["APPROVED", "PENDING"]))!;
+
+/** Threads of these kinds, for queries that join chat_groups. */
+export function kindCondition(kinds: ChatThreadKind[]): SQL {
+  const visibilities = (Object.keys(GROUP_KIND_OF) as ChatGroupVisibility[]).filter((v) => kinds.includes(GROUP_KIND_OF[v]));
+  const parts: SQL[] = [];
+  if (kinds.includes("DIRECT")) parts.push(eq(chatConversations.kind, "DIRECT"));
+  if (visibilities.length > 0) parts.push(and(eq(chatConversations.kind, "GROUP"), inArray(chatGroups.visibility, visibilities))!);
+  return parts.length > 0 ? or(...parts)! : sql`false`;
+}
+
+/** Any direct thread, and a group that's live or the viewer's own: a group waiting for approval, rejected or removed is only its owner's to see. */
+const threadVisible = (viewerMembershipId: string): SQL => or(eq(chatConversations.kind, "DIRECT"), groupLive(), eq(chatGroups.ownerMembershipId, viewerMembershipId))!;
 
 /** Who sees a message: its sender, and otherwise anyone it wasn't withheld from. */
 const visibleTo = (viewerMembershipId: string) => or(eq(chatMessages.withheld, false), eq(chatMessages.senderMembershipId, viewerMembershipId))!;
@@ -187,12 +208,48 @@ export async function listDeliveryCandidates(db: DbClient, conversationId: strin
     .where(and(eq(chatParticipants.conversationId, conversationId), eq(chatParticipants.state, "ACTIVE")));
 }
 
+/** What about a conversation decides whether it may be delivered at all: its kind, its group, and its institution's switches as stored. */
+export interface DeliveryScope {
+  conversation: Pick<ConversationRow, "kind">;
+  group: Pick<ChatGroupRow, "visibility" | "ownerMembershipId" | "approvedAt" | "moderationStatus"> | null;
+  tenantType: TenantRow["type"];
+  storedFeatures: Partial<TenantFeatures>;
+}
+
+export async function findDeliveryScope(db: DbClient, conversationId: string): Promise<DeliveryScope | undefined> {
+  const [row] = await db
+    .select({
+      conversation: { kind: chatConversations.kind },
+      group: { visibility: chatGroups.visibility, ownerMembershipId: chatGroups.ownerMembershipId, approvedAt: chatGroups.approvedAt, moderationStatus: chatGroups.moderationStatus },
+      tenantType: tenants.type,
+      storedFeatures: tenantSettings.features,
+    })
+    .from(chatConversations)
+    .innerJoin(tenants, eq(tenants.id, chatConversations.tenantId))
+    .innerJoin(tenantSettings, eq(tenantSettings.tenantId, chatConversations.tenantId))
+    .leftJoin(chatGroups, eq(chatGroups.conversationId, chatConversations.id))
+    .where(eq(chatConversations.id, conversationId))
+    .limit(1);
+  return row;
+}
+
 const notMuted = (now: Date) => or(isNull(chatParticipants.mutedUntil), lte(chatParticipants.mutedUntil, now));
 
 export async function findConversation(db: DbClient, tenantId: string, id: string): Promise<ConversationRow | undefined> {
   const [row] = await db
     .select()
     .from(chatConversations)
+    .where(and(eq(chatConversations.tenantId, tenantId), eq(chatConversations.id, id)))
+    .limit(1);
+  return row;
+}
+
+/** A conversation and, if it's a group, its group. */
+export async function findConversationWithGroup(db: DbClient, tenantId: string, id: string): Promise<{ conversation: ConversationRow; group: ChatGroupRow | null } | undefined> {
+  const [row] = await db
+    .select({ conversation: chatConversations, group: chatGroups })
+    .from(chatConversations)
+    .leftJoin(chatGroups, eq(chatGroups.conversationId, chatConversations.id))
     .where(and(eq(chatConversations.tenantId, tenantId), eq(chatConversations.id, id)))
     .limit(1);
   return row;
@@ -209,24 +266,46 @@ export async function findUnmutedParticipants(db: DbClient, conversationId: stri
 }
 
 /**
- * Of these members, those with something to be pushed about: not muted, and with an unread message that isn't withheld,
- * removed, or from someone they've blocked. Counting `last_seq` alone would push about all of those.
+ * A message that counts as news for the participant row in scope: written by someone (a system line about a member joining
+ * isn't worth a push or a bold row), after they last read and after they joined, not withheld, not removed, not theirs, and
+ * not from someone they've blocked.
+ */
+const isNewsFor = (participant: typeof chatParticipants) => sql`
+  ${chatMessages.conversationId} = ${participant.conversationId}
+  and ${chatMessages.kind} = 'TEXT'
+  and ${chatMessages.seq} > greatest(${participant.lastReadSeq}, ${participant.joinedSeq})
+  and ${chatMessages.withheld} = false
+  and ${chatMessages.removedAt} is null
+  and ${chatMessages.senderMembershipId} is distinct from ${participant.membershipId}
+  and not exists (select 1 from ${chatBlocks} where ${chatBlocks.blockerMembershipId} = ${participant.membershipId} and ${chatBlocks.blockedMembershipId} = ${chatMessages.senderMembershipId})`;
+
+/**
+ * Of these members, those with something to be pushed about: not muted, and with an unread message that counts as news.
+ * Counting `last_seq` alone would push about withheld, removed and blocked members' messages too.
  */
 export async function findParticipantsWithNews(db: DbClient, conversationId: string, membershipIds: string[], now: Date): Promise<string[]> {
   if (membershipIds.length === 0) return [];
-  const hasNews = sql`exists (
-    select 1 from ${chatMessages}
-    where ${chatMessages.conversationId} = ${chatParticipants.conversationId}
-      and ${chatMessages.seq} > greatest(${chatParticipants.lastReadSeq}, ${chatParticipants.joinedSeq})
-      and ${chatMessages.withheld} = false
-      and ${chatMessages.removedAt} is null
-      and not exists (select 1 from ${chatBlocks} where ${chatBlocks.blockerMembershipId} = ${chatParticipants.membershipId} and ${chatBlocks.blockedMembershipId} = ${chatMessages.senderMembershipId})
-  )`;
+  const hasNews = sql`exists (select 1 from ${chatMessages} where ${isNewsFor(chatParticipants)})`;
   const rows = await db
     .select({ membershipId: chatParticipants.membershipId })
     .from(chatParticipants)
     .where(and(eq(chatParticipants.conversationId, conversationId), inArray(chatParticipants.membershipId, membershipIds), notMuted(now), hasNews));
   return rows.map((r) => r.membershipId);
+}
+
+/**
+ * How many unread messages the viewer has in each of these group threads, counting only news: a group's `last_seq` moves for
+ * system lines and for members they blocked, so the arithmetic a direct thread uses would overcount. Absent means none.
+ */
+export async function countGroupUnread(db: DbClient, viewerMembershipId: string, conversationIds: string[]): Promise<Map<string, number>> {
+  if (conversationIds.length === 0) return new Map();
+  const rows = await db
+    .select({ conversationId: chatMessages.conversationId, count: sql<number>`count(*)::int` })
+    .from(chatMessages)
+    .innerJoin(chatParticipants, and(eq(chatParticipants.conversationId, chatMessages.conversationId), eq(chatParticipants.membershipId, viewerMembershipId)))
+    .where(and(inArray(chatMessages.conversationId, conversationIds), isNewsFor(chatParticipants)))
+    .groupBy(chatMessages.conversationId);
+  return new Map(rows.map((r) => [r.conversationId, r.count]));
 }
 
 // --- Blocks ---
@@ -292,12 +371,13 @@ export async function listBlocks(db: DbClient, tenantId: string, blockerMembersh
 
 // --- Reading threads ---
 
-/** A viewer's thread: their own participant row, and the other member if there still is one. */
+/** A viewer's thread: their own participant row, the other member of a direct thread if there still is one, and a group's details. */
 export interface ThreadRow {
   conversation: ConversationRow;
   participant: ParticipantRow;
   peer: Pick<MembershipRow, "id" | "fullName" | "avatarUrl" | "status" | "batchYear" | "dateOfBirth"> | null;
   blockedByMe: boolean;
+  group: ChatGroupRow | null;
 }
 
 const threadColumns = (viewerMembershipId: string) => ({
@@ -305,18 +385,31 @@ const threadColumns = (viewerMembershipId: string) => ({
   participant: chatParticipants,
   peer: { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, status: memberships.status, batchYear: memberships.batchYear, dateOfBirth: memberships.dateOfBirth },
   blockedByMe: sql<boolean>`exists (select 1 from ${chatBlocks} where ${chatBlocks.blockerMembershipId} = ${viewerMembershipId} and ${chatBlocks.blockedMembershipId} = ${memberships.id})`,
+  group: chatGroups,
 });
 
-/** The other member of a viewer's direct thread. */
+/** The other member of a viewer's direct thread. A group has none, so nothing joins. */
 const peerJoin = (viewerMembershipId: string) => sql`${memberships.id} = case when ${chatConversations.directLowId} = ${viewerMembershipId} then ${chatConversations.directHighId} else ${chatConversations.directLowId} end`;
 
+const groupJoin = eq(chatGroups.conversationId, chatConversations.id);
+
+/** A thread the viewer is in and may see, of any kind. Whether its kind is switched on is the caller's to check. */
 export async function findThread(db: DbClient, tenantId: string, viewerMembershipId: string, conversationId: string): Promise<ThreadRow | undefined> {
   const [row] = await db
     .select(threadColumns(viewerMembershipId))
     .from(chatParticipants)
     .innerJoin(chatConversations, eq(chatConversations.id, chatParticipants.conversationId))
     .leftJoin(memberships, peerJoin(viewerMembershipId))
-    .where(and(eq(chatParticipants.tenantId, tenantId), eq(chatParticipants.membershipId, viewerMembershipId), eq(chatParticipants.conversationId, conversationId), eq(chatParticipants.state, "ACTIVE")))
+    .leftJoin(chatGroups, groupJoin)
+    .where(
+      and(
+        eq(chatParticipants.tenantId, tenantId),
+        eq(chatParticipants.membershipId, viewerMembershipId),
+        eq(chatParticipants.conversationId, conversationId),
+        eq(chatParticipants.state, "ACTIVE"),
+        threadVisible(viewerMembershipId),
+      ),
+    )
     .limit(1);
   return row;
 }
@@ -324,18 +417,25 @@ export async function findThread(db: DbClient, tenantId: string, viewerMembershi
 /**
  * Which threads an inbox holds. A requester's request stays in their main inbox whatever became of it, because moving it
  * would reveal a decline, and so does anything a withheld send made its sender believe. A request the member declined is in
- * no list. A request from someone suspended is out of sight until they're reinstated.
+ * no list. A request from someone suspended is out of sight until they're reinstated. Groups are in the main inbox.
  */
 function inboxCondition(viewerMembershipId: string, inbox: ChatInbox): SQL {
   const iAsked = eq(chatConversations.requesterMembershipId, viewerMembershipId);
   if (inbox === "REQUESTS") return and(eq(chatConversations.directState, "PENDING"), isNull(chatParticipants.withheldState), sql`${chatConversations.requesterMembershipId} is distinct from ${viewerMembershipId}`, eq(memberships.status, "APPROVED"))!;
-  return or(isNotNull(chatParticipants.withheldState), inArray(chatConversations.directState, ["ACCEPTED", "CLOSED"]), and(inArray(chatConversations.directState, ["PENDING", "DECLINED"]), iAsked))!;
+  return or(eq(chatConversations.kind, "GROUP"), isNotNull(chatParticipants.withheldState), inArray(chatConversations.directState, ["ACCEPTED", "CLOSED"]), and(inArray(chatConversations.directState, ["PENDING", "DECLINED"]), iAsked))!;
 }
 
-export async function listThreads(db: DbClient, tenantId: string, viewerMembershipId: string, q: { inbox: ChatInbox; kinds: ChatConversationKind[]; cursor?: string; limit: number }): Promise<CursorPage<ThreadRow>> {
+export async function listThreads(db: DbClient, tenantId: string, viewerMembershipId: string, q: { inbox: ChatInbox; kinds: ChatThreadKind[]; cursor?: string; limit: number }): Promise<CursorPage<ThreadRow>> {
   // A frozen thread stays where it was, so a blocked member's messages can't move it.
   const sortAt = sql`coalesce(${chatParticipants.frozenSortAt}, ${chatConversations.lastMessageAt})`;
-  const conds: SQL[] = [eq(chatParticipants.tenantId, tenantId), eq(chatParticipants.membershipId, viewerMembershipId), eq(chatParticipants.state, "ACTIVE"), inArray(chatConversations.kind, q.kinds), inboxCondition(viewerMembershipId, q.inbox)];
+  const conds: SQL[] = [
+    eq(chatParticipants.tenantId, tenantId),
+    eq(chatParticipants.membershipId, viewerMembershipId),
+    eq(chatParticipants.state, "ACTIVE"),
+    kindCondition(q.kinds),
+    threadVisible(viewerMembershipId),
+    inboxCondition(viewerMembershipId, q.inbox),
+  ];
   const keyset = keysetCondition(sortAt, chatConversations.id, decodeCursor(q.cursor), "desc");
   if (keyset) conds.push(keyset);
   const rows = await db
@@ -343,6 +443,7 @@ export async function listThreads(db: DbClient, tenantId: string, viewerMembersh
     .from(chatParticipants)
     .innerJoin(chatConversations, eq(chatConversations.id, chatParticipants.conversationId))
     .leftJoin(memberships, peerJoin(viewerMembershipId))
+    .leftJoin(chatGroups, groupJoin)
     .where(and(...conds))
     .orderBy(desc(sortAt), desc(chatConversations.id))
     .limit(q.limit + 1);
@@ -357,6 +458,7 @@ export async function findDirectThreadInInbox(db: DbClient, tenantId: string, vi
     .from(chatParticipants)
     .innerJoin(chatConversations, eq(chatConversations.id, chatParticipants.conversationId))
     .leftJoin(memberships, peerJoin(viewerMembershipId))
+    .leftJoin(chatGroups, groupJoin)
     .where(
       and(
         eq(chatParticipants.tenantId, tenantId),
@@ -373,13 +475,14 @@ export async function findDirectThreadInInbox(db: DbClient, tenantId: string, vi
 }
 
 /** Everything the badge counts from, one row per thread of this member. */
-export async function listBadgeThreads(db: DbClient, tenantId: string, viewerMembershipId: string, kinds: ChatConversationKind[]): Promise<ThreadRow[]> {
+export async function listBadgeThreads(db: DbClient, tenantId: string, viewerMembershipId: string, kinds: ChatThreadKind[]): Promise<ThreadRow[]> {
   return db
     .select(threadColumns(viewerMembershipId))
     .from(chatParticipants)
     .innerJoin(chatConversations, eq(chatConversations.id, chatParticipants.conversationId))
     .leftJoin(memberships, peerJoin(viewerMembershipId))
-    .where(and(eq(chatParticipants.tenantId, tenantId), eq(chatParticipants.membershipId, viewerMembershipId), eq(chatParticipants.state, "ACTIVE"), inArray(chatConversations.kind, kinds)));
+    .leftJoin(chatGroups, groupJoin)
+    .where(and(eq(chatParticipants.tenantId, tenantId), eq(chatParticipants.membershipId, viewerMembershipId), eq(chatParticipants.state, "ACTIVE"), kindCondition(kinds), threadVisible(viewerMembershipId)));
 }
 
 export type MessageWithSender = { message: ChatMessageRow; sender: ChatSender | null };
@@ -404,15 +507,20 @@ export async function listThreadMessages(
   return buildCursorPage(rows, q.limit, (r) => ({ v: String(r.message.seq), id: r.message.id }), (r) => r);
 }
 
-/** The newest message this member can see in each of these threads, for the list's preview. */
-export async function findLastVisibleMessages(db: DbClient, viewerMembershipId: string, conversationIds: string[]): Promise<Map<string, ChatMessageRow>> {
+/**
+ * The newest message this member can see in each of these threads, for the list's preview. Nothing from before they joined,
+ * which in an invite-only group would show a newcomer the last thing said before them.
+ */
+export async function findLastVisibleMessages(db: DbClient, viewerMembershipId: string, conversationIds: string[]): Promise<Map<string, MessageWithSender>> {
   if (conversationIds.length === 0) return new Map();
+  const joinedSeq = sql`coalesce((select ${chatParticipants.joinedSeq} from ${chatParticipants} where ${chatParticipants.conversationId} = ${chatMessages.conversationId} and ${chatParticipants.membershipId} = ${viewerMembershipId}), 0)`;
   const rows = await db
-    .selectDistinctOn([chatMessages.conversationId])
+    .selectDistinctOn([chatMessages.conversationId], { message: chatMessages, sender: senderColumns })
     .from(chatMessages)
-    .where(and(inArray(chatMessages.conversationId, conversationIds), visibleTo(viewerMembershipId)))
+    .leftJoin(memberships, eq(memberships.id, chatMessages.senderMembershipId))
+    .where(and(inArray(chatMessages.conversationId, conversationIds), visibleTo(viewerMembershipId), gt(chatMessages.seq, joinedSeq)))
     .orderBy(chatMessages.conversationId, desc(chatMessages.seq));
-  return new Map(rows.map((m) => [m.conversationId, m]));
+  return new Map(rows.map((r) => [r.message.conversationId, r]));
 }
 
 export async function findMessageInTenant(db: DbClient, tenantId: string, id: string): Promise<{ message: ChatMessageRow; conversation: ConversationRow } | undefined> {

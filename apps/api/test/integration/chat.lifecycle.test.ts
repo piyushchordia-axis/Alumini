@@ -1,16 +1,17 @@
 import type { ChatConversationDto, ChatMessageDto } from "@illuminize/shared";
 import { DELETED_MEMBER_NAME } from "@illuminize/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatMessages, chatParticipants, chatReports, memberships, notifications, tenants } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, notifications, tenants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
-import { acceptedThread, ageRequest, chatApi, conversationRow, openRequest, type Session } from "../helpers/chat";
+import { acceptedThread, ageRequest, chatApi, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
 import { auth, createMembership, createTenant, loginAs, memberSession } from "../helpers/factories";
+import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -323,5 +324,140 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
       expect(refused.status).toBe(403);
       expect(refused.body.error.code).toBe("TENANT_INACTIVE");
     });
+
+    it("tells nobody in a group anything either, and still lets an account in it be deleted", async () => {
+      const { tenant, a, b } = await setup();
+      const group = await createGroup(ctx, tenant.slug, a, { name: "Quiet room" });
+      await groupsApi(ctx, tenant.slug, b).join(group.id);
+      await ctx.db.update(tenants).set({ status: "SUSPENDED" }).where(eq(tenants.id, tenant.id));
+      expect(await chatRecipients(ctx.db, group.id)).toEqual([]);
+      expect((await deleteAccount(a)).status).toBeLessThan(300);
+      expect(await groupRow(group.id)).toMatchObject({ ownerMembershipId: b.membership.id, memberCount: 1 });
+    });
   });
+
+  describe("groups", () => {
+    /** A group's thread as this member reads it, oldest first. */
+    const thread = async (slug: string, m: Session, id: string) => [...((await chatApi(ctx, slug, m).messages(id)).body.data as ChatMessageDto[])].reverse();
+
+    describe("deleting an account", () => {
+      it("passes on the groups they owned to whoever has been in longest, fixes the count, and keeps what they wrote from Deleted member", async () => {
+        const { tenant, a, b, chat } = await setup();
+        const c = await memberSession(ctx, tenant.id);
+        const group = await createGroup(ctx, tenant.slug, a, { name: "Handed on" });
+        await groupsApi(ctx, tenant.slug, b).join(group.id);
+        await groupsApi(ctx, tenant.slug, c).join(group.id);
+        await chat(a).send(group.id, "Written before I went");
+        expect((await deleteAccount(a)).status).toBeLessThan(300);
+
+        expect(await groupRow(group.id)).toMatchObject({ ownerMembershipId: b.membership.id, memberCount: 2, archivedAt: null });
+        const owners = await ctx.db.select().from(chatParticipants).where(and(eq(chatParticipants.conversationId, group.id), eq(chatParticipants.role, "OWNER")));
+        expect(owners.map((p) => p.membershipId)).toEqual([b.membership.id]);
+        const seen = await thread(tenant.slug, c, group.id);
+        expect(seen.find((m) => m.body === "Written before I went")).toMatchObject({ sender: null });
+        expect(seen.slice(-2).map((m) => [m.kind, m.sender?.id ?? null, m.meta])).toEqual([
+          ["SYSTEM", null, { event: "LEFT" }],
+          ["SYSTEM", b.membership.id, { event: "OWNER_CHANGED" }],
+        ]);
+        expect((await groupsApi(ctx, tenant.slug, b).get(group.id)).body.data).toMatchObject({ isOwner: true, memberCount: 2, canEdit: true });
+      });
+
+      it("archives a group nobody is left in, and leaves the groups they were only a member of with the right count", async () => {
+        const { tenant, a, b } = await setup();
+        const alone = await createGroup(ctx, tenant.slug, a, { name: "Just me" });
+        const theirs = await createGroup(ctx, tenant.slug, b, { name: "Someone else's" });
+        await groupsApi(ctx, tenant.slug, a).join(theirs.id);
+        expect((await groupRow(theirs.id)).memberCount).toBe(2);
+        await deleteAccount(a);
+        expect(await groupRow(alone.id)).toMatchObject({ ownerMembershipId: null, memberCount: 0, archivedAt: expect.any(Date) });
+        expect(await groupRow(theirs.id)).toMatchObject({ ownerMembershipId: b.membership.id, memberCount: 1, archivedAt: null });
+        expect((await groupsApi(ctx, tenant.slug, b).members(theirs.id)).body.data.map((m: { member: { id: string } }) => m.member.id)).toEqual([b.membership.id]);
+      });
+
+      it("drops their invitations both ways: those they sent stop showing, and those they had go with them", async () => {
+        const { tenant, a, b, chat } = await setup();
+        const c = await memberSession(ctx, tenant.id);
+        const open = await createGroup(ctx, tenant.slug, c, { name: "Open room" });
+        await groupsApi(ctx, tenant.slug, a).join(open.id);
+        await groupsApi(ctx, tenant.slug, a).invite(open.id, [b.membership.id]);
+        const closed = await createGroup(ctx, tenant.slug, c, { name: "Closed room", visibility: "INVITE_ONLY" });
+        await groupsApi(ctx, tenant.slug, c).invite(closed.id, [a.membership.id]);
+        expect((await chat(b).badge()).body.data.invites).toBe(1);
+
+        const realtime = new CapturingRealtime();
+        const previous = ctx.realtime;
+        ctx.realtime = realtime;
+        try {
+          await deleteAccount(a);
+        } finally {
+          ctx.realtime = previous;
+        }
+        // B's Invitations and badge catch up at once.
+        expect(realtime.to(b.user.id, "chat:changed").map((e) => e.payload)).toEqual([{ tenantSlug: tenant.slug, conversationId: open.id }]);
+        expect(realtime.to(b.user.id, "chat:unread").map((e) => e.payload)).toEqual([expect.objectContaining({ invites: 0 })]);
+        expect((await groupsApi(ctx, tenant.slug, b).invites()).body.data).toEqual([]);
+        expect((await chat(b).badge()).body.data.invites).toBe(0);
+        expect(await ctx.db.select().from(chatParticipants).where(eq(chatParticipants.conversationId, closed.id))).toHaveLength(1);
+        // Another member can still invite them, and that one shows.
+        await groupsApi(ctx, tenant.slug, c).invite(open.id, [b.membership.id]);
+        expect((await groupsApi(ctx, tenant.slug, b).invites()).body.data).toHaveLength(1);
+      });
+    });
+
+    describe("suspending a member", () => {
+      const suspendVia = (slug: string, admin: Session, m: Session) => request(ctx.app).post(`/api/v1/t/${slug}/admin/members/${m.membership.id}/suspend`).set(admin.headers).send({ reason: "Testing" });
+
+      it("hands the groups they owned to whoever has been in longest, keeps them in it, and archives a group nobody else could take", async () => {
+        const { tenant, a, b } = await setup();
+        const c = await memberSession(ctx, tenant.id);
+        const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+        const shared = await createGroup(ctx, tenant.slug, a, { name: "Shared" });
+        await groupsApi(ctx, tenant.slug, b).join(shared.id);
+        const alone = await createGroup(ctx, tenant.slug, a, { name: "Alone" });
+        expect((await suspendVia(tenant.slug, admin, a)).status).toBeLessThan(300);
+
+        expect(await groupRow(shared.id)).toMatchObject({ ownerMembershipId: b.membership.id, memberCount: 2, archivedAt: null });
+        expect(await participantOf(shared.id, a.membership.id)).toMatchObject({ state: "ACTIVE", role: "MEMBER" });
+        expect((await thread(tenant.slug, b, shared.id)).at(-1)).toMatchObject({ kind: "SYSTEM", sender: { id: b.membership.id }, meta: { event: "OWNER_CHANGED" } });
+        // Left as it was, it would carry on in Discover with nobody able to run it.
+        expect(await groupRow(alone.id)).toMatchObject({ ownerMembershipId: null, archivedAt: expect.any(Date) });
+        const discover = (await groupsApi(ctx, tenant.slug, c).list()).body.data as Array<{ id: string }>;
+        expect(discover.map((g) => g.id)).toEqual([shared.id]);
+        expect((await groupsApi(ctx, tenant.slug, c).join(alone.id)).status).toBe(404);
+      });
+
+      it("leaves a group members can't see anyway as the suspended owner's, for when they're reinstated", async () => {
+        const { tenant, a, b } = await setup();
+        const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+        const group = await createGroup(ctx, tenant.slug, a, { name: "Removed room" });
+        await groupsApi(ctx, tenant.slug, b).join(group.id);
+        await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${group.id}/remove`).set(admin.headers).send({ note: "Off topic" }).expect(200);
+        expect((await suspendVia(tenant.slug, admin, a)).status).toBeLessThan(300);
+        expect(await groupRow(group.id)).toMatchObject({ ownerMembershipId: a.membership.id, moderationStatus: "REMOVED", moderationNote: "Off topic", archivedAt: null });
+        expect(await participantOf(group.id, b.membership.id)).toMatchObject({ role: "MEMBER" });
+        // Restored while they're suspended, it stays out of Discover, where nobody could run it.
+        await request(ctx.app).post(`/api/v1/t/${tenant.slug}/admin/moderation/GROUP/${group.id}/restore`).set(admin.headers).send({}).expect(200);
+        const c = await memberSession(ctx, tenant.id);
+        expect((await groupsApi(ctx, tenant.slug, c).list()).body.data).toEqual([]);
+      });
+
+      it("leaves them out of delivery while what they wrote stays, with their name", async () => {
+        const { tenant, a, b, chat } = await setup();
+        const group = await createGroup(ctx, tenant.slug, b, { name: "Still readable" });
+        await groupsApi(ctx, tenant.slug, a).join(group.id);
+        await chat(a).send(group.id, "Before my suspension");
+        await ctx.db.update(memberships).set({ status: "SUSPENDED" }).where(eq(memberships.id, a.membership.id));
+        expect((await chatRecipients(ctx.db, group.id)).map((r) => r.membershipId)).toEqual([b.membership.id]);
+        expect((await thread(tenant.slug, b, group.id)).find((m) => m.body === "Before my suspension")).toMatchObject({ sender: { id: a.membership.id } });
+        expect((await chat(b).send(group.id, "Still going")).status).toBe(201);
+      });
+    });
+
+    async function participantOf(conversationId: string, membershipId: string) {
+      const [row] = await ctx.db.select().from(chatParticipants).where(and(eq(chatParticipants.conversationId, conversationId), eq(chatParticipants.membershipId, membershipId)));
+      return row;
+    }
+  });
+
+  const groupRow = async (id: string) => (await ctx.db.select().from(chatGroups).where(eq(chatGroups.conversationId, id)))[0]!;
 });

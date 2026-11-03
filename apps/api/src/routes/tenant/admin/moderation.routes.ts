@@ -32,7 +32,7 @@ export function moderationRoutes(ctx: AppContext): Router {
     router.post(
       `/moderation/:contentType/:id/${action}`,
       route({ params: contentRefParamsSchema, body: moderationActionSchema }, async ({ req, res, params, body }) => {
-        const result = await moderateContent(ctx, req.tenantCtx!, adminActor(req), params.contentType, params.id, action, body.note);
+        const result = await moderateContent(ctx, req.tenantCtx!, adminActor(req), params.contentType, params.id, action, body.note, { reviewed: body.reviewed });
         const content = await getContentForAdmin(ctx, req.tenantCtx!, adminViewer(req), params.contentType, params.id);
         ok(res, { ...result, content });
       }),

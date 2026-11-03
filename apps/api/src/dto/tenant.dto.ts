@@ -40,6 +40,7 @@ export function toTenantPublicDto(t: TenantRow, s: TenantSettingsRow): TenantPub
     timezone: t.timezone,
     settings: {
       memberApprovalMode: s.memberApprovalMode,
+      contentModerationMode: s.contentModerationMode,
       allowSelfRegistration: s.allowSelfRegistration,
       minBatchYear: s.minBatchYear,
       maxBatchYear: s.maxBatchYear,

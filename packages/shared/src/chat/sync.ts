@@ -114,6 +114,8 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
   };
   const refreshBadge = (slug: string) => throttled(`badge:${slug}`, opts.badgeEveryMs ?? 30_000, () => void qc.invalidateQueries({ queryKey: chatKeys.badge(slug) }));
   const refreshLists = (slug: string) => throttled(`lists:${slug}`, opts.listsEveryMs ?? 2000, () => void qc.invalidateQueries({ queryKey: chatKeys.lists(slug) }));
+  /** Discover, My groups and Invitations: a group's members, name or owner changing can move it in any of them. */
+  const refreshGroupLists = (slug: string) => throttled(`groups:${slug}`, opts.listsEveryMs ?? 2000, () => void qc.invalidateQueries({ queryKey: chatKeys.groupLists(slug) }));
 
   const isOpen = (slug: string, id: string) => {
     const active = opts.getActive();
@@ -188,6 +190,7 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
       qc.setQueryData(chatKeys.list(slug, inbox), (old: { pages: unknown[]; pageParams: unknown[] } | undefined) => keepNewestPage(old));
     }
     void qc.invalidateQueries({ queryKey: chatKeys.lists(slug) });
+    void qc.invalidateQueries({ queryKey: chatKeys.groupLists(slug) });
     // Threads not on screen are refetched when next opened.
     void qc.invalidateQueries({ queryKey: chatKeys.threads(slug), refetchType: "none" });
     if (!conversationId) return;
@@ -286,17 +289,27 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
         }),
         realtime.on("chat:changed", ({ tenantSlug: slug, conversationId: id }) => {
           void qc.invalidateQueries({ queryKey: chatKeys.conversation(slug, id) });
-          // It may mean a request whose text this member was never sent, and no seq comes with it to reveal a gap.
-          if (isOpen(slug, id)) void fillGap(slug, id);
-          else void qc.invalidateQueries({ queryKey: chatKeys.messages(slug, id), refetchType: "none" });
+          // A group's details and members, when it is one. The key holds nothing for a direct thread.
+          void qc.invalidateQueries({ queryKey: chatKeys.group(slug, id) });
+          // It may mean a request whose text this member was never sent, and no seq comes with it to reveal a gap. In a group
+          // it may mean rows already on screen read differently now, such as a member this one blocked or unblocked on
+          // another device turning redacted or back, which only reading the loaded pages again can show.
+          if (isOpen(slug, id)) {
+            const thread = qc.getQueryData(chatKeys.conversation(slug, id)) as Pick<ChatConversationDto, "kind"> | undefined;
+            if (thread?.kind === "GROUP") void qc.invalidateQueries({ queryKey: chatKeys.messages(slug, id) });
+            else void fillGap(slug, id);
+          } else void qc.invalidateQueries({ queryKey: chatKeys.messages(slug, id), refetchType: "none" });
           refreshLists(slug);
+          refreshGroupLists(slug);
           refreshBadge(slug);
         }),
-        realtime.on("chat:unread", ({ tenantSlug: slug, unread, requests }) => {
+        realtime.on("chat:unread", ({ tenantSlug: slug, unread, requests, invites }) => {
           const key = chatKeys.badge(slug);
-          qc.setQueryData(key, (): ChatBadgeDto => ({ unread, requests }));
+          const before = qc.getQueryData(key) as ChatBadgeDto | undefined;
+          qc.setQueryData(key, (): ChatBadgeDto => ({ unread, requests, invites }));
           // A throttled refetch may have read the counts before this changed them, and would put the old ones back.
           refetchIfFetching(key);
+          if (before?.invites !== invites) void qc.invalidateQueries({ queryKey: chatKeys.groupInvites(slug) });
         }),
         realtime.onReconnect(catchUp),
       ];

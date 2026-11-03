@@ -56,12 +56,16 @@ export function formatAmountRange(min: number | null, max: number | null, curren
 }
 
 export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
+  return (
+    name
+      .split(/\s+/)
+      // Words, not symbols: "London & UK alumni" is "LU", not "L&", and "🏃 Morning runners" is "MR".
+      .filter((part) => /^[\p{L}\p{N}]/u.test(part))
+      .slice(0, 2)
+      // A whole character, never half of one, for a letter beyond the basic plane.
+      .map((p) => Array.from(p)[0]!.toUpperCase())
+      .join("")
+  );
 }
 
 export function pluralize(n: number, one: string, many = `${one}s`): string {

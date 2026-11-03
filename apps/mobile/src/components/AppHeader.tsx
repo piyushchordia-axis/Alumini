@@ -1,4 +1,4 @@
-import type { TenantFeature } from "@illuminize/shared";
+import { chatAvailable, type TenantFeature } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Redirect, useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -56,10 +56,17 @@ export function FeatureGate({ feature, children }: { feature: TenantFeature; chi
   return <>{children}</>;
 }
 
-/** The same for Messages, which also needs a member who isn't a current pupil. */
+/** The same for Messages, which holds direct chats and groups, and also needs a member who isn't a current pupil. */
 export function ChatGate({ children }: { children: ReactNode }) {
   const { tenant, membership } = useMembership();
-  if (!tenant.settings.features.messaging || !membership.chatEligible) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
+  if (!chatAvailable(tenant.settings.features, membership.chatEligible)) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
+  return <>{children}</>;
+}
+
+/** The same for Groups. */
+export function GroupsGate({ children }: { children: ReactNode }) {
+  const { tenant, membership } = useMembership();
+  if (!tenant.settings.features.groups || !membership.chatEligible) return <Redirect href={homeHref(tenant.slug, tenant.settings.features)} />;
   return <>{children}</>;
 }
 

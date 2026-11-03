@@ -1,4 +1,4 @@
-import type { ChatInbox } from "@illuminize/shared";
+import { chatAvailable, type ChatInbox } from "@illuminize/shared";
 import clsx from "clsx";
 import { Outlet, useMatch, useSearchParams } from "react-router-dom";
 import { ConversationList } from "@/components/chat/ConversationList";
@@ -17,8 +17,8 @@ export function MessagesPage() {
   const inbox = inboxFromParams(params);
   const changeInbox = (next: ChatInbox) => setParams(next === "REQUESTS" ? { tab: "requests" } : {}, { replace: true });
 
-  // Messages are off and this is Blocked members, the one part still open (see RequireChat): no inbox beside it.
-  if (!tenant.settings.features.messaging) {
+  // Messages and groups are off and this is Blocked members, the one part still open (see RequireChat): no inbox beside it.
+  if (!chatAvailable(tenant.settings.features, true)) {
     return (
       <div className="flex min-h-0 flex-1 bg-white md:overflow-hidden md:rounded-xl md:border md:border-slate-200 md:shadow-sm">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -31,7 +31,7 @@ export function MessagesPage() {
   return (
     <div className="flex min-h-0 flex-1 bg-white md:overflow-hidden md:rounded-xl md:border md:border-slate-200 md:shadow-sm">
       <section aria-label="Conversations" className={clsx("min-h-0 w-full flex-col md:flex md:w-80 md:shrink-0 md:border-r md:border-slate-200", onInbox ? "flex" : "hidden")}>
-        <ConversationList slug={slug} inbox={inbox} onInboxChange={changeInbox} directoryOn={tenant.settings.features.directory} />
+        <ConversationList slug={slug} inbox={inbox} onInboxChange={changeInbox} features={tenant.settings.features} />
       </section>
       <div className={clsx("min-h-0 min-w-0 flex-1 flex-col", onInbox ? "hidden md:flex" : "flex")}>
         <Outlet />
@@ -48,7 +48,7 @@ export function NoConversationPane() {
         💬
       </div>
       <p className="text-base font-semibold text-slate-800">Choose a conversation</p>
-      <p className="mt-1 max-w-sm text-balance text-sm text-slate-500">Messages are private between the two of you. Admins only ever see a message that someone reports, with a few around it.</p>
+      <p className="mt-1 max-w-sm text-balance text-sm text-slate-500">Messages are private to the people in each conversation. Admins only ever see a message that someone reports, with a few around it.</p>
     </div>
   );
 }

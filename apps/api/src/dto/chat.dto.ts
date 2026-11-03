@@ -5,26 +5,47 @@ import type { ChatReportQueueRow, ChatReportRow, FoundChatReport } from "../repo
 export const toChatMemberDto = (m: ChatSender): ChatMemberDto => ({ id: m.id, fullName: m.fullName, avatarUrl: m.avatarUrl });
 
 /**
+ * What a message's sender shows as, and what of its text: a sender this member blocked in a group loses their name, and
+ * their own words, though a system line keeps its fixed text, which names nobody.
+ */
+function shownSenderAndBody(row: ChatMessageRow, sender: ChatSender | null, redacted: boolean): { sender: ChatMemberDto | null; body: string | null } {
+  if (row.removedAt) return { sender: redacted || !sender ? null : toChatMemberDto(sender), body: null };
+  if (redacted) return { sender: null, body: row.kind === "SYSTEM" ? row.body : null };
+  return { sender: sender ? toChatMemberDto(sender) : null, body: row.body };
+}
+
+/**
  * A message as `viewerMembershipId` sees it. `withheld` is never serialized, and neither is anything else that would differ
  * for its sender. A removed message keeps its row and loses its text, which only that report's audited view can read.
+ * `redacted` is for a group member who blocked its sender (see redactedSendersFor).
  */
-export function toChatMessageDto(row: ChatMessageRow, sender: ChatSender | null, viewerMembershipId: string | null): ChatMessageDto {
+export function toChatMessageDto(row: ChatMessageRow, sender: ChatSender | null, viewerMembershipId: string | null, redacted = false): ChatMessageDto {
   return {
     id: row.id,
     conversationId: row.conversationId,
     seq: row.seq,
     kind: row.kind,
-    sender: sender ? toChatMemberDto(sender) : null,
-    body: row.removedAt ? null : row.body,
+    ...shownSenderAndBody(row, sender, redacted),
     removed: !!row.removedAt,
+    redacted,
     meta: row.meta ?? null,
     clientKey: row.senderMembershipId === viewerMembershipId ? row.clientKey : null,
     createdAt: row.createdAt.toISOString(),
   };
 }
 
-export function toChatLastMessageDto(row: ChatMessageRow, viewerMembershipId: string): ChatLastMessageDto {
-  return { seq: row.seq, body: row.removedAt ? null : row.body, mine: row.senderMembershipId === viewerMembershipId, createdAt: row.createdAt.toISOString() };
+/** An inbox row's preview. Only a group's names its sender, because in a direct thread it's one of the two of them. */
+export function toChatLastMessageDto(row: ChatMessageRow, sender: ChatSender | null, viewerMembershipId: string, opts: { inGroup: boolean; redacted: boolean }): ChatLastMessageDto {
+  const shown = shownSenderAndBody(row, sender, opts.redacted);
+  return {
+    seq: row.seq,
+    kind: row.kind,
+    body: shown.body,
+    mine: row.senderMembershipId === viewerMembershipId,
+    sender: opts.inGroup ? shown.sender : null,
+    redacted: opts.redacted,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 export function toChatBlockDto(block: ChatBlockRow, member: ChatSender): ChatBlockDto {

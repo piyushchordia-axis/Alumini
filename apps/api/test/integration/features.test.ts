@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { auditLog, tenantSettings } from "../../src/db/schema";
 import { seedCore, SEED } from "../../src/db/seed";
 import { runInTransaction } from "../../src/lib/transaction";
+import { chatApi, createGroup, groupsApi } from "../helpers/chat";
 import { auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -148,6 +149,90 @@ describe.skipIf(!dbAvailable)("tenant features", () => {
       }
       await toggle(true);
       expect((await api().get(thread).set(b.headers)).status).toBe(200);
+    });
+  });
+
+  describe("the groups key", () => {
+    const groupsOf = (slug: string, m: Parameters<typeof groupsApi>[2]) => groupsApi(ctx, slug, m);
+
+    it("reads off at a school whose row was stripped to {feed: true}, on every group route, and on anywhere else", async () => {
+      const stripped = { feed: true };
+      const { tenant: school } = await createTenant(ctx, { type: "SCHOOL", features: stripped });
+      const { tenant: college } = await createTenant(ctx, { type: "COLLEGE", features: stripped });
+      const atSchool = await memberSession(ctx, school.id, { batchYear: 2000 });
+      const atCollege = await memberSession(ctx, college.id);
+      const id = "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81";
+      const g = groupsOf(school.slug, atSchool);
+      for (const res of [await g.list(), await g.create({ name: "Old friends", visibility: "OPEN" }), await g.invites(), await g.get(id), await g.join(id), await g.members(id)]) {
+        expect(res.status, res.request.url).toBe(403);
+        expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+      }
+      expect((await groupsOf(college.slug, atCollege).create({ name: "Old friends", visibility: "OPEN" })).status).toBe(201);
+      expect((await api().get(`/api/v1/tenants/${school.slug}`)).body.data.settings.features.groups).toBe(false);
+      expect((await api().get(`/api/v1/tenants/${college.slug}`)).body.data.settings.features.groups).toBe(true);
+    });
+
+    it("lets a school's admin turn groups on, after which open groups work there", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", batchYear: 1990 });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2000 });
+      await api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ features: { groups: true } }).expect(200);
+      expect(await storedFeatures(tenant.id)).toMatchObject({ groups: true, messaging: false });
+      expect((await groupsOf(tenant.slug, alum).create({ name: "Class of 2000", visibility: "OPEN" })).status).toBe(201);
+    });
+
+    it("with messaging off, refuses invite-only groups on every route while open groups keep working, and switching back restores them", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const owner = await memberSession(ctx, tenant.id);
+      const member = await memberSession(ctx, tenant.id);
+      const open = await createGroup(ctx, tenant.slug, owner, { name: "Open room" });
+      const closed = await createGroup(ctx, tenant.slug, owner, { name: "Closed room", visibility: "INVITE_ONLY" });
+      await groupsOf(tenant.slug, owner).invite(closed.id, [member.membership.id]);
+      await groupsOf(tenant.slug, member).accept(closed.id);
+      await groupsOf(tenant.slug, member).join(open.id);
+      const toggle = (messaging: boolean) => api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ features: { messaging } }).expect(200);
+      const g = groupsOf(tenant.slug, member);
+      const chat = chatApi(ctx, tenant.slug, member);
+
+      await toggle(false);
+      for (const res of [
+        await g.get(closed.id),
+        await g.members(closed.id),
+        await g.leave(closed.id),
+        await chat.get(closed.id),
+        await chat.messages(closed.id),
+        await chat.read(closed.id, 1),
+        await chat.send(closed.id, "Not with messaging off"),
+        await groupsOf(tenant.slug, owner).create({ name: "Another closed one", visibility: "INVITE_ONLY" }),
+      ]) {
+        expect(res.status, res.request.url).toBe(403);
+        expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
+      }
+      expect((await g.list({ scope: "MINE" })).body.data.map((x: { id: string }) => x.id)).toEqual([open.id]);
+      expect((await chat.list()).body.data.map((x: { id: string }) => x.id)).toEqual([open.id]);
+      expect((await chat.get(open.id)).status).toBe(200);
+      expect((await chat.send(open.id, "Open rooms still work")).status).toBe(201);
+      expect((await groupsOf(tenant.slug, owner).create({ name: "Another open one", visibility: "OPEN" })).status).toBe(201);
+      // Nothing was deleted on the way.
+      await toggle(true);
+      expect((await g.get(closed.id)).body.data).toMatchObject({ myState: "ACTIVE" });
+      expect((await chat.get(closed.id)).status).toBe(200);
+    });
+
+    it("off, takes groups out of the inbox and its routes, and on again, brings them back", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const owner = await memberSession(ctx, tenant.id);
+      const open = await createGroup(ctx, tenant.slug, owner, { name: "Open room" });
+      const toggle = (groups: boolean) => api().patch(`/api/v1/t/${tenant.slug}/admin/settings`).set(admin.headers).send({ features: { groups } }).expect(200);
+      await toggle(false);
+      expect((await chatApi(ctx, tenant.slug, owner).list()).body.data).toEqual([]);
+      expect((await chatApi(ctx, tenant.slug, owner).get(open.id)).status).toBe(403);
+      expect((await chatApi(ctx, tenant.slug, owner).send(open.id, "Groups are off")).status).toBe(403);
+      expect((await groupsOf(tenant.slug, owner).get(open.id)).status).toBe(403);
+      await toggle(true);
+      expect((await chatApi(ctx, tenant.slug, owner).list()).body.data.map((x: { id: string }) => x.id)).toEqual([open.id]);
     });
   });
 

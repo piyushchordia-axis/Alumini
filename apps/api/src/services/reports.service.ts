@@ -1,23 +1,34 @@
-import type { AdminReportDto, AdminReportsQuery, CursorPage, ReportCreateInput, ReportDto, ReportResolveInput } from "@illuminize/shared";
+import { isCurrentPupil, type AdminReportDto, type AdminReportsQuery, type CursorPage, type ReportCreateInput, type ReportDto, type ReportResolveInput } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import { toAdminReportDto, toReportDto } from "../dto/content.dto";
 import { AppError } from "../lib/errors";
 import { buildPage, type Page } from "../lib/pagination";
+import { findGroupView } from "../repositories/chatGroups.repo";
 import { findModerationItem } from "../repositories/moderation.repo";
 import { findReportById, insertReport, listReportsForAdmin, listReportsForReporter, resolveOpenReportsForContent, updateReport } from "../repositories/reports.repo";
 import type { AuthContext, TenantContext } from "../types/request";
 import { recordAudit } from "./audit.service";
 import { contentLabel, type ContentActor } from "./content.common";
+import { canSeeGroup } from "./chat/common";
 import { canViewContent } from "./moderation";
 import { moderateContent } from "./moderation.service";
 import { notifyTenantAdmins } from "./notifications/notification.service";
 
+/**
+ * A group can be reported only by someone who may know it exists, by the same rule as every group route, so asking about an
+ * invite-only group can't confirm it. A group under review stays reportable by its members, who still see it.
+ */
+async function canReportGroup(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, id: string): Promise<boolean> {
+  if (isCurrentPupil(tenantCtx.tenant, actor.membership)) return false;
+  const view = await findGroupView(ctx.db, tenantCtx.tenant.id, id, actor.membership.id);
+  return !!view && canSeeGroup(view.group, view.participant, actor.membership.id, new Date());
+}
+
 export async function createReport(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: ReportCreateInput): Promise<ReportDto> {
   const tenantId = tenantCtx.tenant.id;
   const item = await findModerationItem(ctx.db, tenantId, input.contentType, input.contentId);
-  if (!item || !canViewContent(item.moderationStatus, { isAuthor: item.authorMembershipId === actor.membership.id, isAdmin: false })) {
-    throw AppError.notFound(`${contentLabel(input.contentType)} not found`);
-  }
+  const visible = input.contentType === "GROUP" ? await canReportGroup(ctx, tenantCtx, actor, input.contentId) : !!item && canViewContent(item.moderationStatus, { isAuthor: item.authorMembershipId === actor.membership.id, isAdmin: false });
+  if (!item || !visible) throw AppError.notFound(`${contentLabel(input.contentType)} not found`);
   if (item.authorMembershipId === actor.membership.id) throw AppError.badRequest("You cannot report your own content");
   const row = await insertReport(ctx.db, {
     tenantId,

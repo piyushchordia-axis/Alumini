@@ -1,11 +1,11 @@
-import { MEMBER_SECTIONS, splitSections, type MemberSection } from "@illuminize/shared";
-import { chatBadgeLabel } from "@illuminize/shared/chat";
+import { chatAvailable, MEMBER_SECTIONS, splitSections, type MemberSection } from "@illuminize/shared";
+import type { ChatBadgeLabel } from "@illuminize/shared/chat";
 import { Tabs, useSegments } from "expo-router";
 import { PlatformPressable } from "expo-router/react-navigation";
 import { type ColorValue, Text } from "react-native";
 import { useChatBadge } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
-import { SECTION_TABS } from "@/lib/sections";
+import { SECTION_TABS, sectionBadges } from "@/lib/sections";
 import { colors, useTheme } from "@/theme";
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: "600" } as const;
@@ -28,16 +28,22 @@ function TabIcon({ icon, active, color }: { icon: string; active: boolean; color
   return <Text style={{ fontSize: 20, opacity: active ? 1 : 0.6, color }}>{icon}</Text>;
 }
 
+/** On the icon, so the label below keeps its room. The tab's name carries the count for screen readers. */
+const tabBadge = (badge: ChatBadgeLabel | undefined) =>
+  badge && badge.count > 0 ? { tabBarAccessibilityLabel: badge.label, tabBarBadge: badge.count > 99 ? "99+" : badge.count, tabBarBadgeStyle: BADGE_STYLE } : {};
+
 /** The member tabs: four sections, then More. Each tab's stack draws its own header (see AppHeader). */
 export default function TabsLayout() {
   const { tenant, membership } = useMembership();
   const theme = useTheme();
   const segments: string[] = useSegments();
   const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible);
-  const chatBadge = chatBadgeLabel(useChatBadge(tenant.slug, tenant.settings.features.messaging && membership.chatEligible).data);
-  // On the icon, so the label below keeps its room. The tab's name carries the count for screen readers.
-  const badgeFor = (section: MemberSection) =>
-    section === "messages" && chatBadge.count > 0 ? { tabBarAccessibilityLabel: chatBadge.label, tabBarBadge: chatBadge.count > 99 ? "99+" : chatBadge.count, tabBarBadgeStyle: BADGE_STYLE } : {};
+  const badgeData = useChatBadge(tenant.slug, chatAvailable(tenant.settings.features, membership.chatEligible)).data;
+  const badges = sectionBadges(badgeData);
+  // A section behind More has its badge in the More hub, so More says there's something inside, and what.
+  const moreBadges = overflow.map((s) => badges[s]).filter((b): b is ChatBadgeLabel => !!b && b.count > 0);
+  const moreBadge: ChatBadgeLabel = { count: moreBadges.reduce((sum, b) => sum + b.count, 0), label: `More, ${moreBadges.map((b) => b.label).join(", ")}` };
+  const badgeFor = (section: MemberSection) => tabBadge(bar.includes(section) ? badges[section] : undefined);
   // A focused tab with no button highlights nothing, so More stands in for the screens reached through it.
   const tab = segments[segments.indexOf("(tabs)") + 1];
   const moreActive = tab === "profile" || overflow.some((s) => SECTION_TABS[s].path === tab);
@@ -65,6 +71,7 @@ export default function TabsLayout() {
         name="more"
         options={{
           title: "More",
+          ...tabBadge(moreBadge),
           tabBarIcon: ({ focused, color }) => <TabIcon icon="☰" active={focused || moreActive} color={moreActive ? theme.primary : color} />,
           tabBarLabelStyle: moreActive ? { ...LABEL_STYLE, color: theme.primary } : LABEL_STYLE,
           tabBarButton: (props) => <PlatformPressable {...props} aria-selected={moreActive || props["aria-selected"]} />,

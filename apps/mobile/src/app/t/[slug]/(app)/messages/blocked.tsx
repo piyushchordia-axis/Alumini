@@ -1,4 +1,4 @@
-import { chatKeys } from "@illuminize/shared/chat";
+import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { FlatList, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlockMemberButton } from "@/components/chat/BlockMember";
@@ -35,7 +35,7 @@ function BlockedMembers() {
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.lg + insets.bottom, gap: spacing.sm }}
-        ListHeaderComponent={<Text style={{ fontSize: 13, color: colors.muted, marginBottom: spacing.sm }}>{"Blocked members aren't told. Nothing they send reaches you, and unblocking doesn't bring back what they sent while blocked."}</Text>}
+        ListHeaderComponent={<Text style={{ fontSize: 13, color: colors.muted, marginBottom: spacing.sm }}>{BLOCKED_LIST_EXPLAINED}</Text>}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             <EmptyState icon="🛡️" title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
