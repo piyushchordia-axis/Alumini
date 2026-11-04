@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { MemberLink } from "@/components/common/MemberLink";
+import { RichText } from "@/components/common/RichText";
 import { RsvpButtons } from "@/components/events/RsvpButtons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
@@ -78,7 +79,7 @@ export function EventDetailPage() {
               <ModerationStatusBadge status={e.moderationStatus} note={e.moderationNote} />
             </div>
           </div>
-          <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{e.description}</p>
+          <RichText text={e.description} className="mt-4" />
           <div className="mt-5 border-t border-slate-100 pt-4">
             <div className="mb-3 text-sm text-slate-600">
               <strong className="text-slate-900">{e.yesCount}</strong> going{e.maybeCount ? ` · ${e.maybeCount} maybe` : ""}

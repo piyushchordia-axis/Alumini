@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COUNTRIES, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "../constants";
+import { normalizeSkills, tidySkill } from "../lib/skills";
 import { isValidCalendarDate } from "../lib/time";
 
 export const uuidSchema = z.uuid();
@@ -57,3 +58,14 @@ export const optionalTrimmed = (max: number) =>
     .optional()
     .nullable()
     .transform((v) => (v === "" ? null : (v ?? null)));
+
+/**
+ * A list of skills, stored normalised (see `normalizeSkills`). Each skill's length is checked as it's sent, tidied, so an
+ * error's path is that skill's place in the list sent; the count is checked after normalising, so repeats and blanks don't
+ * count. Going over either limit is an error rather than a list silently cut short.
+ */
+export const skillListSchema = (max: number, maxLength: number) =>
+  z
+    .array(z.string().transform(tidySkill).pipe(z.string().max(maxLength, `Keep each skill to ${maxLength} characters`)))
+    .transform((list) => normalizeSkills(list))
+    .pipe(z.array(z.string()).max(max, `Add at most ${max} skills`));

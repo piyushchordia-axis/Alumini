@@ -3,6 +3,7 @@ import {
   MARITAL_STATUS_LABELS,
   PROFESSION_TYPES,
   PROFESSION_TYPE_LABELS,
+  RICH_TEXT_HINT,
   membershipProfileSchema,
   validateProfileFieldValues,
   type MembershipDto,
@@ -202,7 +203,7 @@ export function ProfileForm({
           <Input label="Number of kids" value={f.kidsCount} onChangeText={(v) => set("kidsCount", v.replace(/\D/g, ""))} keyboardType="number-pad" error={errors.kidsCount} />
           <Input label="LinkedIn profile" value={f.linkedinUrl} onChangeText={(v) => set("linkedinUrl", v)} placeholder="https://www.linkedin.com/in/…" autoCapitalize="none" error={errors.linkedinUrl} />
           <Input label="Interests" value={f.interests} onChangeText={(v) => set("interests", v)} placeholder="cricket, startups, travel" hint="Comma separated" error={errors.interests} />
-          <Input label="Short bio" value={f.bio} onChangeText={(v) => set("bio", v)} multiline maxLength={1000} error={errors.bio} />
+          <Input label="Short bio" value={f.bio} onChangeText={(v) => set("bio", v)} multiline maxLength={1000} hint={RICH_TEXT_HINT} error={errors.bio} />
           <CustomFieldInputs fields={optionalFields} values={answers} errors={answerErrors} onChange={setAnswer} />
           <Row style={{ justifyContent: "space-between" }}>
             <Text style={{ color: colors.text, flex: 1 }}>Show my phone number to other members</Text>

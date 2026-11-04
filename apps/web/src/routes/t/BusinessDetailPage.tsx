@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { MemberLink } from "@/components/common/MemberLink";
+import { RichText } from "@/components/common/RichText";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, Loading } from "@/components/ui";
@@ -52,7 +53,7 @@ export function BusinessDetailPage() {
             <ModerationStatusBadge status={b.moderationStatus} note={b.moderationNote} />
           </div>
         </div>
-        <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{b.description}</p>
+        <RichText text={b.description} className="mt-4" />
         <div className="mt-5 flex flex-wrap gap-2">
           {b.websiteUrl && (
             <a href={b.websiteUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm">

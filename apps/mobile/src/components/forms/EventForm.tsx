@@ -2,6 +2,7 @@ import {
   COMMON_TIME_ZONES,
   EVENT_KINDS,
   EVENT_KIND_LABELS,
+  RICH_TEXT_HINT,
   eventCreateSchema,
   eventEditSchema,
   localTimeZone,
@@ -96,7 +97,7 @@ export function EventForm({
       <Input label="Max attendees" value={maxAttendees} onChangeText={(v) => setMaxAttendees(v.replace(/\D/g, ""))} keyboardType="number-pad" hint="Leave blank for unlimited" error={errors.maxAttendees} />
       <Input label="Venue" value={venueName} onChangeText={setVenueName} placeholder="Café, hall, link for online" error={errors.venueName} />
       <Input label="Address" value={address} onChangeText={setAddress} error={errors.address} />
-      <Input label="Details *" value={description} onChangeText={setDescription} multiline placeholder="What's the plan? Who should come?" error={errors.description} />
+      <Input label="Details *" value={description} onChangeText={setDescription} multiline placeholder="What's the plan? Who should come?" hint={RICH_TEXT_HINT} error={errors.description} />
       <Row>
         <Button
           title={coverImageUrl ? "Change cover image" : "📷 Cover image"}

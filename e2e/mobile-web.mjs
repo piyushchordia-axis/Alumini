@@ -218,6 +218,13 @@ try {
     await openSection("Events");
     await page.getByText("Mumbai alumni coffee meetup").locator("visible=true").first().click();
     await page.getByText("Who's going").waitFor();
+    // The seeded description's bullets are list items, and its web address a link.
+    await page.getByRole("listitem").filter({ hasText: "Partners and kids welcome" }).locator("visible=true").first().waitFor();
+    await page.getByRole("link", { name: "https://example.com/maps/blue-tokai-bandra", exact: true }).locator("visible=true").first().waitFor();
+    // Its email address is a mail link, which opens in place rather than in a blank tab.
+    const mail = page.getByRole("link", { name: "meetups@demou.example", exact: true }).locator("visible=true").first();
+    if ((await mail.getAttribute("href")) !== "mailto:meetups@demou.example" || (await mail.getAttribute("target")) !== null || !(await mail.getAttribute("rel"))?.includes("nofollow"))
+      throw new Error("a member's email link should be a mail link that opens in place, with nofollow");
     const before = Number((await page.locator("text=/^\\d+$/").first().textContent()).trim());
     await tap("I'm going");
     // The feed's tab, with this member's post, stays mounted but hidden: the attendee is the visible match.
@@ -287,6 +294,21 @@ try {
     await visible(page.getByText("hello@zylolabs.example", { exact: false })).waitFor();
     await visible(page.getByText("5550 0101", { exact: false })).waitFor();
     await visible(page.getByRole("button", { name: "Report this content" })).waitFor();
+    // The description is rich text: its three bullets are one list, and its address an anchor that opens in a new tab.
+    const bullets = visible(page.getByRole("list").filter({ hasText: "Credit decisions in under a day" })).getByRole("listitem");
+    if ((await bullets.count()) !== 3) throw new Error(`the description's bullets should be one list of 3 items, not ${await bullets.count()}`);
+    const pricing = visible(page.getByRole("link", { name: "https://example.com/zylo/pricing", exact: true }));
+    if ((await pricing.getAttribute("href")) !== "https://example.com/zylo/pricing" || (await pricing.getAttribute("target")) !== "_blank") throw new Error("a description's link should be an anchor that opens in a new tab");
+    if (!(await pricing.getAttribute("rel"))?.includes("nofollow")) throw new Error("a member's link should carry nofollow");
+    // A bullet is only for the eye; a step's number is read out, starting where the list starts.
+    if ((await visible(page.getByRole("list").filter({ hasText: "Credit decisions in under a day" })).ariaSnapshot()).includes("•")) throw new Error("a bullet should be hidden from screen readers");
+    const steps = visible(page.getByRole("list").filter({ hasText: "Book a short call" }));
+    const stepsTree = await steps.ariaSnapshot();
+    if ((await steps.getByRole("listitem").count()) !== 3 || !/1\.\s*Book a short call/.test(stepsTree) || !/3\.\s*Lend from the first week/.test(stepsTree))
+      throw new Error(`the description's numbered steps should be one list of 3, numbered for screen readers from 1:\n${stepsTree}`);
+    // An English list has its numbers on the left, before the text.
+    if (!(await steps.getByRole("listitem").first().evaluate((li) => li.children[0].getBoundingClientRect().right <= li.children[1].getBoundingClientRect().left)))
+      throw new Error("a numbered item's number should sit to the left of its text");
     await shot("m07a-business-detail");
   });
 

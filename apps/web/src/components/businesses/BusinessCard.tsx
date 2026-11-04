@@ -1,4 +1,4 @@
-import { BUSINESS_CATEGORY_LABELS, type BusinessCardDto } from "@illuminize/shared";
+import { BUSINESS_CATEGORY_LABELS, plainExcerpt, type BusinessCardDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Avatar, Badge } from "@/components/ui";
@@ -19,7 +19,7 @@ export function BusinessCard({ slug, item }: { slug: string; item: BusinessCardD
         </div>
       </div>
       <ModerationCardNote status={item.moderationStatus} note={item.moderationNote} />
-      <p className="mt-2 line-clamp-2 text-sm text-slate-600">{item.description}</p>
+      <p className="mt-2 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{plainExcerpt(item.description, 200)}</p>
       <p className="mt-2 text-xs text-slate-400">
         {item.author.fullName} · batch of {item.author.batchYear} · {timeAgo(item.createdAt)}
       </p>

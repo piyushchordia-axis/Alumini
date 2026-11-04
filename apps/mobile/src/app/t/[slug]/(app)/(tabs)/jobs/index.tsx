@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPES, JOB_TYPE_LABELS, JOBS_TAB_LABELS, JOBS_TABS, jobsTabFrom, referralBoxFrom, type JobDto, type JobSeekerDto, type JobsTab, type JobType, type ReferralBox } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPES, JOB_TYPE_LABELS, JOBS_TAB_LABELS, JOBS_TABS, jobsTabFrom, plainExcerpt, referralBoxFrom, type JobDto, type JobSeekerDto, type JobsTab, type JobType, type ReferralBox } from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
@@ -39,7 +39,7 @@ function JobCard({ slug, job }: { slug: string; job: JobDto }) {
         {job.isRemote ? " · Remote" : ""}
       </Muted>
       <Text numberOfLines={2} style={{ color: "#475569" }}>
-        {job.description}
+        {plainExcerpt(job.description, 200)}
       </Text>
       <Muted>
         {job.author.fullName} · {timeAgo(job.createdAt)}

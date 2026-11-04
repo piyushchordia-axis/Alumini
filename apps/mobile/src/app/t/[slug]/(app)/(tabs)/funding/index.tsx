@@ -1,4 +1,4 @@
-import { FUNDING_STAGE_LABELS, type FundingDto } from "@illuminize/shared";
+import { FUNDING_STAGE_LABELS, plainExcerpt, type FundingDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -26,7 +26,7 @@ function FundingCard({ slug, item }: { slug: string; item: FundingDto }) {
       </Row>
       <Muted size={13}>{formatAmountRange(item.amountMinMinor, item.amountMaxMinor, item.currency)}</Muted>
       <Text numberOfLines={2} style={{ color: "#475569" }}>
-        {item.pitch}
+        {plainExcerpt(item.pitch, 200)}
       </Text>
       <Muted>
         {item.author.fullName} · {timeAgo(item.createdAt)}

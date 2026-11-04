@@ -1,4 +1,4 @@
-import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, RICH_TEXT_HINT, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useMemo, useState } from "react";
@@ -111,8 +111,8 @@ export function JobForm({
           <Checkbox {...register("isRemote")} label="Remote friendly" />
         </div>
         <div className="sm:col-span-2">
-          <FormField label="Description" required error={e.description?.message} hint="Role, requirements, how to apply.">
-            <Textarea {...register("description")} rows={6} invalid={!!e.description} />
+          <FormField label="Description" required error={e.description?.message} hint={RICH_TEXT_HINT}>
+            <Textarea {...register("description")} rows={6} invalid={!!e.description} placeholder="Role, requirements, how to apply" />
           </FormField>
         </div>
         <FormField label="Apply link" error={e.applyUrl?.message}>

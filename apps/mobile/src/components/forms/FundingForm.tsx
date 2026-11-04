@@ -1,4 +1,4 @@
-import { FUNDING_STAGES, FUNDING_STAGE_LABELS, fundingCreateSchema, type FundingCreateInput, type FundingDto, type FundingKind, type FundingStage } from "@illuminize/shared";
+import { FUNDING_STAGES, FUNDING_STAGE_LABELS, RICH_TEXT_HINT, fundingCreateSchema, type FundingCreateInput, type FundingDto, type FundingKind, type FundingStage } from "@illuminize/shared";
 import { useState } from "react";
 import { Button, ChipSelect, ErrorText, Input, Title } from "@/components/ui";
 import { useFormErrors } from "./useFormErrors";
@@ -59,7 +59,7 @@ export function FundingForm({ kind, initial, submitLabel, onSubmit }: { kind: Fu
       <ChipSelect label="Currency" options={CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={setCurrency} />
       <Input label={kind === "SEEKING" ? "Minimum raise" : "Minimum cheque"} value={min} onChangeText={setMin} keyboardType="decimal-pad" error={errors.amountMinMinor} hint="Whole amount, e.g. 2500000" />
       <Input label={kind === "SEEKING" ? "Maximum raise" : "Maximum cheque"} value={max} onChangeText={setMax} keyboardType="decimal-pad" error={errors.amountMaxMinor} />
-      <Input label={kind === "SEEKING" ? "Pitch *" : "Investment thesis *"} value={pitch} onChangeText={setPitch} multiline error={errors.pitch} />
+      <Input label={kind === "SEEKING" ? "Pitch *" : "Investment thesis *"} value={pitch} onChangeText={setPitch} multiline hint={RICH_TEXT_HINT} error={errors.pitch} />
       <Input label="Sectors" value={sectors} onChangeText={setSectors} placeholder="fintech, SaaS" hint="Comma separated, up to 10" error={errors.sectors} />
       <Input label="Website" value={websiteUrl} onChangeText={setWebsiteUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" error={errors.websiteUrl} />
       <Input label="Contact email" value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" error={errors.contactEmail} />

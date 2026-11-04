@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, plainExcerpt, type JobDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
@@ -24,7 +24,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobDto }) {
         </div>
       </div>
       <ModerationCardNote status={job.moderationStatus} note={job.moderationNote} />
-      <p className="mt-2 line-clamp-2 text-sm text-slate-600">{job.description}</p>
+      <p className="mt-2 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{plainExcerpt(job.description, 200)}</p>
       <p className="mt-2 text-xs text-slate-400">
         Posted by {job.author.fullName} (batch of {job.author.batchYear}) · {timeAgo(job.createdAt)}
         {job.salaryRange ? ` · ${job.salaryRange}` : ""}

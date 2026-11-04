@@ -1,4 +1,4 @@
-import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, businessCreateSchema, type BusinessCategory, type BusinessCreateInput, type BusinessDto } from "@illuminize/shared";
+import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, RICH_TEXT_HINT, businessCreateSchema, type BusinessCategory, type BusinessCreateInput, type BusinessDto } from "@illuminize/shared";
 import { useState } from "react";
 import { Avatar, Button, ChipSelect, ErrorText, Input, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
@@ -33,7 +33,7 @@ export function BusinessForm({ slug, initial, submitLabel, onSubmit }: { slug: s
       <ChipSelect label="Category *" options={BUSINESS_CATEGORIES.map((c) => ({ value: c, label: BUSINESS_CATEGORY_LABELS[c] }))} value={category} onChange={setCategory} />
       <ErrorText error={errors.category} />
       <Input label="City" value={city} onChangeText={setCity} error={errors.city} />
-      <Input label="Description *" value={description} onChangeText={setDescription} multiline hint="What you do, and anything alumni should know." error={errors.description} />
+      <Input label="Description *" value={description} onChangeText={setDescription} multiline placeholder="What you do, and anything alumni should know" hint={RICH_TEXT_HINT} error={errors.description} />
       <Row>
         {logoUrl && <Avatar name={name} src={logoUrl} size={56} />}
         <Button

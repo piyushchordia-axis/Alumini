@@ -11,7 +11,8 @@ import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Badge, Body, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { RichText } from "@/components/RichText";
+import { Badge, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -90,7 +91,7 @@ function JobDetail({ jobId }: { jobId: string }) {
         <ModerationNote status={j.moderationStatus} note={j.moderationNote} />
         {j.salaryRange && <Muted size={13}>💰 {j.salaryRange}</Muted>}
         {j.expiresAt && <Muted>Applications close {formatDate(j.expiresAt)}</Muted>}
-        <Body>{j.description}</Body>
+        <RichText text={j.description} />
         {j.applyUrl && !j.isClosed && <Button title="Apply ↗" onPress={() => void Linking.openURL(j.applyUrl!)} />}
         {j.contactEmail && <Button title={`✉️ ${j.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${j.contactEmail}`)} />}
         {j.contactPhone && <Button title={`📞 ${j.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${j.contactPhone}`)} />}

@@ -54,6 +54,133 @@ export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number];
 /** Listings one member may have, counting everything an admin hasn't removed. */
 export const MAX_BUSINESS_LISTINGS = 5;
 
+/** Where a member works, and the industry of a job's company. A fixed list, because free text would make the filter useless. */
+export const INDUSTRIES = [
+  "SOFTWARE_INTERNET",
+  "IT_SERVICES",
+  "BANKING_FINANCE",
+  "INVESTMENT_VC",
+  "CONSULTING",
+  "ACCOUNTING",
+  "LAW",
+  "HEALTHCARE",
+  "PHARMA_BIOTECH",
+  "EDUCATION_RESEARCH",
+  "GOVERNMENT",
+  "MANUFACTURING_ENGINEERING",
+  "ENERGY",
+  "CONSTRUCTION_REAL_ESTATE",
+  "RETAIL_CONSUMER",
+  "MEDIA_ENTERTAINMENT",
+  "MARKETING_ADVERTISING",
+  "TELECOM",
+  "TRANSPORT_LOGISTICS",
+  "HOSPITALITY_TRAVEL",
+  "AGRICULTURE",
+  "NON_PROFIT",
+  "ARTS_DESIGN",
+  "OTHER",
+] as const;
+export type Industry = (typeof INDUSTRIES)[number];
+export const INDUSTRY_LABELS: Record<Industry, string> = {
+  SOFTWARE_INTERNET: "Software and internet",
+  IT_SERVICES: "IT services",
+  BANKING_FINANCE: "Banking and finance",
+  INVESTMENT_VC: "Investment and venture capital",
+  CONSULTING: "Consulting",
+  ACCOUNTING: "Accounting",
+  LAW: "Law",
+  HEALTHCARE: "Healthcare",
+  PHARMA_BIOTECH: "Pharma and biotech",
+  EDUCATION_RESEARCH: "Education and research",
+  GOVERNMENT: "Government and public service",
+  MANUFACTURING_ENGINEERING: "Manufacturing and engineering",
+  ENERGY: "Energy",
+  CONSTRUCTION_REAL_ESTATE: "Construction and real estate",
+  RETAIL_CONSUMER: "Retail and consumer goods",
+  MEDIA_ENTERTAINMENT: "Media and entertainment",
+  MARKETING_ADVERTISING: "Marketing and advertising",
+  TELECOM: "Telecom",
+  TRANSPORT_LOGISTICS: "Transport and logistics",
+  HOSPITALITY_TRAVEL: "Hospitality and travel",
+  AGRICULTURE: "Agriculture",
+  NON_PROFIT: "Non-profit",
+  ARTS_DESIGN: "Arts and design",
+  OTHER: "Other",
+};
+
+/** What a member is open to, beyond work (the job-seeker profile) and mentoring (the mentor profile). */
+export const OPEN_TO = ["HIRING", "COLLABORATING", "INVESTING"] as const;
+export type OpenTo = (typeof OPEN_TO)[number];
+export const OPEN_TO_LABELS: Record<OpenTo, string> = {
+  HIRING: "Hiring",
+  COLLABORATING: "Collaborating",
+  INVESTING: "Investing",
+};
+
+export const WORK_MODES = ["ON_SITE", "HYBRID", "REMOTE"] as const;
+export type WorkMode = (typeof WORK_MODES)[number];
+export const WORK_MODE_LABELS: Record<WorkMode, string> = {
+  ON_SITE: "On-site",
+  HYBRID: "Hybrid",
+  REMOTE: "Remote",
+};
+
+export const JOB_SENIORITIES = ["ENTRY", "MID", "SENIOR", "LEAD", "MANAGER", "EXECUTIVE"] as const;
+export type JobSeniority = (typeof JOB_SENIORITIES)[number];
+export const JOB_SENIORITY_LABELS: Record<JobSeniority, string> = {
+  ENTRY: "Entry level",
+  MID: "Mid level",
+  SENIOR: "Senior",
+  LEAD: "Lead",
+  MANAGER: "Manager",
+  EXECUTIVE: "Executive",
+};
+
+export const SALARY_PERIODS = ["YEAR", "MONTH", "HOUR"] as const;
+export type SalaryPeriod = (typeof SALARY_PERIODS)[number];
+export const SALARY_PERIOD_LABELS: Record<SalaryPeriod, string> = {
+  YEAR: "Per year",
+  MONTH: "Per month",
+  HOUR: "Per hour",
+};
+
+/** Salaries are stored in minor units, and every currency here has two minor digits. */
+export const SALARY_CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "CAD", "AUD"] as const;
+export type SalaryCurrency = (typeof SALARY_CURRENCIES)[number];
+export const SALARY_CURRENCY_LABELS: Record<SalaryCurrency, string> = {
+  INR: "Indian rupee (₹)",
+  USD: "US dollar ($)",
+  EUR: "Euro (€)",
+  GBP: "British pound (£)",
+  AED: "UAE dirham (AED)",
+  SGD: "Singapore dollar (S$)",
+  CAD: "Canadian dollar (C$)",
+  AUD: "Australian dollar (A$)",
+};
+/** Written before the amount. The dirham's own sign is right-to-left script, so its code stands in for it. */
+export const SALARY_CURRENCY_SYMBOLS: Record<SalaryCurrency, string> = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AED: "AED ",
+  SGD: "S$",
+  CAD: "C$",
+  AUD: "A$",
+};
+
+export const COMPANY_SIZES = ["SIZE_1_10", "SIZE_11_50", "SIZE_51_200", "SIZE_201_1000", "SIZE_1001_5000", "SIZE_5001_PLUS"] as const;
+export type CompanySize = (typeof COMPANY_SIZES)[number];
+export const COMPANY_SIZE_LABELS: Record<CompanySize, string> = {
+  SIZE_1_10: "1–10",
+  SIZE_11_50: "11–50",
+  SIZE_51_200: "51–200",
+  SIZE_201_1000: "201–1,000",
+  SIZE_1001_5000: "1,001–5,000",
+  SIZE_5001_PLUS: "5,001+",
+};
+
 /** One thread per pair of members (DIRECT), or a shared room (GROUP). */
 export const CHAT_CONVERSATION_KINDS = ["DIRECT", "GROUP"] as const;
 export type ChatConversationKind = (typeof CHAT_CONVERSATION_KINDS)[number];

@@ -7,7 +7,8 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { RichText } from "@/components/RichText";
+import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -50,7 +51,7 @@ export default function BusinessDetailScreen() {
           <ModerationBadge status={b.moderationStatus} />
         </Row>
         <ModerationNote status={b.moderationStatus} note={b.moderationNote} />
-        <Body>{b.description}</Body>
+        <RichText text={b.description} />
         {b.websiteUrl && <Button title="🌐 Website" variant="outline" onPress={() => void Linking.openURL(b.websiteUrl!)} />}
         {b.contactEmail && <Button title={`✉️ ${b.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${b.contactEmail}`)} />}
         {b.contactPhone && <Button title={`📞 ${b.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${b.contactPhone}`)} />}

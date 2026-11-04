@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
+import { RichText } from "@/components/RichText";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { qk } from "@/lib/queryKeys";
@@ -66,7 +67,7 @@ export default function MyProfileScreen() {
             </Muted>
           </View>
         </Row>
-        {membership.bio && <Text style={{ color: "#334155", lineHeight: 20 }}>{membership.bio}</Text>}
+        <RichText text={membership.bio} style={{ fontSize: 14, lineHeight: 20, color: "#334155" }} />
         <Row>
           {membership.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />}
           <Muted>{user?.phone}</Muted>

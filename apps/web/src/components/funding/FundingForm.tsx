@@ -1,4 +1,4 @@
-import { FUNDING_STAGES, FUNDING_STAGE_LABELS, fundingCreateSchema, type FundingCreateInput, type FundingDto, type FundingKind, type FundingStage } from "@illuminize/shared";
+import { FUNDING_STAGES, FUNDING_STAGE_LABELS, RICH_TEXT_HINT, fundingCreateSchema, type FundingCreateInput, type FundingDto, type FundingKind, type FundingStage } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
@@ -114,7 +114,7 @@ export function FundingForm({ initial, kind, onSubmit, submitLabel }: { initial?
           <Input type="number" min={0} step="any" inputMode="decimal" {...register("amountMax")} />
         </FormField>
         <div className="sm:col-span-2">
-          <FormField label={kind === "SEEKING" ? "Pitch" : "Investment thesis"} required error={e.pitch?.message}>
+          <FormField label={kind === "SEEKING" ? "Pitch" : "Investment thesis"} required error={e.pitch?.message} hint={RICH_TEXT_HINT}>
             <Textarea {...register("pitch")} rows={6} />
           </FormField>
         </div>

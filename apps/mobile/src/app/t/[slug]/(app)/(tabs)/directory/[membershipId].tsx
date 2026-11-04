@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Text, View } from "react-native";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
+import { RichText } from "@/components/RichText";
 import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -45,7 +46,7 @@ export default function MemberProfileScreen() {
         </View>
         {m.id === membership.id && <Button title="Edit my profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />}
         {chatOn && m.canMessage && <MessageMemberButton slug={slug} member={m} />}
-        {m.bio && <Text style={{ color: "#1e293b", lineHeight: 21 }}>{m.bio}</Text>}
+        <RichText text={m.bio} style={{ fontSize: 14, lineHeight: 21, color: "#1e293b" }} />
         {m.interests.length > 0 && (
           <Row>
             {m.interests.map((i) => (

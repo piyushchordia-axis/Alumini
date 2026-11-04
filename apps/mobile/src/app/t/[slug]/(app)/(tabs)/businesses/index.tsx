@@ -1,4 +1,4 @@
-import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, type BusinessCardDto, type BusinessCategory } from "@illuminize/shared";
+import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, plainExcerpt, type BusinessCardDto, type BusinessCategory } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -28,7 +28,7 @@ function BusinessCard({ slug, item }: { slug: string; item: BusinessCardDto }) {
         <ModerationBadge status={item.moderationStatus} />
       </Row>
       <Text numberOfLines={2} style={{ color: "#475569" }}>
-        {item.description}
+        {plainExcerpt(item.description, 200)}
       </Text>
       <Muted>
         {item.author.fullName} · {timeAgo(item.createdAt)}

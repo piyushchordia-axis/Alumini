@@ -1,4 +1,4 @@
-import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto, type JobType } from "@illuminize/shared";
+import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, RICH_TEXT_HINT, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto, type JobType } from "@illuminize/shared";
 import { useState } from "react";
 import { Switch, Text, View } from "react-native";
 import { DateTimeField } from "@/components/DateTimeField";
@@ -76,7 +76,7 @@ export function JobForm({
         <Text style={{ color: colors.text }}>Remote friendly</Text>
         <Switch value={isRemote} onValueChange={setIsRemote} trackColor={{ true: theme.primary }} accessibilityLabel="Remote friendly" />
       </Row>
-      <Input label="Description *" value={description} onChangeText={setDescription} multiline error={errors.description} hint="Role, requirements, how to apply." />
+      <Input label="Description *" value={description} onChangeText={setDescription} multiline placeholder="Role, requirements, how to apply" error={errors.description} hint={RICH_TEXT_HINT} />
       <Input label="Apply link" value={applyUrl} onChangeText={setApplyUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" error={errors.applyUrl} />
       <Input label="Contact email" value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" error={errors.contactEmail} />
       <Input label="Contact phone" value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" error={errors.contactPhone} />

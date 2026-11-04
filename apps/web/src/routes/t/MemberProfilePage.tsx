@@ -2,6 +2,7 @@ import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
+import { RichText } from "@/components/common/RichText";
 import { Avatar, Badge, Card, ErrorBox, Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -56,7 +57,7 @@ export function MemberProfilePage() {
             )}
           </div>
         </div>
-        {m.bio && <p className="mt-5 whitespace-pre-line text-[15px] text-slate-800">{m.bio}</p>}
+        <RichText text={m.bio} className="mt-5" />
         {m.interests.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {m.interests.map((i) => (

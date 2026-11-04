@@ -197,6 +197,13 @@ try {
     await page.click("button:has-text(\"I'm going\")");
     await page.locator("strong").first().filter({ hasText: new RegExp(`^${Number(before) + 1}$`) }).waitFor({ timeout: 10000 });
     await page.waitForSelector("text=Smoke Tester");
+    // The seeded description's bullets are list items, and its web address a link that opens in a new tab.
+    await page.locator("ul > li", { hasText: "Partners and kids welcome" }).waitFor();
+    await page.locator('a[href^="https://"][target="_blank"][rel*="noopener"]', { hasText: "https://example.com/maps/blue-tokai-bandra" }).waitFor();
+    // Its email address is a mail link, which opens in place rather than in a blank tab.
+    const mail = page.locator('a[href="mailto:meetups@demou.example"]', { hasText: "meetups@demou.example" });
+    await mail.waitFor();
+    if ((await mail.getAttribute("target")) !== null || !(await mail.getAttribute("rel")).includes("nofollow")) throw new Error("a member's email link should open in place, with nofollow");
     await shot("07-event");
   });
 
@@ -251,6 +258,16 @@ try {
     await page.waitForSelector('a[href="mailto:hello@zylolabs.example"]');
     await page.waitForSelector('a[href^="tel:"]:has-text("5550 0101")');
     await page.waitForSelector('button:has-text("Report")');
+    // The description is rich text: its three bullets are one list, with no dash left over, and its address is a link.
+    const bullets = page.locator("ul:has(> li:text-is('Credit decisions in under a day')) > li");
+    await bullets.first().waitFor();
+    if ((await bullets.count()) !== 3) throw new Error(`the description's bullets should be one list of 3 items, not ${await bullets.count()}`);
+    if (await page.getByText("- Credit decisions", { exact: false }).count()) throw new Error("a bullet still shows its dash");
+    const pricing = page.locator('a[href^="https://"][rel*="noopener"]', { hasText: "https://example.com/zylo/pricing" });
+    if ((await pricing.getAttribute("target")) !== "_blank" || !(await pricing.getAttribute("rel")).includes("nofollow")) throw new Error("a member's link should open in a new tab with nofollow");
+    // Its numbered steps are an ordered list that keeps the number it starts at.
+    const steps = page.locator("ol:has(> li:text-is('Book a short call'))");
+    if ((await steps.getAttribute("start")) !== "1" || (await steps.locator(":scope > li").count()) !== 3) throw new Error("the description's numbered steps should be one <ol start=1> of 3 items");
     await shot("08-business-detail");
   });
 

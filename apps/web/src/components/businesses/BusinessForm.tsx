@@ -1,4 +1,4 @@
-import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, businessCreateSchema, type BusinessCreateInput, type BusinessDto } from "@illuminize/shared";
+import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, RICH_TEXT_HINT, businessCreateSchema, type BusinessCreateInput, type BusinessDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -61,8 +61,8 @@ export function BusinessForm({ slug, initial, onSubmit, submitLabel }: { slug: s
           <Input {...register("city", nullable)} />
         </FormField>
         <div className="sm:col-span-2">
-          <FormField label="Description" required error={e.description?.message} hint="What you do, and anything alumni should know.">
-            <Textarea {...register("description")} rows={5} invalid={!!e.description} />
+          <FormField label="Description" required error={e.description?.message} hint={RICH_TEXT_HINT}>
+            <Textarea {...register("description")} rows={5} invalid={!!e.description} placeholder="What you do, and anything alumni should know" />
           </FormField>
         </div>
         <div className="sm:col-span-2">

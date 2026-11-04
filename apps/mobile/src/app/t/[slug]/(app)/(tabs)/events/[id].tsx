@@ -7,7 +7,8 @@ import { Alert, Image, Pressable, Text, View } from "react-native";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Body, Button, Card, LoadError, Muted, Row, Screen, Spinner, toggleState } from "@/components/ui";
+import { RichText } from "@/components/RichText";
+import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner, toggleState } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -68,7 +69,7 @@ export default function EventDetailScreen() {
             <ModerationBadge status={e.moderationStatus} />
           </Row>
           <ModerationNote status={e.moderationStatus} note={e.moderationNote} />
-          <Body>{e.description}</Body>
+          <RichText text={e.description} />
           <Text style={{ color: colors.muted, fontSize: 13 }}>
             <Text style={{ fontWeight: "700", color: colors.text }}>{e.yesCount}</Text> going{e.maybeCount ? ` · ${e.maybeCount} maybe` : ""}
             {e.maxAttendees ? ` · ${Math.max(e.maxAttendees - e.yesCount, 0)} spots left` : ""}

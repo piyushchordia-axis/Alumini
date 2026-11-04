@@ -2,6 +2,7 @@ import {
   COMMON_TIME_ZONES,
   EVENT_KINDS,
   EVENT_KIND_LABELS,
+  RICH_TEXT_HINT,
   eventCreateSchema,
   eventEditSchema,
   localTimeZone,
@@ -144,7 +145,7 @@ export function EventForm({
           <Input {...register("address", nullable)} />
         </FormField>
         <div className="sm:col-span-2">
-          <FormField label="Details" required error={e.description?.message}>
+          <FormField label="Details" required error={e.description?.message} hint={RICH_TEXT_HINT}>
             <Textarea {...register("description")} rows={5} placeholder="What's the plan? Who should come?" />
           </FormField>
         </div>

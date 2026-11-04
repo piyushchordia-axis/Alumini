@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { MemberLink } from "@/components/common/MemberLink";
+import { RichText } from "@/components/common/RichText";
 import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
@@ -97,7 +98,7 @@ function JobDetailPage({ jobId }: { jobId: string }) {
         </div>
         {j.salaryRange && <p className="mt-2 text-sm text-slate-700">💰 {j.salaryRange}</p>}
         {j.expiresAt && <p className="text-xs text-slate-500">Applications close {formatDate(j.expiresAt)}</p>}
-        <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-slate-800 [overflow-wrap:anywhere]">{j.description}</p>
+        <RichText text={j.description} className="mt-4" />
         <div className="mt-5 flex flex-wrap gap-2">
           {j.applyUrl && !j.isClosed && (
             <a href={j.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white">

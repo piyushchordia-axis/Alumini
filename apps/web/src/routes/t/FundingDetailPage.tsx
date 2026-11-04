@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MemberLink } from "@/components/common/MemberLink";
+import { RichText } from "@/components/common/RichText";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { Badge, Button, Card, ErrorBox, LinkButton, Loading } from "@/components/ui";
@@ -45,7 +46,7 @@ export function FundingDetailPage() {
             <ModerationStatusBadge status={f.moderationStatus} note={f.moderationNote} />
           </div>
         </div>
-        <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{f.pitch}</p>
+        <RichText text={f.pitch} className="mt-4" />
         {f.sectors.length > 0 && <p className="mt-3 text-sm text-slate-500">{f.sectors.map((s) => `#${s}`).join("  ")}</p>}
         <div className="mt-5 flex flex-wrap gap-2">
           {f.websiteUrl && (

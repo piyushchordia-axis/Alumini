@@ -3,6 +3,7 @@ import {
   MARITAL_STATUS_LABELS,
   PROFESSION_TYPES,
   PROFESSION_TYPE_LABELS,
+  RICH_TEXT_HINT,
   membershipProfileSchema,
   validateProfileFieldValues,
   type MembershipDto,
@@ -169,7 +170,7 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
             />
           </FormField>
           <div className="sm:col-span-2">
-            <FormField label="Short bio" error={errors.bio?.message}>
+            <FormField label="Short bio" error={errors.bio?.message} hint={RICH_TEXT_HINT}>
               <Textarea {...register("bio")} placeholder="Tell your batchmates what you're up to" maxLength={1000} />
             </FormField>
           </div>
