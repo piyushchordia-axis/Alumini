@@ -6,6 +6,7 @@ import { Fragment, useState } from "react";
 import { Text, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { IconMail } from "@/components/icons";
 import { WayOutBanner } from "@/components/jobs/ReferralRequests";
 import { useJobReferralList, useReferralRows } from "@/components/jobs/ReferralRows";
 import { Badge, Button, Card, EmptyState, ErrorText, Spinner } from "@/components/ui";
@@ -128,7 +129,7 @@ export function JobReferrals({ slug, job }: { slug: string; job: JobDetailDto })
           <Button title="Retry loading" variant="outline" onPress={() => void list.refetch()} />
         </View>
       ) : list.items.length === 0 ? (
-        <EmptyState icon="📨" title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />
+        <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />
       ) : (
         list.items.map((r) => <Fragment key={r.id}>{rows.renderRow(r)}</Fragment>)
       )}

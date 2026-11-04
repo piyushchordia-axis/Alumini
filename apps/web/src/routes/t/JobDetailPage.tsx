@@ -1,11 +1,12 @@
-import { CAN_REFER_BADGE, JOB_DELETED_TEXT, JOB_TYPE_LABELS, waitingReferralsCloseText } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_DELETED_TEXT, waitingReferralsCloseText } from "@illuminize/shared";
 import { errorMessage, fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { MemberLink } from "@/components/common/MemberLink";
-import { RichText } from "@/components/common/RichText";
+import { JobApplyArea } from "@/components/jobs/JobApplyArea";
+import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
@@ -32,6 +33,7 @@ function JobDetailPage({ jobId }: { jobId: string }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [confirming, setConfirming] = useState<"close" | "delete" | null>(null);
+  const [now] = useState(() => Date.now());
   const headingId = useId();
   // Mark closed goes once the job is closed, so focus moves to the job's heading rather than to the top of the page.
   const focus = useRowFocus(confirming !== null);
@@ -77,45 +79,23 @@ function JobDetailPage({ jobId }: { jobId: string }) {
         ← All jobs
       </Link>
       <Card className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 id={headingId} tabIndex={-1} className="text-xl font-semibold text-slate-900 outline-none [overflow-wrap:anywhere] focus-visible:ring-2 focus-visible:ring-primary/40">
-              {j.title}
-            </h1>
-            <p className="text-slate-600 [overflow-wrap:anywhere]">
-              {j.companyName}
-              {j.location ? ` · ${j.location}` : ""}
-              {j.isRemote ? " · Remote" : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge tone="info">{JOB_TYPE_LABELS[j.jobType]}</Badge>
-            {/* A closed job takes no requests, whatever its poster offered. */}
-            {j.canRefer && !j.isClosed && <Badge tone="success">{CAN_REFER_BADGE}</Badge>}
-            {j.isClosed && <Badge>Closed</Badge>}
-            <ModerationStatusBadge status={j.moderationStatus} note={j.moderationNote} />
-          </div>
-        </div>
-        {j.salaryRange && <p className="mt-2 text-sm text-slate-700">💰 {j.salaryRange}</p>}
-        {j.expiresAt && <p className="text-xs text-slate-500">Applications close {formatDate(j.expiresAt)}</p>}
-        <RichText text={j.description} className="mt-4" />
-        <div className="mt-5 flex flex-wrap gap-2">
-          {j.applyUrl && !j.isClosed && (
-            <a href={j.applyUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white">
-              Apply ↗
-            </a>
-          )}
-          {j.contactEmail && (
-            <a href={`mailto:${j.contactEmail}`} className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm [overflow-wrap:anywhere]">
-              ✉️ {j.contactEmail}
-            </a>
-          )}
-          {j.contactPhone && (
-            <a href={`tel:${j.contactPhone}`} className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm">
-              📞 {j.contactPhone}
-            </a>
-          )}
-        </div>
+        <JobDetails
+          job={j}
+          now={now}
+          titleId={headingId}
+          badges={
+            // A closed job takes no requests, whatever its poster offered. The job type is among the facts.
+            j.canRefer || j.isClosed || j.moderationStatus !== "APPROVED" ? (
+              <>
+                {j.canRefer && !j.isClosed && <Badge tone="success">{CAN_REFER_BADGE}</Badge>}
+                {j.isClosed && <Badge>Closed</Badge>}
+                <ModerationStatusBadge status={j.moderationStatus} note={j.moderationNote} />
+              </>
+            ) : null
+          }
+          // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
+          apply={<JobApplyArea job={j} now={now} />}
+        />
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <MemberLink slug={slug} member={j.author} meta={`Posted ${formatDate(j.createdAt)}`} />
           <div className="flex flex-wrap items-center gap-2">
@@ -159,6 +139,7 @@ function JobDetailPage({ jobId }: { jobId: string }) {
           </div>
         </div>
       </Card>
+      <AboutCompany job={j} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] p-5 shadow-[var(--shadow-1)]" />
       {j.isMine ? <JobReferrals slug={slug} job={j} /> : <MyReferral slug={slug} job={j} />}
     </div>
   );

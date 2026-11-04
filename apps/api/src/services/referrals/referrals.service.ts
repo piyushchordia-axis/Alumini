@@ -2,6 +2,7 @@ import {
   REFERRAL_MAX_OPEN_PER_REQUESTER,
   REFERRAL_MAX_REQUESTS_PER_JOB,
   REFERRAL_MAX_WAITING_PER_JOB,
+  jobIsOpen,
   referralsEnabled,
   type ChatReportCreateInput,
   type CursorQuery,
@@ -71,8 +72,8 @@ function auditOf(tenantId: string, actor: ContentActor, action: string, referral
   return { tenantId, actorUserId: actor.userId, actorMembershipId: actor.membership.id, action, targetType: "referral", targetId: referralId, ip: actor.ip };
 }
 
-/** A job takes new referral requests: published, open, not past its end date, and its poster offered. */
-const takesRequests = (job: JobRow, now: Date): boolean => job.moderationStatus === "APPROVED" && !job.isClosed && (!job.expiresAt || job.expiresAt > now) && job.canRefer;
+/** A job takes new referral requests while it's open (`jobIsOpen`) and its poster offered. */
+const takesRequests = (job: JobRow, now: Date): boolean => job.canRefer && jobIsOpen(job, now);
 
 /** Whether the viewer can open the job's page now, as its own route would decide. */
 const jobOpenTo = (actor: ContentActor, found: JobWithAuthor | null | undefined): boolean => !!found && canView(actor, found.job.moderationStatus, found.job.authorMembershipId, found.author.status);

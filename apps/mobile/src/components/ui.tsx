@@ -374,10 +374,11 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
-export function EmptyState({ icon, title, description }: { icon?: string; title: string; description?: string }) {
+/** `icon` is an SVG icon from `components/icons.tsx`; a string is drawn as text, as older screens still pass emoji. */
+export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
   return (
     <View style={styles.empty}>
-      {icon && <Text style={{ fontSize: 32 }}>{icon}</Text>}
+      {typeof icon === "string" ? <Text style={{ fontSize: 32 }}>{icon}</Text> : icon}
       <Text style={styles.emptyTitle}>{title}</Text>
       {description && <Text style={styles.hint}>{description}</Text>}
     </View>

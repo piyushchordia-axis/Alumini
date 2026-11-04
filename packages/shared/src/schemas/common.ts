@@ -33,21 +33,26 @@ const urlParts = (u: string): URL | null => {
 };
 
 /**
- * An http(s) link a member puts on their profile. No user name or password: "https://linkedin.com@evil.com" reads as
- * one site and opens another. An unparsable link passes that check, which leaves it to the URL check's own message.
+ * An http(s) link a member types, of at most `max` characters as stored: on their profile, or a job's apply link, company
+ * website and logo. No user name or password: "https://linkedin.com@evil.com" reads as one site and opens another. An
+ * unparsable link passes that check, which leaves it to the URL check's own message.
  *
  * It's stored as the URL parser read it (`URL.href`), so whatever opens it later goes where the checks looked. Typed
  * text can read differently to other parsers: "https://linkedin.com\@evil.com" is linkedin.com to a browser but
  * evil.com to iOS, and is stored as "https://linkedin.com/@evil.com", linkedin.com to both. That also lower-cases the
  * host, ends a bare host with "/", and percent-encodes spaces, bidi controls and other non-ASCII text in the path.
  */
-export const linkUrlSchema = httpUrlSchema
-  .refine((u) => {
-    const url = urlParts(u);
-    return !url || (!url.username && !url.password);
-  }, "Remove the user name or password from the link")
-  .transform((u) => urlParts(u)?.href ?? u)
-  .pipe(z.string().max(500, "Keep the link to 500 characters"));
+export const linkUrlSchemaUpTo = (max: number) =>
+  httpUrlSchema
+    .refine((u) => {
+      const url = urlParts(u);
+      return !url || (!url.username && !url.password);
+    }, "Remove the user name or password from the link")
+    .transform((u) => urlParts(u)?.href ?? u)
+    .pipe(z.string().max(max, `Keep the link to ${max} characters`));
+
+/** A link on a member's profile: see `linkUrlSchemaUpTo`. */
+export const linkUrlSchema = linkUrlSchemaUpTo(500);
 
 /**
  * A link to one of `hosts`, or a subdomain of one ("www.linkedin.com", "in.linkedin.com"), judged by the URL's own

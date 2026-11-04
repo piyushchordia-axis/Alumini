@@ -28,6 +28,7 @@ export function JobFormPage() {
       <PageHeader title={jobId ? "Edit job" : "Post a job"} subtitle="Share an opening or a referral with alumni" />
       <Card className="p-5">
         <JobForm
+          slug={slug}
           initial={existing.data}
           submitLabel={jobId ? "Save changes" : "Post job"}
           offerReferrals={offerReferrals}

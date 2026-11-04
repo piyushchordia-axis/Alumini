@@ -1,18 +1,22 @@
-import type {
-  PollDto,
-  AdminReportDto,
-  BusinessCardDto,
-  BusinessDto,
-  CommentDto,
-  ContentPreviewDto,
-  EventDto,
-  FundingDto,
-  JobDto,
-  JobSeekerDto,
-  ModerationItemDto,
-  PostDto,
-  ReactionEntryDto,
-  ReportDto,
+import {
+  jobIsOpen,
+  plainExcerpt,
+  type PollDto,
+  type AdminReportDto,
+  type BusinessCardDto,
+  type BusinessDto,
+  type CommentDto,
+  type ContentPreviewDto,
+  type EventDto,
+  type FundingDto,
+  type JobCardDto,
+  type JobDto,
+  type JobSeekerDto,
+  type ModerationItemDto,
+  type PostDto,
+  type ReactionEntryDto,
+  type ReportDto,
+  type SalaryCurrency,
 } from "@illuminize/shared";
 import type { BusinessWithAuthor } from "../repositories/businesses.repo";
 import type { EventWithAuthor, RsvpRow } from "../repositories/events.repo";
@@ -32,23 +36,39 @@ export interface Viewer {
   isAdmin: boolean;
 }
 
-/** The moderation note is between the admins and the author; other members never receive it. */
-const noteFor = (note: string | null, authorId: string, viewer: Viewer | null) => (viewer && (viewer.isAdmin || viewer.membershipId === authorId) ? note : null);
+/** The viewer is the content's author or an admin. */
+const authorOrAdmin = (authorId: string, viewer: Viewer | null) => !!viewer && (viewer.isAdmin || viewer.membershipId === authorId);
 
-/** `canRefer` is what the referral rules make of the stored flag for this viewer, never the flag itself (see jobs.service). */
-export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null, canRefer: boolean): JobDto {
+/** The moderation note is between the admins and the author; other members never receive it. */
+const noteFor = (note: string | null, authorId: string, viewer: Viewer | null) => (authorOrAdmin(authorId, viewer) ? note : null);
+
+/** The most characters in a job card's `summary`. */
+const JOB_SUMMARY_LENGTH = 200;
+
+/**
+ * For lists: built field by field, so no contact details, apply link or section reaches one, and the detail adds them below.
+ * `canRefer` is what the referral rules make of the stored flag for this viewer, never the flag itself (see jobs.service).
+ */
+export function toJobCardDto({ job, author }: JobWithAuthor, viewer: Viewer | null, canRefer: boolean): JobCardDto {
   return {
     id: job.id,
     title: job.title,
     companyName: job.companyName,
+    companyLogoUrl: job.companyLogoUrl,
     location: job.location,
-    isRemote: job.isRemote,
+    workMode: job.workMode,
     jobType: job.jobType,
-    description: job.description,
-    applyUrl: job.applyUrl,
-    contactEmail: job.contactEmail,
-    contactPhone: job.contactPhone,
-    salaryRange: job.salaryRange,
+    seniority: job.seniority,
+    experienceMin: job.experienceMin,
+    experienceMax: job.experienceMax,
+    skills: job.skills,
+    salaryMinMinor: job.salaryMinMinor,
+    salaryMaxMinor: job.salaryMaxMinor,
+    // The API only stores currencies from the shared list.
+    salaryCurrency: job.salaryCurrency as SalaryCurrency,
+    salaryPeriod: job.salaryPeriod,
+    salaryNote: job.salaryNote,
+    summary: plainExcerpt(job.description, JOB_SUMMARY_LENGTH),
     isClosed: job.isClosed,
     expiresAt: iso(job.expiresAt),
     moderationStatus: job.moderationStatus,
@@ -59,6 +79,32 @@ export function toJobDto({ job, author }: JobWithAuthor, viewer: Viewer | null, 
     canRefer,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * A job in full. Once it stops taking applications (`jobIsOpen`), only its poster and admins still get its apply link,
+ * email, phone and how to apply: the poster edits them, and admins review them.
+ */
+export function toJobDto(row: JobWithAuthor, viewer: Viewer | null, canRefer: boolean, now: Date): JobDto {
+  const { job, author } = row;
+  const contactsShown = jobIsOpen(job, now) || authorOrAdmin(author.id, viewer);
+  return {
+    ...toJobCardDto(row, viewer, canRefer),
+    description: job.description,
+    responsibilities: job.responsibilities,
+    requirements: job.requirements,
+    benefits: job.benefits,
+    howToApply: contactsShown ? job.howToApply : null,
+    applyUrl: contactsShown ? job.applyUrl : null,
+    contactEmail: contactsShown ? job.contactEmail : null,
+    contactPhone: contactsShown ? job.contactPhone : null,
+    openings: job.openings,
+    educationRequirement: job.educationRequirement,
+    companyWebsite: job.companyWebsite,
+    companyIndustry: job.companyIndustry,
+    companySize: job.companySize,
+    aboutCompany: job.aboutCompany,
   };
 }
 

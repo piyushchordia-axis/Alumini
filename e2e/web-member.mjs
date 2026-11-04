@@ -269,14 +269,134 @@ try {
   await step("create a job and view it", async () => {
     await page.click('nav >> text=Jobs');
     await page.waitForSelector("text=Backend Engineer (Node.js)");
+    const cardPlaces = () => page.locator('a[href*="/app/jobs/"]:not([href$="/new"])').allInnerTexts();
+    const backend = page.locator("a", { hasText: "Backend Engineer (Node.js)" });
+    const intern = page.locator("a", { hasText: "Summer Intern – Strategy" });
+    await intern.waitFor();
+    await page.locator("a", { hasText: "Zylo Labs · Mumbai · Remote" }).waitFor();
+    // A card gives the pay and experience, and three of the seeded four skills with the rest counted.
+    await backend.getByText("₹25–40 LPA", { exact: true }).waitFor();
+    await backend.getByText("3–6 years", { exact: true }).waitFor();
+    await backend.getByText("+1 more", { exact: true }).waitFor();
+    // Work mode waits behind More filters. Remote lists only remote jobs, and each card it leaves says so where it says
+    // where the job is done.
+    await page.getByRole("button", { name: "More filters" }).click();
+    await page.getByLabel("Work mode").selectOption("REMOTE");
+    await intern.waitFor({ state: "detached" });
+    await backend.waitFor();
+    const remoteCards = await cardPlaces();
+    if (!remoteCards.length || remoteCards.some((text) => !text.includes(" · Remote"))) throw new Error(`Remote lists a job that isn't remote: ${remoteCards.join(" | ")}`);
+    await page.getByLabel("Work mode").selectOption("");
+    await intern.waitFor();
+    // One year of experience: not enough for 3–6 years, enough for 1–3, and a job that asks for none still fits.
+    await page.getByLabel("Your experience (years)").fill("1");
+    await backend.waitFor({ state: "detached" });
+    await page.locator("a", { hasText: "Associate Product Manager" }).waitFor();
+    await intern.waitFor();
+    // Checked again now the filtered list is on the page: the cards also go while it loads, filtered or not.
+    if (await backend.count()) throw new Error("one year of experience still lists the 3–6 year Backend job");
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await backend.waitFor();
+
     await page.click("text=+ Post a job");
     await page.fill('input[name="title"]', `Smoke Test Engineer ${unique}`);
     await page.fill('input[name="companyName"]', "Smoke Labs");
+    await page.getByLabel("Work mode").selectOption("REMOTE");
+    await page.getByLabel("Seniority").selectOption("SENIOR");
+    await page.fill('input[name="experienceMin"]', "4");
+    await page.fill('input[name="experienceMax"]', "8");
+    // About the role first, so the form could be posted as it stands: Enter in Skills must still only add the skill.
     await page.fill('textarea[name="description"]', "Keep the smoke tests green. Remote within India.");
+    let posted = 0;
+    const countPosts = (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/jobs")) posted += 1;
+    };
+    page.on("request", countPosts);
+    // A comma adds the skill before it, and Enter the one still typed, without posting the form.
+    const skills = page.getByLabel("Skills", { exact: true });
+    await skills.fill("Playwright, TypeScript");
+    await skills.press("Enter");
+    await page.getByRole("button", { name: "Remove Playwright" }).waitFor();
+    await page.getByRole("button", { name: "Remove TypeScript" }).waitFor();
+    // The pay is typed in full and previewed as the job will show it.
+    await page.fill('input[name="salaryMin"]', "1800000");
+    await page.fill('input[name="salaryMax"]', "2500000");
+    await page.getByText("₹18–25 LPA", { exact: true }).waitFor();
+    await page.getByLabel("Pay note").fill("plus ESOPs");
+    await page.fill('textarea[name="responsibilities"]', "- Run the suites on every push\n- Fix what breaks the same day\n- Keep them fast");
+    await page.fill('input[name="companyWebsite"]', "https://example.com/smoke-labs");
+    const applyAt = `https://example.com/smoke-jobs/${unique}`;
+    await page.fill('textarea[name="howToApply"]', `Send your CV through ${applyAt}, or write to us.`);
+    const applyUrl = `https://example.com/smoke-apply/${unique}`;
+    await page.getByLabel("Apply link").fill(applyUrl);
+    await page.getByLabel("Contact email").fill("smoke-jobs@example.com");
+    await shot("06a-job-form");
+    page.off("request", countPosts);
+    if (posted) throw new Error("Enter in Skills posted the job");
     await page.click('button:has-text("Post job")');
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+$/);
+    const jobUrl = page.url();
     await page.waitForSelector("h1:has-text('Smoke Test Engineer')");
+    await page.getByText("Smoke Labs · Remote", { exact: true }).waitFor();
+    // The facts, each once: the pay in lakhs, its note, the experience and the seniority.
+    await page.getByText("₹18–25 LPA", { exact: true }).waitFor();
+    await page.getByText("plus ESOPs", { exact: true }).waitFor();
+    await page.getByText("4–8 years", { exact: true }).waitFor();
+    await page.getByText("Senior", { exact: true }).waitFor();
+    await page.getByRole("list", { name: "Skills" }).getByText("TypeScript", { exact: true }).waitFor();
+    // Bullet points become a list, and an address in How to apply a link that opens apart from the app.
+    const bullets = await page.getByRole("region", { name: "Responsibilities", exact: true }).locator("li").count();
+    if (bullets !== 3) throw new Error(`Responsibilities shows ${bullets} bullet points, not 3`);
+    const howToApply = page.getByRole("region", { name: "How to apply", exact: true });
+    const link = howToApply.locator('a[href^="https://"][target="_blank"][rel*="noopener"]');
+    await link.waitFor();
+    if ((await link.getAttribute("href")) !== applyAt) throw new Error(`How to apply links to ${await link.getAttribute("href")}, not ${applyAt}`);
+    await page.getByRole("region", { name: "About the company", exact: true }).getByRole("link", { name: /example\.com\/smoke-labs/ }).waitFor();
+    const email = page.locator('a[href="mailto:smoke-jobs@example.com"]');
+    await email.waitFor();
+    // Apply opens the poster's link in a new tab, without handing it this page.
+    const apply = page.getByRole("link", { name: "Apply (opens in a new tab)", exact: true });
+    await apply.waitFor();
+    if ((await apply.getAttribute("href")) !== applyUrl || (await apply.getAttribute("target")) !== "_blank" || !(await apply.getAttribute("rel"))?.includes("noopener"))
+      throw new Error("Apply should open the job's apply link in a new tab, with noopener");
     await shot("06-job-detail");
+
+    // An edit that changes only the title keeps everything else the job says: the form gives back what it was given.
+    await page.getByRole("link", { name: "Edit", exact: true }).click();
+    await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+\/edit$/);
+    await page.getByRole("heading", { name: "Edit job" }).waitFor();
+    await page.fill('input[name="title"]', `Smoke Test Engineer ${unique} (remote)`);
+    await page.click('button:has-text("Save changes")');
+    await page.waitForURL(jobUrl);
+    await page.waitForSelector(`h1:has-text('Smoke Test Engineer ${unique} (remote)')`);
+    await page.getByText("Smoke Labs · Remote", { exact: true }).waitFor();
+    for (const fact of ["₹18–25 LPA", "plus ESOPs", "4–8 years", "Senior"]) await page.getByText(fact, { exact: true }).waitFor();
+    const keptSkills = await page.getByRole("list", { name: "Skills" }).locator("li").allInnerTexts();
+    if (keptSkills.join(",") !== "Playwright,TypeScript") throw new Error(`the edit left the skills as ${keptSkills.join(", ")}`);
+    const keptBullets = await page.getByRole("region", { name: "Responsibilities", exact: true }).locator("li").count();
+    if (keptBullets !== 3) throw new Error(`after the edit, Responsibilities shows ${keptBullets} bullet points, not 3`);
+    if ((await link.getAttribute("href")) !== applyAt) throw new Error("the edit lost How to apply's link");
+    await page.getByRole("region", { name: "About the company", exact: true }).getByRole("link", { name: /example\.com\/smoke-labs/ }).waitFor();
+    await email.waitFor();
+    if ((await apply.getAttribute("href")) !== applyUrl) throw new Error("the edit lost the apply link");
+    // Closed, it takes no more applications: its contacts and How to apply go from the page, its poster's too, and the
+    // page says so.
+    await page.getByRole("button", { name: "Mark closed" }).click();
+    await page.getByText("Applications closed", { exact: true }).waitFor();
+    await email.waitFor({ state: "detached" });
+    await apply.waitFor({ state: "detached" });
+    await howToApply.waitFor({ state: "detached" });
+    await shot("06b-job-closed");
+
+    // Another job at the same company, however it's typed, offers this one's company details.
+    await page.goto(`${BASE}/t/demo-university/app/jobs/new`);
+    await page.fill('input[name="companyName"]', "smoke  labs");
+    await page.getByRole("button", { name: "Use details from your last job at Smoke Labs" }).click();
+    await page.getByText("Filled in from your last job at Smoke Labs. Check them before you post.").waitFor();
+    const website = await page.locator('input[name="companyWebsite"]').inputValue();
+    if (website !== "https://example.com/smoke-labs") throw new Error(`The company's website filled in as "${website}"`);
+    await page.goto(jobUrl);
+    await page.waitForSelector("h1:has-text('Smoke Test Engineer')");
   });
 
   await step("delete your own job through the confirm dialog", async () => {

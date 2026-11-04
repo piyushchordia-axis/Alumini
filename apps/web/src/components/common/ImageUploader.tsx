@@ -1,5 +1,6 @@
 import { ALLOWED_IMAGE_MIME, imageFileProblem } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
+import clsx from "clsx";
 import { useRef, useState } from "react";
 import { IconClose, IconImage } from "@/components/icons";
 import { Button } from "@/components/ui";
@@ -14,6 +15,8 @@ export function ImageUploader({
   removeLabel = "Remove image",
   showPreviews = true,
   showTrigger = true,
+  triggerClassName,
+  onBusyChange,
 }: {
   slug: string;
   urls: string[];
@@ -23,6 +26,9 @@ export function ImageUploader({
   removeLabel?: string;
   showPreviews?: boolean;
   showTrigger?: boolean;
+  triggerClassName?: string;
+  /** Told when an upload starts and ends, so a form can wait for it rather than save without the image. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -37,6 +43,7 @@ export function ImageUploader({
       return setProblem(bad);
     }
     setBusy(true);
+    onBusyChange?.(true);
     try {
       const { url } = await api.uploads.upload(slug, file);
       onChange([...urls, url].slice(0, max));
@@ -44,6 +51,7 @@ export function ImageUploader({
       setProblem(errorMessage(err));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
       if (ref.current) ref.current.value = "";
     }
   };
@@ -67,7 +75,7 @@ export function ImageUploader({
             variant="ghost"
             size="sm"
             loading={busy}
-            className="gap-1.5"
+            className={clsx("gap-1.5", triggerClassName)}
             onClick={() => {
               setProblem(null);
               ref.current?.click();

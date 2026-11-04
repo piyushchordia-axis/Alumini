@@ -8,6 +8,7 @@ import {
   type ChatGroupContentDto,
   type ContentDto,
   type ContentType,
+  type JobDto,
   type ModerationItemDto,
   type ModerationStatus,
 } from "@illuminize/shared";
@@ -16,6 +17,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { JobApplyArea } from "@/components/jobs/JobApplyArea";
+import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
@@ -102,8 +105,21 @@ function ContentPreview({ content }: { content: ContentDto }) {
   }
   if ("body" in content) return <p className="text-sm text-slate-800">{content.body}</p>;
   if ("pitch" in content) return <p className="whitespace-pre-line text-sm text-slate-800">{content.pitch}</p>;
+  // Before the description check below: an event has one too, and an admin approving a job needs every part of it.
+  if ("companyName" in content) return <JobPreview job={content} />;
   if ("description" in content) return <p className="whitespace-pre-line text-sm text-slate-800">{content.description}</p>;
   return null;
+}
+
+/** The whole job as its page shows it, with its contacts as text and its How to apply even once closed: all of what's approved. */
+function JobPreview({ job }: { job: JobDto }) {
+  const [now] = useState(() => Date.now());
+  return (
+    <div className="space-y-4 text-sm">
+      <JobDetails job={job} now={now} level={2} showClosedSections apply={<JobApplyArea job={job} now={now} plain />} />
+      <AboutCompany job={job} level={2} plain className="border-t border-slate-200 pt-4" />
+    </div>
+  );
 }
 
 export function ModerationRow({ slug, item }: { slug: string; item: ModerationItemDto }) {

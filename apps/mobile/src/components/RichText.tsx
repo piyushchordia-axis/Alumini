@@ -7,7 +7,7 @@ import { colors, spacing, useTheme } from "@/theme";
 const EXTERNAL_REL = "noopener noreferrer nofollow ugc";
 
 /** A phone with nothing to open the link (no mail app, say) leaves the screen as it was rather than throwing. */
-function openLink(href: string) {
+export function openLink(href: string) {
   Linking.openURL(href).catch(() => undefined);
 }
 

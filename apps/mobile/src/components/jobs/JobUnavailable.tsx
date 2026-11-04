@@ -2,6 +2,7 @@ import { errorMessage, isApiClientError, isTransientError } from "@illuminize/sh
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { ChatNotice } from "@/components/chat/ChatFrame";
+import { IconJobs } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { jobsHref } from "@/lib/referrals";
@@ -30,7 +31,7 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
   const said = jobUnavailableText(error);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ChatNotice icon="💼" title={title ?? said.heading} text={text ?? said.body}>
+      <ChatNotice icon={<IconJobs size={32} color={colors.faint} />} title={title ?? said.heading} text={text ?? said.body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         <BackToJobs />
       </ChatNotice>

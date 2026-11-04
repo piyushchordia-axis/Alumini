@@ -21,7 +21,7 @@ import type {
   ChatReportDto,
   FundingDto,
   JobDetailDto,
-  JobDto,
+  JobCardDto,
   JobSeekerDto,
   MemberCardDto,
   MemberProfileDto,
@@ -83,7 +83,7 @@ export function directoryEndpoints(core: ApiCore) {
 export function jobEndpoints(core: ApiCore) {
   const referralAction = (name: "accept" | "decline" | "withdraw") => (slug: string, id: string) => core.data<ReferralDto>({ method: "POST", path: `/jobs/referrals/${id}/${name}`, tenantSlug: slug });
   return {
-    list: (slug: string, query?: Partial<JobListQuery>) => core.request<CursorPage<JobDto>>({ path: "/jobs", tenantSlug: slug, query: q(query) }),
+    list: (slug: string, query?: Partial<JobListQuery>) => core.request<CursorPage<JobCardDto>>({ path: "/jobs", tenantSlug: slug, query: q(query) }),
     create: (slug: string, input: JobCreateInput) => core.data<JobDetailDto>({ method: "POST", path: "/jobs", tenantSlug: slug, body: input }),
     get: (slug: string, id: string) => core.data<JobDetailDto>({ path: `/jobs/${id}`, tenantSlug: slug }),
     update: (slug: string, id: string, input: JobUpdateInput) => core.data<JobDetailDto>({ method: "PATCH", path: `/jobs/${id}`, tenantSlug: slug, body: input }),

@@ -10,26 +10,32 @@ export interface ImageUploadOptions {
   purpose?: UploadPurpose;
   /** Offer the platform's square crop after picking. iOS always crops square and the web build has no crop step, so the server's crop is what guarantees the shape. */
   square?: boolean;
+  /** Also told what went wrong, for a caller that keeps the message in its own state (the job form's logo). */
+  onError?: (message: string) => void;
 }
 
 /**
  * Picks an image from the library and uploads it to the tenant; resolves with the public URL, or null when nothing was
- * uploaded. What went wrong is in `error`, for the caller to show beside the control: Alert.alert does nothing in the
- * web build. `cancel` gives up on an upload that is running (it also gives up by itself after a while, and when the
- * screen closes).
+ * uploaded. What went wrong is in `error` (and goes to `onError`), for the caller to show beside the control:
+ * Alert.alert does nothing in the web build. `cancel` gives up on an upload that is running (it also gives up by itself
+ * after a while, and when the screen closes).
  */
-export function useImageUpload(slug: string, { purpose, square = false }: ImageUploadOptions = {}) {
+export function useImageUpload(slug: string, { purpose, square = false, onError }: ImageUploadOptions = {}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = useRef<{ cancel: () => void } | null>(null);
   useEffect(() => () => running.current?.cancel(), []);
+  const fail = (message: string | null) => {
+    setError(message);
+    if (message) onError?.(message);
+  };
 
   const pickAndUpload = async (): Promise<string | null> => {
     setError(null);
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        setError("Allow photo access to choose an image.");
+        fail("Allow photo access to choose an image.");
         return null;
       }
       let res: ImagePicker.ImagePickerResult;
@@ -40,7 +46,7 @@ export function useImageUpload(slug: string, { purpose, square = false }: ImageU
         // The browser build's picker refuses a file that is neither an image nor a video, so say what the web app says.
         // On a phone it fails for other reasons: the photo couldn't be read, or the crop couldn't be saved.
         const unsupported = Platform.OS === "web" || /unsupported file type/i.test(errorMessage(err, ""));
-        setError(unsupported ? imageFileProblem({ type: null }) : "Couldn't open that photo. Try another one.");
+        fail(unsupported ? imageFileProblem({ type: null }) : "Couldn't open that photo. Try another one.");
         return null;
       }
       if (res.canceled || !res.assets[0]) return null;
@@ -51,7 +57,7 @@ export function useImageUpload(slug: string, { purpose, square = false }: ImageU
       // Check before uploading so an unsupported photo fails at once instead of after a slow upload.
       const wrongType = imageFileProblem({ type });
       if (wrongType) {
-        setError(wrongType);
+        fail(wrongType);
         return null;
       }
       setBusy(true);
@@ -59,7 +65,7 @@ export function useImageUpload(slug: string, { purpose, square = false }: ImageU
       const webFile = picked && purpose === "avatar" ? await shrinkPhoto(picked) : picked;
       const tooBig = imageFileProblem({ type: webFile?.type ?? type, size: webFile?.size ?? asset.fileSize });
       if (tooBig) {
-        setError(tooBig);
+        fail(tooBig);
         return null;
       }
       const name = webFile?.name ?? asset.fileName ?? `photo.${type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"}`;
@@ -71,7 +77,7 @@ export function useImageUpload(slug: string, { purpose, square = false }: ImageU
       const { url } = await upload.promise;
       return url;
     } catch (err) {
-      if (!isUploadCancelled(err)) setError(errorMessage(err));
+      if (!isUploadCancelled(err)) fail(errorMessage(err));
       return null;
     } finally {
       running.current = null;

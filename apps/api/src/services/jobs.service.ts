@@ -1,22 +1,83 @@
-import { isCurrentPupil, referralsEnabled, resolveFeatures, type CursorPage, type JobCreateInput, type JobDetailDto, type JobDto, type JobListQuery, type JobSeekerDto, type JobSeekerUpsertInput, type JobUpdateInput } from "@illuminize/shared";
+import {
+  isCurrentPupil,
+  jobRangeIssues,
+  referralsEnabled,
+  resolveFeatures,
+  type CursorPage,
+  type JobCardDto,
+  type JobCreateInput,
+  type JobDetailDto,
+  type JobDto,
+  type JobListQuery,
+  type JobRanges,
+  type JobSeekerDto,
+  type JobSeekerUpsertInput,
+  type JobUpdateInput,
+} from "@illuminize/shared";
 import type { AppContext } from "../context";
-import { toJobDto, toJobSeekerDto } from "../dto/content.dto";
+import { toJobCardDto, toJobDto, toJobSeekerDto } from "../dto/content.dto";
 import { AppError } from "../lib/errors";
 import { runInTransaction } from "../lib/transaction";
-import { deleteJob, deleteSeeker, findJobWithAuthor, findSeeker, insertJob, listJobs, listSeekers, lockJob, updateJob, upsertSeeker, type JobWithAuthor } from "../repositories/jobs.repo";
+import { deleteJob, deleteSeeker, findJobWithAuthor, findSeeker, insertJob, listJobs, listSeekers, lockJob, updateJob, upsertSeeker, type JobRow, type JobWithAuthor } from "../repositories/jobs.repo";
 import type { TenantContext } from "../types/request";
 import { afterContentWrite, assertAuthor, assertCanView, initialStatusFor, statusAfterEdit, type ContentActor, viewerOf } from "./content.common";
 import { closeReferralsForJob, toJobDetail } from "./referrals/referrals.service";
 
 const jobNotFound = () => AppError.notFound("Job not found");
 
+/**
+ * The fields copied from a job's input to its row as they are. Keyed by every input field but the two handled on their own,
+ * so a field added to the schema and not here fails to compile rather than being dropped without a word.
+ */
+const COPIED_COLUMNS: Record<Exclude<keyof JobUpdateInput, "expiresAt" | "canRefer">, true> = {
+  title: true,
+  companyName: true,
+  location: true,
+  workMode: true,
+  jobType: true,
+  seniority: true,
+  experienceMin: true,
+  experienceMax: true,
+  skills: true,
+  educationRequirement: true,
+  openings: true,
+  description: true,
+  responsibilities: true,
+  requirements: true,
+  benefits: true,
+  howToApply: true,
+  applyUrl: true,
+  contactEmail: true,
+  contactPhone: true,
+  salaryMinMinor: true,
+  salaryMaxMinor: true,
+  salaryCurrency: true,
+  salaryPeriod: true,
+  salaryNote: true,
+  companyLogoUrl: true,
+  companyWebsite: true,
+  companyIndustry: true,
+  companySize: true,
+  aboutCompany: true,
+};
+
 function jobColumns(input: JobCreateInput | JobUpdateInput) {
   const out: Record<string, unknown> = {};
-  for (const key of ["title", "companyName", "location", "isRemote", "jobType", "description", "applyUrl", "contactEmail", "contactPhone", "salaryRange"] as const) {
+  for (const key of Object.keys(COPIED_COLUMNS) as Array<keyof typeof COPIED_COLUMNS>) {
     if (input[key] !== undefined) out[key] = input[key];
   }
   if (input.expiresAt !== undefined) out.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
   return out;
+}
+
+/**
+ * An edit's ranges checked against what's stored, inside the lock: a PATCH of one end is checked against the other, which
+ * the schema never saw. The database's own checks would only give a 500.
+ */
+function assertMergedRanges(before: JobRow, input: JobUpdateInput): void {
+  const end = (key: keyof JobRanges) => (input[key] !== undefined ? input[key] : before[key]);
+  const issues = jobRangeIssues({ experienceMin: end("experienceMin"), experienceMax: end("experienceMax"), salaryMinMinor: end("salaryMinMinor"), salaryMaxMinor: end("salaryMaxMinor") }, input);
+  if (issues.length > 0) throw AppError.badRequest(issues[0]!.message, issues);
 }
 
 /**
@@ -28,19 +89,25 @@ function referralsFor(tenantCtx: TenantContext, actor: ContentActor): boolean {
   return referralsEnabled(resolveFeatures(tenantCtx.tenant.type, tenantCtx.settings.features)) && !isCurrentPupil(tenantCtx.tenant, actor.membership);
 }
 
-/** A job as `actor` sees it. It takes referral requests only while they see referrals at all, and never from a poster who is a current pupil. */
-function jobDto(tenantCtx: TenantContext, actor: ContentActor, row: JobWithAuthor, shown = referralsFor(tenantCtx, actor)): JobDto {
-  return toJobDto(row, viewerOf(actor), shown && row.job.canRefer && !isCurrentPupil(tenantCtx.tenant, row.author));
+/** Whether a viewer is told the job takes referral requests: only while they see referrals at all (`shown`), and never from a poster who is a current pupil. */
+function canReferFor(tenantCtx: TenantContext, row: JobWithAuthor, shown: boolean): boolean {
+  return shown && row.job.canRefer && !isCurrentPupil(tenantCtx.tenant, row.author);
+}
+
+/** A job in full as `actor` sees it. */
+function jobDto(tenantCtx: TenantContext, actor: ContentActor, row: JobWithAuthor): JobDto {
+  return toJobDto(row, viewerOf(actor), canReferFor(tenantCtx, row, referralsFor(tenantCtx, actor)), new Date());
 }
 
 function jobDetail(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, row: JobWithAuthor): Promise<JobDetailDto> {
   return toJobDetail(ctx.db, tenantCtx.tenant, actor.membership.id, row, jobDto(tenantCtx, actor, row));
 }
 
-export async function listTenantJobs(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: JobListQuery): Promise<CursorPage<JobDto>> {
+export async function listTenantJobs(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: JobListQuery): Promise<CursorPage<JobCardDto>> {
   const shown = referralsFor(tenantCtx, actor);
+  const viewer = viewerOf(actor);
   const page = await listJobs(ctx.db, tenantCtx.tenant, query, actor.membership.id, shown);
-  return { data: page.data.map((r) => jobDto(tenantCtx, actor, r, shown)), nextCursor: page.nextCursor };
+  return { data: page.data.map((r) => toJobCardDto(r, viewer, canReferFor(tenantCtx, r, shown))), nextCursor: page.nextCursor };
 }
 
 export async function createJob(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, input: JobCreateInput): Promise<JobDetailDto> {
@@ -85,6 +152,7 @@ export async function updateJobListing(ctx: AppContext, tenantCtx: TenantContext
     const before = await lockJob(tx, tenantId, id);
     if (!before) throw jobNotFound();
     assertAuthor(actor, before.authorMembershipId);
+    assertMergedRanges(before, input);
     const status = statusAfterEdit(tenantCtx, actor, before.moderationStatus);
     const row = (await updateJob(tx, tenantId, id, {
       ...jobColumns(input),

@@ -70,7 +70,7 @@ export async function digestDetails(db: DbClient, tenantId: string, content: Dig
       : [],
     content.jobIds.length
       ? db
-          .select({ id: jobs.id, title: jobs.title, companyName: jobs.companyName, location: jobs.location, isRemote: jobs.isRemote })
+          .select({ id: jobs.id, title: jobs.title, companyName: jobs.companyName, location: jobs.location, workMode: jobs.workMode })
           .from(jobs)
           .innerJoin(memberships, eq(memberships.id, jobs.authorMembershipId))
           .where(and(eq(jobs.tenantId, tenantId), inArray(jobs.id, content.jobIds), eq(jobs.moderationStatus, "APPROVED"), visible))

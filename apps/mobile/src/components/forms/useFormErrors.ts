@@ -20,8 +20,12 @@ export function useFormErrors() {
     try {
       await fn();
     } catch (err) {
-      if (isApiClientError(err) && Object.keys(err.fieldErrors).length) setErrors(err.fieldErrors);
-      else setServerError(errorMessage(err));
+      if (isApiClientError(err) && Object.keys(err.fieldErrors).length) {
+        // Keyed by field, as fromZod keys them: "skills.3" (one skill too long) is the skills field's error.
+        const next: Record<string, string> = {};
+        for (const [path, message] of Object.entries(err.fieldErrors)) next[path.split(".")[0]!] ??= message;
+        setErrors(next);
+      } else setServerError(errorMessage(err));
     } finally {
       setBusy(false);
     }

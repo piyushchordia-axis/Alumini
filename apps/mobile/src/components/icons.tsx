@@ -2,7 +2,8 @@ import type { ReactElement, ReactNode } from "react";
 import type { ColorValue } from "react-native";
 import { Circle, Path, Rect, Svg } from "react-native-svg";
 
-type Props = { size?: number; color?: ColorValue };
+export type IconProps = { size?: number; color?: ColorValue };
+type Props = IconProps;
 
 function Base({ size = 20, children }: Props & { children: ReactNode }) {
   return (
@@ -226,6 +227,23 @@ export function IconSpark({ size = 20, color }: Props) {
   );
 }
 
+/* Job facts, contacts and company details, drawn as the web set draws them. */
+export function IconMapPin({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z" {...stroke(color)} />
+      <Circle cx="12" cy="9.5" r="2.5" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconClock({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="9" {...stroke(color)} />
+      <Path d="M12 7v5l3 2" {...stroke(color)} />
+    </Base>
+  );
+}
 export function IconGraduationCap({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -239,6 +257,68 @@ export function IconGlobe({ size = 20, color }: Props) {
     <Base size={size} color={color}>
       <Circle cx="12" cy="12" r="9" {...stroke(color)} />
       <Path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconExternalLink({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M14 4h6v6M20 4l-9 9" {...stroke(color)} />
+      <Path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconPhone({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconMail({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="3" y="5" width="18" height="14" rx="2" {...stroke(color)} />
+      <Path d="m3 7 9 7 9-7" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconBuilding({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18" {...stroke(color)} />
+      <Path d="M8 7h4M8 11h4M8 15h4" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconWallet({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3M3 6v12a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" {...stroke(color)} />
+      <Path d="M21 12h-4a2 2 0 0 0 0 4h4z" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconLaptop({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="4" y="5" width="16" height="11" rx="1.5" {...stroke(color)} />
+      <Path d="M2 19h20" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconStairs({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M4 20h4v-5h4v-5h4V5h4" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconTag({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M3 4v7.5l9.5 9.5 8.5-8.5L11.5 3H4a1 1 0 0 0-1 1z" {...stroke(color)} />
+      <Circle cx="7.5" cy="7.5" r="1.5" {...stroke(color)} />
     </Base>
   );
 }

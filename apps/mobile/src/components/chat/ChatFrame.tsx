@@ -66,12 +66,17 @@ export function ChatHeader({ title, member, subtitle, actions }: { title: string
 export const iconButton = { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" } as const;
 
 /** In place of a chat screen that can't be shown: says why and offers a way on. It never leaves the member on a blank screen. */
-export function ChatNotice({ icon = "💬", title, text, children }: { icon?: string; title: string; text?: string; children?: ReactNode }) {
+/** `icon` is an SVG icon from `components/icons.tsx`; a string is drawn as text, as older screens still pass emoji. */
+export function ChatNotice({ icon = "💬", title, text, children }: { icon?: ReactNode; title: string; text?: string; children?: ReactNode }) {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.sm }}>
-      <Text style={{ fontSize: 32 }} accessible={false}>
-        {icon}
-      </Text>
+      {typeof icon === "string" ? (
+        <Text style={{ fontSize: 32 }} accessible={false}>
+          {icon}
+        </Text>
+      ) : (
+        <View aria-hidden>{icon}</View>
+      )}
       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" }}>{title}</Text>
       {text ? <Text style={{ fontSize: 14, color: colors.muted, textAlign: "center", maxWidth: 320 }}>{text}</Text> : null}
       {children ? <View style={{ marginTop: spacing.md, gap: spacing.sm, width: "100%", maxWidth: 320 }}>{children}</View> : null}
