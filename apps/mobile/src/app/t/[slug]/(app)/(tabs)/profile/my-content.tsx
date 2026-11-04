@@ -5,7 +5,7 @@ import { FlatList, View , Text } from "react-native";
 import { OwnedGroupCard } from "@/components/groups/GroupCards";
 import { PostCard } from "@/components/PostCard";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
+import { Card, EmptyState, ListEmpty, Muted, Row, StackScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -51,13 +51,15 @@ export default function MyContentScreen() {
   type Item = { id: string; title?: string; name?: string; body?: string; moderationStatus: "PENDING" | "APPROVED" | "REJECTED" | "REMOVED"; moderationNote?: string | null };
   if (tabs.length === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding, businesses, groups and events." />
-      </View>
+      <StackScreen title="My posts & listings">
+        <View style={{ padding: spacing.lg }}>
+          <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding, businesses, groups and events." />
+        </View>
+      </StackScreen>
     );
   }
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <StackScreen title="My posts & listings">
       <View style={{ padding: spacing.lg }}>
         <Tabs value={tab} onChange={setTab} tabs={tabs.map(({ value, label }) => ({ value, label }))} />
       </View>
@@ -90,6 +92,6 @@ export default function MyContentScreen() {
           )
         }
       />
-    </View>
+    </StackScreen>
   );
 }

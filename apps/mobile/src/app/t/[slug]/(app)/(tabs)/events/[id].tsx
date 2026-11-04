@@ -48,7 +48,7 @@ export default function EventDetailScreen() {
     { value: "NO", label: "Can't make it", color: "#475569" },
   ];
   return (
-    <Screen>
+    <Screen title="Event">
       <Card style={{ padding: 0, overflow: "hidden" }}>
         {e.coverImageUrl && <Image source={{ uri: e.coverImageUrl }} style={{ width: "100%", height: 180 }} />}
         <View style={{ padding: 16, gap: 8 }}>

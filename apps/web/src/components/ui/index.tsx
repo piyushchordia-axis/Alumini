@@ -121,16 +121,23 @@ export function FormField({ label, error, hint, children, required, group }: { l
 }
 
 /* ---------- Layout bits ---------- */
-export function Card({ className, children, as: Tag = "div" }: { className?: string; children: ReactNode; as?: "div" | "section" | "article" }) {
-  return <Tag className={clsx("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>{children}</Tag>;
+type CardElevation = 1 | 2;
+
+const cardElevationClass: Record<CardElevation, string> = {
+  1: "border border-[var(--border-subtle)] bg-[var(--surface-1)] shadow-[var(--shadow-1)]",
+  2: "border border-[var(--border-strong)] bg-[var(--surface-2)] shadow-[var(--shadow-2)]",
+};
+
+export function Card({ className, children, as: Tag = "div", elevation = 1 }: { className?: string; children: ReactNode; as?: "div" | "section" | "article"; elevation?: CardElevation }) {
+  return <Tag className={clsx("rounded-xl", cardElevationClass[elevation], className)}>{children}</Tag>;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm leading-snug text-slate-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

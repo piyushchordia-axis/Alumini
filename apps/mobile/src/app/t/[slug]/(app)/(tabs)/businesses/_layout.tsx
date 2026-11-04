@@ -1,18 +1,17 @@
 import { Stack } from "expo-router";
-import { detailHeader, FeatureGate, useAppHeaderOptions } from "@/components/AppHeader";
+import { FeatureGate } from "@/components/AppHeader";
 
 /** What a screen opened straight from a link, a push or another tab goes back to, with `withAnchor` or on a cold start. */
 export const unstable_settings = { anchor: "index" };
 
 export default function BusinessesStack() {
-  const appHeader = useAppHeaderOptions();
   return (
     <FeatureGate feature="businesses">
-      <Stack>
-        <Stack.Screen name="index" options={appHeader} />
-        <Stack.Screen name="[id]" options={{ ...detailHeader, title: "Business" }} />
-        <Stack.Screen name="new" options={{ ...detailHeader, title: "Add a business", presentation: "modal" }} />
-        <Stack.Screen name="edit/[id]" options={{ ...detailHeader, title: "Edit listing", presentation: "modal" }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="[id]" />
+        <Stack.Screen name="new" options={{ presentation: "modal" }} />
+        <Stack.Screen name="edit/[id]" options={{ presentation: "modal" }} />
       </Stack>
     </FeatureGate>
   );

@@ -27,7 +27,7 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { MentorCard } from "@/components/mentors/MentorCards";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, Spinner, Tabs } from "@/components/ui";
+import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, SectionScreen, Spinner, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -239,7 +239,7 @@ function MentorsSection({ slug }: { slug: string }) {
   // Such as "Request sent", from the request form, which has gone.
   useGroupNotice("mentors", setStatus);
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm }}>
         <Title subtitle="Members who offer to guide others, and your requests" />
         <Tabs tall value={tab} onChange={(next) => go(next, box)} tabs={MENTORS_TABS.map((t) => ({ value: t, label: MENTORS_TAB_LABELS[t], ...(t === "requests" && waiting > 0 ? { count: waiting } : {}) }))} />
@@ -254,7 +254,7 @@ function MentorsSection({ slug }: { slug: string }) {
           <BeAMentor slug={slug} />
         )}
       </View>
-    </View>
+    </SectionScreen>
   );
 }
 
@@ -271,26 +271,35 @@ function MentorsWayOut({ slug }: { slug: string }) {
   const sent = useMentorshipList(slug, "sent");
   const me = useMyMentorProfile(slug);
   const [status, setStatus] = useStatus();
-  if (received.isLoading || sent.isLoading || me.isLoading) return <Spinner />;
+  if (received.isLoading || sent.isLoading || me.isLoading)
+    return (
+      <SectionScreen>
+        <Spinner />
+      </SectionScreen>
+    );
   const failed = [received, sent, me].find((q) => q.error && q.data === undefined);
   if (failed)
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.sm }}>
-        <ErrorText error={failed.error} />
-        <Button title="Retry loading" variant="outline" onPress={() => void failed.refetch()} />
-      </View>
+      <SectionScreen>
+        <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+          <ErrorText error={failed.error} />
+          <Button title="Retry loading" variant="outline" onPress={() => void failed.refetch()} />
+        </View>
+      </SectionScreen>
     );
   const listed = !!me.data?.isActive;
   if (!listed && received.items.length === 0 && sent.items.length === 0)
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.md }}>
-        <EmptyState icon="🔒" title="Mentors aren't available" description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`} />
-        <Button title="Go to the app" accessibilityRole="link" onPress={() => router.replace(homeHref(slug, tenant.settings.features))} />
-      </View>
+      <SectionScreen>
+        <View style={{ padding: spacing.lg, gap: spacing.md }}>
+          <EmptyState icon="🔒" title="Mentors aren't available" description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`} />
+          <Button title="Go to the app" accessibilityRole="link" onPress={() => router.replace(homeHref(slug, tenant.settings.features))} />
+        </View>
+      </SectionScreen>
     );
   const why = membership.chatEligible ? `${tenant.shortName ?? tenant.name} has switched mentorship off.` : "Mentorship isn't open to your account.";
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <MentorshipRequests
         slug={slug}
         box={box}
@@ -309,7 +318,7 @@ function MentorsWayOut({ slug }: { slug: string }) {
           </View>
         }
       />
-    </View>
+    </SectionScreen>
   );
 }
 

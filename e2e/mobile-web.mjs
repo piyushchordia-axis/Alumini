@@ -122,10 +122,13 @@ try {
   });
 
   await step("celebrations card and a poll vote on the feed", async () => {
-    const card = page.getByText("🎉 Celebrating today").locator("visible=true").first();
+    const card = page.getByText("Celebrating today", { exact: true }).locator("visible=true").first();
     await card.waitFor();
-    await page.getByRole("button", { name: "Send wishes" }).locator("visible=true").first().click();
-    await page.getByText("Wished ✓").locator("visible=true").first().waitFor();
+    // Each row says what it celebrates, and its year is the batch, never a birth year.
+    await page.getByText(/^Birthday · batch of \d{4}$/).locator("visible=true").first().waitFor();
+    await page.getByText(/^\d+ years? with us · batch of \d{4}$/).locator("visible=true").first().waitFor();
+    await page.getByRole("button", { name: "Wish", exact: true }).locator("visible=true").first().click();
+    await page.getByText("Wished", { exact: true }).locator("visible=true").first().waitFor();
     await shot("m04c-celebrations");
     // The poll is a few posts down; scroll until the list has rendered it.
     const question = page.getByText("Where should we hold the next London meetup?").locator("visible=true").first();
@@ -217,7 +220,8 @@ try {
     await page.getByText("Who's going").waitFor();
     const before = Number((await page.locator("text=/^\\d+$/").first().textContent()).trim());
     await tap("I'm going");
-    await page.getByText("Mobile Smoke").first().waitFor();
+    // The feed's tab, with this member's post, stays mounted but hidden: the attendee is the visible match.
+    await page.getByText("Mobile Smoke").locator("visible=true").first().waitFor();
     await shot("m06-event");
     void before;
   });

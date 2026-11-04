@@ -15,7 +15,7 @@ export default function EditProfileScreen() {
   const fields = useProfileFields(tenant.slug);
   if (fields.isLoading) return <Spinner />;
   return (
-    <Screen>
+    <Screen title="Edit profile">
       <ProfileForm
         tenant={tenant}
         initial={membership}

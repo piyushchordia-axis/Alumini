@@ -2,7 +2,7 @@ import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize
 import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMuted } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Avatar, Button, EmptyState, ListEmpty, Tabs } from "@/components/ui";
+import { Avatar, Button, EmptyState, ListEmpty, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -90,7 +90,7 @@ export default function MessagesScreen() {
   const requests = badge.data?.requests ?? 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm, backgroundColor: colors.bg }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
@@ -135,6 +135,6 @@ export default function MessagesScreen() {
           renderItem={({ item }) => <ConversationRow c={item} now={now} onPress={() => router.push(`/t/${slug}/messages/${item.id}`)} />}
         />
       </View>
-    </View>
+    </SectionScreen>
   );
 }

@@ -49,7 +49,7 @@ export default function MyProfileScreen() {
       },
     ]);
   return (
-    <Screen>
+    <Screen title="My profile">
       <Card>
         <Row gap={12}>
           <Avatar name={membership.fullName} src={membership.avatarUrl} size={64} />

@@ -20,7 +20,7 @@ export default function EditBusinessScreen() {
   // Only with nothing cached: a failed background refetch must not replace the form and lose what was typed.
   if (!item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={leave} backLabel="Back" />;
   return (
-    <Screen>
+    <Screen title="Edit listing">
       <BusinessForm
         slug={slug}
         initial={item.data}

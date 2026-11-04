@@ -13,7 +13,7 @@ export default function NewFundingScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   return (
-    <Screen>
+    <Screen title="New listing">
       <FundingForm
         kind={kind}
         submitLabel="Publish listing"

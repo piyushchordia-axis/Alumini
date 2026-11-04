@@ -1,18 +1,21 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { StackHeader } from "@/components/StackHeader";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
 /**
  * Standard screen container. Pass `topInset` on screens without a navigation header so content clears the status bar
- * and notch. The content moves up with the keyboard on iOS (Android resizes the window itself).
+ * and notch. Pass `title` on pushed stack screens (profile, settings) to draw an in-tree back bar instead of a native
+ * header that can float over content. The content moves up with the keyboard on iOS (Android resizes the window itself).
  */
-export function Screen({ children, scroll = true, padded = true, topInset = false, style }: { children: ReactNode; scroll?: boolean; padded?: boolean; topInset?: boolean; style?: ViewStyle }) {
+export function Screen({ children, scroll = true, padded = true, topInset = false, title, style }: { children: ReactNode; scroll?: boolean; padded?: boolean; topInset?: boolean; title?: string; style?: ViewStyle }) {
   const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={[{ flex: scroll ? undefined : 1 }, style]}>{children}</View>;
-  const edges: Edge[] = topInset ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
+  const edges: Edge[] = topInset && title == null ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
   return (
     <SafeAreaView style={styles.screen} edges={edges}>
+      {title != null && <StackHeader title={title} />}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {scroll ? (
           <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -352,7 +355,19 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, fontWeight: "600", color: colors.muted },
   tabCount: { backgroundColor: "#cbd5e1", borderRadius: radius.full, paddingHorizontal: 6, minWidth: 18, alignItems: "center" },
   tabCountText: { fontSize: 11, fontWeight: "700", color: colors.text },
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, alignSelf: "flex-start" },
   badgeText: { fontSize: 11, fontWeight: "600" },
   empty: { alignItems: "center", gap: 6, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },
@@ -361,3 +376,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700", color: colors.text },
   body: { fontSize: 15, lineHeight: 22, color: "#1e293b" },
 });
+
+export { SectionScreen } from "@/components/SectionScreen";
+export { StackScreen } from "@/components/StackScreen";
+export { StackHeader } from "@/components/StackHeader";

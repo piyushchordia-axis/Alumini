@@ -24,7 +24,7 @@ export default function MemberProfileScreen() {
   const canBlock = m.id !== membership.id && membership.chatEligible;
   const chatOn = canBlock && tenant.settings.features.messaging;
   return (
-    <Screen>
+    <Screen title="Member">
       <Card>
         <View style={{ alignItems: "center", gap: 8 }}>
           <Avatar name={m.fullName} src={m.avatarUrl} size={88} />

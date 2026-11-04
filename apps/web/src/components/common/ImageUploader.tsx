@@ -1,11 +1,30 @@
 import { ALLOWED_IMAGE_MIME, MAX_UPLOAD_BYTES } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useRef, useState } from "react";
+import { IconClose, IconImage } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { api } from "@/lib/api";
 import { toast } from "@/stores/uiStore";
 
-export function ImageUploader({ slug, urls, onChange, max = 1, label = "Add image", removeLabel = "Remove image" }: { slug: string; urls: string[]; onChange: (urls: string[]) => void; max?: number; label?: string; removeLabel?: string }) {
+export function ImageUploader({
+  slug,
+  urls,
+  onChange,
+  max = 1,
+  label = "Add image",
+  removeLabel = "Remove image",
+  showPreviews = true,
+  showTrigger = true,
+}: {
+  slug: string;
+  urls: string[];
+  onChange: (urls: string[]) => void;
+  max?: number;
+  label?: string;
+  removeLabel?: string;
+  showPreviews?: boolean;
+  showTrigger?: boolean;
+}) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -26,19 +45,21 @@ export function ImageUploader({ slug, urls, onChange, max = 1, label = "Add imag
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {urls.map((u) => (
-        <div key={u} className="relative">
-          <img src={u} alt="" className="h-20 w-20 rounded-lg object-cover" />
-          <button type="button" onClick={() => onChange(urls.filter((x) => x !== u))} className="absolute -right-1 -top-1 rounded-full bg-slate-900 px-1.5 text-xs text-white" aria-label={removeLabel}>
-            ✕
-          </button>
-        </div>
-      ))}
-      {urls.length < max && (
+      {showPreviews &&
+        urls.map((u) => (
+          <div key={u} className="relative">
+            <img src={u} alt="" className="h-20 w-20 rounded-lg object-cover" />
+            <button type="button" onClick={() => onChange(urls.filter((x) => x !== u))} className="absolute -right-1 -top-1 rounded-full bg-slate-900 p-1 text-white" aria-label={removeLabel}>
+              <IconClose size={12} />
+            </button>
+          </div>
+        ))}
+      {showTrigger && urls.length < max && (
         <>
           <input ref={ref} type="file" accept={ALLOWED_IMAGE_MIME.join(",")} className="hidden" onChange={(e) => e.target.files?.[0] && void pick(e.target.files[0])} />
-          <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => ref.current?.click()}>
-            📷 {label}
+          <Button type="button" variant="ghost" size="sm" loading={busy} className="gap-1.5" onClick={() => ref.current?.click()}>
+            <IconImage size={16} />
+            {label}
           </Button>
         </>
       )}

@@ -11,7 +11,7 @@ export default function NewEventScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   return (
-    <Screen>
+    <Screen title="Plan a gathering">
       <EventForm
         slug={tenant.slug}
         defaultCity={membership.city ?? tenant.city}

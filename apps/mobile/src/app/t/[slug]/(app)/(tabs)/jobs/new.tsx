@@ -14,7 +14,7 @@ export default function NewJobScreen() {
   const qc = useQueryClient();
   const offerReferrals = useReferralsAvailable();
   return (
-    <Screen>
+    <Screen title="Post a job">
       <JobForm
         submitLabel="Post job"
         offerReferrals={offerReferrals}

@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
+import { Badge, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -52,7 +52,7 @@ export default function EventsScreen() {
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const list = useInfiniteList(qk.events(slug, { scope }), (cursor) => api.events.list(slug, { scope, cursor, limit: 20 }));
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ padding: spacing.lg }}>
         <Tabs value={scope} onChange={setScope} tabs={[{ value: "upcoming", label: "Upcoming" }, { value: "past", label: "Past" }]} />
       </View>
@@ -73,6 +73,6 @@ export default function EventsScreen() {
       <Pressable onPress={() => router.push(`/t/${slug}/events/new`)} accessibilityRole="button" accessibilityLabel="Plan a gathering" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
         <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
       </Pressable>
-    </View>
+    </SectionScreen>
   );
 }

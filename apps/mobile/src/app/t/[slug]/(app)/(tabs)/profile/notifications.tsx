@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Button, EmptyState, ListEmpty, Muted } from "@/components/ui";
+import { Button, EmptyState, ListEmpty, Muted, StackScreen } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -9,7 +9,6 @@ import { timeAgo } from "@/lib/format";
 import { notificationHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
-
 
 export default function NotificationsScreen() {
   const { tenant } = useMembership();
@@ -25,7 +24,7 @@ export default function NotificationsScreen() {
   const readAll = useMutation({ mutationFn: () => api.notifications.markAllRead(slug), onSuccess: refresh });
   const readOne = useMutation({ mutationFn: (id: string) => api.notifications.markRead(slug, id), onSuccess: refresh });
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <StackScreen title="Notifications">
       <View style={{ padding: spacing.md, flexDirection: "row", gap: spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Button title="Mark all read" variant="outline" onPress={() => readAll.mutate()} loading={readAll.isPending} />
@@ -65,6 +64,6 @@ export default function NotificationsScreen() {
           );
         }}
       />
-    </View>
+    </StackScreen>
   );
 }

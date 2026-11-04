@@ -8,7 +8,7 @@ import { FlatList, Text, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { GroupCard, InvitationCard } from "@/components/groups/GroupCards";
-import { Button, EmptyState, Input, ListEmpty, Tabs } from "@/components/ui";
+import { Button, EmptyState, Input, ListEmpty, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge } from "@/hooks/useChat";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -165,7 +165,7 @@ export default function GroupsScreen() {
   }, [status]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
           <View style={{ flex: 1 }}>
@@ -182,6 +182,6 @@ export default function GroupsScreen() {
       <View role="tabpanel" aria-label={TABS.find((t) => t.value === tab)!.label} style={{ flex: 1 }}>
         {tab === "discover" ? <Discover slug={slug} /> : tab === "mine" ? <MyGroups slug={slug} /> : <Invitations slug={slug} onStatus={setStatus} />}
       </View>
-    </View>
+    </SectionScreen>
   );
 }

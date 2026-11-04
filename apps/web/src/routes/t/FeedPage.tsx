@@ -27,7 +27,9 @@ export function FeedPage() {
       {list.items.map((p) => (
         <PostCard key={p.id} slug={slug} post={p} />
       ))}
-      {!list.isLoading && list.items.length === 0 && pinned.length === 0 && <EmptyState icon="💬" title="No posts yet" description="Be the first to say hello to your batchmates." />}
+      {!list.isLoading && list.items.length === 0 && pinned.length === 0 && (
+        <EmptyState title={`No posts yet at ${tenant.shortName ?? tenant.name}`} description="Be the first to share an update with your batchmates." />
+      )}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

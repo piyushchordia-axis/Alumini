@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ImageUploader } from "@/components/common/ImageUploader";
+import { IconAnnounce, IconPoll } from "@/components/icons";
 import { Avatar, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -39,10 +40,10 @@ export function PostComposer() {
     onError: (e) => toast.error(errorMessage(e)),
   });
   return (
-    <Card className="p-4">
-      <div className="flex gap-3">
-        <Avatar name={membership.fullName} src={membership.avatarUrl} />
-        <div className="flex-1 space-y-3">
+    <Card elevation={2} className="overflow-hidden p-0">
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <Avatar name={membership.fullName} src={membership.avatarUrl} className="mt-0.5" />
+        <div className="min-w-0 flex-1 space-y-3">
           <Textarea
             aria-label="New post"
             placeholder={poll ? "Ask a question…" : `Share something with ${tenant.shortName ?? "the network"}…`}
@@ -50,6 +51,7 @@ export function PostComposer() {
             onChange={(e) => setBody(e.target.value)}
             maxLength={5000}
             rows={3}
+            className="border-0 bg-transparent px-0 shadow-none focus:ring-0"
           />
           {poll && (
             <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3">
@@ -88,7 +90,9 @@ export function PostComposer() {
           )}
           {announce && (
             <fieldset className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-              <legend className="px-1 font-medium text-slate-800">📣 Announcement</legend>
+              <legend className="flex items-center gap-1.5 px-1 font-medium text-slate-800">
+                <IconAnnounce size={16} /> Announcement
+              </legend>
               <p className="text-slate-600">
                 Every member{audience.data ? ` (${audience.data.members})` : ""} gets it in the app and as a push notification.
               </p>
@@ -108,34 +112,39 @@ export function PostComposer() {
               {audience.data && audience.data.channels.length === 0 && <p className="text-xs text-slate-500">Your plan doesn&apos;t include email, WhatsApp or SMS announcements.</p>}
             </fieldset>
           )}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} />
-              {isAdmin && (
-                <Button variant="ghost" size="sm" aria-pressed={!!announce} onClick={() => setAnnounce(announce ? null : { pin: true, channels: [] })}>
-                  📣 {announce ? "Not an announcement" : "Announcement"}
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" aria-pressed={!!poll} onClick={() => setPoll(poll ? null : { options: ["", ""], allowsMultiple: false, closesInDays: "" })}>
-                📊 {poll ? "Remove poll" : "Poll"}
-              </Button>
-            </div>
-            <Button
-              onClick={() => {
-                if (announce?.channels.length) {
-                  const d = audience.data;
-                  const parts = announce.channels.map((c) => (c === "EMAIL" ? `email to ${d?.withEmail ?? 0}` : `${c === "WHATSAPP" ? "WhatsApp" : "SMS"} to ${d?.withPhone ?? 0}`));
-                  if (!confirm(`Send this announcement by ${parts.join(" and ")} members? Messages are billed to your institution.`)) return;
-                }
-                create.mutate();
-              }}
-              loading={create.isPending}
-              disabled={!body.trim() || !pollReady}
-            >
-              {announce ? "Post announcement" : "Post"}
+          {images.length > 0 && <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} showTrigger={false} />}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/80 px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-1">
+          <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} showPreviews={false} />
+          {isAdmin && (
+            <Button variant="ghost" size="sm" aria-pressed={!!announce} className="gap-1.5" onClick={() => setAnnounce(announce ? null : { pin: true, channels: [] })}>
+              <IconAnnounce size={16} />
+              {announce ? "Undo announce" : "Announce"}
             </Button>
-          </div>
-          {membership.role !== "TENANT_ADMIN" && <p className="text-xs text-slate-400">Posts are subject to this institution's moderation settings.</p>}
+          )}
+          <Button variant="ghost" size="sm" aria-pressed={!!poll} className="gap-1.5" onClick={() => setPoll(poll ? null : { options: ["", ""], allowsMultiple: false, closesInDays: "" })}>
+            <IconPoll size={16} />
+            {poll ? "Remove poll" : "Poll"}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {membership.role !== "TENANT_ADMIN" && <p className="hidden text-xs text-slate-400 sm:block">Subject to moderation</p>}
+          <Button
+            onClick={() => {
+              if (announce?.channels.length) {
+                const d = audience.data;
+                const parts = announce.channels.map((c) => (c === "EMAIL" ? `email to ${d?.withEmail ?? 0}` : `${c === "WHATSAPP" ? "WhatsApp" : "SMS"} to ${d?.withPhone ?? 0}`));
+                if (!confirm(`Send this announcement by ${parts.join(" and ")} members? Messages are billed to your institution.`)) return;
+              }
+              create.mutate();
+            }}
+            loading={create.isPending}
+            disabled={!body.trim() || !pollReady}
+          >
+            {announce ? "Post announcement" : "Post"}
+          </Button>
         </div>
       </div>
     </Card>

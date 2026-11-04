@@ -79,7 +79,7 @@ try {
     const card = page.locator("article", { hasText: body }).first();
     await card.waitFor();
     await card.locator('button[aria-label="Celebrate"]').click();
-    await card.locator("span.ml-1").filter({ hasText: /^\s*1\s*$/ }).waitFor({ timeout: 10000 });
+    await card.getByText("1", { exact: true }).waitFor({ timeout: 10000 });
     await card.locator("a", { hasText: "comments" }).click();
     await page.waitForURL(/\/app\/feed\/[0-9a-f-]+$/);
     await page.waitForSelector('h2:has-text("Comments")');
@@ -129,7 +129,7 @@ try {
     await page.goto(BASE + "/t/demo-university/app/feed");
     const ann = page.locator("article", { hasText: "Registrations for DemoU Alumni Day 2026" }).first();
     await ann.waitFor();
-    await ann.locator("text=📣 Announcement").waitFor();
+    await ann.getByText("Announcement", { exact: true }).waitFor();
     const poll = page.locator("article", { hasText: "Where should we hold the next London meetup?" }).first();
     await poll.waitFor();
     await poll.locator('[aria-label="Poll"] button:has-text("Shoreditch")').click();
@@ -141,8 +141,11 @@ try {
   await step("celebrations card: send birthday wishes", async () => {
     const card = page.locator("section", { hasText: "Celebrating today" }).first();
     await card.waitFor();
-    await card.locator('button:has-text("Send wishes")').first().click();
-    await card.locator("text=Wished ✓").first().waitFor();
+    // Each row says what it celebrates, and its year is the batch, never a birth year.
+    await card.getByText(/^Birthday · batch of \d{4}$/).first().waitFor();
+    await card.getByText(/^\d+ years? with us · batch of \d{4}$/).first().waitFor();
+    await card.getByRole("button", { name: "Wish", exact: true }).first().click();
+    await card.getByText("Wished", { exact: true }).first().waitFor();
   });
 
   await step("weekly digest: run it now and read “This week”", async () => {

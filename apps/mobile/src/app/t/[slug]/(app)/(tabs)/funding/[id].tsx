@@ -27,7 +27,7 @@ export default function FundingDetailScreen() {
   if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const f = item.data;
   return (
-    <Screen>
+    <Screen title="Funding">
       <Card>
         <Text style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{f.title}</Text>
         <Muted size={14}>{formatAmountRange(f.amountMinMinor, f.amountMaxMinor, f.currency)}</Muted>

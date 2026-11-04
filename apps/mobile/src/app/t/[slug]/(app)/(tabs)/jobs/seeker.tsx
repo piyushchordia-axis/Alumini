@@ -38,7 +38,7 @@ function SeekerForm({ slug, initial }: { slug: string; initial: JobSeekerDto | n
   });
   const remove = useMutation({ mutationFn: () => api.jobs.seekers.remove(slug), onSuccess: done });
   return (
-    <Screen>
+    <Screen title="Looking for work">
       <Text style={{ color: colors.muted }}>Let alumni know what you&apos;re looking for. Your directory card gets an “open to work” tag.</Text>
       <Input label="What are you looking for? *" value={note} onChangeText={setNote} multiline maxLength={500} placeholder="e.g. Senior backend roles in fintech, open to relocation" />
       <Input label="Preferred roles" value={roles} onChangeText={setRoles} />

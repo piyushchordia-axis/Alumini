@@ -21,6 +21,15 @@ describe("normalizePhone", () => {
     expect(() => normalizePhone("+1")).toThrow(AppError);
   });
 
+  it("rejects India national numbers longer than 10 digits", () => {
+    expect(() => normalizePhone("+9198765432101")).toThrow(AppError);
+    expect(() => normalizePhone("98765432101")).toThrow(AppError);
+  });
+
+  it("accepts a German mobile at its allowed national length", () => {
+    expect(normalizePhone("+4915123456789")).toEqual({ e164: "+4915123456789", region: "DE" });
+  });
+
   it("masks phone numbers", () => {
     expect(maskPhone("+919876543210")).toBe("+91*******210");
   });

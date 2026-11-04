@@ -18,6 +18,7 @@ export function DirectoryPage() {
   const [professionType, setProfessionType] = useState<ProfessionType | "">("");
   const [company, setCompany] = useState("");
   const [custom, setCustom] = useState<Record<string, string>>({});
+  const [advanced, setAdvanced] = useState(false);
   const field = Object.entries(custom)
     .filter(([, v]) => v)
     .map(([k, v]) => `${k}:${v}`);
@@ -42,66 +43,76 @@ export function DirectoryPage() {
     setCustom({});
   };
   const hasFilters = Object.values(filters).some((v) => v !== undefined);
+  const advancedActive = !!(city || country || professionType || company || field.length);
 
   return (
     <div className="space-y-4">
       <PageHeader title="Directory" subtitle="Find batchmates by year, city, company or profession" />
-      <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Input aria-label="Search members" placeholder="Name, company, role" value={q} onChange={(e) => setQ(e.target.value)} className="sm:col-span-2" />
-        <Select aria-label="Batch" value={batchYear} onChange={(e) => setBatchYear(e.target.value)}>
-          <option value="">Any batch</option>
-          {facets.data?.batchYears.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="City" value={city} onChange={(e) => setCity(e.target.value)}>
-          <option value="">Any city</option>
-          {facets.data?.cities.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Country" value={country} onChange={(e) => setCountry(e.target.value)}>
-          <option value="">Any country</option>
-          {facets.data?.countries.map((c) => (
-            <option key={c} value={c}>
-              {countryName(c)}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Profession" value={professionType} onChange={(e) => setProfessionType(e.target.value as ProfessionType | "")}>
-          <option value="">Any profession</option>
-          {PROFESSION_TYPES.map((p) => (
-            <option key={p} value={p}>
-              {PROFESSION_TYPE_LABELS[p]}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Company" value={company} onChange={(e) => setCompany(e.target.value)} className="sm:col-span-2">
-          <option value="">Any company</option>
-          {facets.data?.companies.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </Select>
-        {facets.data?.fields.map((f) => (
-          <Select key={f.key} aria-label={f.label} value={custom[f.key] ?? ""} onChange={(e) => setCustom((c) => ({ ...c, [f.key]: e.target.value }))}>
-            <option value="">{`Any ${f.label.toLowerCase()}`}</option>
-            {f.options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[var(--shadow-1)]">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+          <Input aria-label="Search members" placeholder="Name, company, role" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Select aria-label="Batch" value={batchYear} onChange={(e) => setBatchYear(e.target.value)} className="sm:w-36">
+            <option value="">Any batch</option>
+            {facets.data?.batchYears.map((y) => (
+              <option key={y} value={y}>
+                {y}
               </option>
             ))}
           </Select>
-        ))}
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={reset} className="justify-self-start">
-            Clear filters
+          <Button type="button" variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
+            {advanced ? "Hide filters" : advancedActive ? "More filters · on" : "More filters"}
           </Button>
+        </div>
+        {advanced && (
+          <div className="grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Select aria-label="City" value={city} onChange={(e) => setCity(e.target.value)}>
+              <option value="">Any city</option>
+              {facets.data?.cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Country" value={country} onChange={(e) => setCountry(e.target.value)}>
+              <option value="">Any country</option>
+              {facets.data?.countries.map((c) => (
+                <option key={c} value={c}>
+                  {countryName(c)}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Profession" value={professionType} onChange={(e) => setProfessionType(e.target.value as ProfessionType | "")}>
+              <option value="">Any profession</option>
+              {PROFESSION_TYPES.map((p) => (
+                <option key={p} value={p}>
+                  {PROFESSION_TYPE_LABELS[p]}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Company" value={company} onChange={(e) => setCompany(e.target.value)} className="sm:col-span-2">
+              <option value="">Any company</option>
+              {facets.data?.companies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            {facets.data?.fields.map((f) => (
+              <Select key={f.key} aria-label={f.label} value={custom[f.key] ?? ""} onChange={(e) => setCustom((c) => ({ ...c, [f.key]: e.target.value }))}>
+                <option value="">{`Any ${f.label.toLowerCase()}`}</option>
+                {f.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            ))}
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={reset} className="justify-self-start">
+                Clear filters
+              </Button>
+            )}
+          </div>
         )}
       </div>
       {list.isLoading && <Loading />}
@@ -111,7 +122,7 @@ export function DirectoryPage() {
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon="🎓" title="No members match" description="Try removing a filter." />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState title="No members match" description="Try removing a filter." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

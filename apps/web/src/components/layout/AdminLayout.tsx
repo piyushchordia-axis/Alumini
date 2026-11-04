@@ -1,11 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
+import type { ComponentType } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import {
+  IconAdmin,
+  IconAnalytics,
+  IconAudit,
+  IconDashboard,
+  IconDirectory,
+  IconFields,
+  IconFlag,
+  IconMail,
+  IconMessages,
+  IconSettings,
+  type IconProps,
+} from "@/components/icons";
 import { Avatar } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
+
+type AdminIcon = ComponentType<IconProps>;
 
 export function AdminLayout() {
   const { tenant, me, isPlatformAdmin } = useAdminTenant();
@@ -13,26 +29,29 @@ export function AdminLayout() {
   const pollInterval = usePollInterval();
   const dashboard = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug), refetchInterval: pollInterval });
   const d = dashboard.data;
-  const items = [
-    { to: `${base}/dashboard`, label: "Dashboard", icon: "📊" },
-    { to: `${base}/analytics`, label: "Analytics", icon: "📈" },
-    { to: `${base}/members`, label: "Members", icon: "👥", count: d?.pendingMembers },
-    { to: `${base}/moderation`, label: "Moderation", icon: "🛡️", count: d?.pendingContent },
-    { to: `${base}/reports`, label: "Reports", icon: "🚩", count: d?.openReports },
-    { to: `${base}/chat-reports`, label: "Chat reports", icon: "💬", count: d?.openChatReports },
-    { to: `${base}/invitations`, label: "Invitations", icon: "✉️" },
-    { to: `${base}/profile-fields`, label: "Profile fields", icon: "🧩" },
-    { to: `${base}/settings`, label: "Settings", icon: "⚙️" },
-    { to: `${base}/audit`, label: "Audit log", icon: "📜" },
+  const items: { to: string; label: string; icon: AdminIcon; count?: number }[] = [
+    { to: `${base}/dashboard`, label: "Dashboard", icon: IconDashboard },
+    { to: `${base}/analytics`, label: "Analytics", icon: IconAnalytics },
+    { to: `${base}/members`, label: "Members", icon: IconDirectory, count: d?.pendingMembers },
+    { to: `${base}/moderation`, label: "Moderation", icon: IconAdmin, count: d?.pendingContent },
+    { to: `${base}/reports`, label: "Reports", icon: IconFlag, count: d?.openReports },
+    { to: `${base}/chat-reports`, label: "Chat reports", icon: IconMessages, count: d?.openChatReports },
+    { to: `${base}/invitations`, label: "Invitations", icon: IconMail },
+    { to: `${base}/profile-fields`, label: "Profile fields", icon: IconFields },
+    { to: `${base}/settings`, label: "Settings", icon: IconSettings },
+    { to: `${base}/audit`, label: "Audit log", icon: IconAudit },
   ];
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    clsx("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition", isActive ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-100");
+    clsx(
+      "flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition",
+      isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100",
+    );
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-[var(--surface-page)]">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
           <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} size="sm" />
-          <span className="truncate font-semibold text-slate-900">{tenant.shortName ?? tenant.name}</span>
+          <span className="font-display truncate font-semibold text-slate-900">{tenant.shortName ?? tenant.name}</span>
           <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white">Admin</span>
           <div className="ml-auto flex items-center gap-3 text-sm">
             {isPlatformAdmin && (
@@ -54,10 +73,10 @@ export function AdminLayout() {
       </header>
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:gap-6 md:py-6">
         <aside className="w-full shrink-0 md:w-56">
-          <nav aria-label="Admin sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:px-0 md:flex-col">
+          <nav aria-label="Admin sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 md:mx-0 md:px-0 md:flex-col md:space-y-0.5">
             {items.map((i) => (
               <NavLink key={i.to} to={i.to} className={linkClass}>
-                <span>{i.icon}</span>
+                <i.icon size={16} />
                 <span className="whitespace-nowrap">{i.label}</span>
                 {!!i.count && <span aria-label={`${i.count} waiting`} className="ml-auto rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{i.count}</span>}
               </NavLink>

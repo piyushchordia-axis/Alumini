@@ -17,7 +17,7 @@ export default function EditPostScreen() {
   if (post.isLoading) return <Spinner />;
   if (post.error || !post.data) return <LoadError error={post.error ?? "Not found"} onRetry={() => void post.refetch()} onBack={() => router.back()} backLabel="Back" />;
   return (
-    <Screen>
+    <Screen title="Edit post">
       <PostForm
         slug={slug}
         placeholder="Edit your post"

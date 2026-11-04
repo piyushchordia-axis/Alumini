@@ -1,4 +1,4 @@
-import { countryByCode, defaultFeaturesFor } from "@illuminize/shared";
+import { clampNationalNumber, countryByCode, defaultFeaturesFor } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -80,8 +80,17 @@ export default function LoginScreen() {
       <Title sub="We'll send a one-time code on WhatsApp (SMS fallback).">Sign in</Title>
       {step === "phone" ? (
         <View style={{ gap: 12 }}>
-          <CountryPicker label="Country code" variant="dial" value={country} onChange={(c) => setCountry(c ?? "IN")} />
-          <Input label={`Mobile number (${dial})`} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" value={number} onChangeText={(v) => setNumber(v.replace(/[^\d\s-]/g, ""))} placeholder="98765 43210" autoFocus />
+          <CountryPicker
+            label="Country code"
+            variant="dial"
+            value={country}
+            onChange={(c) => {
+              const next = c ?? "IN";
+              setCountry(next);
+              setNumber((n) => clampNationalNumber(next, n));
+            }}
+          />
+          <Input label={`Mobile number (${dial})`} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" value={number} onChangeText={(v) => setNumber(clampNationalNumber(country, v))} placeholder="98765 43210" autoFocus />
           <ErrorText error={error ? errorMessage(error) : null} />
           <Button title="Send code" onPress={() => void request()} loading={busy} disabled={number.replace(/\D/g, "").length < 6} />
         </View>

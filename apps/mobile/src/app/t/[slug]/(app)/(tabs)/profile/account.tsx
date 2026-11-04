@@ -41,7 +41,7 @@ export default function AccountScreen() {
   const d = status.data;
   const showForm = editing || (d && !d.email && !d.pending);
   return (
-    <Screen>
+    <Screen title="Email & account">
       <Card>
         <Text style={{ fontWeight: "700", color: colors.text }}>Email</Text>
         <Muted size={13}>For the weekly digest and announcements. Never shown to other members; shared by all your institutions.</Muted>

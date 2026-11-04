@@ -36,7 +36,7 @@ export default function BusinessDetailScreen() {
   if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={leave} backLabel="Back" />;
   const b = item.data;
   return (
-    <Screen>
+    <Screen title="Business">
       <Card>
         <Row style={{ flexWrap: "nowrap" }}>
           <Avatar name={b.name} src={b.logoUrl} size={56} />

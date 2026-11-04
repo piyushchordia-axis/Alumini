@@ -41,9 +41,10 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
 ## 3. Things to try
 
 **As a new alumnus**
-1. On the first screen, pick **Demo University** and sign in with any new number.
+1. On the first screen, pick **Demo University** and sign in with any new number. The landing is brand-first (cover +
+   institution name); chrome uses SVG icons, not emoji.
 2. Fill in your profile: batch, profession, company, city, plus the optional details.
-3. Post in the community feed, react and comment on others' posts.
+3. Post in the community feed (composer tray with Add image / Poll / Post), react and comment on others' posts.
 4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
 5. Open **Events** and RSVP to the Mumbai coffee meetup, or plan your own gathering.
 6. Search the **Directory** by batch, city or company.
@@ -148,10 +149,10 @@ profile and sign out.
 
 **Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)
 - **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed opens with today's birthday (Meera) and Rahul's own
-  third anniversary of joining. Tap **Send wishes**; Meera sees them under the bell. Only the day and month are ever
+  third anniversary of joining. Tap **Wish**; Meera sees them under the bell. Only the day and month are ever
   shown. Members can opt out in their profile.
-- **Polls and announcements.** Vote in Priya's London meetup poll. The pinned 📣 announcement came from the admin;
-  as Demo University's admin (`+91 90000 00001`) write a post, choose **📣 Announcement**, and tick **Also email it**.
+- **Polls and announcements.** Vote in Priya's London meetup poll. The pinned announcement came from the admin;
+  as Demo University's admin (`+91 90000 00001`) write a post, choose **Announce**, and tick **Also email it**.
   Email, WhatsApp and SMS are offered only when the institution's plan includes them; in this demo they're printed in
   the API terminal.
 - **This week.** Every Monday morning members get a digest of popular posts, new jobs and upcoming events, in the app

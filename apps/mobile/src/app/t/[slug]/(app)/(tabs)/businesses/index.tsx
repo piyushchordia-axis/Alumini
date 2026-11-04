@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -49,7 +49,7 @@ export default function BusinessesScreen() {
   const filters = { q: search || undefined, city: place || undefined, category: category || undefined };
   const list = useInfiniteList(qk.businesses(slug, filters), (cursor) => api.businesses.list(slug, { ...filters, cursor, limit: 20 }));
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
         <Button title="Add a business" onPress={() => router.push(`/t/${slug}/businesses/new`)} />
         <Input accessibilityLabel="Search businesses" placeholder="Search name or description" value={q} onChangeText={setQ} autoCorrect={false} />
@@ -70,6 +70,6 @@ export default function BusinessesScreen() {
         }
         renderItem={({ item }) => <BusinessCard slug={slug} item={item} />}
       />
-    </View>
+    </SectionScreen>
   );
 }

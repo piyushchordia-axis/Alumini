@@ -301,11 +301,11 @@ member or invalid with a reason. Phones without a country code use the instituti
 
 - **Polls.** A post can carry a poll (2 to 6 options, single or multiple choice, optional closing time). Votes are
   anonymous; members see counts. Options are locked once anyone votes.
-- **Announcements.** Admins can post as an announcement: pinned by default, a 📣 badge, an in-app notification and push
-  to every member, and optionally email, WhatsApp or SMS when the plan includes them (members can opt out of those in
-  their notification settings, and emails carry one-click unsubscribe). The send runs as a background job in batches
-  of 1000 and stops if the post is removed first. The feed's pinned strip shows five; further pinned posts stay in the
-  feed with their badge.
+- **Announcements.** Admins can post as an announcement: pinned by default, an announcement badge (SVG icon in the
+  apps), an in-app notification and push to every member, and optionally email, WhatsApp or SMS when the plan includes
+  them (members can opt out of those in their notification settings, and emails carry one-click unsubscribe). The send
+  runs as a background job in batches of 1000 and stops if the post is removed first. The feed's pinned strip shows
+  five; further pinned posts stay in the feed with their badge.
 - **Celebrations.** A feed card lists today's birthdays (day and month only, never the year) and membership
   anniversaries (from the approval date), with *Send wishes*. The member gets one greeting, and wishes collect into one
   notification ("Asha and 23 others…"). Members can opt out of either in their profile.
@@ -597,9 +597,10 @@ apps/api/src
 apps/api/drizzle  SQL migrations (generated; some hand-written parts: pg_trgm, the moderation_items view, and the
                   content_type rebuilds in 0019 and 0023)
 apps/api/test     vitest unit + integration tests (real Postgres, in-memory Redis)
-apps/web/src      routes/ (member app, t/admin, platform), components/, hooks/, stores/
+apps/web/src      routes/ (member app, t/admin, platform), components/ (ui, icons, feed, layout…), hooks/, stores/;
+                  design tokens in index.css (Manrope + Source Sans 3, elevation ladder)
 apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and other stacked screens above them),
-                  components/, hooks/, stores/, theme/
+                  components/ (ui, icons via react-native-svg…), hooks/, stores/, theme/
 packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client),
                   realtime/ (events and client), chat/ (chat cache and live sync, no React),
                   lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections)
@@ -778,12 +779,14 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     dialog and refreshes the list.
   - Illuminize staff reach only escalated chat reports, even in an institution where they are genuine admins.
 - Screens and navigation:
-  - The admin Members page scrolls sideways on phones (about 85px): its status tabs don't fit.
+  - The admin Members status tabs can still overflow sideways on narrow phones (member rows reflow; tabs don't wrap).
   - The web app's shared Modal close and ConfirmDialog buttons are under 44px tall.
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
+  - UI follow-ups: deeper tenant theming / branding preview in admin, skeleton loaders and purposeful motion, and a
+    sweep of any remaining emoji on secondary empty states (chrome and feed already use the shared SVG icon set).
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

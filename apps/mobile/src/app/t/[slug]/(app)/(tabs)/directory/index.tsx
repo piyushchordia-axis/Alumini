@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row } from "@/components/ui";
+import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -80,7 +80,7 @@ export default function DirectoryScreen() {
   };
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
         <Input accessibilityLabel="Search members" placeholder="Name, company, role" value={q} onChangeText={setQ} autoCorrect={false} />
         <Row style={{ justifyContent: "space-between" }}>
@@ -123,6 +123,6 @@ export default function DirectoryScreen() {
         }
         renderItem={({ item }) => <MemberCard slug={slug} member={item} />}
       />
-    </View>
+    </SectionScreen>
   );
 }

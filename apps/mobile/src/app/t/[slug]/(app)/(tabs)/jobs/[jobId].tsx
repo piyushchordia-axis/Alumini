@@ -70,7 +70,7 @@ function JobDetail({ jobId }: { jobId: string }) {
   const waiting = j.pendingReferralCount ?? 0;
   const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;
   return (
-    <Screen>
+    <Screen title="Job">
       <Card>
         <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
           {j.title}

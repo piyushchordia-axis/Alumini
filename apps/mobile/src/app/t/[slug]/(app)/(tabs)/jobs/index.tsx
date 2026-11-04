@@ -7,7 +7,7 @@ import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralReq
 import { useReferralList } from "@/components/jobs/ReferralRows";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
+import { Badge, Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -97,7 +97,7 @@ export default function JobsScreen() {
   useGroupNotice("jobs", setStatus);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm }}>
         <Tabs
           tall
@@ -184,6 +184,6 @@ export default function JobsScreen() {
           <ReferralsWayOut slug={slug} box={box} onBoxChange={(next) => go("referrals", next)} onBack={() => go("openings")} />
         )}
       </View>
-    </View>
+    </SectionScreen>
   );
 }

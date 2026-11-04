@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("country list", () => {
   it("covers every dialable region with unique codes, India first", () => {
     expect(COUNTRIES.length).toBeGreaterThan(230);
-    expect(COUNTRIES[0]).toEqual({ code: "IN", name: "India", dial: "+91" });
+    expect(COUNTRIES[0]).toEqual({ code: "IN", name: "India", dial: "+91", maxNationalDigits: 10 });
     expect(new Set(COUNTRIES.map((c) => c.code)).size).toBe(COUNTRIES.length);
     for (const c of COUNTRIES) expect(c.dial).toMatch(/^\+\d{1,4}$/);
   });

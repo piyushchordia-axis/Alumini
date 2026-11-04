@@ -3,15 +3,16 @@ import { Stack } from "expo-router";
 /** What a screen opened straight from another tab goes back to, with `withAnchor`. */
 export const unstable_settings = { anchor: "index" };
 
+/** Native headers float over content on device; each screen draws StackHeader / Screen title instead. */
 export default function ProfileStack() {
   return (
-    <Stack screenOptions={{ headerTitleStyle: { fontWeight: "700" } }}>
-      <Stack.Screen name="index" options={{ title: "My profile" }} />
-      <Stack.Screen name="edit" options={{ title: "Edit profile" }} />
-      <Stack.Screen name="my-content" options={{ title: "My posts & listings" }} />
-      <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-      <Stack.Screen name="account" options={{ title: "Email & account" }} />
-      <Stack.Screen name="notification-settings" options={{ title: "Notification settings" }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="edit" />
+      <Stack.Screen name="my-content" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="account" />
+      <Stack.Screen name="notification-settings" />
     </Stack>
   );
 }

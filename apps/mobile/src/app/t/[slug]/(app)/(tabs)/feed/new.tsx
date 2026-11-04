@@ -11,7 +11,7 @@ export default function NewPostScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   return (
-    <Screen>
+    <Screen title="New post">
       <PostForm
         slug={tenant.slug}
         placeholder={`Share something with ${tenant.shortName ?? "the network"}…`}

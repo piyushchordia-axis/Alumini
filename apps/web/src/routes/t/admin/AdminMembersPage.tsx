@@ -138,20 +138,27 @@ export function AdminMembersPage() {
       {list.data && list.data.data.length === 0 && <EmptyState title={`No ${status.toLowerCase()} members`} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((m) => (
-          <li key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <Avatar name={m.fullName} src={m.avatarUrl} />
-            <div className="min-w-0 flex-1">
-              <Link to={`/t/${slug}/admin/members/${m.id}`} className="font-medium text-slate-900 hover:underline">
-                {m.fullName}
-              </Link>
-              {m.role === "TENANT_ADMIN" && <span className="ml-2 rounded bg-primary/10 px-1.5 text-xs text-primary">Admin</span>}
-              <div className="text-xs text-slate-500">
-                Batch of {m.batchYear} · {m.phone} · {[m.companyName, m.city].filter(Boolean).join(", ") || "—"} · requested {formatDate(m.createdAt)}
+          <li key={m.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Avatar name={m.fullName} src={m.avatarUrl} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link to={`/t/${slug}/admin/members/${m.id}`} className="font-medium text-slate-900 hover:underline">
+                    {m.fullName}
+                  </Link>
+                  {m.role === "TENANT_ADMIN" && <span className="rounded bg-primary/10 px-1.5 text-xs text-primary">Admin</span>}
+                  <MemberStatusBadge status={m.status} />
+                </div>
+                <div className="mt-0.5 break-words text-xs text-slate-500">
+                  Batch of {m.batchYear}
+                  {m.phone ? ` · ${m.phone}` : ""}
+                  {[m.companyName, m.city].filter(Boolean).length ? ` · ${[m.companyName, m.city].filter(Boolean).join(", ")}` : ""}
+                  {` · requested ${formatDate(m.createdAt)}`}
+                </div>
+                {m.statusReason && <div className="text-xs text-slate-400">Reason: {m.statusReason}</div>}
               </div>
-              {m.statusReason && <div className="text-xs text-slate-400">Reason: {m.statusReason}</div>}
             </div>
-            <MemberStatusBadge status={m.status} />
-            {m.id === me?.id ? <span className="text-xs text-slate-400">You</span> : <MemberActionButtons member={m} actions={actions} compact />}
+            <div className="shrink-0 sm:ml-2">{m.id === me?.id ? <span className="text-xs text-slate-400">You</span> : <MemberActionButtons member={m} actions={actions} compact />}</div>
           </li>
         ))}
       </ul>

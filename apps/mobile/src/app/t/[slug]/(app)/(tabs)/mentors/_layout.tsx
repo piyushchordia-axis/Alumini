@@ -1,5 +1,4 @@
 import { Stack } from "expo-router";
-import { useAppHeaderOptions } from "@/components/AppHeader";
 
 /**
  * Finding mentors, requests and the member's own offer to mentor. A mentor's page and the request form sit above the tabs,
@@ -7,10 +6,9 @@ import { useAppHeaderOptions } from "@/components/AppHeader";
  * which says so itself.
  */
 export default function MentorsStack() {
-  const appHeader = useAppHeaderOptions();
   return (
     <Stack>
-      <Stack.Screen name="index" options={appHeader} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
     </Stack>
   );
 }

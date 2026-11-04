@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, Tabs } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -42,7 +42,7 @@ export default function FundingScreen() {
   const [kind, setKind] = useState<"SEEKING" | "OFFERING">("SEEKING");
   const list = useInfiniteList(qk.funding(slug, { kind }), (cursor) => api.funding.list(slug, { kind, cursor, limit: 20 }));
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
         <Tabs value={kind} onChange={setKind} tabs={[{ value: "SEEKING", label: "Seeking funding" }, { value: "OFFERING", label: "Investors" }]} />
         <Row>
@@ -64,6 +64,6 @@ export default function FundingScreen() {
         }
         renderItem={({ item }) => <FundingCard slug={slug} item={item} />}
       />
-    </View>
+    </SectionScreen>
   );
 }

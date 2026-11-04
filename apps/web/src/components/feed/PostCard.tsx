@@ -1,11 +1,12 @@
 import { MAX_POST_IMAGES, REACTION_TYPES, type PostDto, type ReactionType } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { MemberLink } from "@/components/common/MemberLink";
 import { PollView } from "@/components/feed/PollView";
+import { IconAnnounce, IconCelebrate, IconComment, IconInsight, IconLike, IconLove, IconPin } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { Badge, Button, Card, Textarea } from "@/components/ui";
@@ -13,8 +14,13 @@ import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { toast } from "@/stores/uiStore";
 
-const REACTION_EMOJI: Record<ReactionType, string> = { LIKE: "👍", LOVE: "❤️", CELEBRATE: "🎉", INSIGHTFUL: "💡" };
 const REACTION_LABEL: Record<ReactionType, string> = { LIKE: "Like", LOVE: "Love", CELEBRATE: "Celebrate", INSIGHTFUL: "Insightful" };
+const REACTION_ICON: Record<ReactionType, ComponentType<{ size?: number; className?: string }>> = {
+  LIKE: IconLike,
+  LOVE: IconLove,
+  CELEBRATE: IconCelebrate,
+  INSIGHTFUL: IconInsight,
+};
 
 export function PostCard({ slug, post, detail = false, onDeleted }: { slug: string; post: PostDto; detail?: boolean; onDeleted?: () => void }) {
   const qc = useQueryClient();
@@ -57,12 +63,20 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
   const removed = post.moderationStatus === "REMOVED";
 
   return (
-    <Card as="article" className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary p-4" : "p-4"}>
+    <Card as="article" elevation={1} className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary p-4" : "p-4"}>
       <div className="flex items-start justify-between gap-3">
         <MemberLink slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
-        <div className="flex items-center gap-2">
-          {post.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
-          {post.isPinned && <Badge tone="primary">📌 Pinned</Badge>}
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {post.kind === "ANNOUNCEMENT" && (
+            <Badge tone="primary" className="gap-1">
+              <IconAnnounce size={12} /> Announcement
+            </Badge>
+          )}
+          {post.isPinned && (
+            <Badge tone="primary" className="gap-1">
+              <IconPin size={12} /> Pinned
+            </Badge>
+          )}
           <ModerationStatusBadge status={post.moderationStatus} note={post.moderationNote} />
         </div>
       </div>
@@ -94,26 +108,37 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
           ))}
         </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-500">
-        {REACTION_TYPES.map((t) => (
-          <button
-            key={t}
-            type="button"
-            disabled={post.moderationStatus !== "APPROVED"}
-            onClick={() => react.mutate(post.myReaction === t ? null : t)}
-            className={`rounded-full px-2 py-1 transition hover:bg-slate-100 ${post.myReaction === t ? "bg-primary/10 ring-1 ring-primary/30" : ""}`}
-            aria-label={REACTION_LABEL[t]}
-            aria-pressed={post.myReaction === t}
-          >
-            {REACTION_EMOJI[t]}
-          </button>
-        ))}
-        <span className="ml-1">{post.reactionCount}</span>
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-sm text-slate-500">
+        <div className="flex items-center gap-1 rounded-full bg-slate-50 p-0.5 ring-1 ring-slate-200/80">
+          {REACTION_TYPES.map((t) => {
+            const Icon = REACTION_ICON[t];
+            const active = post.myReaction === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                disabled={post.moderationStatus !== "APPROVED"}
+                onClick={() => react.mutate(active ? null : t)}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-white hover:text-slate-800 disabled:opacity-40 ${active ? "bg-white text-primary shadow-sm" : "text-slate-500"}`}
+                aria-label={REACTION_LABEL[t]}
+                aria-pressed={active}
+                title={REACTION_LABEL[t]}
+              >
+                <Icon size={16} />
+              </button>
+            );
+          })}
+        </div>
+        <span className="tabular-nums text-xs text-slate-500">{post.reactionCount}</span>
+        <div className="mx-1 hidden h-4 w-px bg-slate-200 sm:block" aria-hidden />
         {detail || removed ? (
-          <span className="ml-3">💬 {post.commentCount}</span>
+          <span className="inline-flex items-center gap-1.5 text-xs">
+            <IconComment size={14} /> {post.commentCount}
+          </span>
         ) : (
-          <Link to={`/t/${slug}/app/feed/${post.id}`} className="ml-3 hover:text-slate-800">
-            💬 {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
+          <Link to={`/t/${slug}/app/feed/${post.id}`} className="inline-flex items-center gap-1.5 text-xs hover:text-slate-800">
+            <IconComment size={14} />
+            {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
           </Link>
         )}
         <span className="ml-auto flex items-center gap-3">

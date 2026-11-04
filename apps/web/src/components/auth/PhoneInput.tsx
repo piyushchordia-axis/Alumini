@@ -1,4 +1,4 @@
-import { COUNTRIES, POPULAR_COUNTRY_CODES, countryByCode, flagEmoji } from "@illuminize/shared";
+import { COUNTRIES, POPULAR_COUNTRY_CODES, clampNationalNumber, countryByCode, flagEmoji } from "@illuminize/shared";
 import { Input } from "@/components/ui";
 
 export interface PhoneValue {
@@ -11,7 +11,8 @@ const popular = POPULAR_COUNTRY_CODES.map((c) => countryByCode(c)!).filter(Boole
 
 /**
  * Country code + national number. The native <select> lists every country by name (type-ahead works), while the
- * closed control shows just the flag and calling code so it stays narrow on phones.
+ * closed control shows just the flag and calling code so it stays narrow on phones. National digits are capped per
+ * country (India: 10).
  */
 export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; onChange: (v: PhoneValue) => void; autoFocus?: boolean }) {
   const selected = countryByCode(value.country) ?? COUNTRIES[0]!;
@@ -27,7 +28,10 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; 
         <select
           aria-label={`Country code, ${selected.name} ${selected.dial}`}
           value={selected.code}
-          onChange={(e) => onChange({ ...value, country: e.target.value })}
+          onChange={(e) => {
+            const country = e.target.value;
+            onChange({ country, number: clampNationalNumber(country, value.number) });
+          }}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         >
           <optgroup label="Popular">
@@ -54,7 +58,7 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; 
         aria-label="Mobile number"
         value={value.number}
         autoFocus={autoFocus}
-        onChange={(e) => onChange({ ...value, number: e.target.value.replace(/[^\d\s-]/g, "") })}
+        onChange={(e) => onChange({ ...value, number: clampNationalNumber(value.country, e.target.value) })}
       />
     </div>
   );

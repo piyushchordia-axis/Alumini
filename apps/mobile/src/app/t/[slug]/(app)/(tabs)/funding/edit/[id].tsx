@@ -17,7 +17,7 @@ export default function EditFundingScreen() {
   if (item.isLoading) return <Spinner />;
   if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={() => router.back()} backLabel="Back" />;
   return (
-    <Screen>
+    <Screen title="Edit listing">
       <FundingForm
         kind={item.data.kind}
         initial={item.data}

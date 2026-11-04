@@ -17,7 +17,7 @@ export default function EditEventScreen() {
   if (ev.isLoading) return <Spinner />;
   if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
   return (
-    <Screen>
+    <Screen title="Edit event">
       <EventForm
         slug={slug}
         initial={ev.data}

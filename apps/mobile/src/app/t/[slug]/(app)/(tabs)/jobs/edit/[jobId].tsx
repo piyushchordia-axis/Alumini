@@ -25,7 +25,7 @@ export default function EditJobScreen() {
   if (error) return <JobUnavailable error={error} onRetry={() => void job.refetch()} />;
   if (!job.data) return <Spinner />;
   return (
-    <Screen>
+    <Screen title="Edit job">
       <JobForm
         initial={job.data}
         submitLabel="Save changes"

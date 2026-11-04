@@ -10,7 +10,7 @@ export default function NewBusinessScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   return (
-    <Screen>
+    <Screen title="Add a business">
       <BusinessForm
         slug={tenant.slug}
         submitLabel="Publish listing"

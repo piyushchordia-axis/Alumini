@@ -1,8 +1,11 @@
 import { chatAvailable, MEMBER_SECTIONS, splitSections, type MemberSection } from "@illuminize/shared";
 import type { ChatBadgeLabel } from "@illuminize/shared/chat";
-import { Tabs, useSegments } from "expo-router";
+import { Tabs, useIsFocused, useSegments } from "expo-router";
 import { PlatformPressable } from "expo-router/react-navigation";
-import { type ColorValue, Text } from "react-native";
+import type { ReactNode } from "react";
+import type { ColorValue, ViewStyle } from "react-native";
+import { Platform, View } from "react-native";
+import { NavIcon, type NavIconName } from "@/components/icons";
 import { useChatBadge } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { useMentorsWayOut } from "@/lib/mentors";
@@ -10,6 +13,17 @@ import { SECTION_TABS, sectionBadges } from "@/lib/sections";
 import { colors, useTheme } from "@/theme";
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: "600" } as const;
+
+/**
+ * On web, inactive tab scenes stay in the DOM with only z-index; nested search bars can still paint over the focused
+ * tab. Hide unfocused scenes completely there. Native uses react-native-screens detachment instead.
+ */
+function TabScene({ children }: { children: ReactNode }) {
+  const focused = useIsFocused();
+  if (Platform.OS !== "web") return <>{children}</>;
+  const style: ViewStyle = { flex: 1, display: focused ? "flex" : "none" };
+  return <View style={style}>{children}</View>;
+}
 
 /**
  * The tab under a screen opened straight from a link or a push, such as a thread above the tabs, so going back lands
@@ -25,8 +39,8 @@ const NO_BUTTON = { tabBarButton: () => null, tabBarItemStyle: { display: "none"
 
 const BADGE_STYLE = { backgroundColor: colors.danger, color: "#fff", fontSize: 10, fontWeight: "700" } as const;
 
-function TabIcon({ icon, active, color }: { icon: string; active: boolean; color?: ColorValue }) {
-  return <Text style={{ fontSize: 20, opacity: active ? 1 : 0.6, color }}>{icon}</Text>;
+function TabIcon({ name, active, color }: { name: NavIconName; active: boolean; color?: ColorValue }) {
+  return <NavIcon name={name} size={22} color={active ? color : colors.muted} />;
 }
 
 /** On the icon, so the label below keeps its room. The tab's name carries the count for screen readers. */
@@ -56,12 +70,15 @@ export default function TabsLayout() {
   return (
     <Tabs
       backBehavior="history"
+      detachInactiveScreens
+      screenLayout={({ children }) => <TabScene>{children}</TabScene>}
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: LABEL_STYLE,
+        tabBarStyle: { backgroundColor: "rgba(255,255,255,0.96)", borderTopColor: colors.border },
       }}
     >
       {/* Every route folder needs a screen here: without one, opening it redirects to the first tab. */}
@@ -69,7 +86,18 @@ export default function TabsLayout() {
         if (section === "mentors" && mentorsOff) return null;
         const { path, label, icon } = SECTION_TABS[section];
         const visibility = bar.includes(section) ? {} : overflow.includes(section) ? NO_BUTTON : { href: null };
-        return <Tabs.Screen key={section} name={path} options={{ title: label, tabBarIcon: ({ focused }) => <TabIcon icon={icon} active={focused} />, ...badgeFor(section), ...visibility }} />;
+        return (
+          <Tabs.Screen
+            key={section}
+            name={path}
+            options={{
+              title: label,
+              tabBarIcon: ({ focused, color }) => <TabIcon name={icon} active={focused} color={color} />,
+              ...badgeFor(section),
+              ...visibility,
+            }}
+          />
+        );
       })}
       {/* Reached from the header (avatar and bell) and from More. Declared before More because a link to a section that is
           off redirects to the first screen that isn't hidden, and with every section off that must be this one, their home. */}
@@ -80,7 +108,7 @@ export default function TabsLayout() {
         options={{
           title: "More",
           ...tabBadge(moreBadge),
-          tabBarIcon: ({ focused, color }) => <TabIcon icon="☰" active={focused || moreActive} color={moreActive ? theme.primary : color} />,
+          tabBarIcon: ({ focused, color }) => <TabIcon name="more" active={focused || moreActive} color={moreActive ? theme.primary : color} />,
           tabBarLabelStyle: moreActive ? { ...LABEL_STYLE, color: theme.primary } : LABEL_STYLE,
           tabBarButton: (props) => <PlatformPressable {...props} aria-selected={moreActive || props["aria-selected"]} />,
         }}

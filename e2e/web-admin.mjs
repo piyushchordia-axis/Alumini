@@ -218,12 +218,13 @@ try {
     await page.waitForURL(/\/app\/feed$/);
     const text = `Homecoming ${unique}: register by Friday.`;
     await page.fill('textarea[aria-label="New post"]', text);
-    await page.click('button:has-text("📣 Announcement")');
+    await page.getByRole("button", { name: "Announce", exact: true }).click();
+    await page.getByRole("button", { name: "Undo announce", pressed: true }).waitFor();
     await page.waitForSelector("text=Every member (");
     await page.locator('label:has-text("Also email it")').locator("input").check();
     await page.click('button:has-text("Post announcement")');
     await page.waitForSelector("text=Announcement posted");
-    await page.locator("article", { hasText: text }).first().locator("text=📣 Announcement").waitFor();
+    await page.locator("article", { hasText: text }).first().getByText("Announcement", { exact: true }).waitFor();
     await shot("a08-announcement");
   });
 

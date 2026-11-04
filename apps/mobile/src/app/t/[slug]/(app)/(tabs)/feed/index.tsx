@@ -3,12 +3,12 @@ import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
 import { DigestBanner } from "@/components/DigestBanner";
 import { PostCard } from "@/components/PostCard";
-import { EmptyState, ListEmpty, Spinner } from "@/components/ui";
+import { EmptyState, ListEmpty, SectionScreen, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
-import { colors, spacing, useTheme } from "@/theme";
+import { spacing, useTheme } from "@/theme";
 
 export default function FeedScreen() {
   const { tenant } = useMembership();
@@ -18,7 +18,7 @@ export default function FeedScreen() {
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const data = [...(list.first?.pinned ?? []), ...list.items];
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <SectionScreen>
       <FlatList
         data={data}
         keyExtractor={(p) => p.id}
@@ -29,7 +29,7 @@ export default function FeedScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon="💬" title="No posts yet" description="Be the first to say hello to your batchmates." />
+            <EmptyState title={`No posts yet at ${tenant.shortName ?? tenant.name}`} description="Be the first to share an update with your batchmates." />
           </ListEmpty>
         }
         ListHeaderComponent={
@@ -44,6 +44,6 @@ export default function FeedScreen() {
       <Pressable onPress={() => router.push(`/t/${slug}/feed/new`)} accessibilityRole="button" accessibilityLabel="New post" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
         <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
       </Pressable>
-    </View>
+    </SectionScreen>
   );
 }

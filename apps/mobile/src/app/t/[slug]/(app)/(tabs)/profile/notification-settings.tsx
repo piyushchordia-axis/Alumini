@@ -63,7 +63,7 @@ export default function NotificationSettingsScreen() {
   const p = prefs.data;
   const categories = visibleNotificationCategories({ features: tenant.settings.features, chatEligible: membership.chatEligible, isTenantAdmin });
   return (
-    <Screen>
+    <Screen title="Notification settings">
       <Muted size={13}>For {tenant.name}. Account notices (approvals, moderation decisions) always reach you.</Muted>
       {categories.map((c) => {
         const info = NOTIFICATION_CATEGORY_INFO[c];
