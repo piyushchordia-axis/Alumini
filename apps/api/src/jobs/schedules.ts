@@ -21,4 +21,6 @@ export const scheduledJobs: ScheduledJob[] = [
   { id: "messages-sweep", job: "messages.sweep", data: {}, repeat: { every: 5 * 60_000 } },
   // Every 15 minutes, because some zones are offset by half an hour (India) or 45 minutes (Nepal).
   { id: "engagement-tick", job: "engagement.tick", data: {}, repeat: { every: 15 * 60_000 } },
+  // Photos picked in a form that was never saved; nothing else deletes them.
+  { id: "avatar-sweep", job: "uploads.sweepAvatars", data: {}, repeat: { every: 6 * 60 * 60_000 } },
 ];

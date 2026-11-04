@@ -1,12 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { auditLog, memberships } from "../../src/db/schema";
-import { auth, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
+import { auditLog, invitations, memberships } from "../../src/db/schema";
+import { PROFILE, auth, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
+import { testPng } from "../helpers/images";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+const PNG = await testPng();
 
 describe.skipIf(!dbAvailable)("visibility and access rules", () => {
   let ctx: TestContext;
@@ -72,17 +73,51 @@ describe.skipIf(!dbAvailable)("visibility and access rules", () => {
     const open = (await createTenant(ctx)).tenant;
     const closed = (await createTenant(ctx, { allowSelfRegistration: false })).tenant;
     const stranger = auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
-    const upload = (slug: string, headers: Record<string, string>) => api().post(`/api/v1/t/${slug}/uploads`).set(headers).attach("file", PNG, { filename: "a.png", contentType: "image/png" });
+    const upload = (slug: string, headers: Record<string, string>, query = "") =>
+      api().post(`/api/v1/t/${slug}/uploads${query}`).set(headers).attach("file", PNG, { filename: "a.png", contentType: "image/png" });
 
     expect((await upload(open.slug, stranger)).status).toBe(201); // registering: avatar before the membership exists
     expect((await upload(closed.slug, stranger)).status).toBe(403);
     const suspended = await memberSession(ctx, open.id, { status: "SUSPENDED" });
     expect((await upload(open.slug, suspended.headers)).status).toBe(403);
     const member = await memberSession(ctx, open.id);
+    // Refused before it is counted, so it takes none of the quota (a client newer than the API sending a new purpose).
+    for (let i = 0; i < 3; i++) expect((await upload(open.slug, member.headers, "?purpose=banner")).status).toBe(400);
     expect((await upload(open.slug, member.headers)).status).toBe(201);
     expect((await upload(open.slug, member.headers)).status).toBe(201);
     // Cap of 3 per institution per day in this test context.
     expect((await upload(open.slug, member.headers)).status).toBe(429);
+  });
+
+  it("lets someone with an open invitation to a closed institution upload a photo to register with", async () => {
+    const { tenant } = await createTenant(ctx, { allowSelfRegistration: false });
+    const base = `/api/v1/t/${tenant.slug}`;
+    const invitee = async (invitation: { status?: "SENT" | "REVOKED"; expiresInMs: number }) => {
+      const user = await createUser(ctx);
+      await ctx.db.insert(invitations).values({
+        tenantId: tenant.id,
+        phoneE164: user.phoneE164,
+        token: `visibility-${user.id}`,
+        status: invitation.status ?? "SENT",
+        expiresAt: new Date(Date.now() + invitation.expiresInMs),
+      });
+      const headers = auth((await loginAs(ctx, user.phoneE164)).accessToken);
+      const upload = () => api().post(`${base}/uploads?purpose=avatar`).set(headers).attach("file", PNG, { filename: "me.png", contentType: "image/png" });
+      return { headers, upload };
+    };
+
+    const invited = await invitee({ expiresInMs: 86_400_000 });
+    const photo = await invited.upload();
+    expect(photo.status).toBe(201);
+    const joined = await api().post(`${base}/memberships`).set(invited.headers).send({ ...PROFILE, avatarUrl: photo.body.data.url });
+    expect(joined.status).toBe(201);
+    expect(joined.body.data.avatarUrl).toBe(photo.body.data.url);
+
+    const revoked = await (await invitee({ status: "REVOKED", expiresInMs: 86_400_000 })).upload();
+    expect(revoked.status).toBe(403);
+    expect(revoked.body.error.code).toBe("NOT_A_MEMBER");
+    const expired = await (await invitee({ expiresInMs: -1000 })).upload();
+    expect(expired.status).toBe(403);
   });
 
   it("records a null membership when Illuminize staff pin a post", async () => {

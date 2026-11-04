@@ -12,6 +12,7 @@ import { prepareChatForAccountDeletion } from "./chat/lifecycle";
 import { prepareMentorshipsForAccountDeletion } from "./mentorship/mentorship.service";
 import { prepareReferralsForAccountDeletion } from "./referrals/referrals.service";
 import { issueSession, revokeAllSessions, type SessionMeta } from "./token.service";
+import { avatarKeysOfUser, removeAvatarsIfUnused } from "./uploads.service";
 
 export async function loginWithVerifiedPhone(ctx: AppContext, phoneE164: string, meta: SessionMeta): Promise<AuthSessionDto> {
   const { region } = normalizePhone(phoneE164);
@@ -47,10 +48,13 @@ export async function deleteAccount(ctx: AppContext, userId: string, ip?: string
     const finishMentorships = await prepareMentorshipsForAccountDeletion(ctx, tx, userId);
     const finishReferrals = await prepareReferralsForAccountDeletion(ctx, tx, userId);
     await prepareChatForAccountDeletion(ctx, tx, userId);
+    // Collected first: the cascade takes the memberships that show the photos, and the uploads' link to the user.
+    const avatarKeys = await avatarKeysOfUser(ctx, tx, userId);
     await deleteUser(tx, userId);
     await finishMentorships();
     await finishReferrals();
     // Once it's done: a deletion that gives up on a row lock tells them to try again, and they have to still be signed in to.
     await afterCommit(ctx, tx, () => revokeAllSessions(ctx, userId));
+    await afterCommit(ctx, tx, () => removeAvatarsIfUnused(ctx, avatarKeys));
   });
 }

@@ -17,8 +17,8 @@ import { Pressable, Switch, Text, View } from "react-native";
 import { CountryPicker } from "@/components/CountryPicker";
 import { CustomFieldInputs, answersToValues, type FieldAnswers } from "@/components/CustomFieldInputs";
 import { DateTimeField } from "@/components/DateTimeField";
-import { Avatar, Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
-import { useImageUpload } from "@/hooks/useImagePicker";
+import { AvatarPicker } from "@/components/profile/AvatarPicker";
+import { Button, ChipSelect, ErrorText, Input, Row } from "@/components/ui";
 import { colors, useTheme } from "@/theme";
 
 type Form = {
@@ -91,12 +91,14 @@ export function ProfileForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // While the photo uploads, saving would send the old one and the new one would be lost.
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [more, setMore] = useState(!!initial?.bio);
-  const upload = useImageUpload(tenant.slug);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((s) => ({ ...s, [k]: v }));
   const nul = (s: string) => (s.trim() ? s.trim() : null);
 
   const submit = async () => {
+    if (photoBusy) return;
     setErrors({});
     setServerError(null);
     const editable = Object.fromEntries(customFields.filter((x) => x.memberEditable).map((x) => [x.key, answers[x.key] ?? null]));
@@ -124,7 +126,9 @@ export function ProfileForm({
         .map((s) => s.trim())
         .filter(Boolean)
         .slice(0, 20),
-      avatarUrl: f.avatarUrl,
+      // Only when it changed here: a form opened before the photo changed elsewhere would otherwise put back one that may
+      // be gone by now (and be refused).
+      ...(f.avatarUrl !== (initial?.avatarUrl ?? null) ? { avatarUrl: f.avatarUrl } : {}),
       isPhoneVisible: f.isPhoneVisible,
       celebrateBirthday: f.celebrateBirthday,
       celebrateAnniversary: f.celebrateAnniversary,
@@ -151,6 +155,8 @@ export function ProfileForm({
         const fe = err.fieldErrors;
         setErrors(fe);
         setAnswerErrors(Object.fromEntries(Object.entries(fe).filter(([k]) => k.startsWith("fields.")).map(([k, m]) => [k.slice(7), m])));
+        // The marked fields may be scrolled out of sight (the photo is at the very top), so say so beside the button.
+        setServerError(fe.avatarUrl ? "Check the profile photo at the top." : "Check the details marked above.");
       } else setServerError(errorMessage(err));
     } finally {
       setBusy(false);
@@ -159,23 +165,18 @@ export function ProfileForm({
 
   return (
     <View style={{ gap: 14 }}>
-      <Row gap={12}>
-        <Avatar name={f.fullName || "?"} src={f.avatarUrl} size={64} />
-        <Button
-          title={upload.busy ? "Uploading…" : f.avatarUrl ? "Change photo" : "Add photo"}
-          variant="outline"
-          loading={upload.busy}
-          onPress={async () => {
-            const url = await upload.pickAndUpload();
-            if (url) set("avatarUrl", url);
-          }}
-        />
-        {f.avatarUrl && (
-          <Pressable onPress={() => set("avatarUrl", null)} accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={8}>
-            <Muted>Remove</Muted>
-          </Pressable>
-        )}
-      </Row>
+      <AvatarPicker
+        slug={tenant.slug}
+        name={f.fullName}
+        value={f.avatarUrl}
+        error={errors.avatarUrl}
+        onBusyChange={setPhotoBusy}
+        onChange={(url) => {
+          set("avatarUrl", url);
+          setErrors((e) => ({ ...e, avatarUrl: "" }));
+          setServerError(null);
+        }}
+      />
       <Input label="Full name *" value={f.fullName} onChangeText={(v) => set("fullName", v)} error={errors.fullName} autoComplete="name" />
       <Input label="Batch (year of passing out) *" value={f.batchYear} onChangeText={(v) => set("batchYear", v.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" error={errors.batchYear} hint={`${tenant.settings.minBatchYear} – ${tenant.settings.maxBatchYear}`} />
       <ChipSelect label="What do you do? *" options={PROFESSION_TYPES.map((p) => ({ value: p, label: PROFESSION_TYPE_LABELS[p] }))} value={f.professionType} onChange={(v) => v && set("professionType", v)} />
@@ -220,7 +221,8 @@ export function ProfileForm({
         </View>
       )}
       <ErrorText error={serverError} />
-      <Button title={submitLabel} onPress={() => void submit()} loading={busy} />
+      {photoBusy && <Text style={{ color: colors.muted, fontSize: 13, textAlign: "center" }}>Wait for the photo to finish uploading.</Text>}
+      <Button title={submitLabel} onPress={() => void submit()} loading={busy} disabled={photoBusy} />
     </View>
   );
 }

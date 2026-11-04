@@ -51,7 +51,7 @@ import type {
   RsvpSummaryDto,
   UploadResultDto,
 } from "../../types/dto";
-import type { CelebrationKind, ReactionType, RsvpStatus } from "../../constants";
+import type { CelebrationKind, ReactionType, RsvpStatus, UploadPurpose } from "../../constants";
 import type { ApiCore, QueryParams } from "../core";
 
 type Q = Record<string, unknown> | undefined;
@@ -271,11 +271,15 @@ export interface NativeFile {
 
 export function uploadEndpoints(core: ApiCore) {
   return {
-    upload: (slug: string, file: Blob | NativeFile, filename = "image.jpg") => {
+    /**
+     * `purpose: "avatar"` for a profile photo: the server crops it square, and a profile accepts no other kind. `signal`
+     * cancels it (see startUpload).
+     */
+    upload: (slug: string, file: Blob | NativeFile, opts: { filename?: string; purpose?: UploadPurpose; signal?: AbortSignal } = {}) => {
       const formData = new FormData();
-      if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, (file as File).name || filename);
+      if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, (file as File).name || opts.filename || "image.jpg");
       else formData.append("file", file as unknown as Blob);
-      return core.data<UploadResultDto>({ method: "POST", path: "/uploads", tenantSlug: slug, formData });
+      return core.data<UploadResultDto>({ method: "POST", path: "/uploads", tenantSlug: slug, query: { purpose: opts.purpose }, formData, signal: opts.signal });
     },
   };
 }

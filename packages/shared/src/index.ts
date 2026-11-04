@@ -25,6 +25,7 @@ export * from "./schemas/events";
 export * from "./schemas/reports";
 export * from "./schemas/platform";
 export * from "./schemas/payments";
+export * from "./schemas/uploads";
 export * from "./types/dto";
 export * from "./lib/notifications";
 export * from "./lib/mentorship";

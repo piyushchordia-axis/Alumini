@@ -43,6 +43,8 @@ export interface JobPayloads {
   "chat.pushEvent": { tenantId: string; conversationId: string; kind: Exclude<ChatPushKind, "CHAT_MESSAGE" | "CHAT_GROUP_INVITE">; actorMembershipId: string | null };
   /** Tell members they've been invited to a group. They aren't in it, so this names them rather than reading its participants. */
   "chat.pushGroupInvite": { tenantId: string; conversationId: string; inviteeMembershipIds: string[] };
+  /** Delete profile photos that were uploaded but never saved to a profile (see sweepUnusedAvatars). */
+  "uploads.sweepAvatars": Record<string, never>;
 }
 
 export type JobName = keyof JobPayloads;
@@ -75,4 +77,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "chat.pushConversation": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "chat.pushEvent": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "chat.pushGroupInvite": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
+  "uploads.sweepAvatars": { queue: "jobs", attempts: 1 },
 };

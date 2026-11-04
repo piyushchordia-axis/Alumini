@@ -47,7 +47,7 @@ export function BusinessForm({ slug, initial, submitLabel, onSubmit }: { slug: s
         />
         {logoUrl && <Button title="Remove logo" variant="ghost" onPress={() => setLogoUrl(null)} />}
       </Row>
-      <ErrorText error={errors.logoUrl} />
+      <ErrorText error={upload.error ?? errors.logoUrl} />
       <Input label="Website" value={websiteUrl} onChangeText={setWebsiteUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" error={errors.websiteUrl} />
       <Input label="Contact email" value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" hint={CONTACT_HINT} error={errors.contactEmail} />
       <Input label="Contact phone" value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" hint={CONTACT_HINT} error={errors.contactPhone} />

@@ -44,6 +44,7 @@ import {
   RSVP_STATUSES,
   TENANT_STATUSES,
   TENANT_TYPES,
+  UPLOAD_PURPOSES,
 } from "@illuminize/shared";
 
 export const tenantTypeEnum = pgEnum("tenant_type", TENANT_TYPES);
@@ -90,3 +91,4 @@ export const mentorAreaEnum = pgEnum("mentor_area", MENTOR_AREAS);
 export const mentorAvailabilityEnum = pgEnum("mentor_availability", MENTOR_AVAILABILITIES);
 export const mentorshipStatusEnum = pgEnum("mentorship_status", MENTORSHIP_STATUSES);
 export const referralStatusEnum = pgEnum("referral_status", REFERRAL_STATUSES);
+export const uploadPurposeEnum = pgEnum("upload_purpose", UPLOAD_PURPOSES);

@@ -19,3 +19,4 @@ export * from "./engagement";
 export * from "./chat";
 export * from "./mentorship";
 export * from "./referrals";
+export * from "./uploads";

@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { forwardRef, useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
+import { IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 
 /* ---------- Button ---------- */
@@ -210,10 +211,24 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
 
 export function Avatar({ name, src, size = "md", className }: { name: string; src?: string | null; size?: "sm" | "md" | "lg" | "xl"; className?: string }) {
   const s = { sm: "h-8 w-8 text-xs", md: "h-10 w-10 text-sm", lg: "h-14 w-14 text-base", xl: "h-24 w-24 text-2xl" }[size];
-  return src ? (
-    <img src={src} alt={name} className={clsx("shrink-0 rounded-full object-cover", s, className)} />
-  ) : (
-    <span className={clsx("flex shrink-0 items-center justify-center rounded-full bg-primary/15 font-semibold text-primary", s, className)}>{initials(name)}</span>
+  const iconSize = { sm: 16, md: 20, lg: 28, xl: 44 }[size];
+  // The initials (or, with no name yet, a person icon) show while the photo loads and whenever it won't (deleted,
+  // offline, blocked). Remembering which src loaded or failed, rather than flags, makes a new photo start over.
+  const [failed, setFailed] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const photo = src && src !== failed ? src : null;
+  const shown = !!photo && loaded === photo;
+  const letters = initials(name);
+  return (
+    // Once the photo is in, the tint goes, so a logo with see-through parts looks as it would on its own.
+    <span className={clsx("relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-primary", !shown && "bg-primary/15", s, className)}>
+      {!shown && (
+        <span aria-hidden={photo ? true : undefined} className="flex items-center justify-center">
+          {letters || <IconProfile size={iconSize} />}
+        </span>
+      )}
+      {photo && <img src={photo} alt={name} onLoad={() => setLoaded(photo)} onError={() => setFailed(photo)} className="absolute inset-0 h-full w-full object-cover" />}
+    </span>
   );
 }
 

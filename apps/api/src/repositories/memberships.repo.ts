@@ -50,6 +50,20 @@ export async function lockMembership(db: DbClient, tenantId: string, id: string)
     .for("no key update");
 }
 
+/**
+ * The member's photo URL as saved now, holding their row until the transaction ends as the update that follows would.
+ * A request that read the membership before its transaction began may hold an older photo; this one is current. Null
+ * for no photo, undefined for no such membership.
+ */
+export async function lockMembershipAvatarUrl(db: DbClient, tenantId: string, id: string): Promise<string | null | undefined> {
+  const [row] = await db
+    .select({ avatarUrl: memberships.avatarUrl })
+    .from(memberships)
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .for("no key update");
+  return row ? row.avatarUrl : undefined;
+}
+
 export async function findMembershipWithUser(
   db: DbClient,
   tenantId: string,

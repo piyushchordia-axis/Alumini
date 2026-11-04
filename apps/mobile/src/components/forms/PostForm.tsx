@@ -55,6 +55,7 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
           />
         )}
       </Row>
+      <ErrorText error={upload.error} />
       {!initial && !poll && <Button title="📊 Add a poll" variant="ghost" onPress={() => setPoll({ options: ["", ""], allowsMultiple: false, closesInDays: "" })} />}
       {poll && (
         <View style={{ gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10 }}>

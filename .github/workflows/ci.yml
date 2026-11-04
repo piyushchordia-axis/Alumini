@@ -52,6 +52,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Its native binary comes from a platform package (no install script), so a missing one fails here, not in a test.
+      - name: Image processing (sharp) loads
+        working-directory: apps/api
+        run: node -e "import('sharp').then(({ default: s }) => console.log('sharp', s.versions.sharp, 'libvips', s.versions.vips))"
+
       - name: Lint
         run: pnpm turbo lint --filter=@illuminize/api --filter=@illuminize/shared --filter=@illuminize/web
 
@@ -72,3 +77,22 @@ jobs:
 
       - name: Build API and web
         run: pnpm turbo build --filter=@illuminize/api --filter=@illuminize/web
+
+  docker:
+    name: API image builds and loads sharp (Alpine, musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image installs with --ignore-scripts on musl, so sharp's musl binary must come from the lockfile alone.
+      - name: Build the API image
+        run: docker build -f apps/api/Dockerfile -t illuminize-api .
+
+      - name: Process an image inside it
+        run: >-
+          docker run --rm illuminize-api node -e "import('sharp').then(async ({ default: s }) => {
+          const png = await s({ create: { width: 8, height: 8, channels: 3, background: '#336699' } }).png().toBuffer();
+          const out = await s(png).resize(4, 4).jpeg().toBuffer();
+          console.log('sharp', s.versions.sharp, 'libvips', s.versions.vips, (await s(out).metadata()).format);
+          })"

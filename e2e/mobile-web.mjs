@@ -139,6 +139,35 @@ try {
     await shot("m04d-poll");
   });
 
+  // After the post with a photo, whose wait for its image would also find this one on the app bar.
+  await step("edit profile: add a photo through the round picker, saved as a square the profile shows", async () => {
+    const shown = (locator) => locator.locator("visible=true").last();
+    await page.goto(BASE + "/t/demo-university/profile");
+    await shown(page.getByRole("button", { name: "Edit profile" })).click();
+    await page.waitForURL("**/t/demo-university/profile/edit");
+    await shown(page.getByText("Members recognise faces first", { exact: false })).waitFor();
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    const chooser = page.waitForEvent("filechooser");
+    await shown(page.getByRole("button", { name: "Add photo", exact: true })).click();
+    await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png });
+    await shown(page.getByRole("button", { name: "Change photo", exact: true })).waitFor();
+    await shown(page.getByRole("button", { name: "Remove photo", exact: true })).waitFor();
+    await shot("m04f-profile-photo-picked");
+    await tap("Save profile");
+    await page.waitForURL("**/t/demo-university/profile");
+    // Served from /uploads/ as the 512-pixel square JPEG the server makes of a profile photo (this one was a 1×1 PNG).
+    const saved = page.locator('img[src*="/uploads/"]').locator("visible=true").first();
+    await saved.waitFor();
+    const [width, height, src] = await saved.evaluate(async (img) => {
+      await img.decode();
+      return [img.naturalWidth, img.naturalHeight, img.src];
+    });
+    if (width !== 512 || height !== 512 || !src.endsWith(".jpg")) throw new Error(`the saved photo is ${width}×${height} at ${src}, not a 512-pixel square JPEG`);
+    // The next step starts on the feed.
+    await page.goto(BASE + "/t/demo-university/feed");
+    await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();
+  });
+
   await step("every section opens its own screen, with Events, Groups, Mentors and Funding behind More", async () => {
     if ((await page.locator('a[role="tab"]').locator("visible=true").count()) !== 5) throw new Error("the tab bar should show four sections, then More");
     const moreColor = () => barTab("More").evaluate((el) => getComputedStyle(el).color);

@@ -110,6 +110,7 @@ export function EventForm({
         />
         {coverImageUrl && <Button title="Remove cover" variant="ghost" onPress={() => setCoverImageUrl(null)} />}
       </Row>
+      <ErrorText error={upload.error} />
       <ErrorText error={serverError} />
       <Button title={submitLabel} onPress={() => void submit()} loading={busy} />
     </>

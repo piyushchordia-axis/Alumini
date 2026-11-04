@@ -51,6 +51,10 @@ jobs:
       - name: Setup again (must be idempotent)
         run: node scripts/setup-local.mjs --skip-docker --skip-install
 
+      - name: Image processing (sharp) loads
+        working-directory: apps/api
+        run: node -e "import('sharp').then(({ default: s }) => console.log('sharp', s.versions.sharp, 'libvips', s.versions.vips))"
+
       - name: Lint
         run: pnpm turbo lint --filter=@illuminize/api --filter=@illuminize/shared --filter=@illuminize/web
 

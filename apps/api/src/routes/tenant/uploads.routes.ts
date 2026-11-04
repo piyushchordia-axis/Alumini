@@ -1,12 +1,13 @@
-import { ALLOWED_IMAGE_MIME, MAX_UPLOAD_BYTES } from "@illuminize/shared";
+import { ALLOWED_IMAGE_MIME, MAX_UPLOAD_BYTES, uploadQuerySchema } from "@illuminize/shared";
 import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
-import { IMAGE_EXTENSIONS, sniffImageType } from "../../lib/images";
 import { byUser, rateLimit } from "../../middleware/rateLimit";
-import { ok } from "../../middleware/validate";
+import { ok, route } from "../../middleware/validate";
 import { keys } from "../../redis/keys";
+import { findMyInvitation } from "../../services/invitations.service";
+import { storeUpload } from "../../services/uploads.service";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,16 +20,23 @@ const upload = multer({
 
 /**
  * Who may upload into an institution's storage: its members (approved, or pending/rejected while they fix their
- * registration), people registering where self-registration is open (avatar before the membership exists), and
- * Illuminize staff. Suspended members and strangers to a closed institution may not.
+ * registration), people registering where self-registration is open or who hold an open invitation (a photo before the
+ * membership exists), and Illuminize staff. Suspended members and other strangers to a closed institution may not.
  */
-const canUpload: RequestHandler = (req, _res, next) => {
-  const m = req.membership;
-  if (req.auth?.isPlatformAdmin) return next();
-  if (m) return m.status === "SUSPENDED" ? next(AppError.forbidden("Your membership is suspended", "MEMBERSHIP_SUSPENDED")) : next();
-  if (req.tenantCtx?.settings.allowSelfRegistration) return next();
-  next(AppError.forbidden("You are not a member of this institution", "NOT_A_MEMBER"));
-};
+function canUpload(ctx: AppContext): RequestHandler {
+  return async (req, _res, next) => {
+    try {
+      const m = req.membership;
+      if (req.auth?.isPlatformAdmin) return next();
+      if (m) return m.status === "SUSPENDED" ? next(AppError.forbidden("Your membership is suspended", "MEMBERSHIP_SUSPENDED")) : next();
+      if (req.tenantCtx?.settings.allowSelfRegistration) return next();
+      if (req.auth && (await findMyInvitation(ctx, req.tenantCtx!, req.auth.userId))) return next();
+      next(AppError.forbidden("You are not a member of this institution", "NOT_A_MEMBER"));
+    } catch (err) {
+      next(err);
+    }
+  };
+}
 
 /** Per-institution daily cap across all its members. */
 function tenantDailyQuota(ctx: AppContext): RequestHandler {
@@ -49,26 +57,30 @@ function tenantDailyQuota(ctx: AppContext): RequestHandler {
   };
 }
 
+/**
+ * Checks `?purpose=` before anything is counted or the file is read, so a request the handler would refuse (a client
+ * newer than this API, say) costs neither the member's hourly uploads nor the institution's daily ones.
+ */
+const validQuery: RequestHandler = (req, _res, next) => {
+  const parsed = uploadQuerySchema.safeParse(req.query ?? {});
+  next(parsed.success ? undefined : parsed.error);
+};
+
 export function uploadRoutes(ctx: AppContext): Router {
   const router = Router({ mergeParams: true });
   router.post(
     "/uploads",
-    canUpload,
+    canUpload(ctx),
+    validQuery,
     rateLimit(ctx, { bucket: "uploads", limit: 20, windowSec: 3600, keyFn: byUser }),
     tenantDailyQuota(ctx),
     upload.single("file"),
-    async (req, res, next) => {
-      try {
-        const file = req.file;
-        if (!file) throw AppError.badRequest("Attach an image in the 'file' field");
-        const mime = sniffImageType(file.buffer);
-        if (!mime) throw new AppError(415, "UNSUPPORTED_MEDIA", "The file is not a valid JPEG, PNG or WebP image");
-        const stored = await ctx.storage.save({ tenantId: req.tenantCtx!.tenant.id, buffer: file.buffer, mime, extension: IMAGE_EXTENSIONS[mime] });
-        ok(res, { url: stored.url }, 201);
-      } catch (err) {
-        next(err);
-      }
-    },
+    route({ query: uploadQuerySchema }, async ({ req, res, query }) => {
+      const file = req.file;
+      if (!file) throw AppError.badRequest("Attach an image in the 'file' field");
+      const stored = await storeUpload(ctx, { tenantId: req.tenantCtx!.tenant.id, userId: req.auth!.userId, buffer: file.buffer, purpose: query.purpose });
+      ok(res, stored, 201);
+    }),
   );
   return router;
 }

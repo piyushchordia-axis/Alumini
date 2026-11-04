@@ -13,12 +13,12 @@ import {
 } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
 import { CountrySelect } from "@/components/common/CountrySelect";
 import { CommaListInput } from "@/components/common/CommaListInput";
-import { ImageUploader } from "@/components/common/ImageUploader";
+import { AvatarPicker } from "@/components/profile/AvatarPicker";
 import { CustomFieldInputs, answersToValues, type FieldAnswers } from "@/components/profile/CustomFieldInputs";
 import { Button, Checkbox, ErrorBox, FormField, Input, Select, Textarea } from "@/components/ui";
 
@@ -55,6 +55,8 @@ const toForm = (m?: Partial<MembershipDto>): MembershipProfileInput => ({
 
 export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFields = [], mode = "edit" }: ProfileFormProps) {
   const [serverError, setServerError] = useState<unknown>(null);
+  // While the photo uploads, saving would send the old one and the new one would be lost.
+  const [photoBusy, setPhotoBusy] = useState(false);
   const initialAnswers = answersToValues(initial?.fields);
   const [answers, setAnswers] = useState<FieldAnswers>(initialAnswers);
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
@@ -67,13 +69,16 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
   };
   type FormInput = z.input<typeof membershipProfileSchema>;
   const form = useForm<FormInput, unknown, MembershipProfileInput>({ resolver: zodResolver(membershipProfileSchema), defaultValues: toForm(initial) });
-  const { register, handleSubmit, control, formState, setError } = form;
+  const { register, handleSubmit, control, formState, setError, clearErrors } = form;
   const errors = formState.errors;
   const years: number[] = [];
   for (let y = tenant.settings.maxBatchYear; y >= tenant.settings.minBatchYear; y--) years.push(y);
   const profession = useWatch({ control, name: "professionType" });
+  const fullName = useWatch({ control, name: "fullName" });
+  const photoWaitId = useId();
 
   const submit = handleSubmit(async (values) => {
+    if (photoBusy) return;
     setServerError(null);
     // Only send answers the member can change; check them here first for instant feedback.
     const editable = Object.fromEntries(customFields.filter((f) => !readOnly(f)).map((f) => [f.key, answers[f.key] ?? null]));
@@ -82,8 +87,12 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
       setAnswerErrors(check.errors);
       return;
     }
+    // The photo goes only when it changed here: a form opened before the photo changed elsewhere would otherwise put
+    // back one that may be gone by now (and be refused).
+    const { avatarUrl, ...rest } = values;
+    const changed = avatarUrl !== (initial?.avatarUrl ?? null) ? { ...rest, avatarUrl } : rest;
     try {
-      await onSubmit(customFields.length ? { ...values, fields: editable } : values);
+      await onSubmit(customFields.length ? { ...changed, fields: editable } : changed);
     } catch (err) {
       if (isApiClientError(err)) {
         const fields = err.fieldErrors;
@@ -100,9 +109,23 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="flex items-center gap-4">
-        <Controller control={control} name="avatarUrl" render={({ field }) => <ImageUploader slug={tenant.slug} urls={field.value ? [field.value] : []} onChange={(u) => field.onChange(u[0] ?? null)} label="Photo" />} />
-      </div>
+      <Controller
+        control={control}
+        name="avatarUrl"
+        render={({ field, fieldState }) => (
+          <AvatarPicker
+            slug={tenant.slug}
+            name={fullName ?? ""}
+            value={field.value ?? null}
+            error={fieldState.error?.message}
+            onBusyChange={setPhotoBusy}
+            onChange={(url) => {
+              field.onChange(url);
+              clearErrors("avatarUrl");
+            }}
+          />
+        )}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Full name" required error={errors.fullName?.message}>
           <Input {...register("fullName")} invalid={!!errors.fullName} autoComplete="name" />
@@ -186,7 +209,12 @@ export function ProfileForm({ tenant, initial, submitLabel, onSubmit, customFiel
       </details>
 
       {serverError ? <ErrorBox error={serverError} /> : null}
-      <Button type="submit" block loading={formState.isSubmitting}>
+      {photoBusy && (
+        <p className="text-center text-sm text-slate-500" id={photoWaitId}>
+          Wait for the photo to finish uploading.
+        </p>
+      )}
+      <Button type="submit" block loading={formState.isSubmitting} disabled={photoBusy} aria-describedby={photoBusy ? photoWaitId : undefined}>
         {submitLabel}
       </Button>
     </form>

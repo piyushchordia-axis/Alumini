@@ -22,6 +22,7 @@ import { initialMembershipStatus, transitionMembership, type MembershipAction } 
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
 import { notify, notifyTenantAdmins } from "./notifications/notification.service";
+import { applyAvatarChange } from "./uploads.service";
 
 /** An admin acting on a member, or Illuminize staff. */
 export interface Actor extends AuthContext {
@@ -82,16 +83,18 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
     let row: MembershipRow;
     let action: "membership.create" | "membership.reapply";
 
+    if (existing && existing.status !== "REJECTED") {
+      const msg =
+        existing.status === "PENDING"
+          ? "Your membership request is already awaiting approval"
+          : existing.status === "SUSPENDED"
+            ? "Your membership is suspended"
+            : "You are already a member of this institution";
+      throw AppError.conflict(msg);
+    }
+    await applyAvatarChange(ctx, tx, tenant.id, { membershipId: existing?.id ?? null, next: input.avatarUrl, uploaderIds: [actor.userId] });
+
     if (existing) {
-      if (existing.status !== "REJECTED") {
-        const msg =
-          existing.status === "PENDING"
-            ? "Your membership request is already awaiting approval"
-            : existing.status === "SUSPENDED"
-              ? "Your membership is suspended"
-              : "You are already a member of this institution";
-        throw AppError.conflict(msg);
-      }
       const next = approveNow ? "APPROVED" : transitionMembership(existing.status, "reapply", settings.memberApprovalMode);
       row = (await updateMembership(tx, tenant.id, existing.id, {
         ...profileColumns(input),
@@ -162,6 +165,7 @@ export async function updateMyProfile(
 ): Promise<MembershipDto> {
   assertBatchYear(tenantCtx, input.batchYear);
   const row = await runInTransaction(ctx, async (tx) => {
+    await applyAvatarChange(ctx, tx, tenantCtx.tenant.id, { membershipId: membership.id, next: input.avatarUrl, uploaderIds: [membership.userId] });
     const updated = await updateMembership(tx, tenantCtx.tenant.id, membership.id, profileColumns(input));
     if (!updated) throw AppError.notFound("Membership not found");
     if (input.fields) await saveAnswers(ctx, tx, tenantCtx.tenant.id, membership.id, input.fields, "member");
@@ -358,8 +362,9 @@ export async function adminUpdateProfile(
   const { user, row } = await recordingRefusal(ctx, tenant.id, actor, "membership.admin_profile_update", membershipId, () =>
     runInTransaction(ctx, async (tx) => {
       await assertNoOpenReportAboutActor(tx, tenant.id, actor);
-      const { user } = await loadTarget(tx, tenant.id, membershipId);
+      const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
       assertBatchYear(tenantCtx, input.batchYear);
+      await applyAvatarChange(ctx, tx, tenant.id, { membershipId, next: input.avatarUrl, uploaderIds: [target.userId, actor.userId] });
       const row = (await updateMembership(tx, tenant.id, membershipId, profileColumns(input)))!;
       if (input.fields) await saveAnswers(ctx, tx, tenant.id, membershipId, input.fields, "admin");
       return { user, row };

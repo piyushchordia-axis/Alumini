@@ -1,7 +1,8 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode, type Ref } from "react";
+import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StackHeader } from "@/components/StackHeader";
+import { IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -42,21 +43,46 @@ export function LoadError({ error, onRetry, onBack, backLabel = "Choose another 
   );
 }
 
-export function Button({ title, variant = "primary", loading, disabled, style, ...rest }: PressableProps & { title: string; variant?: "primary" | "outline" | "ghost" | "danger"; loading?: boolean; style?: ViewStyle }) {
+/** `icon` draws before the title, given the title's colour (an SVG from components/icons). `ref` reaches the pressable, to move focus to it. */
+export function Button({
+  title,
+  variant = "primary",
+  loading,
+  disabled,
+  icon,
+  style,
+  ref,
+  ...rest
+}: PressableProps & {
+  title: string;
+  variant?: "primary" | "outline" | "ghost" | "danger";
+  loading?: boolean;
+  icon?: (color: string) => ReactNode;
+  style?: ViewStyle;
+  ref?: Ref<ComponentRef<typeof View>>;
+}) {
   const theme = useTheme();
   const bg = variant === "primary" ? theme.primary : variant === "danger" ? colors.danger : "transparent";
   const fg = variant === "primary" || variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.primary;
   return (
     <Pressable
+      ref={ref}
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={title}
       aria-disabled={!!(disabled || loading)}
       aria-busy={!!loading}
-      style={({ pressed }) => [styles.button, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
+      style={({ pressed }) => [styles.button, icon ? styles.buttonWithIcon : null, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
       {...rest}
     >
-      {loading ? <ActivityIndicator color={fg} /> : <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>}
+      {loading ? (
+        <ActivityIndicator color={fg} />
+      ) : (
+        <>
+          {icon?.(fg)}
+          <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -264,10 +290,34 @@ export function Badge({ label, tone = "neutral" }: { label: string; tone?: "neut
 
 export function Avatar({ name, src, size = 40 }: { name: string; src?: string | null; size?: number }) {
   const theme = useTheme();
-  if (src) return <Image source={{ uri: src }} accessibilityIgnoresInvertColors accessible={false} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  // The initials (or, with no name yet, a person icon) show while the photo loads and whenever it won't (deleted,
+  // offline). Remembering which src loaded or failed, rather than flags, makes a new photo start over.
+  const [failed, setFailed] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const photo = src && src !== failed ? src : null;
+  const shown = !!photo && loaded === photo;
+  const letters = initials(name);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ color: theme.primary, fontWeight: "700", fontSize: size * 0.36 }}>{initials(name)}</Text>
+    // Once the photo is in, the tint goes, so a logo with see-through parts looks as it would on its own.
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: "hidden", backgroundColor: shown ? "transparent" : theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
+      {!shown &&
+        (letters ? (
+          <Text aria-hidden={!!photo} style={{ color: theme.primary, fontWeight: "700", fontSize: size * 0.36 }}>
+            {letters}
+          </Text>
+        ) : (
+          <IconProfile size={Math.round(size * 0.45)} color={theme.primary} />
+        ))}
+      {photo && (
+        <Image
+          source={{ uri: photo }}
+          onLoad={() => setLoaded(photo)}
+          onError={() => setFailed(photo)}
+          accessibilityIgnoresInvertColors
+          accessible={false}
+          style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+        />
+      )}
     </View>
   );
 }
@@ -305,13 +355,35 @@ export function ListEmpty({ loading, error, onRetry, children }: { loading: bool
   return <>{children}</>;
 }
 
+/**
+ * Has screen readers read `message` when it appears or changes. role="alert" does it on the web build only: Android
+ * follows a live region (the caller sets `accessibilityLiveRegion`), and iOS has to be told.
+ */
+function useAnnounced(message: string) {
+  useEffect(() => {
+    if (message && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(message);
+  }, [message]);
+}
+
 export function ErrorText({ error }: { error: unknown }) {
-  if (!error) return null;
-  const msg = error instanceof Error ? error.message : String(error);
+  const msg = !error ? "" : error instanceof Error ? error.message : String(error);
+  useAnnounced(msg);
+  if (!msg) return null;
   return (
-    <View style={styles.errorBox} accessibilityRole="alert">
+    <View style={styles.errorBox} accessibilityRole="alert" accessibilityLiveRegion={Platform.OS === "android" ? "polite" : undefined}>
       <Text style={{ color: "#991b1b", fontSize: 13 }}>{msg}</Text>
     </View>
+  );
+}
+
+/** A field's own error: red text under the control, like Input's, read out when it appears. */
+export function FieldError({ error }: { error?: string | null }) {
+  useAnnounced(error ?? "");
+  if (!error) return null;
+  return (
+    <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion={Platform.OS === "android" ? "polite" : undefined}>
+      {error}
+    </Text>
   );
 }
 
@@ -341,6 +413,7 @@ const styles = StyleSheet.create({
   padded: { padding: spacing.lg, gap: spacing.md },
   button: { height: 46, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.lg, borderWidth: 1 },
   buttonText: { fontWeight: "600", fontSize: 15 },
+  buttonWithIcon: { flexDirection: "row", gap: spacing.sm },
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
   input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
   error: { color: colors.danger, fontSize: 12 },

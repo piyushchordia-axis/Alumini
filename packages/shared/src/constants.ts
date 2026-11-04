@@ -457,6 +457,11 @@ export const MAX_POST_IMAGES = 4;
 export const MAX_POLL_OPTIONS = 6;
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+/** What an upload is for (`?purpose=`). An avatar is cropped to a square JPEG and is the only kind a profile photo may use. */
+export const UPLOAD_PURPOSES = ["image", "avatar"] as const;
+export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
+/** Side of the square a profile photo is cropped to, in pixels. */
+export const AVATAR_SIZE = 512;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 export const MIN_BATCH_YEAR = 1950;

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileForm } from "@/components/profile/ProfileForm";
-import { Avatar, Button, Card, PageHeader } from "@/components/ui";
+import { Avatar, Button, Card, Loading, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
 import { api } from "@/lib/api";
@@ -24,26 +24,30 @@ export function MyProfilePage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="My profile" subtitle={`Signed in as ${user?.phone ?? ""}`} />
       <Card className="p-5">
-        <ProfileForm
-          key={fields.data ? "with-fields" : "loading"}
-          tenant={tenant}
-          initial={membership}
-          customFields={fields.data ?? []}
-          submitLabel="Save profile"
-          onSubmit={async (values) => {
-            try {
-              const updated = await api.membership.updateMe(tenant.slug, values);
-              qc.setQueryData(qk.membership(tenant.slug), updated);
-              void qc.invalidateQueries({ queryKey: qk.me });
-              void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
-              void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
-              toast.success("Profile saved");
-            } catch (err) {
-              toast.error(errorMessage(err));
-              throw err;
-            }
-          }}
-        />
+        {/* The form starts once the institution's questions are in, so nothing typed or uploaded is lost to a remount. */}
+        {fields.isLoading ? (
+          <Loading />
+        ) : (
+          <ProfileForm
+            tenant={tenant}
+            initial={membership}
+            customFields={fields.data ?? []}
+            submitLabel="Save profile"
+            onSubmit={async (values) => {
+              try {
+                const updated = await api.membership.updateMe(tenant.slug, values);
+                qc.setQueryData(qk.membership(tenant.slug), updated);
+                void qc.invalidateQueries({ queryKey: qk.me });
+                void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
+                void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
+                toast.success("Profile saved");
+              } catch (err) {
+                toast.error(errorMessage(err));
+                throw err;
+              }
+            }}
+          />
+        )}
       </Card>
       <Card className="p-5">
         <EmailSettings />

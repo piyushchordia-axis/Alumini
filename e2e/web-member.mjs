@@ -333,6 +333,49 @@ try {
     await page.locator(`text=${name} and Sons`).waitFor({ state: "detached" });
   });
 
+  // After the business journey, whose wait for its logo would also find this photo in the header.
+  await step("my profile: the photo picker refuses a wrong file beside it, and a saved photo is a square every avatar shows", async () => {
+    await page.goto(BASE + "/t/demo-university/app/profile");
+    await page.waitForSelector('h1:has-text("My profile")');
+    const picker = page.getByRole("group", { name: "Profile photo" });
+    const photo = page.locator('input[aria-label="Profile photo"]');
+    await picker.getByRole("button", { name: "Add photo", exact: true }).waitFor();
+    await picker.getByText("ST", { exact: true }).waitFor();
+    await photo.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not a photo") });
+    await picker.getByRole("alert").filter({ hasText: "Choose a JPEG, PNG or WebP image." }).waitFor();
+    await shot("08d-profile-photo-error");
+    await photo.setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
+    await picker.getByRole("button", { name: "Change photo", exact: true }).waitFor();
+    await picker.getByRole("button", { name: "Remove photo", exact: true }).waitFor();
+    if (await picker.getByRole("alert").count()) throw new Error("the picker's error stayed after a good photo");
+    await page.click('button:has-text("Save profile")');
+    // The header shows the saved photo, served from /uploads/ as the 512-pixel square JPEG the server makes of a profile
+    // photo (this one was a 1×1 PNG), so it went up as an avatar.
+    const header = page.locator('a[aria-label="My profile"]');
+    const saved = header.locator('img[src*="/uploads/"]');
+    await saved.waitFor();
+    const [width, height, src] = await saved.evaluate(async (img) => {
+      await img.decode();
+      return [img.naturalWidth, img.naturalHeight, img.src];
+    });
+    if (width !== 512 || height !== 512 || !src.endsWith(".jpg")) throw new Error(`the saved photo is ${width}×${height} at ${src}, not a 512-pixel square JPEG`);
+    await shot("08e-profile-photo");
+
+    // A photo that can't load shows the initials instead, in the header and the picker.
+    const images = /\/uploads\/[^?#]+\.(jpg|png|webp)$/;
+    await page.route(images, (route) => route.fulfill({ status: 404 }));
+    await page.reload();
+    // Once the profile is in (a photo to change), the initials also show while a photo loads: so it's the broken photo
+    // being dropped that shows they stand in for it.
+    await picker.getByRole("button", { name: "Change photo", exact: true }).waitFor();
+    for (const avatar of [header, picker]) {
+      await avatar.locator("img").waitFor({ state: "detached" });
+      await avatar.getByText("ST", { exact: true }).waitFor();
+    }
+    await shot("08f-profile-photo-unavailable");
+    await page.unroute(images);
+  });
+
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
   const expectMoreActive = async (active, where) => {
     const current = (await moreButton.getAttribute("aria-current")) === "true";
