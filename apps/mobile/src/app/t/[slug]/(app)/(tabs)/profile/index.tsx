@@ -1,11 +1,11 @@
-import { PROFILE_SECTIONS } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, profileStrength } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, Text } from "react-native";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
-import { PROFILE_SECTION_TITLES } from "@/components/profile/useProfileDraft";
+import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -80,6 +80,8 @@ export default function MyProfileScreen() {
         </Row>
         <ProfileDetails profile={membership} tenant={tenant} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, marginTop: spacing.xs }} />
       </Card>
+      {/* From what's saved, so it moves when a save lands. */}
+      <ProfileStrengthPanel strength={profileStrength(membership, tenant)} slug={slug} />
       <Card>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" hitSlop={6}>
           <Text style={{ color: theme.primary, fontWeight: "600" }}>🗂️ My posts & listings</Text>

@@ -356,7 +356,8 @@ export interface ProfileEducationDto {
 /**
  * What "Use details from …" offers someone joining an institution: their profile at another one, the details that
  * belong to the person rather than the institution. Never the batch, the institution's own questions, personal details,
- * the phone setting or the photo. Their degree and field there come as an entry of `education`, named after it.
+ * the phone setting or the photo. Their degree and field there come as an entry of `education`, named after it. Their
+ * date of birth is null when they keep their birthday off that institution's feed.
  */
 export interface PortableProfileDto
   extends Pick<

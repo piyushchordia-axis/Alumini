@@ -1,22 +1,35 @@
 import {
+  PORTABLE_PROFILE_KEYS,
+  PROFILE_NUDGE_ITEMS,
   PROFILE_NUDGE_SNOOZE_DAYS,
+  PROFILE_SECTIONS,
   PROFILE_STRENGTH_HIDE_AT,
+  fillFromPortableProfile,
   hiddenProfileKeys,
   hostUrlSchema,
   linkUrlSchema,
   membershipProfileSchema,
   membershipProfileUpdateSchema,
+  missingProfileItems,
+  portableProfileFillMessage,
+  portableProfileOfferText,
+  portableProfileUndoMessage,
+  profileSectionFields,
   profileSectionOf,
+  profileSectionOfStep,
   profileStepOf,
   profileStrength,
   profileYearsLabel,
+  registrationStepHeading,
   showProfileNudge,
   socialUrlFromInput,
   sortEducation,
   sortExperiences,
+  undoPortableProfileFill,
   withoutHiddenProfileKeys,
   yearsOfExperience,
   yearsOfExperienceLabel,
+  type PortableProfileDto,
   type ProfileStrengthInput,
 } from "@illuminize/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -173,6 +186,157 @@ describe("profileStepOf", () => {
     expect(profileStepOf("somethingElse")).toBe(1);
     expect(profileStepOf("constructor")).toBe(1);
     expect(profileSectionOf("toString")).toBe("basics");
+  });
+});
+
+describe("missingProfileItems", () => {
+  it("suggests the heaviest items still missing, in the checklist's order on a tie", () => {
+    const started = { ...empty, avatarUrl: "x", headline: "y", companyName: "Acme", city: "Pune" };
+    expect(PROFILE_NUDGE_ITEMS).toBe(3);
+    expect(missingProfileItems(profileStrength(started, college, NOW)).map((i) => i.key)).toEqual(["skills", "bio", "industry"]);
+    expect(missingProfileItems(profileStrength(empty, college, NOW), 2).map((i) => i.key)).toEqual(["photo", "headline"]);
+    expect(missingProfileItems(profileStrength({ ...complete, bio: null }, college, NOW)).map((i) => i.key)).toEqual(["bio"]);
+    expect(missingProfileItems(profileStrength(complete, college, NOW))).toEqual([]);
+  });
+});
+
+describe("registration steps", () => {
+  it("names each step after its section", () => {
+    expect([1, 2, 3].map((s) => registrationStepHeading(s as 1 | 2 | 3))).toEqual(["Step 1 of 3 · Basics", "Step 2 of 3 · Work", "Step 3 of 3 · About you"]);
+    expect([1, 2, 3].map((s) => profileSectionOfStep(s as 1 | 2 | 3))).toEqual([...PROFILE_SECTIONS]);
+  });
+
+  it("lists each section's inputs, every input in exactly one, as profileSectionOf places them", () => {
+    expect(profileSectionFields("basics").sort()).toEqual(["avatarUrl", "batchYear", "city", "country", "dateOfBirth", "fullName", "professionType"]);
+    expect(profileSectionFields("work").sort()).toEqual(["careerStartYear", "companyName", "designation", "experiences", "headline", "industry", "skills"]);
+    const all = PROFILE_SECTIONS.flatMap((s) => profileSectionFields(s));
+    expect(new Set(all).size).toBe(all.length);
+    // Every key of the registration body but the institution's own questions.
+    const body = Object.keys(membershipProfileSchema.shape).filter((k) => k !== "fields");
+    expect([...all].sort()).toEqual(body.sort());
+    for (const s of PROFILE_SECTIONS) for (const key of profileSectionFields(s)) expect(profileSectionOf(key), key).toBe(s);
+    // Everything registration requires is in the first step, so the later ones can be skipped.
+    const required = Object.entries(membershipProfileSchema.shape).filter(([, schema]) => !schema.safeParse(undefined).success).map(([key]) => key);
+    expect(required.length).toBeGreaterThan(0);
+    for (const key of required) expect(profileSectionOf(key), key).toBe("basics");
+  });
+});
+
+describe("fillFromPortableProfile", () => {
+  type Form = Partial<Record<(typeof PORTABLE_PROFILE_KEYS)[number] | "fullName", unknown>>;
+  const start: Form = { fullName: "Asha Rao", city: null, country: "IN", headline: null, skills: [], experiences: [], bio: null, githubUrl: null, openTo: [] };
+  const copy: Form = {
+    city: "Pune",
+    country: "US",
+    headline: "Builds payments",
+    skills: ["Go", "SQL"],
+    experiences: [{ company: "Acme", title: "Intern", startYear: 2013, endYear: 2014 }],
+    bio: null,
+    githubUrl: "https://github.com/asha",
+    openTo: ["HIRING"],
+  };
+
+  it("fills every input the member hasn't changed, including ones that only hold the form's default", () => {
+    const fill = fillFromPortableProfile(copy, start, start);
+    expect(fill.filled).toEqual(["city", "country", "headline", "skills", "experiences", "githubUrl", "openTo"]);
+    expect(fill.kept).toEqual([]);
+    expect(fill.values).toEqual({ city: "Pune", country: "US", headline: "Builds payments", skills: ["Go", "SQL"], experiences: copy.experiences, githubUrl: "https://github.com/asha", openTo: ["HIRING"] });
+  });
+
+  it("keeps what the member typed, and never clears an input the other profile leaves blank", () => {
+    const typed = { ...start, city: "Mumbai", skills: ["Rust"], bio: "My own words" };
+    const fill = fillFromPortableProfile(copy, typed, start);
+    expect(fill.kept).toEqual(["city", "skills"]);
+    expect(fill.values).not.toHaveProperty("city");
+    expect(fill.values).not.toHaveProperty("skills");
+    expect(fill.values).not.toHaveProperty("bio");
+    expect(fill.filled).toContain("headline");
+  });
+
+  it("fills an input cleared back to blank, and passes over one that already matches", () => {
+    const fill = fillFromPortableProfile(copy, { ...start, city: "  ", headline: "Builds payments", country: "US" }, start);
+    expect(fill.filled).toContain("city");
+    expect(fill.filled).not.toContain("headline");
+    expect(fill.filled).not.toContain("country");
+    expect(fill.kept).toEqual([]);
+  });
+
+  it("leaves alone the inputs the form hides", () => {
+    const fill = fillFromPortableProfile(copy, start, start, ["githubUrl", "openTo", "careerStartYear"]);
+    expect(fill.filled).not.toContain("githubUrl");
+    expect(fill.filled).not.toContain("openTo");
+    expect(fill.values).not.toHaveProperty("githubUrl");
+  });
+
+  it("covers every detail the API offers, and only those", () => {
+    const offered: Record<Exclude<keyof PortableProfileDto, "source">, true> = {
+      headline: true,
+      companyName: true,
+      designation: true,
+      industry: true,
+      careerStartYear: true,
+      skills: true,
+      experiences: true,
+      education: true,
+      linkedinUrl: true,
+      websiteUrl: true,
+      githubUrl: true,
+      instagramUrl: true,
+      xUrl: true,
+      openTo: true,
+      bio: true,
+      interests: true,
+      city: true,
+      country: true,
+      dateOfBirth: true,
+    };
+    expect([...PORTABLE_PROFILE_KEYS].sort()).toEqual(Object.keys(offered).sort());
+  });
+
+  it("says what it filled in and what it kept", () => {
+    expect(portableProfileFillMessage("Demo University", { filled: ["city"], kept: [] })).toBe("Filled in your city from Demo University.");
+    expect(portableProfileFillMessage("Demo University", { filled: ["city", "headline", "skills"], kept: [] })).toBe("Filled in your city, headline and skills from Demo University.");
+    expect(portableProfileFillMessage("Demo University", { filled: ["city", "country", "headline", "skills", "bio"], kept: ["designation", "githubUrl"] })).toBe(
+      "Filled in your city, country, headline and 2 more from Demo University. Kept what you'd entered for your role and GitHub.",
+    );
+    expect(portableProfileFillMessage("Demo University", { filled: [], kept: ["city"] })).toBe("Nothing new to add from Demo University. Kept what you'd entered for your city.");
+  });
+
+  it("names the date of birth in its offer only when it brings one", () => {
+    expect(portableProfileOfferText({ dateOfBirth: "1990-04-02" })).toBe(
+      "Bring over your city, date of birth, work, skills, links and bio from there. Nothing you've typed here is replaced, and you can change any of it.",
+    );
+    expect(portableProfileOfferText({ dateOfBirth: null })).toBe("Bring over your city, work, skills, links and bio from there. Nothing you've typed here is replaced, and you can change any of it.");
+  });
+});
+
+describe("undoPortableProfileFill", () => {
+  type Form = Partial<Record<(typeof PORTABLE_PROFILE_KEYS)[number], unknown>>;
+  const before: Form = { city: null, headline: null, skills: [], experiences: [] };
+  const copy: Form = { city: "Pune", headline: "Builds payments", skills: ["Go", "SQL"], experiences: [{ company: "Acme", title: "Intern", startYear: 2013, endYear: 2014 }] };
+  const fill = fillFromPortableProfile(copy, before, before);
+
+  it("puts back everything it filled while nothing has changed since", () => {
+    const undo = undoPortableProfileFill(fill, before, { ...before, ...fill.values });
+    expect(undo.values).toEqual(before);
+    expect(undo.kept).toEqual([]);
+    expect(portableProfileUndoMessage("Demo University", undo)).toBeNull();
+  });
+
+  it("keeps what the member changed after the fill, and says so", () => {
+    const now = { ...before, ...fill.values, headline: "Head of payments at Acme", skills: ["Go", "SQL", "Rust"] };
+    const undo = undoPortableProfileFill(fill, before, now);
+    expect(undo.kept).toEqual(["headline", "skills"]);
+    expect(undo.values).toEqual({ city: null, experiences: [] });
+    expect(undo.values).not.toHaveProperty("headline");
+    expect(portableProfileUndoMessage("Demo University", undo)).toBe("Took out the details from Demo University. Kept your changes to your headline and skills.");
+  });
+
+  it("counts a list row edited in place as a change, and an input cleared back to how it was as none", () => {
+    const edited = [{ company: "Acme", title: "Intern", startYear: 2013, endYear: 2015 }];
+    const undo = undoPortableProfileFill(fill, before, { ...before, ...fill.values, experiences: edited, city: "  " });
+    expect(undo.kept).toEqual(["experiences"]);
+    expect(undo.values).toHaveProperty("city", null);
   });
 });
 

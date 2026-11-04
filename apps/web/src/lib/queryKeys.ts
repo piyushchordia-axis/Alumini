@@ -3,6 +3,8 @@ export const qk = {
   tenant: (slug: string) => ["tenant", slug] as const,
   me: ["me"] as const,
   myEmail: ["me", "email"] as const,
+  /** "Use details from …" when joining `slug`: the signed-in person's profile at another institution. */
+  profileCopy: (slug: string) => ["profile-copy", slug] as const,
   membership: (slug: string) => ["membership", slug] as const,
   profileFields: (slug: string) => ["profile-fields", slug] as const,
   myInvitation: (slug: string) => ["membership", slug, "invitation"] as const,

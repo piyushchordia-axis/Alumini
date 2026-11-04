@@ -1,10 +1,12 @@
 import {
   PROFILE_SECTIONS,
+  PROFILE_SECTION_TITLES,
   hiddenProfileKeys,
   isCurrentPupil,
   membershipProfileSchema,
   profileEducationSchema,
   profileExperienceSchema,
+  profileSectionFields,
   profileSectionOf,
   socialUrlFromInput,
   validateProfileFieldValues,
@@ -25,8 +27,6 @@ import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useState, type RefObject } from "react";
 import { answersToValues, type FieldAnswers } from "@/components/CustomFieldInputs";
 import type { SkillsInputHandle } from "@/components/SkillsInput";
-
-export const PROFILE_SECTION_TITLES: Record<ProfileSection, string> = { basics: "Basics", work: "Work", about: "About you" };
 
 /** A past role as typed: years are text until saved. `key` keeps a row's place while others come and go. */
 export interface ExperienceDraft {
@@ -85,6 +85,8 @@ export type ProfileListKey = "experiences" | "education";
 type ListItem<L extends ProfileListKey> = ProfileDraft[L][number];
 /** The fields set one at a time; photo and lists have their own setters. */
 type FieldKey = Exclude<keyof ProfileDraft, ProfileListKey | "avatarUrl">;
+/** Some of the inputs' values, set together with setValues: anything but the photo, which has its picker. */
+export type DraftValues = Partial<Pick<ProfileDraft, FieldKey | ProfileListKey>>;
 
 /** Which site each link field is for, so a typed handle becomes that site's address. */
 export const LINK_KINDS: Record<ProfileLinkKey, SocialLinkKind> = { linkedinUrl: "linkedin", websiteUrl: "website", githubUrl: "github", instagramUrl: "instagram", xUrl: "x" };
@@ -96,7 +98,8 @@ const year = (v: number | null | undefined) => (v == null ? "" : String(v));
 const blankExperience = (): ExperienceDraft => ({ key: rowKey(), title: "", company: "", startYear: "", endYear: "" });
 const blankEducation = (): EducationDraft => ({ key: rowKey(), institution: "", degree: "", fieldOfStudy: "", startYear: "", endYear: "" });
 
-const toDraft = (m?: Partial<MembershipDto>): ProfileDraft => ({
+/** A membership (or any part of one, such as PortableProfileDto) as the form's inputs hold it, blanks filled in. */
+export const toDraft = (m?: Partial<MembershipDto>): ProfileDraft => ({
   fullName: m?.fullName ?? "",
   batchYear: m?.batchYear ? String(m.batchYear) : "",
   dateOfBirth: m?.dateOfBirth ?? "",
@@ -140,8 +143,9 @@ export const yearDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
 const experienceInput = (e: ExperienceDraft) => ({ title: e.title, company: e.company, startYear: yearOrNull(e.startYear), endYear: yearOrNull(e.endYear) });
 const educationInput = (e: EducationDraft) => ({ institution: e.institution, degree: nul(e.degree), fieldOfStudy: nul(e.fieldOfStudy), startYear: yearOrNull(e.startYear), endYear: yearOrNull(e.endYear) });
 
-/** An empty required box in a list says what's missing rather than the schema's "Too small". */
+/** An empty required box says what's missing rather than the schema's "Too small". */
 const WHEN_EMPTY: [RegExp, string][] = [
+  [/^fullName$/, "Enter your full name"],
   [/^experiences\.\d+\.title$/, "Enter the job title"],
   [/^experiences\.\d+\.company$/, "Enter the company"],
   [/^education\.\d+\.institution$/, "Enter where you studied"],
@@ -158,6 +162,56 @@ function issueErrors(issues: readonly { path: readonly PropertyKey[]; code: stri
     out[path] ??= issue.code === "too_small" ? (WHEN_EMPTY.find(([re]) => re.test(path))?.[1] ?? issue.message) : issue.message;
   }
   return out;
+}
+
+/** `errors`, saying what's missing for a batch left blank, which the schema reads as the year 0. */
+function withBlankBatch(errors: Record<string, string>, d: ProfileDraft): Record<string, string> {
+  return errors.batchYear && !d.batchYear.trim() ? { ...errors, batchYear: "Enter the year you passed out" } : errors;
+}
+
+/**
+ * The draft as the profile body, for the schema to check: `skills` with whatever is still typed in the skills box, and
+ * the photo only when it changed from `savedAvatar`, as a form opened before the photo changed elsewhere would otherwise
+ * put back one that may be gone by now (and be refused).
+ */
+function draftBody(d: ProfileDraft, skills: string[], savedAvatar: string | null) {
+  const link = (key: ProfileLinkKey) => socialUrlFromInput(LINK_KINDS[key], d[key]);
+  return {
+    fullName: d.fullName,
+    batchYear: d.batchYear,
+    dateOfBirth: nul(d.dateOfBirth),
+    professionType: d.professionType,
+    companyName: nul(d.companyName),
+    designation: nul(d.designation),
+    city: nul(d.city),
+    country: nul(d.country),
+    maritalStatus: d.maritalStatus || null,
+    kidsCount: d.kidsCount.trim() ? Number(d.kidsCount) : null,
+    bio: nul(d.bio),
+    interests: d.interests
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 20),
+    headline: nul(d.headline),
+    industry: d.industry || null,
+    careerStartYear: yearOrNull(d.careerStartYear),
+    skills,
+    degree: nul(d.degree),
+    fieldOfStudy: nul(d.fieldOfStudy),
+    experiences: d.experiences.map(experienceInput),
+    education: d.education.map(educationInput),
+    linkedinUrl: link("linkedinUrl"),
+    websiteUrl: link("websiteUrl"),
+    githubUrl: link("githubUrl"),
+    instagramUrl: link("instagramUrl"),
+    xUrl: link("xUrl"),
+    openTo: d.openTo,
+    ...(d.avatarUrl !== savedAvatar ? { avatarUrl: d.avatarUrl } : {}),
+    isPhoneVisible: d.isPhoneVisible,
+    celebrateBirthday: d.celebrateBirthday,
+    celebrateAnniversary: d.celebrateAnniversary,
+  };
 }
 
 /** `errors` without `keys`, and without anything under a key ending in "." ("experiences." for every row's). */
@@ -180,19 +234,24 @@ export interface ProfileDraftOptions {
    * it never adds it itself. Made by the screen, which also hands it to the box.
    */
   skillsRef: RefObject<SkillsInputHandle | null>;
-  /** After a refused save: the section holding the first problem, or null for a problem with no input to show it. */
+  /**
+   * After a refused save or step check: the section holding the first problem, or null for a problem with no input to
+   * show it.
+   */
   onRefused?: (section: ProfileSection | null) => void;
 }
 
 /**
  * The profile form's state, shared by its three sections (Basics, Work, About you) however a screen lays them out. It all
- * lives here, above the sections, so a value stays when its input unmounts (a folded list row, a closed disclosure).
- * Also the institution's own questions, and saving: one request for everything, with each error the server sends put on
- * the input it belongs to by its full path ("experiences.1.endYear" included), and the rows and disclosures holding one
- * opened.
+ * lives here, above the sections, so a value stays when its input unmounts (a folded list row, a closed disclosure, a
+ * registration step not shown). Also the institution's own questions, and saving: one request for everything, with each
+ * error the server sends put on the input it belongs to by its full path ("experiences.1.endYear" included), and the
+ * rows and disclosures holding one opened.
  */
 export function useProfileDraft({ tenant, initial, customFields = [], mode = "edit", onSubmit, skillsRef, onRefused }: ProfileDraftOptions) {
-  const [draft, setDraft] = useState<ProfileDraft>(() => toDraft(initial));
+  // The form as it opened, which registration's "Use details from …" compares with to tell what the member has typed.
+  const [start] = useState<ProfileDraft>(() => toDraft(initial));
+  const [draft, setDraft] = useState<ProfileDraft>(start);
   const [answers, setAnswers] = useState<FieldAnswers>(() => answersToValues(initial?.fields));
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -200,8 +259,7 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
   const [busy, setBusy] = useState(false);
   // While the photo uploads, saving would send the old one and the new one would be lost.
   const [photoBusy, setPhotoBusy] = useState(false);
-  // Registration keeps About you behind "More about you (optional)"; both disclosures open when an error is inside.
-  const [moreOpen, setMoreOpen] = useState(() => mode === "register" && (!!initial?.bio || !!initial?.linkedinUrl));
+  // The "Personal" disclosure opens when an error is inside it.
   const [personalOpen, setPersonalOpen] = useState(false);
   // List rows folded into a summary, by key: at first, every saved one. A new row, one opened again and one with an
   // error show their inputs, and an error's row stays open while it's put right.
@@ -223,6 +281,18 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
   const set = <K extends FieldKey>(key: K, value: ProfileDraft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
     setErrors((e) => without(e, key, ...(key === "skills" ? ["skills."] : [])));
+  };
+  /**
+   * Sets several inputs at once (registration's "Use details from …" and its Undo, and Skip for now putting Work back),
+   * clearing their errors. Complete list entries arrive folded into their summaries, as saved ones are.
+   */
+  const setValues = (values: DraftValues) => {
+    const keys = Object.keys(values);
+    if (keys.length === 0) return;
+    setDraft((d) => ({ ...d, ...values }));
+    setErrors((e) => without(e, ...keys, ...keys.map((k) => `${k}.`)));
+    const rows = [...(values.experiences ?? []).filter((r) => r.title.trim()), ...(values.education ?? []).filter((r) => r.institution.trim())];
+    if (rows.length) setFolded((s) => new Set([...s, ...rows.map((r) => r.key)]));
   };
   const setAvatar = (url: string | null) => {
     setDraft((d) => ({ ...d, avatarUrl: url }));
@@ -272,11 +342,52 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
       if (row) fold(row.key, false);
     }
     const sections = paths.map((p) => profileSectionOf(p, customFields));
-    if (mode === "register" && sections.includes("about")) setMoreOpen(true);
     const first = PROFILE_SECTIONS.find((s) => sections.includes(s)) ?? "basics";
     // The marked inputs may be out of sight (the photo is at the very top), so say so beside the button too.
     setServerError(paths.includes("avatarUrl") ? "Check the profile photo at the top." : mode === "edit" ? `Check the details marked in ${PROFILE_SECTION_TITLES[first]}.` : "Check the details marked above.");
     onRefused?.(first);
+  };
+
+  /** The answers to `defs` the member can change, checked: registration needs every required one. */
+  const checkAnswers = (defs: ProfileFieldDto[]) => {
+    const editable = Object.fromEntries(defs.filter((x) => x.memberEditable).map((x) => [x.key, answers[x.key] ?? null]));
+    return { editable, ...validateProfileFieldValues(defs, editable, { requireAll: mode === "register", previous: answersToValues(initial?.fields), canEdit: (x) => x.memberEditable }) };
+  };
+
+  /**
+   * The draft as the schema reads it, with the inputs this member can't see left out: what the form hides (a student's
+   * start year, a pupil's links and Open to, studies here at a school) keeps its value for when it shows again, but is
+   * neither checked nor sent, so nothing they can't see may block a save.
+   */
+  const parse = (skills: string[]) => {
+    const hidden = hiddenProfileKeys(tenant, { professionType: draft.professionType, batchYear: Number(draft.batchYear), dateOfBirth: draft.dateOfBirth || null });
+    return membershipProfileSchema.safeParse(withoutHiddenProfileKeys(draftBody(draft, skills, initial?.avatarUrl ?? null), hidden));
+  };
+  const batchOutOfRange = (batch: number) =>
+    batch < tenant.settings.minBatchYear || batch > tenant.settings.maxBatchYear ? `Must be between ${tenant.settings.minBatchYear} and ${tenant.settings.maxBatchYear}` : null;
+
+  /**
+   * Checks one section as saving would, with the institution's questions in it, as registration does before leaving a
+   * step: marks what's wrong, says so by the button and reports the section (onRefused), as a refused save does. True
+   * when there's nothing wrong. Checking Work first adds the skill still typed in its box, which is about to go.
+   */
+  const checkSection = (section: ProfileSection): boolean => {
+    if (photoBusy || busy) return false;
+    setServerError(null);
+    const skills = section === "work" ? (skillsRef.current?.commit() ?? draft.skills) : draft.skills;
+    const parsed = parse(skills);
+    const found: Record<string, string> = parsed.success ? {} : Object.fromEntries(Object.entries(withBlankBatch(issueErrors(parsed.error.issues), draft)).filter(([path]) => profileSectionOf(path) === section));
+    const outOfRange = section === "basics" && !("batchYear" in found) ? batchOutOfRange(Number(draft.batchYear)) : null;
+    if (outOfRange) found.batchYear = outOfRange;
+    const defs = customFields.filter((x) => profileSectionOf(`fields.${x.key}`, customFields) === section);
+    const { errors: wrong } = checkAnswers(defs);
+    const keys = profileSectionFields(section);
+    setErrors((e) => ({ ...without(e, ...keys, ...keys.map((k) => `${k}.`)), ...found }));
+    setAnswerErrors((e) => ({ ...e, ...Object.fromEntries(defs.map((x) => [x.key, wrong[x.key] ?? ""])) }));
+    const paths = [...Object.keys(found), ...Object.keys(wrong).map((k) => `fields.${k}`)];
+    if (paths.length === 0) return true;
+    reveal(paths);
+    return false;
   };
 
   const submit = async () => {
@@ -284,61 +395,19 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     setErrors({});
     setServerError(null);
     const skills = skillsRef.current?.commit() ?? draft.skills;
-    const editable = Object.fromEntries(customFields.filter((x) => x.memberEditable).map((x) => [x.key, answers[x.key] ?? null]));
-    const check = validateProfileFieldValues(customFields, editable, { requireAll: mode === "register", previous: answersToValues(initial?.fields), canEdit: (x) => x.memberEditable });
+    const check = checkAnswers(customFields);
+    const editable = check.editable;
     setAnswerErrors(check.errors);
     if (Object.keys(check.errors).length) return reveal(Object.keys(check.errors).map((k) => `fields.${k}`));
-    const d = draft;
-    const link = (key: ProfileLinkKey) => socialUrlFromInput(LINK_KINDS[key], d[key]);
-    const raw = {
-      fullName: d.fullName,
-      batchYear: d.batchYear,
-      dateOfBirth: nul(d.dateOfBirth),
-      professionType: d.professionType,
-      companyName: nul(d.companyName),
-      designation: nul(d.designation),
-      city: nul(d.city),
-      country: nul(d.country),
-      maritalStatus: d.maritalStatus || null,
-      kidsCount: d.kidsCount.trim() ? Number(d.kidsCount) : null,
-      bio: nul(d.bio),
-      interests: d.interests
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 20),
-      headline: nul(d.headline),
-      industry: d.industry || null,
-      careerStartYear: yearOrNull(d.careerStartYear),
-      skills,
-      degree: nul(d.degree),
-      fieldOfStudy: nul(d.fieldOfStudy),
-      experiences: d.experiences.map(experienceInput),
-      education: d.education.map(educationInput),
-      linkedinUrl: link("linkedinUrl"),
-      websiteUrl: link("websiteUrl"),
-      githubUrl: link("githubUrl"),
-      instagramUrl: link("instagramUrl"),
-      xUrl: link("xUrl"),
-      openTo: d.openTo,
-      // Only when it changed here: a form opened before the photo changed elsewhere would otherwise put back one that may
-      // be gone by now (and be refused).
-      ...(d.avatarUrl !== (initial?.avatarUrl ?? null) ? { avatarUrl: d.avatarUrl } : {}),
-      isPhoneVisible: d.isPhoneVisible,
-      celebrateBirthday: d.celebrateBirthday,
-      celebrateAnniversary: d.celebrateAnniversary,
-    };
-    // What the form hides from this member (a student's start year, a pupil's links and Open to, studies here at a school)
-    // keeps its value for when it shows again, but is neither checked nor sent: nothing they can't see may block a save.
-    const hidden = hiddenProfileKeys(tenant, { professionType: d.professionType, batchYear: Number(d.batchYear), dateOfBirth: d.dateOfBirth || null });
-    const parsed = membershipProfileSchema.safeParse(withoutHiddenProfileKeys(raw, hidden));
+    const parsed = parse(skills);
     if (!parsed.success) {
-      const next = issueErrors(parsed.error.issues);
+      const next = withBlankBatch(issueErrors(parsed.error.issues), draft);
       setErrors(next);
       return reveal(Object.keys(next));
     }
-    if (parsed.data.batchYear < tenant.settings.minBatchYear || parsed.data.batchYear > tenant.settings.maxBatchYear) {
-      setErrors({ batchYear: `Must be between ${tenant.settings.minBatchYear} and ${tenant.settings.maxBatchYear}` });
+    const outOfRange = batchOutOfRange(parsed.data.batchYear);
+    if (outOfRange) {
+      setErrors({ batchYear: outOfRange });
       return reveal(["batchYear"]);
     }
     setBusy(true);
@@ -370,8 +439,10 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     tenant,
     initial,
     mode,
+    start,
     draft,
     set,
+    setValues,
     setAvatar,
     errors,
     listError,
@@ -382,11 +453,11 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     optional,
     pupil,
     serverError,
+    /** Drops the note by the button, as registration does on moving to another step. */
+    clearServerError: () => setServerError(null),
     busy,
     photoBusy,
     setPhotoBusy,
-    moreOpen,
-    setMoreOpen,
     personalOpen,
     setPersonalOpen,
     folded,
@@ -395,6 +466,7 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     addItem,
     removeItem,
     checkItem,
+    checkSection,
     submit,
   };
 }

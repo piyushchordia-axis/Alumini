@@ -85,7 +85,8 @@ export function ProfileBasicsSection({ form: f }: { form: ProfileFormController 
         )}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Full name" required error={errors.fullName?.message}>
+        {/* A blank name says what's missing rather than the schema's "Too small". */}
+        <FormField label="Full name" required error={errors.fullName && (errors.fullName.type === "too_small" ? "Enter your full name" : errors.fullName.message)}>
           <Input {...register("fullName")} invalid={!!errors.fullName} aria-invalid={!!errors.fullName || undefined} autoComplete="name" />
         </FormField>
         <FormField label="Batch (year of passing out)" required error={errors.batchYear?.message}>
@@ -110,7 +111,7 @@ export function ProfileBasicsSection({ form: f }: { form: ProfileFormController 
           <Input type="date" {...register("dateOfBirth", { setValueAs: blankIsNull })} invalid={!!errors.dateOfBirth} aria-invalid={!!errors.dateOfBirth || undefined} />
         </FormField>
         <FormField label="Current city" error={errors.city?.message}>
-          <Input {...register("city")} autoComplete="address-level2" aria-invalid={!!errors.city || undefined} />
+          <Input {...register("city")} autoComplete="address-level2" invalid={!!errors.city} aria-invalid={!!errors.city || undefined} />
         </FormField>
         <FormField label="Country" error={errors.country?.message}>
           <CountrySelect {...register("country", { setValueAs: blankIsNull })} />

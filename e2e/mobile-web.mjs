@@ -50,6 +50,31 @@ const signIn = async (number) => {
   await page.getByPlaceholder("••••••").fill(/(\d{6})/.exec(dev)[1]);
   await tap("Verify and continue");
 };
+// Registration is three steps. A click waits out the moment a step that has just opened ignores taps (so a double tap
+// moves one step), and each button's label must be on the page once.
+const stepHeading = (n, name) => page.getByRole("heading", { name: `Step ${n} of 3 · ${name}`, exact: true });
+const pressStepButton = async (name) => {
+  const button = page.getByRole("button", { name, exact: true });
+  await button.waitFor();
+  const shown = await page.getByText(name, { exact: true }).locator("visible=true").count();
+  if (shown !== 1) throw new Error(`"${name}" shows ${shown} times on the register screen`);
+  await button.click();
+};
+/**
+ * From step 1 with its inputs filled: Continue, "Skip for now" on Work (after `onWork`, to look at it), then `label` on
+ * About you, which says when an admin looks first.
+ */
+const finishRegistration = async (label, { onWork } = {}) => {
+  await stepHeading(1, "Basics").waitFor();
+  await pressStepButton("Continue");
+  await stepHeading(2, "Work").waitFor();
+  if ((await page.getByText("Continue", { exact: true }).locator("visible=true").count()) !== 1) throw new Error('"Continue" isn\'t on the Work step once');
+  await onWork?.();
+  await pressStepButton("Skip for now");
+  await stepHeading(3, "About you").waitFor();
+  if (label === "Submit for approval") await page.getByText(/^An admin at .+ will review your profile before you can join\.$/).waitFor();
+  await pressStepButton(label);
+};
 const remembered = () => page.evaluate(() => JSON.parse(localStorage.getItem("illuminize.tenant")).state.lastTenantSlug);
 // A section is on the tab bar or behind More, depending on which others the institution has enabled.
 const openSection = async (label) => {
@@ -91,11 +116,77 @@ try {
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Mobile Smoke");
     await inputs.nth(1).fill("2014");
-    await tap("Join the network");
+    await pressStepButton("Continue");
+    // Skip for now puts Work back as it was last accepted (here, as it started): never what was typed and left
+    // unchecked, even after going back a step and returning, which keeps it.
+    await stepHeading(2, "Work").waitFor();
+    const headlineBox = page.getByLabel("Headline", { exact: true });
+    await headlineBox.fill("Not this one");
+    await shot("m03b-register-work");
+    await page.getByRole("button", { name: "Step 1: Basics", exact: true }).click();
+    await stepHeading(1, "Basics").waitFor();
+    await pressStepButton("Continue");
+    await stepHeading(2, "Work").waitFor();
+    if ((await headlineBox.inputValue()) !== "Not this one") throw new Error("going back a step lost what was typed on the Work step");
+    await pressStepButton("Skip for now");
+    await stepHeading(3, "About you").waitFor();
+    await shot("m03c-register-about");
+    await pressStepButton("Back");
+    await stepHeading(2, "Work").waitFor();
+    if ((await headlineBox.inputValue()) !== "") throw new Error("Skip for now kept what was typed on the Work step");
+    // A problem the server finds opens the step holding it, with the problem on its input.
+    const register = "**/api/v1/t/demo-university/memberships";
+    const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "headline", message: "The server can't take this headline" }] } };
+    await page.route(register, (route) =>
+      route.request().method() === "POST"
+        ? route.fulfill({ status: 400, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(refusal) })
+        : route.fallback(),
+    );
+    await pressStepButton("Continue");
+    await stepHeading(3, "About you").waitFor();
+    await pressStepButton("Join the network");
+    await stepHeading(2, "Work").waitFor();
+    await page.getByText("The server can't take this headline", { exact: true }).waitFor();
+    await page.unroute(register);
+    await pressStepButton("Continue");
+    await stepHeading(3, "About you").waitFor();
+    await pressStepButton("Join the network");
     await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).waitFor();
     for (let i = 0; i < 50 && liveSockets.length === 0; i++) await page.waitForTimeout(100);
     if (liveSockets.length === 0) throw new Error("the app did not open a live-updates connection after signing in");
     await shot("m04-feed");
+  });
+
+  await step("the profile card on the feed lists what to add, opens its section, and Not now puts it away", async () => {
+    const card = page.getByRole("region", { name: "Complete your profile", exact: true });
+    await card.waitFor();
+    // Nothing but a name and a batch yet: the heaviest three of everything.
+    const score = await card.getByRole("progressbar", { name: "Profile strength", exact: true }).getAttribute("aria-valuenow");
+    if (score !== "0") throw new Error(`a new profile scores ${score}, not 0`);
+    const items = await card.getByRole("link").allInnerTexts();
+    if (items.join() !== "Add a profile photo,Write a headline,Add your current role") throw new Error(`the profile card suggests ${items.join(", ")}`);
+    if (await card.locator("textarea, input").count()) throw new Error("the profile card holds a text box, which the feed's first one must not be");
+    await shot("m04-profile-card");
+    await card.getByRole("link", { name: "Write a headline", exact: true }).click();
+    await page.waitForURL("**/t/demo-university/profile/edit?section=work");
+    await page.getByRole("heading", { name: "Work", exact: true }).locator("visible=true").last().waitFor();
+    // Opened from another tab, the edit screen sits on My profile: Back goes there, not to the feed with the edit screen
+    // left behind in the profile stack. Back again is the feed.
+    await page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last().click();
+    await page.waitForURL("**/t/demo-university/profile");
+    await page.getByRole("button", { name: "Edit profile" }).locator("visible=true").first().waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last().click();
+    await page.waitForURL("**/t/demo-university/feed");
+    await card.getByRole("button", { name: "Not now", exact: true }).click();
+    const hiddenNote = page.getByText("Hidden for 14 days. My profile always shows what's left to add.", { exact: true });
+    await hiddenNote.waitFor();
+    if (await card.count()) throw new Error("Not now left the profile card on the feed");
+    // The button went with the card: focus is on the note in its place.
+    if (!(await hiddenNote.evaluate((el) => el.closest("[tabindex]")?.contains(document.activeElement)))) throw new Error("Not now left focus outside the note");
+    // Put away on the server, so it stays away.
+    await page.reload();
+    await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).locator("visible=true").first().waitFor();
+    if (await card.count()) throw new Error("the profile card came back after a reload");
   });
 
   await step("create a post with a photo from the feed", async () => {
@@ -208,6 +299,11 @@ try {
     await page.waitForURL("**/t/demo-university/profile");
     for (const text of [headline, "React Native", "QA engineer", "Flaky Labs", "2012–2016"]) await shown(page.getByText(text, { exact: true })).waitFor();
     await shot("m04h-profile-details");
+    // The meter follows what's saved: the photo (20), the headline (15) and a past role (5) of 100.
+    const meter = shown(page.getByRole("progressbar", { name: "Profile strength", exact: true }));
+    if ((await meter.getAttribute("aria-valuenow")) !== "40") throw new Error(`My profile's meter shows ${await meter.getAttribute("aria-valuenow")}, not 40`);
+    await shown(page.getByText("Still to add", { exact: true })).waitFor();
+    await shown(page.getByRole("link", { name: "Add the city you live in", exact: true })).waitFor();
 
     // A link to a section opens the form there.
     await shown(page.getByRole("link", { name: "Edit About you", exact: true })).click();
@@ -1662,6 +1758,26 @@ try {
     await page.waitForTimeout(1000);
     if (!page.url().endsWith("/register")) throw new Error("a failed refetch sent a removed member back into the app");
     if ((await fullName.inputValue()) !== "Still typing") throw new Error("a failed refetch lost what was typed on the register form");
+    // With the account details failing too, on a bad connection, the form opens without them, and their refetch (which
+    // has nothing to show meanwhile, as when the app comes back to the front) doesn't swap it for a spinner and start it
+    // again.
+    const meUrl = "**/api/v1/me";
+    await page.route(meUrl, (route) =>
+      route.request().method() === "GET"
+        ? route.fulfill({ status: 503, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: { code: "INTERNAL", message: "e2e INTERNAL" } }) })
+        : route.fallback(),
+    );
+    try {
+      membership.answer(404, "NOT_A_MEMBER");
+      await page.reload();
+      await page.getByText("Create your profile").waitFor();
+      await fullName.fill("Still typing");
+      await reconnect(page);
+      await page.waitForTimeout(1000);
+      if ((await fullName.inputValue({ timeout: 1000 })) !== "Still typing") throw new Error("refetching the account lost what was typed on the register form");
+    } finally {
+      await page.unroute(meUrl);
+    }
 
     // A suspended institution: the answer stands until a success, so a later failure must not bring the old screen back.
     await openEvents();
@@ -1722,6 +1838,40 @@ try {
     await tenant.stop();
   });
 
+  await step("re-applying after a rejection fills in every step and shows the reason on each", async () => {
+    // Demo College answers with a rejected application, made from their Demo University membership. Nothing is sent.
+    const reason = "Add the section you were in";
+    const url = "**/api/v1/t/demo-college/memberships/me";
+    let rejected = null;
+    await page.route(url, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch({ url: route.request().url().replace("/t/demo-college/", "/t/demo-university/") });
+      rejected = { ...(await response.json()).data, status: "REJECTED", statusReason: reason };
+      return route.fulfill({ response, json: { data: rejected } });
+    });
+    try {
+      await page.goto(BASE + "/t/demo-college/register");
+      await stepHeading(1, "Basics").waitFor();
+      await page.getByText("Re-apply to join", { exact: true }).waitFor();
+      const why = page.getByText(`Reason: ${reason}`, { exact: true });
+      await why.waitFor();
+      if ((await page.locator("input:visible").nth(0).inputValue()) !== rejected.fullName) throw new Error("re-applying didn't fill in the name");
+      // What's there is theirs already: nothing to bring over.
+      if (await page.getByText(/Use details from/).count()) throw new Error("re-applying offered Use details from another institution");
+      await shot("m08b-register-reapply");
+      // Every step can be opened at once, each prefilled and with the reason.
+      await page.getByRole("button", { name: "Step 3: About you", exact: true }).click();
+      await stepHeading(3, "About you").waitFor();
+      await why.waitFor();
+      await page.getByRole("button", { name: "Step 2: Work", exact: true }).click();
+      await stepHeading(2, "Work").waitFor();
+      await why.waitFor();
+      if ((await page.getByLabel("Headline", { exact: true }).inputValue()) !== (rejected.headline ?? "")) throw new Error("re-applying didn't fill in the headline");
+    } finally {
+      await page.unroute(url);
+    }
+  });
+
   await step("ADMIN_APPROVAL tenant lands on the pending screen", async () => {
     // deep link straight into the college (served with SPA fallback); signed in but not a member → register
     await page.goto(BASE + "/t/demo-college");
@@ -1729,7 +1879,29 @@ try {
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Pending Mobile");
     await inputs.nth(1).fill("2011");
-    await tap("Submit for approval");
+    // Their profile at Demo University is offered: it fills what they haven't typed, and Undo takes it back, all but what
+    // was changed since.
+    await tap("Use details from Demo University");
+    // First: a hidden live region repeats it for screen readers.
+    await page.getByText(/^Filled in your .+ from Demo University\.$/).first().waitFor();
+    await shot("m08a-register-copy");
+    await pressStepButton("Continue");
+    await stepHeading(2, "Work").waitFor();
+    const headline = page.getByLabel("Headline", { exact: true });
+    if ((await headline.inputValue()) === "") throw new Error("Use details didn't fill in the headline");
+    await headline.fill("Head of smoke at Smoke Labs");
+    await page.getByRole("button", { name: "Step 1: Basics", exact: true }).click();
+    await stepHeading(1, "Basics").waitFor();
+    await tap("Undo");
+    await page.getByText("Took out the details from Demo University. Kept your changes to your headline.", { exact: true }).first().waitFor();
+    await page.getByText("Use details from Demo University", { exact: true }).waitFor();
+    await shot("m08c-register-undone");
+    if ((await inputs.nth(0).inputValue()) !== "Pending Mobile") throw new Error("Use details or Undo changed the name they typed");
+    await finishRegistration("Submit for approval", {
+      onWork: async () => {
+        if ((await headline.inputValue()) !== "Head of smoke at Smoke Labs") throw new Error("Undo threw away the headline typed after the copy");
+      },
+    });
     await page.getByText("Awaiting approval").waitFor();
     await shot("m08-pending");
   });
@@ -1755,7 +1927,7 @@ try {
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Forced Out");
     await inputs.nth(1).fill("2015");
-    await tap("Join the network");
+    await finishRegistration("Join the network");
     await barTab("More").waitFor();
     const membership = await scriptMembership(page, "demo-university");
     membership.answer(401, "SESSION_REVOKED");

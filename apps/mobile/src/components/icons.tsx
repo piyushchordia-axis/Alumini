@@ -249,6 +249,13 @@ export function IconClose({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconCheck({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m5 12 5 5L20 7" {...stroke(color)} />
+    </Base>
+  );
+}
 
 export type NavIconName = "feed" | "messages" | "jobs" | "directory" | "events" | "groups" | "mentors" | "businesses" | "funding" | "posts" | "profile" | "more" | "switch" | "signOut" | "bell";
 

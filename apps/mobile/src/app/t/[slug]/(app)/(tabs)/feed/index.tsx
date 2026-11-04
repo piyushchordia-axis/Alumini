@@ -3,6 +3,7 @@ import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
 import { DigestBanner } from "@/components/DigestBanner";
 import { PostCard } from "@/components/PostCard";
+import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
 import { EmptyState, ListEmpty, SectionScreen, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -34,6 +35,7 @@ export default function FeedScreen() {
         }
         ListHeaderComponent={
           <View style={{ gap: spacing.md }}>
+            <ProfileStrengthCard />
             <DigestBanner slug={slug} />
             <CelebrationsCard slug={slug} />
           </View>

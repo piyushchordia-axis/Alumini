@@ -1,11 +1,12 @@
-import { PROFILE_SECTIONS, type ProfileSection } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, profileStrength, type ProfileSection } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
-import { PROFILE_SECTION_TITLES, ProfileForm } from "@/components/profile/ProfileForm";
+import { ProfileForm } from "@/components/profile/ProfileForm";
+import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
 import { Avatar, Badge, Button, Card, Loading, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
@@ -47,6 +48,8 @@ export function MyProfilePage() {
         <ProfileSummary profile={summary} nameAs="h2" nameExtras={membership.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>} />
         <ProfileDetails profile={membership} tenant={tenant} headingLevel={3} className="mt-5 border-t border-slate-100 pt-5" />
       </Card>
+      {/* From what's saved, so it moves when a save lands, not while typing. */}
+      <ProfileStrengthPanel strength={profileStrength(membership, tenant)} />
       <nav aria-label="Profile sections" className="flex flex-wrap items-center gap-2 pt-2 text-sm">
         <span className="text-slate-500">Edit</span>
         {PROFILE_SECTIONS.map((s: ProfileSection) => (

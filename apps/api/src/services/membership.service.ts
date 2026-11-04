@@ -228,7 +228,8 @@ export async function dismissProfileNudge(ctx: AppContext, tenantCtx: TenantCont
 
 /**
  * What "Use details from …" offers someone joining `excludeSlug`: their own details from their most recently updated
- * membership of any other institution (see toPortableProfileDto), or null if they have none.
+ * approved membership of any other active institution (see findLatestMembershipElsewhere and toPortableProfileDto), or
+ * null if they have none.
  */
 export async function getPortableProfile(ctx: AppContext, userId: string, excludeSlug?: string): Promise<PortableProfileDto | null> {
   const found = await findLatestMembershipElsewhere(ctx.db, userId, excludeSlug);

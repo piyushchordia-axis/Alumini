@@ -1,6 +1,6 @@
 import type { TenantType } from "../constants";
 import type { MembershipProfileInput } from "../schemas/membership";
-import type { MembershipDto, ProfileFieldDto } from "../types/dto";
+import type { MembershipDto, PortableProfileDto, ProfileFieldDto } from "../types/dto";
 import { isCurrentPupil } from "./features";
 
 /** The feed's profile-strength card goes away at this score. */
@@ -16,7 +16,26 @@ export const PROFILE_SECTIONS = ["basics", "work", "about"] as const;
 export type ProfileSection = (typeof PROFILE_SECTIONS)[number];
 export type ProfileStep = 1 | 2 | 3;
 
-const SECTION_OF: Record<Exclude<keyof MembershipProfileInput, "fields">, ProfileSection> = {
+/** Each section's name, as the edit screen's headings, the registration steps and the profile checklist say it. */
+export const PROFILE_SECTION_TITLES: Record<ProfileSection, string> = { basics: "Basics", work: "Work", about: "About you" };
+
+/** What each registration step asks for, under its heading. */
+export const REGISTRATION_STEP_HINTS: Record<ProfileSection, string> = {
+  basics: "Your photo, name and batch, so batchmates know it's you.",
+  work: "What you do now and what you did before. You can skip this and add it later.",
+  about: "Your story, studies, links and what you're open to. All of it is optional.",
+};
+
+/** The section a registration step holds: step 1 is "basics". */
+export const profileSectionOfStep = (step: ProfileStep): ProfileSection => PROFILE_SECTIONS[step - 1] ?? "basics";
+
+/** A registration step's heading: "Step 2 of 3 · Work". */
+export const registrationStepHeading = (step: ProfileStep) => `Step ${step} of ${PROFILE_SECTIONS.length} · ${PROFILE_SECTION_TITLES[profileSectionOfStep(step)]}`;
+
+/** A profile input: a key of the profile body other than the institution's own questions (`fields`). */
+export type ProfileInputKey = Exclude<keyof MembershipProfileInput, "fields">;
+
+const SECTION_OF: Record<ProfileInputKey, ProfileSection> = {
   avatarUrl: "basics",
   fullName: "basics",
   batchYear: "basics",
@@ -70,6 +89,11 @@ export function profileSectionOf(path: string, fields: readonly FieldPlacement[]
 /** The registration step (1–3) that holds the field an error `path` names, for jumping to it. See profileSectionOf. */
 export function profileStepOf(path: string, fields: readonly FieldPlacement[] = []): ProfileStep {
   return (PROFILE_SECTIONS.indexOf(profileSectionOf(path, fields)) + 1) as ProfileStep;
+}
+
+/** The profile inputs in `section` (not the institution's questions, which profileSectionOf places), for checking a step. */
+export function profileSectionFields(section: ProfileSection): ProfileInputKey[] {
+  return [...SECTION_BY_FIELD].filter(([, s]) => s === section).map(([key]) => key as ProfileInputKey);
 }
 
 /** Inputs the profile forms leave out for some members. See hiddenProfileKeys. */
@@ -259,4 +283,129 @@ export function showProfileNudge(score: number, dismissedAt: string | null, now:
   if (!dismissedAt) return true;
   const at = Date.parse(dismissedAt);
   return Number.isNaN(at) || now.getTime() - at >= PROFILE_NUDGE_SNOOZE_DAYS * 86_400_000;
+}
+
+/** How many missing items the feed's profile-strength card suggests. */
+export const PROFILE_NUDGE_ITEMS = 3;
+
+/** The heaviest items still missing, for the feed's card to suggest; ties keep the checklist's order. */
+export const missingProfileItems = (strength: ProfileStrength, limit = PROFILE_NUDGE_ITEMS): ProfileStrengthItem[] => strength.items.filter((i) => !i.done).slice(0, limit);
+
+/** A detail "Use details from …" can fill in: a key of PortableProfileDto other than its source. */
+export type PortableProfileKey = Exclude<keyof PortableProfileDto, "source">;
+
+/**
+ * Each portable detail as a sentence names it ("Kept what you'd entered for your city"), in the order the registration
+ * steps ask for them.
+ */
+export const PORTABLE_PROFILE_LABELS: Record<PortableProfileKey, string> = {
+  city: "city",
+  country: "country",
+  dateOfBirth: "date of birth",
+  headline: "headline",
+  companyName: "company",
+  designation: "role",
+  industry: "industry",
+  careerStartYear: "year you started working",
+  skills: "skills",
+  experiences: "past roles",
+  bio: "bio",
+  interests: "interests",
+  education: "studies elsewhere",
+  linkedinUrl: "LinkedIn",
+  websiteUrl: "website",
+  githubUrl: "GitHub",
+  instagramUrl: "Instagram",
+  xUrl: "X",
+  openTo: "Open to",
+};
+export const PORTABLE_PROFILE_KEYS = Object.keys(PORTABLE_PROFILE_LABELS) as PortableProfileKey[];
+
+const isBlank = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+const sameValue = (a: unknown, b: unknown) => (isBlank(a) && isBlank(b)) || JSON.stringify(a) === JSON.stringify(b);
+
+export interface PortableProfileFill<V> {
+  /** The new value of each input to fill in. */
+  values: Partial<V>;
+  /** The details filled in, in PORTABLE_PROFILE_KEYS order. */
+  filled: PortableProfileKey[];
+  /** Details the member had already entered differently, which stay as they are. */
+  kept: PortableProfileKey[];
+}
+
+/**
+ * What "Use details from …" does to a registration form: each detail the other profile has fills its input, unless
+ * the member has changed that input from how the form started (`start`) to something else, which is kept, so nothing
+ * they typed is replaced. A detail the other profile lacks never clears an input, and `skip` (the inputs the form
+ * hides, hiddenProfileKeys) are left alone. `copy`, `current` and `start` are in the form's own shape, whatever that is.
+ */
+export function fillFromPortableProfile<V extends Partial<Record<PortableProfileKey, unknown>>>(copy: V, current: V, start: V, skip: readonly string[] = []): PortableProfileFill<V> {
+  const out: PortableProfileFill<V> = { values: {}, filled: [], kept: [] };
+  for (const key of PORTABLE_PROFILE_KEYS) {
+    if (skip.includes(key) || isBlank(copy[key]) || sameValue(copy[key], current[key])) continue;
+    if (!isBlank(current[key]) && !sameValue(current[key], start[key])) out.kept.push(key);
+    else {
+      out.values[key] = copy[key];
+      out.filled.push(key);
+    }
+  }
+  return out;
+}
+
+export interface PortableProfileUndo<V> {
+  /** What to put back in each input: its value from before "Use details from …". */
+  values: Partial<V>;
+  /** Details filled in that the member has changed since, which stay as they are. */
+  kept: PortableProfileKey[];
+}
+
+/**
+ * What Undo does after "Use details from …": each detail it filled (`fill`) goes back to what it was before (`before`),
+ * unless the member has changed it since (it no longer holds what the fill put there), which is kept, so Undo never
+ * throws away what they typed. `current` is the form as it is now, in the same shape as `fill.values`.
+ */
+export function undoPortableProfileFill<V extends Partial<Record<PortableProfileKey, unknown>>>(
+  fill: Pick<PortableProfileFill<V>, "values" | "filled">,
+  before: Partial<V>,
+  current: V,
+): PortableProfileUndo<V> {
+  const out: PortableProfileUndo<V> = { values: {}, kept: [] };
+  for (const key of fill.filled) {
+    // Changed back to what it was before is no change of theirs to keep.
+    if (sameValue(current[key], fill.values[key]) || sameValue(current[key], before[key])) out.values[key] = before[key];
+    else out.kept.push(key);
+  }
+  return out;
+}
+
+/** "a", "a and b", "a, b and c". */
+const inWords = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? "") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
+const named = (keys: readonly PortableProfileKey[]) => keys.map((k) => PORTABLE_PROFILE_LABELS[k]);
+
+/**
+ * What the banner offers before it's used, under "You have a profile at …". The date of birth is named when it comes too,
+ * as the one personal detail it brings.
+ */
+export function portableProfileOfferText(copy: Pick<PortableProfileDto, "dateOfBirth">): string {
+  const what = copy.dateOfBirth ? "city, date of birth, work, skills, links and bio" : "city, work, skills, links and bio";
+  return `Bring over your ${what} from there. Nothing you've typed here is replaced, and you can change any of it.`;
+}
+
+/**
+ * What the banner says once "Use details from …" has filled the form: "Filled in your city, headline, company and 6
+ * more from Demo University. Kept what you'd entered for your country."
+ */
+export function portableProfileFillMessage(sourceName: string, fill: Pick<PortableProfileFill<unknown>, "filled" | "kept">): string {
+  const shown = named(fill.filled.slice(0, 3));
+  const more = fill.filled.length - shown.length;
+  const filled = fill.filled.length ? `Filled in your ${inWords(more ? [...shown, `${more} more`] : shown)} from ${sourceName}.` : `Nothing new to add from ${sourceName}.`;
+  return fill.kept.length ? `${filled} Kept what you'd entered for your ${inWords(named(fill.kept))}.` : filled;
+}
+
+/**
+ * What the banner says after Undo when it left something the member changed after the fill: "Took out the details from
+ * Demo University. Kept your changes to your headline and skills." Null when it put everything back.
+ */
+export function portableProfileUndoMessage(sourceName: string, undo: Pick<PortableProfileUndo<unknown>, "kept">): string | null {
+  return undo.kept.length ? `Took out the details from ${sourceName}. Kept your changes to your ${inWords(named(undo.kept))}.` : null;
 }

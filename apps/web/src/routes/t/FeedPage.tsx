@@ -2,6 +2,7 @@ import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
 import { DigestBanner } from "@/components/feed/DigestBanner";
 import { PostCard } from "@/components/feed/PostCard";
 import { PostComposer } from "@/components/feed/PostComposer";
+import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
 import { EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -16,6 +17,7 @@ export function FeedPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Community" subtitle={`What's happening at ${tenant.shortName ?? tenant.name}`} />
+      <ProfileStrengthCard />
       <DigestBanner slug={slug} />
       <CelebrationsCard slug={slug} />
       <PostComposer />

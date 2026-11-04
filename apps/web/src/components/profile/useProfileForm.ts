@@ -4,12 +4,14 @@ import {
   hiddenProfileKeys,
   isCurrentPupil,
   membershipProfileSchema,
+  profileSectionFields,
   profileSectionOf,
   validateProfileFieldValues,
   withoutHiddenProfileKeys,
   type MembershipDto,
   type MembershipProfileInput,
   type ProfileFieldDto,
+  type ProfileSection,
   type TenantPublicDto,
 } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
@@ -35,6 +37,11 @@ export interface ProfileFormOptions {
 interface ProfileFormHookOptions extends ProfileFormOptions {
   /** The <form>, where the first error is looked for after a failed save. */
   formRef: RefObject<HTMLFormElement | null>;
+  /**
+   * Told the error paths ("headline", "experiences.1.endYear", "fields.house") before the first error is focused, so a
+   * form that shows one part at a time (registration) can show the part holding it first.
+   */
+  onErrors?: (paths: string[]) => void;
 }
 
 export const toProfileFormValues = (m?: Partial<MembershipDto>): ProfileFormValues => ({
@@ -108,11 +115,12 @@ export function errorMessageOf(err: unknown): string | undefined {
 
 /**
  * The profile form's state, shared by its three sections (Basics, Work, About you) whichever way they're laid out: one
- * react-hook-form instance, so a value stays when its input unmounts (a collapsed list row, a hidden section). Also the
- * institution's own questions, which live outside it, and saving: one request for everything, with each error the
- * server sends put on the input it belongs to ("experiences.1.endYear" included) and the first error brought into view.
+ * react-hook-form instance, so a value stays when its input unmounts (a collapsed list row, a registration step not
+ * shown). Also the institution's own questions, which live outside it, and saving: one request for everything, with
+ * each error the server sends put on the input it belongs to ("experiences.1.endYear" included) and the first error
+ * brought into view.
  */
-export function useProfileForm({ tenant, initial, customFields = [], mode = "edit", onSubmit, formRef }: ProfileFormHookOptions) {
+export function useProfileForm({ tenant, initial, customFields = [], mode = "edit", onSubmit, formRef, onErrors }: ProfileFormHookOptions) {
   const [serverError, setServerError] = useState<unknown>(null);
   // While the photo uploads, saving would send the old one and the new one would be lost.
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -122,8 +130,7 @@ export function useProfileForm({ tenant, initial, customFields = [], mode = "edi
   const [answersChanged, setAnswersChanged] = useState(false);
   // Bumped when a save resets the form, so the list editors start again, collapsed, from what was saved.
   const [version, setVersion] = useState(0);
-  // Registration keeps About you behind "More about you (optional)"; both disclosures open when an error is inside.
-  const [moreOpen, setMoreOpen] = useState(() => mode === "register" && (!!initial?.bio || !!initial?.linkedinUrl));
+  // The "Personal" disclosure opens when an error is inside it.
   const [personalOpen, setPersonalOpen] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
 
@@ -161,8 +168,30 @@ export function useProfileForm({ tenant, initial, customFields = [], mode = "edi
 
   const showErrorsAt = (paths: string[]) => {
     if (paths.some((p) => p === "maritalStatus" || p === "kidsCount")) setPersonalOpen(true);
-    if (mode === "register" && paths.some((p) => profileSectionOf(p, customFields) === "about")) setMoreOpen(true);
+    onErrors?.(paths);
     setFocusRequest((n) => n + 1);
+  };
+
+  /** The answers to `defs` the member can change, checked: registration needs every required one. */
+  const checkAnswers = (defs: ProfileFieldDto[]) => {
+    const editable = Object.fromEntries(defs.filter((f) => !readOnly(f)).map((f) => [f.key, answers[f.key] ?? null]));
+    return { editable, ...validateProfileFieldValues(defs, editable, { requireAll: mode === "register", previous: answersToValues(initial?.fields), canEdit: (f) => !readOnly(f) }) };
+  };
+
+  /**
+   * Checks one section's inputs and the institution's questions in it, as registration does before moving on, and brings
+   * the first problem into view. True when there's none.
+   */
+  const checkSection = async (section: ProfileSection) => {
+    const names = profileSectionFields(section) as Array<Path<ProfileFormValues>>;
+    const valid = await form.trigger(names);
+    const defs = customFields.filter((f) => profileSectionOf(`fields.${f.key}`, customFields) === section);
+    const { errors: wrong } = checkAnswers(defs);
+    setAnswerErrors((e) => ({ ...e, ...Object.fromEntries(defs.map((f) => [f.key, wrong[f.key] ?? ""])) }));
+    const paths = [...names.filter((n) => form.getFieldState(n).invalid), ...Object.keys(wrong).map((k) => `fields.${k}`)];
+    if (valid && paths.length === 0) return true;
+    showErrorsAt(paths);
+    return false;
   };
 
   const submit = form.handleSubmit(
@@ -170,8 +199,8 @@ export function useProfileForm({ tenant, initial, customFields = [], mode = "edi
       if (photoBusy) return;
       setServerError(null);
       // Only send answers the member can change; check them here first for instant feedback.
-      const editable = Object.fromEntries(customFields.filter((f) => !readOnly(f)).map((f) => [f.key, answers[f.key] ?? null]));
-      const check = validateProfileFieldValues(customFields, editable, { requireAll: mode === "register", previous: answersToValues(initial?.fields), canEdit: (f) => !readOnly(f) });
+      const check = checkAnswers(customFields);
+      const editable = check.editable;
       if (Object.keys(check.errors).length) {
         setAnswerErrors(check.errors);
         showErrorsAt(Object.keys(check.errors).map((k) => `fields.${k}`));
@@ -227,10 +256,9 @@ export function useProfileForm({ tenant, initial, customFields = [], mode = "edi
     professionType,
     fullName,
     version,
-    moreOpen,
-    setMoreOpen,
     personalOpen,
     setPersonalOpen,
+    checkSection,
     submit,
   };
 }

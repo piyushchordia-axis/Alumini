@@ -42,6 +42,28 @@ async function loginWithPhone(number, p = page) {
   await p.click('button:has-text("Verify and continue")');
 }
 
+/** Fails unless `text` shows exactly once on the page, as a step's buttons must. */
+async function onlyOnce(p, text) {
+  const n = await p.getByText(text, { exact: true }).count();
+  if (n !== 1) throw new Error(`"${text}" shows ${n} times on the page`);
+}
+
+/**
+ * Registration's last two steps with nothing more filled in: Continue, Skip for now, then `label` ("Join the network" or
+ * "Submit for approval"). `hint` is text the last step must show first.
+ */
+async function finishRegistration(p, label, { hint } = {}) {
+  await onlyOnce(p, "Continue");
+  await p.getByRole("button", { name: "Continue", exact: true }).click();
+  await p.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
+  await onlyOnce(p, "Continue");
+  await onlyOnce(p, "Skip for now");
+  await p.getByRole("button", { name: "Skip for now", exact: true }).click();
+  await p.getByRole("heading", { name: "Step 3 of 3 · About you", exact: true }).waitFor();
+  if (hint) await p.getByText(hint).waitFor();
+  await p.getByRole("button", { name: label, exact: true }).click();
+}
+
 try {
   await step("tenant picker lists seeded institutions", async () => {
     await page.goto(BASE + "/");
@@ -50,26 +72,108 @@ try {
     await shot("01-picker");
   });
 
-  await step("landing → login with OTP (new user) → register → auto-approved feed", async () => {
+  await step("landing → login with OTP (new user) → register in three steps, with a photo → auto-approved feed", async () => {
     await page.click("text=Demo University");
     await page.waitForSelector("text=Sign in / Join");
     await shot("02-landing");
     await page.click("text=Sign in / Join");
     await loginWithPhone(PHONE_A);
     await page.waitForURL(/\/register$/);
+    const heading = (name) => page.getByRole("heading", { name, exact: true });
+    const focused = () => page.evaluate(() => document.activeElement?.textContent ?? "");
+    await heading("Step 1 of 3 · Basics").waitFor();
     await shot("03-register");
+
+    // Step 1: the photo and everything required. Continue checks this step before moving on.
+    await page.setInputFiles('input[aria-label="Profile photo"]', { name: "me.png", mimeType: "image/png", buffer: PNG });
+    await page.getByRole("group", { name: "Profile photo" }).getByRole("button", { name: "Change photo", exact: true }).waitFor();
+    await onlyOnce(page, "Continue");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.locator('input[name="fullName"][aria-invalid="true"]').waitFor();
+    if ((await page.evaluate(() => document.activeElement?.getAttribute("name"))) !== "fullName") throw new Error("Continue didn't focus the missing name");
     await page.fill('input[name="fullName"]', "Smoke Tester");
     await page.selectOption('select[name="batchYear"]', "2012");
     await page.selectOption('select[name="professionType"]', "FOUNDER");
-    await page.fill('input[name="companyName"]', "Smoke Labs");
     await page.fill('input[name="city"]', "Mumbai");
-    // The institution's own profile questions (seeded, optional) live under "More about you".
-    await page.click("text=More about you (optional)");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    // Step 2: work. Skip for now puts the step back as it was last accepted (here, as it started): never what was typed
+    // and left unchecked, even after going back a step and returning, which keeps it.
+    await heading("Step 2 of 3 · Work").waitFor();
+    if ((await focused()) !== "Step 2 of 3 · Work") throw new Error("the Work step's heading didn't take focus");
+    await onlyOnce(page, "Continue");
+    await onlyOnce(page, "Skip for now");
+    await page.fill('input[name="headline"]', "Not this one");
+    await page.getByRole("button", { name: "Step 1: Basics", exact: true }).click();
+    await heading("Step 1 of 3 · Basics").waitFor();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await heading("Step 2 of 3 · Work").waitFor();
+    if ((await page.inputValue('input[name="headline"]')) !== "Not this one") throw new Error("going back a step lost what was typed on the Work step");
+    await page.getByRole("button", { name: "Skip for now", exact: true }).click();
+    await heading("Step 3 of 3 · About you").waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await heading("Step 2 of 3 · Work").waitFor();
+    if ((await page.inputValue('input[name="headline"]')) !== "") throw new Error("Skip for now kept what was typed on the Work step");
+    await page.fill('input[name="headline"]', "Founder of Smoke Labs");
+    await page.fill('input[name="companyName"]', "Smoke Labs");
+    await shot("03b-register-work");
+    // The browser's Back (a phone's back gesture) goes to the step before, keeping everything, rather than leaving.
+    await page.evaluate(() => history.back());
+    await heading("Step 1 of 3 · Basics").waitFor();
+    if (!page.url().endsWith("/register") || (await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("the browser's Back left the registration");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await heading("Step 2 of 3 · Work").waitFor();
+    if ((await page.inputValue('input[name="headline"]')) !== "Founder of Smoke Labs") throw new Error("the browser's Back lost the Work step");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    // Step 3: about you, with the institution's own (seeded, optional) question.
+    await heading("Step 3 of 3 · About you").waitFor();
     await page.getByLabel("Hostel").selectOption({ label: "Tagore" });
-    await page.click('button:has-text("Join the network")');
+    await shot("03c-register-about");
+    // A problem the server finds opens the step holding it, with its input focused.
+    const register = "**/api/v1/t/demo-university/memberships";
+    const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "headline", message: "The server can't take this headline" }] } };
+    await page.route(register, (route) => (route.request().method() === "POST" ? route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify(refusal) }) : route.fallback()));
+    await page.getByRole("button", { name: "Join the network", exact: true }).click();
+    await heading("Step 2 of 3 · Work").waitFor();
+    await page.getByText("The server can't take this headline", { exact: true }).waitFor();
+    if ((await page.evaluate(() => document.activeElement?.getAttribute("name"))) !== "headline") throw new Error("the server's error didn't focus the headline");
+    await page.unroute(register);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await heading("Step 3 of 3 · About you").waitFor();
+    await page.getByRole("button", { name: "Join the network", exact: true }).click();
     await page.waitForURL(/\/app\/feed$/);
     await page.waitForSelector("text=Welcome to the official Demo University alumni network");
+    // The photo from the first step came in with the profile.
+    await page.locator('a[aria-label="My profile"] img[src*="/uploads/"]').waitFor();
+
+    // A new profile: the feed suggests the heaviest things missing, each opening its part of My profile. A <section>, so
+    // the posts below stay the page's articles.
+    const card = page.getByRole("region", { name: "Complete your profile", exact: true });
+    await card.waitFor();
+    if ((await card.evaluate((el) => el.tagName)) !== "SECTION" || (await card.locator("textarea, article").count())) throw new Error("the profile card isn't a plain section");
+    // A photo, a headline, a company and a city: 55 of 100.
+    const score = await card.getByRole("meter", { name: "Profile strength" }).getAttribute("aria-valuenow");
+    if (score !== "55") throw new Error(`the profile card scores ${score}, not 55`);
+    const suggested = await card.getByRole("link").allInnerTexts();
+    if (suggested.join(" | ") !== "Add at least 3 skills | Write a short bio | Choose your industry") throw new Error(`the profile card suggests ${suggested.join(" | ")}`);
+    if (!(await card.getByRole("link", { name: "Add at least 3 skills" }).getAttribute("href")).endsWith("/t/demo-university/app/profile#work")) throw new Error("the skills suggestion doesn't open Work");
     await shot("04-feed");
+    // Not now puts it off on the server, so it stays away after a reload.
+    const [dismissed] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/memberships/me/profile-nudge/dismiss")),
+      card.getByRole("button", { name: "Not now", exact: true }).click(),
+    ]);
+    if (!dismissed.ok()) throw new Error(`dismissing the profile card answered ${dismissed.status()}`);
+    await card.waitFor({ state: "detached" });
+    // The button went with the card: focus is on the note in its place, not back at the top of the page.
+    const note = "Hidden for 14 days. My profile always shows what's left to add.";
+    await page.getByText(note, { exact: true }).waitFor();
+    if ((await focused()) !== note) throw new Error(`Not now left focus on "${await focused()}"`);
+    await shot("04b-feed-card-hidden");
+    await page.reload();
+    await page.waitForSelector("text=Welcome to the official Demo University alumni network");
+    if (await card.count()) throw new Error("the profile card came back after Not now");
   });
 
   await step("post to the feed and react", async () => {
@@ -107,7 +211,7 @@ try {
     await pageB.waitForURL(/\/register$/);
     await pageB.fill('input[name="fullName"]', LISTENER);
     await pageB.selectOption('select[name="batchYear"]', "2015");
-    await pageB.click('button:has-text("Join the network")');
+    await finishRegistration(pageB, "Join the network");
     await pageB.waitForURL(/\/app\/feed$/);
     const body = `Live check ${unique}`;
     await pageB.fill("textarea", body);
@@ -315,7 +419,8 @@ try {
     await page.fill('input[name="city"]', "Mumbai");
     await page.fill('textarea[name="description"]', "Sourdough baked for the smoke tests every morning.");
     await page.setInputFiles('input[type="file"]', { name: "logo.png", mimeType: "image/png", buffer: PNG });
-    await page.locator('img[src*="/uploads/"]').waitFor();
+    // In the form: the header's avatar is the member's photo from /uploads/ too.
+    await page.locator('form img[src*="/uploads/"]').waitFor();
     await page.getByRole("button", { name: "Remove logo", exact: true }).waitFor();
     await page.fill('input[name="contactEmail"]', contact);
     await page.fill('input[name="contactPhone"]', "+91 22 5550 0199");
@@ -365,12 +470,16 @@ try {
     await page.locator(`text=${name} and Sons`).waitFor({ state: "detached" });
   });
 
-  // After the business journey, whose wait for its logo would also find this photo in the header.
+  // The photo set when registering, replaced here.
   await step("my profile: the photo picker refuses a wrong file beside it, and a saved photo is a square every avatar shows", async () => {
     await page.goto(BASE + "/t/demo-university/app/profile");
     await page.waitForSelector('h1:has-text("My profile")');
     const picker = page.getByRole("group", { name: "Profile photo" });
     const photo = page.locator('input[aria-label="Profile photo"]');
+    const header = page.locator('a[aria-label="My profile"]');
+    // The photo from registration, taken away here to start again (not saved until Save profile).
+    const registered = await header.locator('img[src*="/uploads/"]').getAttribute("src");
+    await picker.getByRole("button", { name: "Remove photo", exact: true }).click();
     await picker.getByRole("button", { name: "Add photo", exact: true }).waitFor();
     await picker.getByText("ST", { exact: true }).waitFor();
     await photo.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not a photo") });
@@ -383,8 +492,7 @@ try {
     await page.click('button:has-text("Save profile")');
     // The header shows the saved photo, served from /uploads/ as the 512-pixel square JPEG the server makes of a profile
     // photo (this one was a 1×1 PNG), so it went up as an avatar.
-    const header = page.locator('a[aria-label="My profile"]');
-    const saved = header.locator('img[src*="/uploads/"]');
+    const saved = header.locator(`img[src*="/uploads/"]:not([src="${registered}"])`);
     await saved.waitFor();
     const [width, height, src] = await saved.evaluate(async (img) => {
       await img.decode();
@@ -442,6 +550,13 @@ try {
     await page.getByRole("button", { name: "Edit QA engineer at Flaky Labs", exact: true }).waitFor();
     await shot("08g-profile-edit");
 
+    // The meter always shows, from what's saved: a link and a past role add 10 to registration's 55. Two skills aren't
+    // three yet, so skills are still to add, with a link to Work.
+    const strength = page.getByRole("region", { name: "Profile strength", exact: true });
+    await page.waitForFunction(() => document.querySelector('[role="meter"][aria-label="Profile strength"]')?.getAttribute("aria-valuenow") === "65");
+    if ((await strength.getByRole("link", { name: "Add at least 3 skills", exact: true }).getAttribute("href")) !== "#work") throw new Error("the meter's skills item doesn't open Work");
+    if (await strength.getByRole("link", { name: "Add a link, such as LinkedIn", exact: true }).count()) throw new Error("the meter still asks for a link after one was saved");
+
     // A problem the server finds inside the list ("experiences.0.endYear") goes on that row's input too, opening the row.
     const me = "**/api/v1/t/demo-university/memberships/me";
     const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "experiences.0.endYear", message: "The server can't take this year" }] } };
@@ -480,6 +595,81 @@ try {
     const link = page.getByRole("link", { name: "GitHub", exact: true });
     if ((await link.getAttribute("href")) !== "https://github.com/smoke-tester" || !(await link.getAttribute("rel"))?.includes("nofollow")) throw new Error("the GitHub link isn't the saved address with nofollow");
     await shot("08i-profile-details");
+  });
+
+  await step("joining a second institution offers the details given the first, keeps what's typed, and can be undone", async () => {
+    // Smoke Tester is a member of Demo University only. Nothing is sent here, so they don't join Demo College.
+    await page.goto(BASE + "/t/demo-college/register");
+    await page.getByRole("heading", { name: "Step 1 of 3 · Basics", exact: true }).waitFor();
+    // With no invitation, the name they gave before starts them off.
+    if ((await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("the name wasn't filled in from the account");
+    await page.fill('input[name="city"]', "Pune");
+    await page.getByRole("button", { name: "Use details from Demo University", exact: true }).click();
+    const undo = page.getByRole("button", { name: "Undo", exact: true });
+    await undo.waitFor();
+    await page.getByText("Filled in your headline, company, skills and 2 more from Demo University. Kept what you'd entered for your city.", { exact: true }).waitFor();
+    if ((await page.inputValue('input[name="city"]')) !== "Pune") throw new Error("Use details replaced the city typed here");
+    await shot("08j-register-copied");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
+    if ((await page.inputValue('input[name="headline"]')) !== `Keeps smoke run ${unique} green`) throw new Error("the headline wasn't copied");
+    if ((await page.inputValue('input[name="companyName"]')) !== "Smoke Labs") throw new Error("the company wasn't copied");
+    await page.getByRole("button", { name: "Remove Playwright", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Edit QA engineer at Flaky Labs", exact: true }).waitFor();
+
+    // The headline rewritten after the copy: back on the first step, Undo takes out only what still holds what it filled
+    // in, and says what it kept.
+    await page.fill('input[name="headline"]', "Head of smoke at Smoke Labs");
+    await page.getByRole("button", { name: "Step 1: Basics", exact: true }).click();
+    await undo.click();
+    await page.getByText("Took out the details from Demo University. Kept your changes to your headline.", { exact: true }).waitFor();
+    const useDetails = page.getByRole("button", { name: "Use details from Demo University", exact: true });
+    await useDetails.waitFor();
+    if (!(await useDetails.evaluate((el) => el === document.activeElement))) throw new Error("Undo didn't put focus back on Use details");
+    if ((await page.inputValue('input[name="city"]')) !== "Pune") throw new Error("Undo took out the city typed here");
+    await shot("08j2-register-undone");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
+    if ((await page.inputValue('input[name="headline"]')) !== "Head of smoke at Smoke Labs") throw new Error("Undo threw away the headline typed after the copy");
+    if ((await page.inputValue('input[name="companyName"]')) !== "") throw new Error("Undo left the copied company");
+    if (await page.getByRole("button", { name: "Remove Playwright", exact: true }).count()) throw new Error("Undo left the copied skills");
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    await page.waitForSelector("text=Welcome to the official Demo University alumni network");
+  });
+
+  await step("re-applying after a rejection fills in every step and shows the reason on each", async () => {
+    // Demo College answers with a rejected application, made from their Demo University membership. Nothing is sent.
+    const reason = "Add the section you were in";
+    const url = "**/api/v1/t/demo-college/memberships/me";
+    let rejected = null;
+    await page.route(url, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch({ url: route.request().url().replace("/t/demo-college/", "/t/demo-university/") });
+      rejected = { ...(await response.json()).data, status: "REJECTED", statusReason: reason };
+      return route.fulfill({ response, json: { data: rejected } });
+    });
+    try {
+      await page.goto(BASE + "/t/demo-college/register");
+      await page.getByRole("heading", { name: "Step 1 of 3 · Basics", exact: true }).waitFor();
+      await page.getByText("Re-apply to join", { exact: true }).waitFor();
+      await page.getByText(`Reason: ${reason}`, { exact: true }).waitFor();
+      if ((await page.inputValue('input[name="fullName"]')) !== rejected.fullName) throw new Error("re-applying didn't fill in the name");
+      // What's there is theirs already: nothing to bring over.
+      if (await page.getByText(/Use details from/).count()) throw new Error("re-applying offered Use details from another institution");
+      await shot("08k-register-reapply");
+      // Every step can be opened at once, each prefilled and with the reason.
+      await page.getByRole("button", { name: "Step 3: About you", exact: true }).click();
+      await page.getByRole("heading", { name: "Step 3 of 3 · About you", exact: true }).waitFor();
+      await page.getByText(`Reason: ${reason}`, { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Step 2: Work", exact: true }).click();
+      await page.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
+      await page.getByText(`Reason: ${reason}`, { exact: true }).waitFor();
+      if ((await page.inputValue('input[name="headline"]')) !== rejected.headline) throw new Error("re-applying didn't fill in the headline");
+    } finally {
+      await page.unroute(url);
+    }
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    await page.waitForSelector("text=Welcome to the official Demo University alumni network");
   });
 
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
@@ -646,6 +836,23 @@ try {
     await page.waitForTimeout(1000);
     if (!page.url().endsWith("/register")) throw new Error("a failed refetch sent a removed member back into the app");
     if ((await page.inputValue('input[name="fullName"]')) !== "Still typing") throw new Error("a failed refetch lost what was typed on the register form");
+    // With the account details failing too, on a bad connection, the form opens without them, and their refetch (which
+    // has nothing to show meanwhile) doesn't swap it for a spinner and start it again.
+    const meUrl = "**/api/v1/me";
+    await page.route(meUrl, (route) =>
+      route.request().method() === "GET" ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL", message: "e2e INTERNAL" } }) }) : route.fallback(),
+    );
+    try {
+      membership.answer(404, "NOT_A_MEMBER");
+      await page.reload();
+      await page.waitForSelector("text=Create your profile");
+      await page.fill('input[name="fullName"]', "Still typing");
+      await reconnect(page);
+      await page.waitForTimeout(1000);
+      if ((await page.inputValue('input[name="fullName"]', { timeout: 1000 })) !== "Still typing") throw new Error("refetching the account lost what was typed on the register form");
+    } finally {
+      await page.unroute(meUrl);
+    }
 
     // A suspended institution: the answer stands until a success, so a later failure must not bring the old screen back.
     await openEvents();
@@ -1548,7 +1755,7 @@ try {
     await page.waitForURL(/\/register$/);
     await page.fill('input[name="fullName"]', "Pending Smoke");
     await page.selectOption('select[name="batchYear"]', "2010");
-    await page.click('button:has-text("Submit for approval")');
+    await finishRegistration(page, "Submit for approval", { hint: "will review your profile before you can join" });
     await page.waitForURL(/\/pending$/);
     await page.waitForSelector("text=Awaiting approval");
     await shot("09-pending");

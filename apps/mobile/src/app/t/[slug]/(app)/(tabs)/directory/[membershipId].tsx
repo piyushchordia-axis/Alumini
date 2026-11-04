@@ -28,7 +28,7 @@ export default function MemberProfileScreen() {
     <Screen title="Member">
       <Card style={{ gap: spacing.md }}>
         <ProfileSummary profile={m} nameExtras={m.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />} />
-        {m.id === membership.id && <Button title="Edit my profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />}
+        {m.id === membership.id && <Button title="Edit my profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`, { withAnchor: true })} />}
         {chatOn && m.canMessage && <MessageMemberButton slug={slug} member={m} />}
         <ProfileDetails profile={m} tenant={tenant} style={divider} />
         {/* The phone, the institution's questions and since when, in the order the web app lists them. */}

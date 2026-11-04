@@ -34,6 +34,23 @@ async function loginWithPhone(number, p = page) {
   await p.click('button:has-text("Verify and continue")');
 }
 
+/** Fails unless `text` shows exactly once on the page, as a step's buttons must. */
+async function onlyOnce(p, text) {
+  const n = await p.getByText(text, { exact: true }).count();
+  if (n !== 1) throw new Error(`"${text}" shows ${n} times on the page`);
+}
+
+/** Registration's last two steps with nothing more filled in: Continue, Skip for now, then `label`. */
+async function finishRegistration(p, label) {
+  await onlyOnce(p, "Continue");
+  await p.getByRole("button", { name: "Continue", exact: true }).click();
+  await p.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
+  await onlyOnce(p, "Skip for now");
+  await p.getByRole("button", { name: "Skip for now", exact: true }).click();
+  await p.getByRole("heading", { name: "Step 3 of 3 · About you", exact: true }).waitFor();
+  await p.getByRole("button", { name: label, exact: true }).click();
+}
+
 /** Clicks a download button and returns the file's name and text. */
 async function download(click) {
   const [file] = await Promise.all([page.waitForEvent("download"), click()]);
@@ -215,7 +232,9 @@ try {
       await loginWithPhone(invitePhone, guest);
       await guest.waitForURL(/\/register$/);
       await guest.waitForSelector("text=You were invited");
-      await guest.click('button:has-text("Join the network")');
+      // The invitation fills in the name and batch, so the first step is ready to leave.
+      if ((await guest.inputValue('input[name="fullName"]')) !== "Kavita Invitee") throw new Error("the invitation didn't fill in the name");
+      await finishRegistration(guest, "Join the network");
       await guest.waitForURL(/\/app\/feed$/); // approved straight away: invitations skip the approval queue
     } finally {
       await guest.close();

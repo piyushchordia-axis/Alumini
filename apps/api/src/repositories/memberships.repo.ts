@@ -17,13 +17,17 @@ export async function listMembershipsForUser(db: DbClient, userId: string): Prom
     .orderBy(desc(memberships.createdAt));
 }
 
-/** The user's most recently updated membership of an institution other than `excludeSlug`, with that institution. */
+/**
+ * The user's most recently updated approved membership of an active institution other than `excludeSlug`, with that
+ * institution: a profile they really have somewhere, never an application that was turned down or is still waiting, a
+ * suspended one, or one at an institution that's closed.
+ */
 export async function findLatestMembershipElsewhere(db: DbClient, userId: string, excludeSlug?: string): Promise<{ membership: MembershipRow; tenant: TenantRow } | undefined> {
   const [row] = await db
     .select({ membership: memberships, tenant: tenants })
     .from(memberships)
     .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
-    .where(and(eq(memberships.userId, userId), excludeSlug ? ne(tenants.slug, excludeSlug) : undefined))
+    .where(and(eq(memberships.userId, userId), eq(memberships.status, "APPROVED"), eq(tenants.status, "ACTIVE"), excludeSlug ? ne(tenants.slug, excludeSlug) : undefined))
     .orderBy(desc(memberships.updatedAt), desc(memberships.id))
     .limit(1);
   return row;

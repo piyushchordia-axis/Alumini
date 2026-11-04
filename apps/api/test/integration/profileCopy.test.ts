@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { memberships } from "../../src/db/schema";
+import { memberships, tenants } from "../../src/db/schema";
 import { PROFILE, auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -90,12 +90,15 @@ describe.skipIf(!dbAvailable)("copying a profile from another institution", () =
     const offered = res.body.data;
     expect(Object.keys(offered).sort()).toEqual(PORTABLE_KEYS);
     const { degree: _degree, fieldOfStudy: _field, education, ...rest } = atUniversity;
-    expect(offered).toMatchObject({ ...rest, source: { slug: "demo-university", name: "Demo University" } });
+    // Their birthday is kept off the university's feed, so their date of birth stays there: a new profile would show it.
+    expect(offered).toMatchObject({ ...rest, dateOfBirth: null, source: { slug: "demo-university", name: "Demo University" } });
     // Their degree and field there become studies elsewhere, named after it, after the dated entries.
     expect(offered.education).toEqual([
       { ...education[0] },
       { institution: "Demo University", degree: "M.Tech", fieldOfStudy: "Computer Science", startYear: null, endYear: null },
     ]);
+    expect((await patch(university.slug, { celebrateBirthday: true })).status).toBe(200);
+    expect((await copy(me.headers, joining.slug)).body.data).toMatchObject({ source: { slug: "demo-university" }, dateOfBirth: "1990-04-02" });
 
     // Leaving out the newest one gives the next.
     const fromCollege = await copy(me.headers, university.slug);
@@ -104,6 +107,35 @@ describe.skipIf(!dbAvailable)("copying a profile from another institution", () =
     // Whichever was updated last wins.
     expect((await patch(college.slug, { headline: "Newer headline" })).status).toBe(200);
     expect((await copy(me.headers, joining.slug)).body.data).toMatchObject({ source: { slug: "demo-college" }, headline: "Newer headline" });
+  });
+
+  it("offers only a profile they have: never an application turned down or waiting, a suspension, or a closed institution", async () => {
+    const { tenant: school } = await createTenant(ctx, { slug: "demo-school", name: "Demo School" });
+    const { tenant: college } = await createTenant(ctx, { slug: "demo-college", name: "Demo College" });
+    const { tenant: closed } = await createTenant(ctx, { slug: "closed-institute", name: "Closed Institute" });
+    const { tenant: joining } = await createTenant(ctx, { slug: "joining" });
+    const me = await memberSession(ctx, school.id);
+    expect((await api().patch(`/api/v1/t/${school.slug}/memberships/me`).set(me.headers).send({ headline: "Approved at the school" })).status).toBe(200);
+    const elsewhere = await createMembership(ctx, college.id, me.user.id, { status: "REJECTED" });
+    const atClosed = await createMembership(ctx, closed.id, me.user.id);
+    const later = new Date(Date.now() + 60_000);
+    await ctx.db.update(memberships).set({ headline: "Not approved here", updatedAt: later }).where(eq(memberships.id, elsewhere.id));
+    await ctx.db.update(memberships).set({ headline: "At a closed institution", updatedAt: later }).where(eq(memberships.id, atClosed.id));
+    await ctx.db.update(tenants).set({ status: "SUSPENDED" }).where(eq(tenants.id, closed.id));
+
+    // Newer than the school's, and still passed over.
+    for (const status of ["REJECTED", "PENDING", "SUSPENDED"] as const) {
+      await ctx.db.update(memberships).set({ status }).where(eq(memberships.id, elsewhere.id));
+      expect((await copy(me.headers, joining.slug)).body.data, status).toMatchObject({ source: { slug: "demo-school" }, headline: "Approved at the school" });
+    }
+    await ctx.db.update(tenants).set({ status: "ARCHIVED" }).where(eq(tenants.id, closed.id));
+    expect((await copy(me.headers, joining.slug)).body.data).toMatchObject({ source: { slug: "demo-school" } });
+
+    // Once approved at the college, its newer profile is the one offered; with nothing approved, nothing is.
+    await ctx.db.update(memberships).set({ status: "APPROVED" }).where(eq(memberships.id, elsewhere.id));
+    expect((await copy(me.headers, joining.slug)).body.data).toMatchObject({ source: { slug: "demo-college" }, headline: "Not approved here" });
+    await ctx.db.update(memberships).set({ status: "REJECTED" }).where(eq(memberships.userId, me.user.id));
+    expect((await copy(me.headers, joining.slug)).body.data).toBeNull();
   });
 
   it("never offers anyone else's details", async () => {

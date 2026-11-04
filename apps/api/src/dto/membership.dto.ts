@@ -149,7 +149,8 @@ export function toMemberProfileDto(m: MembershipRow, user: Pick<UserRow, "phoneE
 /**
  * The member's details at `tenant` that they may take to another institution (see PortableProfileDto). Their degree and
  * field there become an entry of studies elsewhere, named after it, unless they already list it; the list keeps to
- * PROFILE_MAX_EDUCATION so it can be saved as it is.
+ * PROFILE_MAX_EDUCATION so it can be saved as it is. Their date of birth isn't offered when they keep their birthday off
+ * that institution's feed: a new profile celebrates it until they turn that off, so copying it would show it.
  */
 export function toPortableProfileDto(m: MembershipRow, tenant: TenantRow): PortableProfileDto {
   const listed = m.education.some((e) => e.institution.trim().toLowerCase() === tenant.name.trim().toLowerCase());
@@ -170,7 +171,7 @@ export function toPortableProfileDto(m: MembershipRow, tenant: TenantRow): Porta
     interests: m.interests,
     city: m.city,
     country: m.country,
-    dateOfBirth: m.dateOfBirth,
+    dateOfBirth: m.celebrateBirthday ? m.dateOfBirth : null,
   };
 }
 

@@ -1,10 +1,10 @@
-import { PROFILE_SECTIONS, type MembershipDto, type ProfileFieldDto, type ProfileSection, type TenantPublicDto } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, type MembershipDto, type ProfileFieldDto, type ProfileSection, type TenantPublicDto } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, type ComponentRef, type ReactNode } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View, type ScrollViewInstance } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, Text, View, type ScrollViewInstance } from "react-native";
 import { ProfileAboutSection, ProfileBasicsSection, ProfileWorkSection } from "@/components/profile/ProfileSections";
-import { PROFILE_SECTION_TITLES, useProfileDraft } from "@/components/profile/useProfileDraft";
+import { useProfileDraft } from "@/components/profile/useProfileDraft";
 import type { SkillsInputHandle } from "@/components/SkillsInput";
 import { Button, Card, ErrorText, Muted, Screen, Spinner, headingRole } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -80,7 +80,8 @@ function ProfileEditor({ tenant, membership, customFields }: { tenant: TenantPub
       void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
       void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
-      Alert.alert("Profile saved");
+      // No dialog to dismiss: My profile (or the feed's card) shows what was saved. A screen reader hears it.
+      if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility("Profile saved");
       router.back();
     },
     // A problem with no input of its own is said beside the button at the end, once it's drawn there.
