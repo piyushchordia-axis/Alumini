@@ -82,11 +82,17 @@ function Charts({ d, weeks }: { d: TenantAnalyticsDto; weeks: number }) {
   const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
   const c = d.coverage.completeness;
   const completeness: CountRow[] = [
+    { label: "Photo", count: c.photo },
+    { label: "Headline", count: c.headline },
     { label: "City", count: c.city },
     { label: "Company", count: c.company },
+    { label: "Industry", count: c.industry },
+    { label: "Skills", count: c.skills },
+    { label: "Past roles", count: c.pastRoles },
+    { label: "Education", count: c.education },
     { label: "Birthday", count: c.birthday },
-    { label: "Photo", count: c.photo },
     { label: "LinkedIn", count: c.linkedin },
+    { label: "Any link", count: c.anyLink },
     { label: "Confirmed email", count: c.email },
   ];
 

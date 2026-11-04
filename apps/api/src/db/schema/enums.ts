@@ -17,6 +17,7 @@ import {
   EVENT_KINDS,
   FUNDING_KINDS,
   FUNDING_STAGES,
+  INDUSTRIES,
   INVITATION_STATUSES,
   JOB_TYPES,
   MARITAL_STATUSES,
@@ -28,6 +29,7 @@ import {
   MEMBERSHIP_STATUSES,
   MODERATION_STATUSES,
   NOTIFICATION_TYPES,
+  OPEN_TO,
   PROFESSION_TYPES,
   PROFILE_FIELD_TYPES,
   PROFILE_FIELD_VISIBILITIES,
@@ -92,3 +94,5 @@ export const mentorAvailabilityEnum = pgEnum("mentor_availability", MENTOR_AVAIL
 export const mentorshipStatusEnum = pgEnum("mentorship_status", MENTORSHIP_STATUSES);
 export const referralStatusEnum = pgEnum("referral_status", REFERRAL_STATUSES);
 export const uploadPurposeEnum = pgEnum("upload_purpose", UPLOAD_PURPOSES);
+export const industryEnum = pgEnum("industry", INDUSTRIES);
+export const openToEnum = pgEnum("open_to", OPEN_TO);

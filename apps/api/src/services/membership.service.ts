@@ -1,15 +1,28 @@
-import type { AdminMemberDto, AdminMembersQuery, MembershipDto, MembershipProfileInput, MembershipProfileUpdate, MembershipRole } from "@illuminize/shared";
+import {
+  isCurrentPupil,
+  sortEducation,
+  sortExperiences,
+  type AdminMemberDto,
+  type AdminMembersQuery,
+  type MembershipDto,
+  type MembershipProfileInput,
+  type MembershipProfileUpdate,
+  type MembershipRole,
+  type PortableProfileDto,
+} from "@illuminize/shared";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
-import { toAdminMemberDto, toMembershipDto } from "../dto/membership.dto";
+import { toAdminMemberDto, toMembershipDto, toPortableProfileDto } from "../dto/membership.dto";
 import { AppError, isAppError } from "../lib/errors";
 import { buildPage, type Page } from "../lib/pagination";
 import {
   approveAllPending as approveAllPendingRepo,
+  findLatestMembershipElsewhere,
   findMembership,
   findMembershipWithUser,
   insertMembership,
   listMembersForAdmin,
+  setProfileNudgeDismissedAt,
   updateMembership,
 } from "../repositories/memberships.repo";
 import { findUserById, updateUser } from "../repositories/users.repo";
@@ -17,7 +30,7 @@ import { hasOpenReportAbout } from "../repositories/chatReports.repo";
 import { claimInvitation, findOpenInvitationByPhone } from "../repositories/invitations.repo";
 import { runInTransaction } from "../lib/transaction";
 import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "./profileFields.service";
-import type { AuthContext, MembershipRow, TenantContext } from "../types/request";
+import type { AuthContext, MembershipRow, TenantContext, TenantRow } from "../types/request";
 import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
@@ -30,7 +43,7 @@ export interface Actor extends AuthContext {
   ip?: string;
 }
 
-function profileColumns(input: MembershipProfileInput | MembershipProfileUpdate) {
+function profileColumns(input: MembershipProfileInput | MembershipProfileUpdate, tenant: Pick<TenantRow, "type">) {
   const out: Partial<MembershipRow> = {};
   if (input.fullName !== undefined) out.fullName = input.fullName;
   if (input.batchYear !== undefined) out.batchYear = input.batchYear;
@@ -49,7 +62,37 @@ function profileColumns(input: MembershipProfileInput | MembershipProfileUpdate)
   if (input.isPhoneVisible !== undefined) out.isPhoneVisible = input.isPhoneVisible;
   if (input.celebrateBirthday !== undefined) out.celebrateBirthday = input.celebrateBirthday;
   if (input.celebrateAnniversary !== undefined) out.celebrateAnniversary = input.celebrateAnniversary;
+  if (input.headline !== undefined) out.headline = input.headline;
+  if (input.industry !== undefined) out.industry = input.industry;
+  if (input.careerStartYear !== undefined) out.careerStartYear = input.careerStartYear;
+  if (input.skills !== undefined) out.skills = input.skills;
+  // A school doesn't ask and its forms don't show them, so its members hold neither: becoming a school clears them
+  // (updatePlatformTenant), and every save there does too, whatever was sent, in case one was written in between.
+  if (tenant.type === "SCHOOL") {
+    out.degree = null;
+    out.fieldOfStudy = null;
+  } else {
+    if (input.degree !== undefined) out.degree = input.degree;
+    if (input.fieldOfStudy !== undefined) out.fieldOfStudy = input.fieldOfStudy;
+  }
+  if (input.websiteUrl !== undefined) out.websiteUrl = input.websiteUrl;
+  if (input.githubUrl !== undefined) out.githubUrl = input.githubUrl;
+  if (input.instagramUrl !== undefined) out.instagramUrl = input.instagramUrl;
+  if (input.xUrl !== undefined) out.xUrl = input.xUrl;
+  if (input.openTo !== undefined) out.openTo = input.openTo;
+  if (input.experiences !== undefined) out.experiences = sortExperiences(input.experiences);
+  if (input.education !== undefined) out.education = sortEducation(input.education);
   return out;
+}
+
+/**
+ * A current pupil is open to nothing (hiring, collaborating, investing), whatever was sent or stored, so the directory's
+ * Open-to filter can never find one. Checked on the row as saved, inside the transaction that saved it, so a change of
+ * batch or date of birth in this edit or an earlier one counts.
+ */
+async function applyPupilRules(tx: DbClient, tenant: TenantRow, row: MembershipRow): Promise<MembershipRow> {
+  if (row.openTo.length === 0 || !isCurrentPupil(tenant, row)) return row;
+  return (await updateMembership(tx, tenant.id, row.id, { openTo: [] }))!;
 }
 
 function assertBatchYear(tenantCtx: TenantContext, batchYear: number | undefined) {
@@ -97,7 +140,7 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
     if (existing) {
       const next = approveNow ? "APPROVED" : transitionMembership(existing.status, "reapply", settings.memberApprovalMode);
       row = (await updateMembership(tx, tenant.id, existing.id, {
-        ...profileColumns(input),
+        ...profileColumns(input, tenant),
         status: next,
         statusReason: null,
         statusChangedAt: new Date(),
@@ -113,11 +156,12 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
         fullName: input.fullName,
         batchYear: input.batchYear,
         professionType: input.professionType,
-        ...profileColumns(input),
+        ...profileColumns(input, tenant),
         statusChangedAt: status === "APPROVED" ? new Date() : null,
       });
       action = "membership.create";
     }
+    row = await applyPupilRules(tx, tenant, row);
 
     await saveAnswers(ctx, tx, tenant.id, row.id, input.fields, "register");
     const accepted = invite ? await claimInvitation(tx, invite.id, row.id) : undefined;
@@ -166,13 +210,29 @@ export async function updateMyProfile(
   assertBatchYear(tenantCtx, input.batchYear);
   const row = await runInTransaction(ctx, async (tx) => {
     await applyAvatarChange(ctx, tx, tenantCtx.tenant.id, { membershipId: membership.id, next: input.avatarUrl, uploaderIds: [membership.userId] });
-    const updated = await updateMembership(tx, tenantCtx.tenant.id, membership.id, profileColumns(input));
+    const updated = await updateMembership(tx, tenantCtx.tenant.id, membership.id, profileColumns(input, tenantCtx.tenant));
     if (!updated) throw AppError.notFound("Membership not found");
     if (input.fields) await saveAnswers(ctx, tx, tenantCtx.tenant.id, membership.id, input.fields, "member");
     if (input.fullName) await updateUser(tx, membership.userId, { displayName: input.fullName });
-    return updated;
+    return applyPupilRules(tx, tenantCtx.tenant, updated);
   });
   return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
+}
+
+/** Puts off the feed's profile-strength card for PROFILE_NUDGE_SNOOZE_DAYS, on every device. */
+export async function dismissProfileNudge(ctx: AppContext, tenantCtx: TenantContext, membership: MembershipRow): Promise<MembershipDto> {
+  const row = await setProfileNudgeDismissedAt(ctx.db, tenantCtx.tenant.id, membership.id, new Date());
+  if (!row) throw AppError.notFound("Membership not found");
+  return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
+}
+
+/**
+ * What "Use details from …" offers someone joining `excludeSlug`: their own details from their most recently updated
+ * membership of any other institution (see toPortableProfileDto), or null if they have none.
+ */
+export async function getPortableProfile(ctx: AppContext, userId: string, excludeSlug?: string): Promise<PortableProfileDto | null> {
+  const found = await findLatestMembershipElsewhere(ctx.db, userId, excludeSlug);
+  return found ? toPortableProfileDto(found.membership, found.tenant) : null;
 }
 
 async function loadTarget(db: DbClient, tenantId: string, membershipId: string) {
@@ -365,7 +425,7 @@ export async function adminUpdateProfile(
       const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
       assertBatchYear(tenantCtx, input.batchYear);
       await applyAvatarChange(ctx, tx, tenant.id, { membershipId, next: input.avatarUrl, uploaderIds: [target.userId, actor.userId] });
-      const row = (await updateMembership(tx, tenant.id, membershipId, profileColumns(input)))!;
+      const row = await applyPupilRules(tx, tenant, (await updateMembership(tx, tenant.id, membershipId, profileColumns(input, tenant)))!);
       if (input.fields) await saveAnswers(ctx, tx, tenant.id, membershipId, input.fields, "admin");
       return { user, row };
     }),

@@ -1,4 +1,4 @@
-import { deleteAccountSchema, emailChangeSchema, pushTokenParamsSchema, pushTokenSchema } from "@illuminize/shared";
+import { deleteAccountSchema, emailChangeSchema, profileCopyQuerySchema, pushTokenParamsSchema, pushTokenSchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../context";
 import { requireAuth } from "../middleware/auth";
@@ -7,6 +7,7 @@ import { noContent, ok, route } from "../middleware/validate";
 import { deletePushToken, upsertPushToken } from "../repositories/users.repo";
 import { deleteAccount, getMe } from "../services/auth.service";
 import { getEmailStatus, removeEmail, requestEmailChange } from "../services/email.service";
+import { getPortableProfile } from "../services/membership.service";
 
 export function meRoutes(ctx: AppContext): Router {
   const router = Router();
@@ -16,6 +17,14 @@ export function meRoutes(ctx: AppContext): Router {
     "/me",
     route({}, async ({ req, res }) => {
       ok(res, await getMe(ctx, req.auth!.userId));
+    }),
+  );
+
+  // The caller's own details at another institution, for "Use details from …" while joining `exclude`. Null if none.
+  router.get(
+    "/me/profile-copy",
+    route({ query: profileCopyQuerySchema }, async ({ req, res, query }) => {
+      ok(res, await getPortableProfile(ctx, req.auth!.userId, query.exclude));
     }),
   );
 

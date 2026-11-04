@@ -1,6 +1,17 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultFeaturesFor, type MentorArea, type MentorAvailability } from "@illuminize/shared";
+import {
+  defaultFeaturesFor,
+  normalizeSkills,
+  sortEducation,
+  sortExperiences,
+  type Industry,
+  type MentorArea,
+  type MentorAvailability,
+  type OpenTo,
+  type ProfileEducationDto,
+  type ProfileExperienceDto,
+} from "@illuminize/shared";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createLogger } from "../lib/logger";
@@ -165,7 +176,140 @@ export const SEED_MEMBERS: Record<string, MemberSeed[]> = {
   ],
 };
 
-async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed): Promise<string> {
+/** A profile's own details. */
+interface SeedProfile {
+  headline?: string;
+  industry?: Industry;
+  careerStartYear?: number;
+  skills?: string[];
+  degree?: string;
+  fieldOfStudy?: string;
+  experiences?: ProfileExperienceDto[];
+  education?: ProfileEducationDto[];
+  linkedinUrl?: string;
+  websiteUrl?: string;
+  githubUrl?: string;
+  instagramUrl?: string;
+  xUrl?: string;
+  openTo?: OpenTo[];
+}
+
+/** Stored the way the API stores a saved profile: skills normalised, and both lists newest first. */
+function seedProfileValues(p: SeedProfile): SeedProfile {
+  return {
+    ...p,
+    ...(p.skills && { skills: normalizeSkills(p.skills) }),
+    ...(p.experiences && { experiences: sortExperiences(p.experiences) }),
+    ...(p.education && { education: sortEducation(p.education) }),
+  };
+}
+
+const pastRole = (company: string, title: string, startYear: number | null, endYear: number | null): ProfileExperienceDto => ({ company, title, startYear, endYear });
+const studied = (institution: string, degree: string | null, fieldOfStudy: string | null, startYear: number | null, endYear: number | null): ProfileEducationDto => ({ institution, degree, fieldOfStudy, startYear, endYear });
+
+/**
+ * Full profiles for a few named members, consistent with the rest of their seed (their posts, listings and mentor notes).
+ * Nothing in them names another member, or says "Mentor", which the directory and its e2e checks look for on cards.
+ */
+const SEED_PROFILES: Record<string, Record<string, SeedProfile>> = {
+  "demo-university": {
+    // Rahul Mehta: "I started Zylo Labs after six years in banking."
+    "+919100000001": {
+      headline: "Founder and CEO of Zylo Labs: lending software for small marketplaces",
+      industry: "BANKING_FINANCE",
+      careerStartYear: 2012,
+      skills: ["Fundraising", "Lending", "Fintech", "Product strategy", "Early hiring"],
+      degree: "B.Tech",
+      fieldOfStudy: "Computer Science",
+      experiences: [pastRole("HDFC Bank", "Product lead, SME lending", 2015, 2018), pastRole("Kotak Mahindra Bank", "Management trainee", 2012, 2015)],
+      linkedinUrl: "https://www.linkedin.com/in/rahul-mehta-zylo",
+      websiteUrl: "https://example.com/zylo",
+      xUrl: "https://x.com/rahulbuilds",
+      openTo: ["HIRING", "COLLABORATING"],
+    },
+    // Priya Nair: moved from engineering to product, and from India to the UK.
+    "+919100000002": {
+      headline: "Product manager at Google, working on consumer apps",
+      industry: "SOFTWARE_INTERNET",
+      careerStartYear: 2012,
+      skills: ["Product management", "User research", "SQL", "A/B testing", "Roadmapping"],
+      degree: "B.Tech",
+      fieldOfStudy: "Electronics",
+      experiences: [pastRole("Flipkart", "Software engineer", 2012, 2015)],
+      education: [studied("London Business School", "MBA", null, 2015, 2017)],
+      linkedinUrl: "https://www.linkedin.com/in/priya-nair-product",
+      openTo: ["HIRING"],
+    },
+    // Vikram Desai: an MBA student, and the seeded job seeker.
+    "+919100000005": {
+      headline: "MBA student at IIM Ahmedabad, looking for product and strategy roles",
+      skills: ["Market research", "Financial modelling", "SQL", "Excel"],
+      degree: "B.Com",
+      fieldOfStudy: "Commerce",
+      experiences: [pastRole("Deloitte", "Analyst", 2020, 2024)],
+      education: [studied("IIM Ahmedabad", "MBA", null, 2024, 2026)],
+      linkedinUrl: "https://www.linkedin.com/in/vikram-desai-iima",
+    },
+    // Sneha Kulkarni: distributed systems, and angel cheques for alumni founders.
+    "+919100000006": {
+      headline: "Principal engineer at Microsoft, building distributed storage",
+      industry: "SOFTWARE_INTERNET",
+      careerStartYear: 2008,
+      skills: ["Distributed systems", "Go", "C++", "Kubernetes", "System design"],
+      degree: "B.Tech",
+      fieldOfStudy: "Computer Science",
+      experiences: [pastRole("Amazon", "Senior software engineer", 2012, 2017), pastRole("Infosys", "Software engineer", 2008, 2010)],
+      education: [studied("University of Washington", "MS", "Computer Science", 2010, 2012)],
+      linkedinUrl: "https://www.linkedin.com/in/sneha-kulkarni-seattle",
+      githubUrl: "https://github.com/sneha-kulkarni-dev",
+      websiteUrl: "https://example.com/cascade",
+      openTo: ["INVESTING"],
+    },
+  },
+  "demo-college": {
+    // Kiran Joshi: warehouse robots, raising a pre-seed round.
+    "+919100000011": {
+      headline: "Founder of Joshi Robotics: warehouse robots for Indian logistics firms",
+      industry: "MANUFACTURING_ENGINEERING",
+      careerStartYear: 2005,
+      skills: ["Robotics", "Embedded systems", "Warehouse automation", "Fundraising"],
+      degree: "B.E.",
+      fieldOfStudy: "Mechanical Engineering",
+      experiences: [pastRole("Tata Motors", "Automation engineer", 2005, 2011)],
+      education: [studied("IIT Bombay", "M.Tech", "Mechatronics", 2011, 2013)],
+      websiteUrl: "https://example.com/joshi-robotics",
+      openTo: ["HIRING", "COLLABORATING"],
+    },
+    // Neha Sharma: the architect who posted the TCS opening.
+    "+919100000012": {
+      headline: "Solutions architect for banking platforms at TCS",
+      industry: "IT_SERVICES",
+      careerStartYear: 2010,
+      skills: ["Solution architecture", "Java", "AWS", "Core banking", "Microservices"],
+      degree: "B.E.",
+      fieldOfStudy: "Computer Engineering",
+      experiences: [pastRole("Wipro", "Senior developer", 2010, 2014)],
+      linkedinUrl: "https://www.linkedin.com/in/neha-sharma-architect",
+      openTo: ["HIRING"],
+    },
+  },
+  // A school asks for no degree: what came after it is studies elsewhere.
+  "demo-school": {
+    // Nikhil Bose: writes seed cheques for DIS founders.
+    "+919100000023": {
+      headline: "Vice president, investment banking at Goldman Sachs",
+      industry: "BANKING_FINANCE",
+      careerStartYear: 2016,
+      skills: ["Financial modelling", "Valuation", "M&A", "Angel investing"],
+      experiences: [pastRole("J.P. Morgan", "Analyst", 2016, 2019)],
+      education: [studied("INSEAD", "MBA", null, 2019, 2020), studied("Shri Ram College of Commerce", "B.Com", "Commerce", 2013, 2016)],
+      linkedinUrl: "https://www.linkedin.com/in/nikhil-bose-sg",
+      openTo: ["INVESTING"],
+    },
+  },
+};
+
+async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed, profile: SeedProfile = {}): Promise<string> {
   const [user] = await db
     .insert(users)
     .values({ phoneE164: m.phone, phoneRegion: "IN", displayName: m.fullName })
@@ -190,6 +334,7 @@ async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed): Promis
       country: m.country ?? null,
       bio: m.bio ?? null,
       interests: m.interests ?? [],
+      ...seedProfileValues(profile),
       lastActiveAt: status === "APPROVED" ? new Date() : null,
     })
     .onConflictDoUpdate({
@@ -205,7 +350,7 @@ export async function seedMembers(db: Db, tenantIds: Record<string, string>): Pr
   for (const [slug, members] of Object.entries(SEED_MEMBERS)) {
     const tenantId = tenantIds[slug];
     if (!tenantId) continue;
-    for (const m of members) membershipIds[`${slug}:${m.phone}`] = await upsertSeedMember(db, tenantId, m);
+    for (const m of members) membershipIds[`${slug}:${m.phone}`] = await upsertSeedMember(db, tenantId, m, SEED_PROFILES[slug]?.[m.phone]);
   }
   return membershipIds;
 }

@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { auditLog, invitations, memberActivityDays, memberFieldValues, outboundMessages, postComments, posts, tenantBillingPlans, tenantProfileFields, tenants, users } from "../../src/db/schema";
+import { auditLog, invitations, memberActivityDays, memberFieldValues, memberships, outboundMessages, postComments, posts, tenantBillingPlans, tenantProfileFields, tenants, users } from "../../src/db/schema";
 import { streamCsv } from "../../src/lib/csvStream";
 import { createLogger } from "../../src/lib/logger";
 import { errorHandler } from "../../src/middleware/errorHandler";
@@ -155,6 +155,11 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
       { tenantId: tenant.id, membershipId: ms[0]!.id, fieldId: multi!.id, value: ["cricket", "chess"] },
       { tenantId: tenant.id, membershipId: ms[1]!.id, fieldId: multi!.id, value: ["chess"] },
     ]);
+    const details = (id: string, set: Partial<typeof memberships.$inferInsert>) => ctx.db.update(memberships).set(set).where(eq(memberships.id, id));
+    await details(ms[0]!.id, { headline: "Engineer", industry: "IT_SERVICES", skills: ["Go"], experiences: [{ company: "Acme", title: "Intern", startYear: 2010, endYear: 2011 }] });
+    await details(ms[1]!.id, { degree: "B.Tech", githubUrl: "https://github.com/someone" });
+    await details(ms[2]!.id, { education: [{ institution: "IIM Ahmedabad", degree: "MBA", fieldOfStudy: null, startYear: null, endYear: null }], linkedinUrl: "https://www.linkedin.com/in/someone" });
+    await details(ms[3]!.id, { fieldOfStudy: "Commerce", xUrl: "https://x.com/someone", skills: [], experiences: [] });
     const expires = new Date(Date.now() + 86_400_000);
     await ctx.db.insert(invitations).values([
       { tenantId: tenant.id, phoneE164: "+919800000001", token: "t1", expiresAt: expires },
@@ -171,7 +176,8 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
       { label: "2011", count: 7 },
     ]);
     expect(d.coverage.professions[0]).toEqual({ label: "Working at a company", count: 14 });
-    expect(d.coverage.completeness).toMatchObject({ total: 15, city: 15, photo: 0, email: 0 });
+    // Education is a degree or field here, or studies elsewhere; any link is LinkedIn or one of the others.
+    expect(d.coverage.completeness).toEqual({ total: 15, photo: 0, headline: 1, city: 15, company: 0, industry: 1, skills: 1, pastRoles: 1, education: 3, birthday: 0, linkedin: 1, anyLink: 3, email: 0 });
     expect(d.coverage.fields).toEqual([
       { key: "house", label: "House", options: [{ label: "Red House", count: 2 }, { label: "Blue House", count: 1 }] },
       { key: "sports", label: "Sports", options: [{ label: "Chess", count: 2 }, { label: "Cricket", count: 1 }] },
@@ -184,6 +190,25 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     const u = await createUser(ctx, { phone: "+919811122233" });
     await ctx.db.update(users).set({ email: "asha@example.com", emailVerifiedAt: new Date() }).where(eq(users.id, u.id));
     const m = await createMembership(ctx, tenant.id, u.id, { fullName: 'Rao, "Asha"', companyName: "=HYPERLINK(\"http://x\")", city: "Pune", country: "IN", approvedAt: new Date("2024-03-10T20:00:00Z") });
+    await ctx.db
+      .update(memberships)
+      .set({
+        headline: "@payments, at scale",
+        industry: "BANKING_FINANCE",
+        careerStartYear: 2014,
+        skills: ["Go", "SQL"],
+        degree: "B.Tech",
+        fieldOfStudy: "Computer Science",
+        experiences: [
+          { company: "Acme", title: "Engineer", startYear: 2014, endYear: 2018 },
+          { company: "Beta", title: "Intern", startYear: 2013, endYear: null },
+        ],
+        education: [{ institution: "IIM Ahmedabad", degree: "MBA", fieldOfStudy: null, startYear: 2018, endYear: 2020 }],
+        linkedinUrl: "https://www.linkedin.com/in/asha",
+        xUrl: "https://x.com/asha",
+        openTo: ["HIRING", "INVESTING"],
+      })
+      .where(eq(memberships.id, m.id));
     const u2 = await createUser(ctx);
     await ctx.db.update(users).set({ email: "unconfirmed@example.com" }).where(eq(users.id, u2.id));
     await createMembership(ctx, tenant.id, u2.id, { fullName: "Bala Unconfirmed", status: "PENDING" });
@@ -209,9 +234,29 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     expect(asha[13]).toBe("2024-03-11"); // approved late evening UTC: the next day in India
     expect(asha.slice(-2)).toEqual(["Ganga; North", "Donor"]);
     expect(body).toContain('"Rao, ""Asha"""');
+    // The profile's own details come between "Last active" (column 14) and the institution's questions, a list in one cell.
+    const details = ["Headline", "Industry", "Started working", "Skills", "Degree", "Field of study", "Past roles", "Studies elsewhere", "LinkedIn", "Website", "GitHub", "Instagram", "X", "Open to"];
+    expect(rows[0]!.slice(14)).toEqual(["Last active", ...details, "House", "Admin notes"]);
+    expect(asha.slice(15, 15 + details.length)).toEqual([
+      "'@payments, at scale",
+      "Banking and finance",
+      "2014",
+      "Go; SQL",
+      "B.Tech",
+      "Computer Science",
+      "Engineer, Acme (2014–2018); Intern, Beta (from 2013)",
+      "MBA, IIM Ahmedabad (2018–2020)",
+      "https://www.linkedin.com/in/asha",
+      "",
+      "",
+      "",
+      "https://x.com/asha",
+      "Hiring; Investing",
+    ]);
     const bala = rows.find((r) => r[0] === "Bala Unconfirmed")!;
     expect(bala[2]).toBe(""); // unconfirmed addresses are left out
     expect(bala[4]).toBe("Pending approval");
+    expect(bala.slice(15, 15 + details.length)).toEqual(details.map(() => ""));
     expect(rows).toHaveLength(4);
 
     const [entry] = await ctx.db.select().from(auditLog).where(eq(auditLog.action, "export.members"));
@@ -219,6 +264,15 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
 
     const member = await memberSession(ctx, tenant.id);
     expect((await api().get(`${base}/exports/members.csv`).set(member.headers)).status).toBe(403);
+  });
+
+  it("leaves the degree columns out of a school's members CSV, since schools don't ask", async () => {
+    const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", fullName: "School Admin" });
+    const res = await csvRequest(api().get(`/api/v1/t/${tenant.slug}/admin/exports/members.csv`).set(admin.headers));
+    expect(res.status).toBe(200);
+    const [header] = parseRows(res.body as string);
+    expect(header!.slice(14)).toEqual(["Last active", "Headline", "Industry", "Started working", "Skills", "Past roles", "Studies elsewhere", "LinkedIn", "Website", "GitHub", "Instagram", "X", "Open to"]);
   });
 
   it("streams every member exactly once across batches", async () => {

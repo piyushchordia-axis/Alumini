@@ -24,6 +24,44 @@ export const httpUrlSchema = z
   .trim()
   .url()
   .refine((u) => /^https?:\/\//i.test(u), "URL must start with http:// or https://");
+const urlParts = (u: string): URL | null => {
+  try {
+    return new URL(u);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * An http(s) link a member puts on their profile. No user name or password: "https://linkedin.com@evil.com" reads as
+ * one site and opens another. An unparsable link passes that check, which leaves it to the URL check's own message.
+ *
+ * It's stored as the URL parser read it (`URL.href`), so whatever opens it later goes where the checks looked. Typed
+ * text can read differently to other parsers: "https://linkedin.com\@evil.com" is linkedin.com to a browser but
+ * evil.com to iOS, and is stored as "https://linkedin.com/@evil.com", linkedin.com to both. That also lower-cases the
+ * host, ends a bare host with "/", and percent-encodes spaces, bidi controls and other non-ASCII text in the path.
+ */
+export const linkUrlSchema = httpUrlSchema
+  .refine((u) => {
+    const url = urlParts(u);
+    return !url || (!url.username && !url.password);
+  }, "Remove the user name or password from the link")
+  .transform((u) => urlParts(u)?.href ?? u)
+  .pipe(z.string().max(500, "Keep the link to 500 characters"));
+
+/**
+ * A link to one of `hosts`, or a subdomain of one ("www.linkedin.com", "in.linkedin.com"), judged by the URL's own
+ * hostname: a check of the whole text would let "https://evil.com/?linkedin.com/" through. Stored as linkUrlSchema
+ * stores it.
+ */
+export const hostUrlSchema = (hosts: readonly string[], message = `Must be a ${hosts.join(" or ")} link`) =>
+  linkUrlSchema.refine((u) => {
+    const url = urlParts(u);
+    if (!url) return true;
+    const host = url.hostname.toLowerCase();
+    return hosts.some((h) => host === h || host.endsWith(`.${h}`));
+  }, message);
+
 export const dateOnlySchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")

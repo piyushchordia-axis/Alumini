@@ -465,6 +465,20 @@ export const AVATAR_SIZE = 512;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 export const MIN_BATCH_YEAR = 1950;
+/** Limits on the profile's own details (see membershipProfileSchema). */
+export const PROFILE_HEADLINE_MAX_LENGTH = 120;
+export const PROFILE_MAX_SKILLS = 20;
+export const SKILL_MAX_LENGTH = 40;
+/** A degree's name, and a field of study, here or elsewhere. */
+export const PROFILE_DEGREE_MAX_LENGTH = 80;
+/** A company, title or institution in the work and study history. */
+export const PROFILE_HISTORY_NAME_MAX_LENGTH = 120;
+export const PROFILE_MAX_EXPERIENCES = 15;
+export const PROFILE_MAX_EDUCATION = 10;
+/** The earliest year a profile's work or studies may start or end in. */
+export const PROFILE_MIN_YEAR = 1940;
+/** How many years ahead studies elsewhere may be due to end, as a batch may be. */
+export const PROFILE_EDUCATION_YEARS_AHEAD = 10;
 export const OTP_LENGTH = 6;
 export const OTP_TTL_SECONDS = 300;
 export const OTP_RESEND_COOLDOWN_SECONDS = 60;

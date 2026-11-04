@@ -124,10 +124,16 @@ export async function getTenantAnalytics(ctx: AppContext, tenantId: string, week
       .select({
         total: sql<number>`count(*)::int`,
         photo: sql<number>`(count(*) filter (where ${memberships.avatarUrl} is not null))::int`,
+        headline: sql<number>`(count(*) filter (where coalesce(${memberships.headline}, '') <> ''))::int`,
         city: sql<number>`(count(*) filter (where coalesce(${memberships.city}, '') <> ''))::int`,
         company: sql<number>`(count(*) filter (where coalesce(${memberships.companyName}, '') <> ''))::int`,
+        industry: sql<number>`(count(*) filter (where ${memberships.industry} is not null))::int`,
+        skills: sql<number>`(count(*) filter (where cardinality(${memberships.skills}) > 0))::int`,
+        pastRoles: sql<number>`(count(*) filter (where jsonb_array_length(${memberships.experiences}) > 0))::int`,
+        education: sql<number>`(count(*) filter (where coalesce(${memberships.degree}, '') <> '' or coalesce(${memberships.fieldOfStudy}, '') <> '' or jsonb_array_length(${memberships.education}) > 0))::int`,
         birthday: sql<number>`(count(*) filter (where ${memberships.dateOfBirth} is not null))::int`,
         linkedin: sql<number>`(count(*) filter (where ${memberships.linkedinUrl} is not null))::int`,
+        anyLink: sql<number>`(count(*) filter (where coalesce(${memberships.linkedinUrl}, ${memberships.websiteUrl}, ${memberships.githubUrl}, ${memberships.instagramUrl}, ${memberships.xUrl}) is not null))::int`,
         email: sql<number>`(count(*) filter (where ${users.email} is not null))::int`,
       })
       .from(memberships)

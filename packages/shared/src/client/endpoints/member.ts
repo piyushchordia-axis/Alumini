@@ -66,6 +66,8 @@ export function membershipEndpoints(core: ApiCore) {
     register: (slug: string, input: MembershipProfileInput) => core.data<MembershipDto>({ method: "POST", path: "/memberships", tenantSlug: slug, body: input }),
     me: (slug: string) => core.data<MembershipDto>({ path: "/memberships/me", tenantSlug: slug }),
     updateMe: (slug: string, input: MembershipProfileUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me", tenantSlug: slug, body: input }),
+    /** Keeps the feed's profile-strength card away for PROFILE_NUDGE_SNOOZE_DAYS, on every device. */
+    dismissProfileNudge: (slug: string) => core.data<MembershipDto>({ method: "POST", path: "/memberships/me/profile-nudge/dismiss", tenantSlug: slug }),
   };
 }
 

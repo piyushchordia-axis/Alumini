@@ -1,3 +1,4 @@
+import type { ProfileEducationDto, ProfileExperienceDto } from "@illuminize/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -13,8 +14,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { maritalStatusEnum, membershipRoleEnum, membershipStatusEnum, professionTypeEnum } from "./enums";
-import { tenantScoped, timestamps } from "./helpers";
+import { industryEnum, maritalStatusEnum, membershipRoleEnum, membershipStatusEnum, openToEnum, professionTypeEnum } from "./enums";
+import { jsonValue, tenantScoped, timestamps } from "./helpers";
 import { users } from "./users";
 
 export const memberships = pgTable(
@@ -47,6 +48,29 @@ export const memberships = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /** One line about what they do, shown under their name. */
+    headline: text("headline"),
+    industry: industryEnum("industry"),
+    /** The year they started working; the apps show the years of experience from it, so it never goes stale. */
+    careerStartYear: smallint("career_start_year"),
+    skills: text("skills")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** Their degree and field of study here. Schools don't ask. */
+    degree: text("degree"),
+    fieldOfStudy: text("field_of_study"),
+    websiteUrl: text("website_url"),
+    githubUrl: text("github_url"),
+    instagramUrl: text("instagram_url"),
+    xUrl: text("x_url"),
+    /** Always empty for a current pupil. */
+    openTo: openToEnum("open_to").array().notNull().default(sql`'{}'::open_to[]`),
+    /** Past roles and studies elsewhere, newest first. Read and written whole with the profile, never one entry at a time. */
+    experiences: jsonValue<ProfileExperienceDto[]>("experiences").notNull().default(sql`'[]'::jsonb`),
+    education: jsonValue<ProfileEducationDto[]>("education").notNull().default(sql`'[]'::jsonb`),
+    /** When they last dismissed the feed's profile-strength card, which then stays away for PROFILE_NUDGE_SNOOZE_DAYS. */
+    profileNudgeDismissedAt: timestamp("profile_nudge_dismissed_at", { withTimezone: true, precision: 3 }),
     avatarUrl: text("avatar_url"),
     isPhoneVisible: boolean("is_phone_visible").notNull().default(false),
     /** Shown on the feed's celebrations card on their birthday (day and month only) / membership anniversary. */
@@ -64,6 +88,7 @@ export const memberships = pgTable(
     index("memberships_tenant_city_idx").on(t.tenantId, t.city),
     index("memberships_tenant_country_idx").on(t.tenantId, t.country),
     index("memberships_tenant_profession_idx").on(t.tenantId, t.professionType),
+    index("memberships_tenant_industry_idx").on(t.tenantId, t.industry),
     index("memberships_tenant_role_idx").on(t.tenantId, t.role),
     index("memberships_tenant_active_idx").on(t.tenantId, t.lastActiveAt),
     index("memberships_user_idx").on(t.userId),

@@ -5,6 +5,7 @@ export * from "./lib/features";
 export * from "./lib/sections";
 export * from "./lib/phone";
 export * from "./lib/skills";
+export * from "./lib/profile";
 export * from "./lib/richText";
 export * from "./lib/salary";
 export * from "./schemas/common";

@@ -4,7 +4,7 @@ import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { requireMember } from "../../middleware/tenant";
 import { ok, route } from "../../middleware/validate";
-import { getMyMembership, registerMembership, updateMyProfile } from "../../services/membership.service";
+import { dismissProfileNudge, getMyMembership, registerMembership, updateMyProfile } from "../../services/membership.service";
 import { getFieldsForMember } from "../../services/profileFields.service";
 import { findMyInvitation } from "../../services/invitations.service";
 
@@ -48,6 +48,14 @@ export function membershipRoutes(ctx: AppContext): Router {
     requireMember,
     route({ body: membershipProfileUpdateSchema }, async ({ req, res, body }) => {
       ok(res, await updateMyProfile(ctx, req.tenantCtx!, req.membership!, body));
+    }),
+  );
+
+  router.post(
+    "/memberships/me/profile-nudge/dismiss",
+    requireMember,
+    route({}, async ({ req, res }) => {
+      ok(res, await dismissProfileNudge(ctx, req.tenantCtx!, req.membership!));
     }),
   );
 

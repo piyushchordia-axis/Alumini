@@ -170,6 +170,7 @@ try {
 
   await step("add a profile question", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/profile-fields`);
+    await page.waitForSelector("text=Degree and field of study are now built into every profile");
     await page.click('button:has-text("+ Add field")');
     const modal = page.locator('[role="dialog"]');
     await modal.locator('label:has-text("Question") input').fill(`Hostel block ${unique}`);
@@ -347,7 +348,12 @@ try {
     const csv = await download(() => page.click('button:has-text("Members CSV")'));
     if (!/^demo-university-members-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
     if (!csv.text.startsWith("\uFEFFName,Phone,Email,")) throw new Error("members CSV is missing its BOM or header");
-    if (!csv.text.split("\r\n")[0].includes("Alumni office notes")) throw new Error("admin-only profile question missing from the export");
+    const lines = csv.text.split("\r\n");
+    if (!lines[0].includes("Alumni office notes")) throw new Error("admin-only profile question missing from the export");
+    // The profile's own details come after "Last active", before the institution's questions; Rahul's are seeded.
+    if (!lines[0].includes("Last active,Headline,Industry,Started working,Skills,Degree,Field of study,Past roles,Studies elsewhere,")) throw new Error(`the members CSV's profile columns are missing or out of place: ${lines[0]}`);
+    const rahul = lines.find((l) => l.startsWith("Rahul Mehta,"));
+    if (!rahul?.includes("Founder and CEO of Zylo Labs") || !rahul.includes("Fundraising; Lending")) throw new Error(`Rahul's profile details are missing from the export: ${rahul}`);
   });
 
   await step("platform admin signs in and sees institutions", async () => {

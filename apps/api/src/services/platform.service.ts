@@ -25,7 +25,8 @@ import { runInTransaction } from "../lib/transaction";
 import { buildPage, type Page } from "../lib/pagination";
 import { normalizePhone } from "../lib/phone";
 import { findPlanEffectiveOn } from "../repositories/billing.repo";
-import { findMembership, findMembershipWithUser, insertMembership, listMembershipsForUser, listTenantAdmins, updateMembership } from "../repositories/memberships.repo";
+import { clearDegreesAt, findMembership, findMembershipWithUser, insertMembership, listMembershipsForUser, listTenantAdmins, updateMembership } from "../repositories/memberships.repo";
+import { keys } from "../redis/keys";
 import {
   findSettings,
   findTenantById,
@@ -198,18 +199,22 @@ export async function updatePlatformTenant(ctx: AppContext, actor: PlatformActor
     const forced = input.type === "SCHOOL" && current.type !== "SCHOOL" ? retypeToSchool(current.type, settings.features) : null;
     await updateTenant(tx, tenantId, input);
     if (forced?.forcedOff.length) await updateSettings(tx, tenantId, { features: forced.features, updatedByUserId: actor.userId });
+    // A school doesn't ask for a degree or field of study, so its members couldn't see or remove the ones they gave.
+    const clearedDegrees = forced ? await clearDegreesAt(tx, tenantId) : 0;
     await recordAuditStrict(tx, {
       tenantId,
       actorUserId: actor.userId,
       action: "platform.tenant.update",
       targetType: "tenant",
       targetId: tenantId,
-      metadata: { fields: Object.keys(input), status: input.status ?? null, ...(forced ? { forcedOff: forced.forcedOff } : {}) },
+      metadata: { fields: Object.keys(input), status: input.status ?? null, ...(forced ? { forcedOff: forced.forcedOff, clearedDegrees } : {}) },
       ip: actor.ip,
     });
-    return current;
+    return { ...current, retypedToSchool: !!forced };
   });
   await invalidateTenantCache(ctx, tenant.slug);
+  // The directory's field-of-study choices came from the degrees just cleared.
+  if (tenant.retypedToSchool) await ctx.redis.del(keys.cacheDirectoryFilters(tenantId));
   return getPlatformTenant(ctx, tenantId);
 }
 

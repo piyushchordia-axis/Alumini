@@ -221,6 +221,279 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(bad.status).toBe(400);
   });
 
+  describe("profile details", () => {
+    const thisYear = new Date().getFullYear();
+    const DETAILS = {
+      headline: "  Builds payments\n at Zylo ",
+      industry: "SOFTWARE_INTERNET",
+      careerStartYear: 2014,
+      skills: ["Go", " go ", "Distributed   systems", "SQL"],
+      degree: "B.Tech",
+      fieldOfStudy: "Computer Science",
+      linkedinUrl: "https://www.linkedin.com/in/asha",
+      websiteUrl: "https://asha.dev",
+      githubUrl: "https://github.com/asha",
+      instagramUrl: "https://www.instagram.com/asha",
+      xUrl: "https://twitter.com/asha",
+      openTo: ["INVESTING", "HIRING", "INVESTING"],
+      experiences: [
+        { company: "Acme", title: "Intern", startYear: 2013, endYear: 2014 },
+        { company: "Blank Co", title: "Volunteer" },
+        { company: "Zylo", title: "Engineer", startYear: 2018, endYear: 2022 },
+      ],
+      education: [
+        { institution: "Coursera", degree: "" },
+        { institution: "IIM Ahmedabad", degree: "MBA", fieldOfStudy: "Finance", startYear: 2022, endYear: 2024 },
+      ],
+    };
+    // As stored: tidied, de-duplicated, newest first, blanks as null.
+    const SAVED = {
+      headline: "Builds payments at Zylo",
+      industry: "SOFTWARE_INTERNET",
+      careerStartYear: 2014,
+      skills: ["Go", "Distributed systems", "SQL"],
+      degree: "B.Tech",
+      fieldOfStudy: "Computer Science",
+      linkedinUrl: "https://www.linkedin.com/in/asha",
+      // As the URL parser reads it.
+      websiteUrl: "https://asha.dev/",
+      githubUrl: "https://github.com/asha",
+      instagramUrl: "https://www.instagram.com/asha",
+      xUrl: "https://twitter.com/asha",
+      openTo: ["HIRING", "INVESTING"],
+      experiences: [
+        { company: "Zylo", title: "Engineer", startYear: 2018, endYear: 2022 },
+        { company: "Acme", title: "Intern", startYear: 2013, endYear: 2014 },
+        { company: "Blank Co", title: "Volunteer", startYear: null, endYear: null },
+      ],
+      education: [
+        { institution: "IIM Ahmedabad", degree: "MBA", fieldOfStudy: "Finance", startYear: 2022, endYear: 2024 },
+        { institution: "Coursera", degree: null, fieldOfStudy: null, startYear: null, endYear: null },
+      ],
+    };
+    const CLEARED = { headline: null, industry: null, careerStartYear: null, skills: [], openTo: [], experiences: [], education: [], githubUrl: null };
+
+    it("round-trips every detail for the member and an admin, and leaves out what isn't sent", async () => {
+      const { tenant } = await createTenant(ctx);
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const member = await memberSession(ctx, tenant.id);
+      const base = `/api/v1/t/${tenant.slug}`;
+      const patch = (body: object) => api().patch(`${base}/memberships/me`).set(member.headers).send(body);
+
+      const saved = await patch(DETAILS);
+      expect(saved.status).toBe(200);
+      expect(saved.body.data).toMatchObject({ ...SAVED, profileNudgeDismissedAt: null });
+      expect((await api().get(`${base}/memberships/me`).set(member.headers)).body.data).toMatchObject(SAVED);
+      const row = (await ctx.db.select().from(memberships).where(eq(memberships.id, member.membership.id)))[0]!;
+      expect(row).toMatchObject(SAVED);
+
+      // Leaving the details out of an edit leaves them alone.
+      expect((await patch({ city: "Pune" })).body.data).toMatchObject({ ...SAVED, city: "Pune" });
+
+      const asAdmin = await api().get(`${base}/admin/members/${member.membership.id}`).set(admin.headers);
+      expect(asAdmin.body.data).toMatchObject(SAVED);
+      expect(asAdmin.body.data).not.toHaveProperty("profileNudgeDismissedAt");
+
+      // An admin's edit takes them too, and sorts and tidies the same way.
+      const edited = await api()
+        .patch(`${base}/admin/members/${member.membership.id}/profile`)
+        .set(admin.headers)
+        .send({ headline: "Head of payments", experiences: [{ company: "Old", title: "Clerk", startYear: 2001, endYear: 2002 }, ...DETAILS.experiences] });
+      expect(edited.status).toBe(200);
+      expect(edited.body.data).toMatchObject({ headline: "Head of payments", experiences: [...SAVED.experiences.slice(0, 2), { company: "Old", title: "Clerk", startYear: 2001, endYear: 2002 }, SAVED.experiences[2]] });
+
+      // Empty lists and nulls clear them.
+      expect((await patch(CLEARED)).body.data).toMatchObject(CLEARED);
+    });
+
+    it("replaces the lists, rather than adding to them, when someone registers again after a rejection", async () => {
+      const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const session = auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+      const base = `/api/v1/t/${tenant.slug}`;
+
+      const first = await api().post(`${base}/memberships`).set(session).send({ ...PROFILE, ...DETAILS });
+      expect(first.status).toBe(201);
+      expect(first.body.data).toMatchObject({ status: "PENDING", ...SAVED });
+      await api().post(`${base}/admin/members/${first.body.data.id}/reject`).set(admin.headers).send({ reason: "Batch could not be verified" });
+
+      const again = await api()
+        .post(`${base}/memberships`)
+        .set(session)
+        .send({ ...PROFILE, skills: ["Rust"], experiences: [{ company: "Nimbus", title: "SRE", startYear: 2023 }], education: [], openTo: ["COLLABORATING"] });
+      expect(again.status).toBe(201);
+      expect(again.body.data).toMatchObject({
+        id: first.body.data.id,
+        status: "PENDING",
+        skills: ["Rust"],
+        experiences: [{ company: "Nimbus", title: "SRE", startYear: 2023, endYear: null }],
+        education: [],
+        openTo: ["COLLABORATING"],
+        // Not sent again, so kept.
+        headline: SAVED.headline,
+        githubUrl: SAVED.githubUrl,
+      });
+    });
+
+    it("refuses bad details, naming each one's place", async () => {
+      const { tenant } = await createTenant(ctx);
+      const member = await memberSession(ctx, tenant.id);
+      const pathsOf = async (body: object) => {
+        const res = await api().patch(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers).send(body);
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe("VALIDATION_ERROR");
+        return (res.body.error.details as Array<{ path: string }>).map((d) => d.path);
+      };
+      const role = { company: "Acme", title: "Engineer" };
+      expect(await pathsOf({ experiences: [role, { ...role, startYear: 2015, endYear: 2012 }] })).toEqual(["experiences.1.endYear"]);
+      expect(await pathsOf({ experiences: [{ ...role, company: "x".repeat(121) }] })).toEqual(["experiences.0.company"]);
+      expect(await pathsOf({ experiences: [{ company: "Acme" }] })).toEqual(["experiences.0.title"]);
+      expect(await pathsOf({ experiences: Array.from({ length: 16 }, () => role) })).toEqual(["experiences"]);
+      expect(await pathsOf({ education: [{ institution: "IIM", endYear: thisYear + 11 }] })).toEqual(["education.0.endYear"]);
+      expect(await pathsOf({ education: [{ institution: "IIM", degree: "x".repeat(81) }] })).toEqual(["education.0.degree"]);
+      expect(await pathsOf({ education: Array.from({ length: 11 }, () => ({ institution: "IIM" })) })).toEqual(["education"]);
+      expect(await pathsOf({ careerStartYear: thisYear + 1 })).toEqual(["careerStartYear"]);
+      expect(await pathsOf({ skills: ["Go", "x".repeat(41)] })).toEqual(["skills.1"]);
+      expect(await pathsOf({ skills: Array.from({ length: 21 }, (_, i) => `Skill ${i}`) })).toEqual(["skills"]);
+      expect(await pathsOf({ headline: "x".repeat(121) })).toEqual(["headline"]);
+      expect(await pathsOf({ degree: "x".repeat(81) })).toEqual(["degree"]);
+      expect(await pathsOf({ industry: "MINING" })).toEqual(["industry"]);
+      expect(await pathsOf({ openTo: ["MENTORING"] })).toEqual(["openTo.0"]);
+      // Nothing was saved along the way.
+      const me = (await api().get(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers)).body.data;
+      expect(me).toMatchObject({ experiences: [], education: [], skills: [], careerStartYear: null, headline: null, industry: null, openTo: [] });
+    });
+
+    it("checks each link's host, refuses credentials in links, and takes URLs only", async () => {
+      const { tenant } = await createTenant(ctx);
+      const member = await memberSession(ctx, tenant.id);
+      const patch = (body: object) => api().patch(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers).send(body);
+      const refused = async (body: Record<string, string>) => {
+        const res = await patch(body);
+        expect(res.status, JSON.stringify(body)).toBe(400);
+        expect([...new Set(res.body.error.details.map((d: { path: string }) => d.path))]).toEqual(Object.keys(body));
+      };
+      await refused({ linkedinUrl: "https://evil.com/?linkedin.com/" });
+      await refused({ linkedinUrl: "https://linkedin.com.evil.com/in/asha" });
+      await refused({ linkedinUrl: "https://user:secret@www.linkedin.com/in/asha" });
+      await refused({ githubUrl: "https://gitlab.com/asha" });
+      await refused({ instagramUrl: "https://evil.com/instagram.com/asha" });
+      await refused({ xUrl: "https://xx.com/asha" });
+      await refused({ websiteUrl: "https://google.com@evil.com/" });
+      await refused({ websiteUrl: "javascript:alert(1)" });
+      // "@handle" is turned into a URL by the forms (socialUrlFromInput); the API takes URLs only.
+      await refused({ githubUrl: "@asha" });
+      await refused({ xUrl: "asha" });
+
+      const ok = await patch({ linkedinUrl: "https://in.linkedin.com/in/asha", xUrl: "https://x.com/asha", githubUrl: "http://github.com/asha", websiteUrl: "https://blog.asha.dev/about" });
+      expect(ok.status).toBe(200);
+      expect(ok.body.data).toMatchObject({ linkedinUrl: "https://in.linkedin.com/in/asha", xUrl: "https://x.com/asha", githubUrl: "http://github.com/asha", websiteUrl: "https://blog.asha.dev/about" });
+      expect((await patch({ xUrl: "https://mobile.twitter.com/asha" })).status).toBe(200);
+
+      // Stored as the URL parser read it, so an app that reads the text another way still opens the site checked. A
+      // browser reads "linkedin.com\@evil.com" as linkedin.com and iOS as evil.com; stored, it's linkedin.com to both.
+      const read = await patch({
+        linkedinUrl: "https://linkedin.com\\@evil.com",
+        githubUrl: "https://GitHub.com/Asha",
+        websiteUrl: "https://asha.dev/‮gnp.exe",
+        instagramUrl: "https://instagram.com",
+      });
+      expect(read.status).toBe(200);
+      expect(read.body.data).toMatchObject({
+        linkedinUrl: "https://linkedin.com/@evil.com",
+        githubUrl: "https://github.com/Asha",
+        websiteUrl: "https://asha.dev/%E2%80%AEgnp.exe",
+        instagramUrl: "https://instagram.com/",
+      });
+      const row = (await ctx.db.select().from(memberships).where(eq(memberships.id, member.membership.id)))[0]!;
+      expect(row.linkedinUrl).toBe("https://linkedin.com/@evil.com");
+      // The 500-character limit is on the link as stored.
+      await refused({ websiteUrl: `https://asha.dev/${"é".repeat(100)}` });
+    });
+
+    it("clears Open to whenever a current pupil's profile is saved, however they became one", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", batchYear: 1990 });
+      const pupil = await memberSession(ctx, tenant.id, { batchYear: thisYear + 2 });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2005 });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const stored = async (id: string) => (await ctx.db.select().from(memberships).where(eq(memberships.id, id)))[0]!.openTo;
+
+      const pupilSave = await api().patch(`${base}/memberships/me`).set(pupil.headers).send({ openTo: ["HIRING"], headline: "Captain of the chess club" });
+      expect(pupilSave.status).toBe(200);
+      expect(pupilSave.body.data).toMatchObject({ openTo: [], headline: "Captain of the chess club" });
+      expect(await stored(pupil.membership.id)).toEqual([]);
+
+      // An alum of the same school keeps it, until a change of date of birth makes them a pupil.
+      expect((await api().patch(`${base}/memberships/me`).set(alum.headers).send({ openTo: ["HIRING", "INVESTING"] })).body.data.openTo).toEqual(["HIRING", "INVESTING"]);
+      const underAge = `${thisYear - 15}-01-01`;
+      expect((await api().patch(`${base}/memberships/me`).set(alum.headers).send({ dateOfBirth: underAge })).body.data.openTo).toEqual([]);
+      expect(await stored(alum.membership.id)).toEqual([]);
+
+      // An admin's edit that makes someone a pupil clears it too.
+      const other = await memberSession(ctx, tenant.id, { batchYear: 2008 });
+      await api().patch(`${base}/memberships/me`).set(other.headers).send({ openTo: ["COLLABORATING"] });
+      const byAdmin = await api().patch(`${base}/admin/members/${other.membership.id}/profile`).set(admin.headers).send({ batchYear: thisYear + 1 });
+      expect(byAdmin.status).toBe(200);
+      expect(byAdmin.body.data.openTo).toEqual([]);
+      expect(await stored(other.membership.id)).toEqual([]);
+
+      // And so does registering as one.
+      const newcomer = auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+      const registered = await api().post(`${base}/memberships`).set(newcomer).send({ ...PROFILE, batchYear: thisYear + 3, openTo: ["HIRING"] });
+      expect(registered.status).toBe(201);
+      expect(registered.body.data.openTo).toEqual([]);
+    });
+
+    it("stores no degree or field of study at a school, whatever is sent, and keeps the rest", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", batchYear: 1990 });
+      const alum = await memberSession(ctx, tenant.id, { batchYear: 2005 });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const own = await api().patch(`${base}/memberships/me`).set(alum.headers).send({ degree: "B.Sc", fieldOfStudy: "Physics", headline: "Teacher" });
+      expect(own.status).toBe(200);
+      expect(own.body.data).toMatchObject({ degree: null, fieldOfStudy: null, headline: "Teacher" });
+      const byAdmin = await api().patch(`${base}/admin/members/${alum.membership.id}/profile`).set(admin.headers).send({ degree: "B.Sc", fieldOfStudy: "Physics" });
+      expect(byAdmin.body.data).toMatchObject({ degree: null, fieldOfStudy: null });
+      const newcomer = auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+      const registered = await api().post(`${base}/memberships`).set(newcomer).send({ ...PROFILE, degree: "B.Sc", fieldOfStudy: "Physics", skills: ["Teaching"] });
+      expect(registered.body.data).toMatchObject({ degree: null, fieldOfStudy: null, skills: ["Teaching"] });
+
+      // A college keeps them.
+      const { tenant: college } = await createTenant(ctx);
+      const student = await memberSession(ctx, college.id);
+      expect((await api().patch(`/api/v1/t/${college.slug}/memberships/me`).set(student.headers).send({ degree: "B.Sc", fieldOfStudy: "Physics" })).body.data).toMatchObject({
+        degree: "B.Sc",
+        fieldOfStudy: "Physics",
+      });
+    });
+
+    it("snoozes the profile-strength card for an approved member, without counting as a profile change", async () => {
+      const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+      const member = await memberSession(ctx, tenant.id);
+      const dismiss = (headers: Record<string, string>) => api().post(`/api/v1/t/${tenant.slug}/memberships/me/profile-nudge/dismiss`).set(headers);
+      const before = (await api().get(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers)).body.data;
+      expect(before.profileNudgeDismissedAt).toBeNull();
+
+      const started = Date.now();
+      const res = await dismiss(member.headers);
+      expect(res.status).toBe(200);
+      const at = Date.parse(res.body.data.profileNudgeDismissedAt);
+      expect(at).toBeGreaterThanOrEqual(started - 1000);
+      expect(at).toBeLessThanOrEqual(Date.now() + 1000);
+      expect(res.body.data.updatedAt).toBe(before.updatedAt);
+      expect((await api().get(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers)).body.data.profileNudgeDismissedAt).toBe(res.body.data.profileNudgeDismissedAt);
+
+      // Only for approved members.
+      const applicant = auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+      expect((await dismiss(applicant)).body.error.code).toBe("NOT_A_MEMBER");
+      await api().post(`/api/v1/t/${tenant.slug}/memberships`).set(applicant).send(PROFILE);
+      const pending = await dismiss(applicant);
+      expect(pending.status).toBe(403);
+      expect(pending.body.error.code).toBe("MEMBERSHIP_PENDING");
+    });
+  });
+
   describe("profile photos", () => {
     type Headers = Record<string, string>;
     const uploadPhoto = async (slug: string, headers: Headers, purpose: "avatar" | "image" = "avatar") => {

@@ -16,6 +16,7 @@ import type {
   BusinessCategory,
   FundingKind,
   FundingStage,
+  Industry,
   InvitationStatus,
   JobType,
   MaritalStatus,
@@ -28,6 +29,7 @@ import type {
   MembershipStatus,
   ModerationStatus,
   NotificationType,
+  OpenTo,
   OutboundMessageStatus,
   PaymentOrderStatus,
   PaymentPurpose,
@@ -304,12 +306,83 @@ export interface MembershipDto {
   isPhoneVisible: boolean;
   celebrateBirthday: boolean;
   celebrateAnniversary: boolean;
+  /** One line about what they do, shown under their name. */
+  headline: string | null;
+  industry: Industry | null;
+  /** The year they started working. The apps show the years of experience from it, so it never goes stale. */
+  careerStartYear: number | null;
+  /** Normalised (see normalizeSkills), in the member's order. */
+  skills: string[];
+  /** Their degree and field of study here. Schools don't ask. */
+  degree: string | null;
+  fieldOfStudy: string | null;
+  /** Past roles, newest first. The current one is companyName and designation. */
+  experiences: ProfileExperienceDto[];
+  /** Studies elsewhere, newest first. */
+  education: ProfileEducationDto[];
+  websiteUrl: string | null;
+  githubUrl: string | null;
+  instagramUrl: string | null;
+  xUrl: string | null;
+  /** Always empty for a current pupil. */
+  openTo: OpenTo[];
   /** Answers to the institution's questions (the member's own and admins' views include admin-only ones). */
   fields: ProfileFieldAnswerDto[];
   /** Approved and not a current pupil, so private contact is open to them. Whether it's switched on is a separate question. */
   chatEligible: boolean;
+  /** When they last dismissed the feed's profile-strength card (see showProfileNudge). */
+  profileNudgeDismissedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A past role on a profile. Years may be blank. */
+export interface ProfileExperienceDto {
+  company: string;
+  title: string;
+  startYear: number | null;
+  endYear: number | null;
+}
+
+/** Studies elsewhere on a profile. Everything but the institution may be blank. */
+export interface ProfileEducationDto {
+  institution: string;
+  degree: string | null;
+  fieldOfStudy: string | null;
+  startYear: number | null;
+  endYear: number | null;
+}
+
+/**
+ * What "Use details from …" offers someone joining an institution: their profile at another one, the details that
+ * belong to the person rather than the institution. Never the batch, the institution's own questions, personal details,
+ * the phone setting or the photo. Their degree and field there come as an entry of `education`, named after it.
+ */
+export interface PortableProfileDto
+  extends Pick<
+    MembershipDto,
+    | "headline"
+    | "companyName"
+    | "designation"
+    | "industry"
+    | "careerStartYear"
+    | "skills"
+    | "experiences"
+    | "education"
+    | "linkedinUrl"
+    | "websiteUrl"
+    | "githubUrl"
+    | "instagramUrl"
+    | "xUrl"
+    | "openTo"
+    | "bio"
+    | "interests"
+    | "city"
+    | "country"
+    | "dateOfBirth"
+  > {
+  /** The institution the details come from. */
+  source: TenantSummaryDto;
 }
 
 /** Compact member representation used in lists, authors and attendees. */
@@ -325,18 +398,36 @@ export interface MemberCardDto {
   avatarUrl: string | null;
   role: MembershipRole;
   isOpenToWork: boolean;
+  headline: string | null;
 }
 
-/** A card in the directory, which alone works out whether a member mentors. */
+/** A card in the directory. Its `isMentor` follows the Mentors list's rule, as MemberProfileDto's does. */
 export interface DirectoryCardDto extends MemberCardDto {
   /** An active mentor. Always false while mentorship is off here, or for a viewer who can't use it. */
   isMentor: boolean;
+  /** Empty for a current pupil. */
+  openTo: OpenTo[];
 }
 
 export interface MemberProfileDto extends MemberCardDto {
   bio: string | null;
-  linkedinUrl: string | null;
   interests: string[];
+  industry: Industry | null;
+  careerStartYear: number | null;
+  skills: string[];
+  degree: string | null;
+  fieldOfStudy: string | null;
+  experiences: ProfileExperienceDto[];
+  education: ProfileEducationDto[];
+  /** A current pupil's links and Open to are shown to nobody but themself. */
+  linkedinUrl: string | null;
+  websiteUrl: string | null;
+  githubUrl: string | null;
+  instagramUrl: string | null;
+  xUrl: string | null;
+  openTo: OpenTo[];
+  /** As on the directory's cards: in the Mentors list this viewer would see. */
+  isMentor: boolean;
   /** Answers to the institution's questions that members may see. */
   fields: ProfileFieldAnswerDto[];
   /** Present only when the member chose to share it. */
@@ -346,7 +437,7 @@ export interface MemberProfileDto extends MemberCardDto {
   canMessage: boolean;
 }
 
-export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible"> {
+export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt"> {
   userId: string;
   phone: string;
   lastActiveAt: string | null;
@@ -929,8 +1020,25 @@ export interface TenantAnalyticsDto {
     cities: CountRow[];
     countries: CountRow[];
     professions: CountRow[];
-    /** Approved members, and how many have filled each part of their profile. */
-    completeness: { total: number; photo: number; city: number; company: number; birthday: number; linkedin: number; email: number };
+    /**
+     * Approved members, and how many have filled each part of their profile. `education`: a degree or field of study
+     * here, or studies elsewhere. `anyLink`: LinkedIn or any of the other links.
+     */
+    completeness: {
+      total: number;
+      photo: number;
+      headline: number;
+      city: number;
+      company: number;
+      industry: number;
+      skills: number;
+      pastRoles: number;
+      education: number;
+      birthday: number;
+      linkedin: number;
+      anyLink: number;
+      email: number;
+    };
     /** Answer counts for the institution's choice and yes/no fields. */
     fields: Array<{ key: string; label: string; options: CountRow[] }>;
   };
@@ -1120,6 +1228,12 @@ export interface DirectoryFiltersDto {
   cities: string[];
   countries: string[];
   companies: string[];
+  /** The industries members here are in, in INDUSTRIES order. */
+  industries: Industry[];
+  /** The 50 skills most members list, most listed first, each spelled as most of them spell it. */
+  skills: string[];
+  /** The 50 commonest fields of study, the same way. */
+  fieldsOfStudy: string[];
   /** The institution's filterable questions (choice and yes/no fields). */
   fields: Array<{ key: string; label: string; options: ProfileFieldOption[] }>;
 }

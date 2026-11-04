@@ -65,7 +65,7 @@ try {
     await page.fill('input[name="city"]', "Mumbai");
     // The institution's own profile questions (seeded, optional) live under "More about you".
     await page.click("text=More about you (optional)");
-    await page.getByLabel("Department").selectOption({ label: "Computer Science" });
+    await page.getByLabel("Hostel").selectOption({ label: "Tagore" });
     await page.click('button:has-text("Join the network")');
     await page.waitForURL(/\/app\/feed$/);
     await page.waitForSelector("text=Welcome to the official Demo University alumni network");

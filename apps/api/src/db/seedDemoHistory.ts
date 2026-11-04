@@ -1,4 +1,14 @@
-import { wallPartsInZone, zonedWallTimeToUtc, type ProfileFieldValue } from "@illuminize/shared";
+import {
+  OPEN_TO,
+  sortExperiences,
+  wallPartsInZone,
+  zonedWallTimeToUtc,
+  type Industry,
+  type OpenTo,
+  type ProfileEducationDto,
+  type ProfileExperienceDto,
+  type ProfileFieldValue,
+} from "@illuminize/shared";
 import { randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import type { Db } from "./client";
@@ -82,6 +92,174 @@ const COMPANIES = ["Infosys", "TCS", "Wipro", "HDFC Bank", "Reliance", "Flipkart
 const ROLES = ["Software Engineer", "Product Manager", "Analyst", "Consultant", "Designer", "Sales Lead", "Operations Manager", "Data Scientist", "Marketing Manager", "Chartered Accountant"] as const;
 const PROFESSIONS = ["EMPLOYED", "EMPLOYED", "EMPLOYED", "EMPLOYED", "EMPLOYED", "FOUNDER", "BUSINESS_OWNER", "STUDENT", "OTHER"] as const;
 
+const COMPANY_INDUSTRY: Record<(typeof COMPANIES)[number], Industry> = {
+  Infosys: "IT_SERVICES",
+  TCS: "IT_SERVICES",
+  Wipro: "IT_SERVICES",
+  "HDFC Bank": "BANKING_FINANCE",
+  Reliance: "ENERGY",
+  Flipkart: "RETAIL_CONSUMER",
+  Swiggy: "SOFTWARE_INTERNET",
+  Zomato: "SOFTWARE_INTERNET",
+  Accenture: "CONSULTING",
+  KPMG: "ACCOUNTING",
+  Amazon: "SOFTWARE_INTERNET",
+  Microsoft: "SOFTWARE_INTERNET",
+  Razorpay: "BANKING_FINANCE",
+  Freshworks: "SOFTWARE_INTERNET",
+  "Tata Motors": "MANUFACTURING_ENGINEERING",
+  Mahindra: "MANUFACTURING_ENGINEERING",
+  "ICICI Bank": "BANKING_FINANCE",
+  "Byju's": "EDUCATION_RESEARCH",
+  Ola: "TRANSPORT_LOGISTICS",
+  Paytm: "BANKING_FINANCE",
+};
+const ROLE_SKILLS: Record<(typeof ROLES)[number], readonly string[]> = {
+  "Software Engineer": ["TypeScript", "Java", "Go", "PostgreSQL", "AWS", "System design", "React", "Kubernetes"],
+  "Product Manager": ["Product management", "User research", "SQL", "Roadmapping", "A/B testing", "Analytics"],
+  Analyst: ["Excel", "SQL", "Power BI", "Financial modelling", "Python"],
+  Consultant: ["Strategy", "Stakeholder management", "Financial modelling", "Process improvement", "Market research"],
+  Designer: ["Figma", "UX research", "Interaction design", "Prototyping", "Design systems"],
+  "Sales Lead": ["B2B sales", "Negotiation", "Account management", "CRM", "Partnerships"],
+  "Operations Manager": ["Operations", "Supply chain", "Lean", "Vendor management", "Excel"],
+  "Data Scientist": ["Python", "Machine learning", "SQL", "Statistics", "PyTorch", "Spark"],
+  "Marketing Manager": ["Brand marketing", "Performance marketing", "SEO", "Content strategy", "Analytics"],
+  "Chartered Accountant": ["Audit", "Taxation", "IFRS", "Financial reporting", "Excel"],
+};
+/** Generated founders and business owners have a big company's name as their own, so their headlines don't repeat it. */
+const FOUNDER_HEADLINES = ["Founder of an early-stage startup", "Building my second startup", "Founder, after a decade in industry"] as const;
+const OWNER_HEADLINES = ["Runs the family business", "Owner of a small manufacturing firm", "Runs a chain of neighbourhood stores"] as const;
+const FOUNDER_SKILLS = ["Fundraising", "Early hiring", "Product strategy", "Sales", "Operations", "Partnerships"] as const;
+const STUDENT_SKILLS = ["Excel", "Python", "Research", "Public speaking", "SQL", "Writing"] as const;
+const OTHER_SKILLS = ["Project management", "Communication", "Excel", "Team leadership", "Writing"] as const;
+/** Degree and field of study here. The university's fields are its old "Department" question's choices, the college's its old "Branch" ones. */
+const STUDIES_HERE: Record<string, ReadonlyArray<readonly [degree: string, field: string]>> = {
+  "demo-university": [
+    ["B.Tech", "Computer Science"],
+    ["B.Tech", "Electronics"],
+    ["B.Tech", "Mechanical Engineering"],
+    ["B.Tech", "Civil Engineering"],
+    ["B.Com", "Commerce"],
+    ["B.Des", "Design"],
+  ],
+  "demo-college": [
+    ["B.E.", "Computer Engineering"],
+    ["B.E.", "Information Technology"],
+    ["B.E.", "Electronics and Telecommunication"],
+    ["B.E.", "Mechanical Engineering"],
+    ["B.E.", "Civil Engineering"],
+  ],
+};
+/** Where the school's alumni went next, and how many years it took. */
+const AFTER_SCHOOL = [
+  ["Delhi University", "B.Com", "Commerce", 3],
+  ["IIT Madras", "B.Tech", "Mechanical Engineering", 4],
+  ["Christ University", "BBA", "Business Administration", 3],
+  ["BITS Pilani", "B.E.", "Computer Science", 4],
+  ["St. Xavier's College, Mumbai", "BA", "Economics", 3],
+  ["Manipal Institute of Technology", "B.Tech", "Electronics", 4],
+] as const;
+const FURTHER_STUDIES = [
+  ["IIM Ahmedabad", "MBA", null],
+  ["IIM Bangalore", "MBA", null],
+  ["ISB Hyderabad", "PGP", "Management"],
+  ["Carnegie Mellon University", "MS", "Computer Science"],
+  ["University of Texas at Austin", "MS", "Electrical Engineering"],
+  ["IIT Bombay", "M.Tech", "Computer Science"],
+  ["London School of Economics", "MSc", "Finance"],
+  ["National University of Singapore", "MSc", "Data Science"],
+] as const;
+
+/** The profile details of a generated member (see generatedProfile). */
+type GeneratedProfile = Pick<
+  typeof memberships.$inferInsert,
+  "headline" | "industry" | "careerStartYear" | "skills" | "degree" | "fieldOfStudy" | "experiences" | "education" | "websiteUrl" | "githubUrl" | "instagramUrl" | "xUrl" | "openTo"
+>;
+
+/** Up to `max` (at least `min`) of `list`, in a random order. */
+function someOf<T>(r: () => number, list: readonly T[], min: number, max: number): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out.slice(0, min + Math.floor(r() * (max - min + 1)));
+}
+
+/**
+ * Profile details for about 60% of generated members, each filled in part, as real profiles are. Draws only from `r`,
+ * a stream of their own, so every other generated value is what it was before profiles had details.
+ */
+function generatedProfile(
+  r: () => number,
+  slug: string,
+  p: { fullName: string; index: number; batch: number; profession: (typeof PROFESSIONS)[number]; company: (typeof COMPANIES)[number] | null; designation: (typeof ROLES)[number] | null },
+  year: number,
+): GeneratedProfile {
+  if (r() >= 0.6) return {};
+  const school = slug === "demo-school";
+  const student = p.profession === "STUDENT";
+  const out: GeneratedProfile = {};
+
+  const here = STUDIES_HERE[slug];
+  if (here && r() < 0.8) [out.degree, out.fieldOfStudy] = pick(r, here);
+  // A school's alumni went on to college; anyone may have studied further, and a student may be doing so now.
+  const education: ProfileEducationDto[] = [];
+  if (school && r() < 0.7) {
+    const [institution, degree, fieldOfStudy, years] = pick(r, AFTER_SCHOOL);
+    education.push({ institution, degree, fieldOfStudy, startYear: p.batch, endYear: p.batch + years });
+  }
+  const finished = education[0]?.endYear ?? p.batch;
+  if (!(school && student) && r() < (student ? 0.6 : 0.2)) {
+    const [institution, degree, fieldOfStudy] = pick(r, FURTHER_STUDIES);
+    const startYear = student ? year - 1 : finished + 1 + Math.floor(r() * 4);
+    if (startYear <= year) education.unshift({ institution, degree, fieldOfStudy, startYear, endYear: startYear + 2 });
+  }
+  if (education.length) out.education = education;
+
+  if (r() < 0.75) {
+    if (p.profession === "EMPLOYED") out.headline = `${p.designation} at ${p.company}`;
+    else if (p.profession === "FOUNDER") out.headline = pick(r, FOUNDER_HEADLINES);
+    else if (p.profession === "BUSINESS_OWNER") out.headline = pick(r, OWNER_HEADLINES);
+    else if (student && education[0]) out.headline = `${education[0].degree} student at ${education[0].institution}`;
+  }
+  if (p.company && r() < 0.85) out.industry = COMPANY_INDUSTRY[p.company];
+
+  if (r() < 0.85) {
+    const pool = student ? STUDENT_SKILLS : p.profession === "FOUNDER" || p.profession === "BUSINESS_OWNER" ? FOUNDER_SKILLS : p.designation ? ROLE_SKILLS[p.designation] : OTHER_SKILLS;
+    out.skills = someOf(r, pool, 2, 5);
+  }
+
+  if (!student) {
+    const started = Math.min(year, finished + Math.floor(r() * 2));
+    if (r() < 0.7) out.careerStartYear = started;
+    // Up to two earlier roles, oldest first here, then stored newest first.
+    const roles: ProfileExperienceDto[] = [];
+    let from = started;
+    for (let k = Math.floor(r() * 3); k > 0; k--) {
+      const until = from + 1 + Math.floor(r() * 4);
+      if (until >= year) break;
+      roles.push({ company: pick(r, COMPANIES.filter((c) => c !== p.company)), title: pick(r, ROLES), startYear: from, endYear: until });
+      from = until;
+    }
+    if (roles.length) out.experiences = sortExperiences(roles);
+  }
+
+  const handle = `${p.fullName.toLowerCase().replace(/[^a-z]+/g, "-")}-${p.index}`;
+  if ((p.designation === "Software Engineer" || p.designation === "Data Scientist") && r() < 0.5) out.githubUrl = `https://github.com/${handle}`;
+  if ((p.profession === "FOUNDER" || p.profession === "BUSINESS_OWNER" || p.designation === "Designer") && r() < 0.4) out.websiteUrl = `https://example.com/${handle}`;
+  if ((p.designation === "Designer" || p.designation === "Marketing Manager") && r() < 0.4) out.instagramUrl = `https://www.instagram.com/${handle.replace(/-/g, ".")}`;
+  if (r() < 0.08) out.xUrl = `https://x.com/${handle.replace(/-/g, "_").slice(0, 15)}`;
+
+  const open = new Set<OpenTo>();
+  if (p.profession === "FOUNDER" && r() < 0.6) open.add("HIRING");
+  if (p.designation?.endsWith("Manager") && r() < 0.2) open.add("HIRING");
+  if (p.profession === "BUSINESS_OWNER" && r() < 0.4) open.add("COLLABORATING");
+  if (p.batch <= 2008 && r() < 0.25) open.add("INVESTING");
+  if (open.size) out.openTo = OPEN_TO.filter((o) => open.has(o));
+  return out;
+}
+
 const POSTS = [
   "Just moved to {city}. Any alumni around for a coffee this weekend?",
   "Our team at {company} is hiring. Happy to refer anyone from the community — DM me.",
@@ -107,21 +285,38 @@ interface FieldSeed {
   helpText?: string;
 }
 const opts = (...labels: string[]) => labels.map((l) => ({ value: l.toLowerCase().replace(/[^a-z0-9]+/g, "-"), label: l }));
+/** The institutions' own questions. None asks for a degree, field of study or later studies: every profile has those. */
 const FIELDS: Record<string, FieldSeed[]> = {
   "demo-university": [
-    { key: "department", label: "Department", type: "SELECT", options: opts("Computer Science", "Electronics", "Mechanical", "Civil", "Commerce", "Design"), filterable: true },
     { key: "hostel", label: "Hostel", type: "SELECT", options: opts("Tagore", "Raman", "Sarojini", "Bhabha"), filterable: true },
     { key: "office_notes", label: "Alumni office notes", type: "LONG_TEXT", visibility: "ADMINS", memberEditable: false },
   ],
   "demo-college": [
-    { key: "branch", label: "Branch", type: "SELECT", options: opts("Computer", "IT", "E&TC", "Mechanical", "Civil"), filterable: true },
-    { key: "higher_studies", label: "Higher studies", type: "SELECT", options: opts("None", "MS", "MBA", "PhD") },
+    { key: "clubs", label: "Clubs and societies", type: "MULTI_SELECT", options: opts("Robotics club", "Debating society", "Music club", "Drama society", "Sports council", "Entrepreneurship cell", "NSS"), filterable: true },
   ],
   "demo-school": [
     { key: "house", label: "School house", type: "SELECT", options: opts("Red", "Blue", "Green", "Yellow"), filterable: true },
     { key: "year_joined", label: "Year you joined the school", type: "NUMBER" },
   ],
 };
+
+/** A member's answer to one of the questions. */
+function answerFor(r: () => number, f: { type: FieldSeed["type"]; options: Array<{ value: string }> }, batch: number): ProfileFieldValue {
+  switch (f.type) {
+    case "SELECT":
+      return pick(r, f.options).value;
+    case "MULTI_SELECT": {
+      const chosen = f.options.filter(() => r() < 0.3).map((o) => o.value);
+      return chosen.length ? chosen : [pick(r, f.options).value];
+    }
+    case "BOOLEAN":
+      return r() < 0.45;
+    case "NUMBER":
+      return batch - 12 + Math.floor(r() * 4);
+    default:
+      return pick(r, ["Donated to the library fund in 2024.", "Spoke at the career fair.", "Prefers WhatsApp over email."]);
+  }
+}
 
 /** Generated members per institution (approved, spread over the last six months). */
 const GENERATED: Record<string, { count: number; batches: [number, number]; prefix: string }> = {
@@ -176,6 +371,9 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
         for (const p of PLACES) if ((x -= p[2]) < 0) return p;
         return PLACES[0];
       };
+      const profiles = rng(`${slug}:profile`);
+      // No later than the server's own year, by which the profile's rules cap years: around New Year, India's can be ahead.
+      const year = Math.min(Number(today.slice(0, 4)), now.getFullYear());
       const people = Array.from({ length: gen.count }, (_, i) => {
         const fullName = `${FIRST[(i * 7 + slug.length) % FIRST.length]} ${LAST[(i * 5 + 3) % LAST.length]}`;
         const [city, country] = place();
@@ -186,7 +384,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
         if (approvedAt > now) approvedAt.setTime(now.getTime() - 3_600_000);
         const batch = gen.batches[1] - Math.floor((gen.batches[1] - gen.batches[0]) * r() ** 1.4);
         const dob = r() < 0.45 ? `${batch - 21}-${pad(1 + Math.floor(r() * 12))}-${pad(1 + Math.floor(r() * 28))}` : null;
-        return {
+        const person = {
           phone: `${gen.prefix}${String(i + 1).padStart(5, "0")}`,
           fullName,
           batch,
@@ -200,6 +398,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
           dob,
           linkedin: r() < 0.4 ? `https://www.linkedin.com/in/${fullName.toLowerCase().replace(/[^a-z]+/g, "-")}-${i}` : null,
         };
+        return { ...person, profile: generatedProfile(profiles, slug, { ...person, index: i }, year) };
       });
       const userRows = await db
         .insert(users)
@@ -226,6 +425,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
             country: p.country,
             dateOfBirth: p.dob,
             linkedinUrl: p.linkedin,
+            ...p.profile,
           })),
         )
         .onConflictDoNothing();
@@ -323,15 +523,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
       for (const m of all) {
         for (const f of defs) {
           if (r() > (f.visibility === "ADMINS" ? 0.15 : 0.7)) continue;
-          const value: ProfileFieldValue =
-            f.type === "SELECT"
-              ? pick(r, f.options).value
-              : f.type === "BOOLEAN"
-                ? r() < 0.45
-                : f.type === "NUMBER"
-                  ? m.batch - 12 + Math.floor(r() * 4)
-                  : pick(r, ["Donated to the library fund in 2024.", "Spoke at the career fair.", "Prefers WhatsApp over email."]);
-          answers.push({ tenantId, membershipId: m.id, fieldId: f.id, value });
+          answers.push({ tenantId, membershipId: m.id, fieldId: f.id, value: answerFor(r, f, m.batch) });
         }
       }
       await chunked(answers, 1000, (rows) => db.insert(memberFieldValues).values(rows).onConflictDoNothing());
@@ -357,7 +549,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
         .limit(1);
       const base = { tenantId: uni, invitedByUserId: adminUser?.id ?? null, expiresAt };
       await db.insert(invitations).values([
-        { ...base, phoneE164: "+919400000001", fullName: "Harsh Vora", batchYear: 2016, token: token(), fieldValues: { department: "mechanical" } },
+        { ...base, phoneE164: "+919400000001", fullName: "Harsh Vora", batchYear: 2016, token: token(), fieldValues: { hostel: "raman" } },
         { ...base, phoneE164: "+919400000002", fullName: "Leela Menon", batchYear: 2019, token: token() },
         { ...base, phoneE164: "+919400000003", fullName: "Kunal Shah", batchYear: 2011, email: "kunal@example.com", token: token() },
         { ...base, phoneE164: "+919400000004", fullName: "Nisha Kaur", batchYear: 2014, token: token(), status: "SENT" as const, sendCount: 1, lastSentAt: sentAt },

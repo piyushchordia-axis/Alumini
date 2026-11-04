@@ -1,4 +1,17 @@
-import { MEMBERSHIP_STATUS_LABELS, PROFESSION_TYPE_LABELS, countryName, wallPartsInZone, type MembershipRole } from "@illuminize/shared";
+import {
+  INDUSTRY_LABELS,
+  MEMBERSHIP_STATUS_LABELS,
+  OPEN_TO_LABELS,
+  PROFESSION_TYPE_LABELS,
+  countryName,
+  wallPartsInZone,
+  type Industry,
+  type MembershipRole,
+  type OpenTo,
+  type ProfileEducationDto,
+  type ProfileExperienceDto,
+  type TenantType,
+} from "@illuminize/shared";
 import type { Response } from "express";
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { AppContext } from "../context";
@@ -30,6 +43,34 @@ const dateTimeIn = (d: Date | null, tz: string) => {
   const p = wallPartsInZone(d, tz);
   return `${dateIn(d, tz)} ${pad(p.hour)}:${pad(p.minute)}`;
 };
+const yearsIn = (start: number | null, end: number | null) => {
+  const span = start && end ? (start === end ? `${start}` : `${start}–${end}`) : start ? `from ${start}` : end ? `until ${end}` : "";
+  return span ? ` (${span})` : "";
+};
+const pastRole = (e: ProfileExperienceDto) => `${e.title}, ${e.company}${yearsIn(e.startYear, e.endYear)}`;
+const study = (e: ProfileEducationDto) => [e.degree, e.fieldOfStudy, e.institution].filter(Boolean).join(", ") + yearsIn(e.startYear, e.endYear);
+
+/** The profile's own details, which go after "Last active" and before the institution's questions. A list is one cell. */
+function profileDetailColumns(type: TenantType): Array<[header: string, value: (r: MemberRow) => unknown]> {
+  const columns: Array<[string, (r: MemberRow) => unknown]> = [
+    ["Headline", (r) => r.headline],
+    ["Industry", (r) => (r.industry ? INDUSTRY_LABELS[r.industry] : null)],
+    ["Started working", (r) => r.careerStartYear],
+    ["Skills", (r) => r.skills],
+    ["Degree", (r) => r.degree],
+    ["Field of study", (r) => r.fieldOfStudy],
+    ["Past roles", (r) => r.experiences.map(pastRole)],
+    ["Studies elsewhere", (r) => r.education.map(study)],
+    ["LinkedIn", (r) => r.linkedinUrl],
+    ["Website", (r) => r.websiteUrl],
+    ["GitHub", (r) => r.githubUrl],
+    ["Instagram", (r) => r.instagramUrl],
+    ["X", (r) => r.xUrl],
+    ["Open to", (r) => r.openTo.map((o) => OPEN_TO_LABELS[o])],
+  ];
+  // Schools don't ask for a degree here, so these would always be empty.
+  return type === "SCHOOL" ? columns.filter(([header]) => header !== "Degree" && header !== "Field of study") : columns;
+}
 
 /**
  * Pages of members in name order (keyset on name, id), so a large institution streams in constant memory and a
@@ -56,6 +97,20 @@ async function* memberPages<T>(ctx: AppContext, tenantId: string, where: ReturnT
         createdAt: memberships.createdAt,
         approvedAt: memberships.approvedAt,
         lastActiveAt: memberships.lastActiveAt,
+        headline: memberships.headline,
+        industry: memberships.industry,
+        careerStartYear: memberships.careerStartYear,
+        skills: memberships.skills,
+        degree: memberships.degree,
+        fieldOfStudy: memberships.fieldOfStudy,
+        experiences: memberships.experiences,
+        education: memberships.education,
+        linkedinUrl: memberships.linkedinUrl,
+        websiteUrl: memberships.websiteUrl,
+        githubUrl: memberships.githubUrl,
+        instagramUrl: memberships.instagramUrl,
+        xUrl: memberships.xUrl,
+        openTo: memberships.openTo,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
@@ -87,6 +142,20 @@ interface MemberRow {
   createdAt: Date;
   approvedAt: Date | null;
   lastActiveAt: Date | null;
+  headline: string | null;
+  industry: Industry | null;
+  careerStartYear: number | null;
+  skills: string[];
+  degree: string | null;
+  fieldOfStudy: string | null;
+  experiences: ProfileExperienceDto[];
+  education: ProfileEducationDto[];
+  linkedinUrl: string | null;
+  websiteUrl: string | null;
+  githubUrl: string | null;
+  instagramUrl: string | null;
+  xUrl: string | null;
+  openTo: OpenTo[];
 }
 
 async function audit(ctx: AppContext, tenantId: string, actor: ExportActor, action: string, metadata: Record<string, unknown>) {
@@ -101,7 +170,8 @@ export async function exportMembersCsv(ctx: AppContext, tenantCtx: TenantContext
   const { tenant } = tenantCtx;
   const tz = tenant.timezone;
   const fields = await getActiveFields(ctx, tenant.id);
-  const header = ["Name", "Phone", "Email", "Batch", "Status", "Role", "Profession", "Company", "Designation", "City", "Country", "Date of birth", "Joined", "Approved", "Last active", ...fields.map((f) => f.label)];
+  const details = profileDetailColumns(tenant.type);
+  const header = ["Name", "Phone", "Email", "Batch", "Status", "Role", "Profession", "Company", "Designation", "City", "Country", "Date of birth", "Joined", "Approved", "Last active", ...details.map(([h]) => h), ...fields.map((f) => f.label)];
   const pages = memberPages(ctx, tenant.id, undefined, async (rows) => {
     const answers = await answersFor(ctx, tenant.id, rows.map((r) => r.id), "admin");
     return rows.map((r) => {
@@ -122,6 +192,7 @@ export async function exportMembersCsv(ctx: AppContext, tenantCtx: TenantContext
         dateIn(r.createdAt, tz),
         dateIn(r.approvedAt, tz),
         dateTimeIn(r.lastActiveAt, tz),
+        ...details.map(([, value]) => value(r)),
         ...fields.map((f) => byKey.get(f.key) ?? ""),
       ];
     });

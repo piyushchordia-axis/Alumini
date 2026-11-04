@@ -1,5 +1,5 @@
 import { wallPartsInZone } from "@illuminize/shared";
-import { and, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNotNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { jobSeekers, memberActivityDays, memberships, tenants, users } from "../db/schema";
 import { escapeLike } from "./content.common";
@@ -15,6 +15,18 @@ export async function listMembershipsForUser(db: DbClient, userId: string): Prom
     .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
     .where(eq(memberships.userId, userId))
     .orderBy(desc(memberships.createdAt));
+}
+
+/** The user's most recently updated membership of an institution other than `excludeSlug`, with that institution. */
+export async function findLatestMembershipElsewhere(db: DbClient, userId: string, excludeSlug?: string): Promise<{ membership: MembershipRow; tenant: TenantRow } | undefined> {
+  const [row] = await db
+    .select({ membership: memberships, tenant: tenants })
+    .from(memberships)
+    .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
+    .where(and(eq(memberships.userId, userId), excludeSlug ? ne(tenants.slug, excludeSlug) : undefined))
+    .orderBy(desc(memberships.updatedAt), desc(memberships.id))
+    .limit(1);
+  return row;
 }
 
 export async function findMembership(db: DbClient, tenantId: string, userId: string): Promise<MembershipRow | undefined> {
@@ -98,6 +110,30 @@ export async function updateMembership(db: DbClient, tenantId: string, id: strin
     .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
     .returning();
   return row;
+}
+
+/** Leaves updated_at alone: putting off the profile-strength card doesn't change the profile. */
+export async function setProfileNudgeDismissedAt(db: DbClient, tenantId: string, id: string, at: Date): Promise<MembershipRow | undefined> {
+  const [row] = await db
+    .update(memberships)
+    .set({ profileNudgeDismissedAt: at })
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .returning();
+  return row;
+}
+
+/**
+ * Clears every member's degree and field of study here, for an institution that becomes a school: schools don't ask,
+ * so nobody there could see or remove them. Leaves updated_at alone, as the members changed nothing. Returns how many
+ * profiles had either.
+ */
+export async function clearDegreesAt(db: DbClient, tenantId: string): Promise<number> {
+  const rows = await db
+    .update(memberships)
+    .set({ degree: null, fieldOfStudy: null })
+    .where(and(eq(memberships.tenantId, tenantId), or(isNotNull(memberships.degree), isNotNull(memberships.fieldOfStudy))))
+    .returning({ id: memberships.id });
+  return rows.length;
 }
 
 export async function listTenantAdmins(db: DbClient, tenantId: string): Promise<MembershipRow[]> {

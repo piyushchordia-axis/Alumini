@@ -1,5 +1,5 @@
 import type { PushTokenInput } from "../../schemas/auth";
-import type { AuthSessionDto, EmailStatusDto, InvitePublicDto, MeDto, OtpRequestResultDto, TenantPublicDto, TenantSummaryDto, TokenPairDto, UnsubscribeInfoDto } from "../../types/dto";
+import type { AuthSessionDto, EmailStatusDto, InvitePublicDto, MeDto, OtpRequestResultDto, PortableProfileDto, TenantPublicDto, TenantSummaryDto, TokenPairDto, UnsubscribeInfoDto } from "../../types/dto";
 import type { ApiCore } from "../core";
 
 export function tenantEndpoints(core: ApiCore) {
@@ -50,6 +50,11 @@ export function authEndpoints(core: ApiCore) {
 export function meEndpoints(core: ApiCore) {
   return {
     get: () => core.data<MeDto>({ path: "/me" }),
+    /**
+     * The details "Use details from …" offers when joining `excludeSlug`: the caller's own, from their most recently
+     * updated membership of another institution. Null when they have none.
+     */
+    profileCopy: (excludeSlug?: string) => core.data<PortableProfileDto | null>({ path: "/me/profile-copy", query: { exclude: excludeSlug } }),
     registerPushToken: (input: PushTokenInput) => core.request<void>({ method: "POST", path: "/me/push-tokens", body: input }),
     email: {
       get: () => core.data<EmailStatusDto>({ path: "/me/email" }),
