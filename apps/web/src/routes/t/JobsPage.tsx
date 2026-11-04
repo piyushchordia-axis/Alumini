@@ -180,7 +180,8 @@ export function JobsPage() {
           <>
             <SeekerToggleCard slug={slug} />
             {seekers.isLoading && <Loading />}
-            <div className="grid gap-3 md:grid-cols-2">
+            {/* Columns that may shrink, as the openings', so a long headline truncates rather than widening the page. */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {seekers.items.map((s) => (
                 <SeekerCard key={s.member.id} slug={slug} seeker={s} />
               ))}

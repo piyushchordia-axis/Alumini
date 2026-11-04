@@ -2,7 +2,7 @@ import { errorMessage, isApiClientError, isTransientError } from "@illuminize/sh
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { ChatNotice } from "@/components/chat/ChatFrame";
-import { IconJobs } from "@/components/icons";
+import { IconJobs, IconLock } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { jobsHref } from "@/lib/referrals";
@@ -44,7 +44,7 @@ export function ReferralsUnavailable({ onBack }: { /** In place of going back do
   const { tenant } = useMembership();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ChatNotice icon="🔒" title="Referrals aren't available" text={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Referrals aren't available" text={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         {onBack ? <Button title="Back to jobs" accessibilityRole="link" onPress={onBack} /> : <BackToJobs />}
       </ChatNotice>
     </View>

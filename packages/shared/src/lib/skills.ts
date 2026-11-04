@@ -26,3 +26,39 @@ export function normalizeSkills(list: readonly string[]): string[] {
   }
   return out;
 }
+
+/** How a job's skills compare with a member's own (see skillMatch). */
+export interface SkillMatch {
+  /** The job's skills the member has, in the job's order and spelling. */
+  matched: string[];
+  /** How many of them there are, out of the job's `total` skills (each counted once, as skillKey compares them). */
+  count: number;
+  total: number;
+}
+
+/**
+ * Which of a job's skills a member has, compared by skillKey, so "typescript" on a profile matches "TypeScript" on a job.
+ * Only the job's skills count, however many more the member lists.
+ */
+export function skillMatch(jobSkills: readonly string[], memberSkills: readonly string[]): SkillMatch {
+  const have = new Set(memberSkills.map(skillKey));
+  const seen = new Set<string>();
+  const matched: string[] = [];
+  for (const skill of jobSkills) {
+    const key = skillKey(skill);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (have.has(key)) matched.push(skill);
+  }
+  return { matched, count: matched.length, total: seen.size };
+}
+
+/**
+ * A job's skills with the ones in `matched` (from skillMatch) first, each part keeping the job's order: a card shows the
+ * first few, so a member sees the skills they have before the rest are counted as "+N more".
+ */
+export function skillsMatchedFirst(jobSkills: readonly string[], matched: readonly string[]): Array<{ skill: string; matched: boolean }> {
+  const keys = new Set(matched.map(skillKey));
+  const marked = jobSkills.map((skill) => ({ skill, matched: keys.has(skillKey(skill)) }));
+  return [...marked.filter((s) => s.matched), ...marked.filter((s) => !s.matched)];
+}

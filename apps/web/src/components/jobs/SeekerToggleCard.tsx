@@ -1,6 +1,7 @@
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { IconCheck } from "@/components/icons";
 import { Button, Card, Checkbox, FormField, Input, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -50,7 +51,14 @@ export function SeekerToggleCard({ slug }: { slug: string }) {
     <Card className="border-primary/30 bg-primary/5 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-slate-900">{mine.data?.isActive ? "You're open to work ✅" : "Looking for a job?"}</h3>
+          {mine.data?.isActive ? (
+            <h3 className="flex items-center gap-1.5 font-semibold text-slate-900">
+              You're open to work
+              <IconCheck size={18} strokeWidth={2.5} className="text-emerald-600" />
+            </h3>
+          ) : (
+            <h3 className="font-semibold text-slate-900">Looking for a job?</h3>
+          )}
           <p className="text-sm text-slate-600">Let alumni know what you're looking for; your card shows in the directory with an “open to work” tag.</p>
         </div>
         <Button variant={mine.data?.isActive ? "outline" : "primary"} size="sm" onClick={openEditor}>

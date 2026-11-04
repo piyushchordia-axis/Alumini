@@ -115,6 +115,8 @@ try {
     // Under the page's h1, the job's title is an h2 and its parts h3s, so no heading level is skipped.
     await row.getByRole("heading", { level: 2, name: "Robotics Intern", exact: true }).waitFor();
     await row.getByRole("heading", { level: 3, name: "About the company", exact: true }).waitFor();
+    // Its skills are shown as they are, with nothing compared with the admin's own.
+    if (await row.getByText(/you have|Add your skills/i).count()) throw new Error("the admin's preview compares the job's skills with the admin's");
     await row.locator('button:has-text("Approve")').click();
     await page.waitForSelector("text=Job approved");
     await shot("a03-moderation");

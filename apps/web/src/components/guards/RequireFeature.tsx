@@ -1,5 +1,6 @@
 import { chatAvailable, mentorshipAvailable, type TenantFeature } from "@illuminize/shared";
 import { Navigate, Outlet, useMatch } from "react-router-dom";
+import { IconLock } from "@/components/icons";
 import { EmptyState, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { homePath, SECTION_LINKS, type SectionLink } from "@/lib/sections";
@@ -14,7 +15,7 @@ export function RequireFeature({ feature }: { feature: TenantFeature }) {
   const label = LINKS_BY_FEATURE[feature]?.label ?? feature;
   return (
     <EmptyState
-      icon="🔒"
+      icon={<IconLock size={32} className="text-slate-400" />}
       title={`${label} is turned off`}
       description={`${tenant.shortName ?? tenant.name} has switched this section off.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}

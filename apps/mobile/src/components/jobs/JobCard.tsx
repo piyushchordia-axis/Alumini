@@ -1,14 +1,15 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, experienceLabel, jobPlaceLabel, jobSalaryText, type JobCardDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { Text, View } from "react-native";
-import { IconClock, IconJobs, IconWallet, type IconProps } from "@/components/icons";
+import { IconCheck, IconClock, IconJobs, IconWallet, type IconProps } from "@/components/icons";
 import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { Badge, Card, Muted } from "@/components/ui";
+import { useMembership } from "@/hooks/useMembership";
 import { timeAgo } from "@/lib/format";
 import { jobHref } from "@/lib/referrals";
-import { colors, radius, spacing } from "@/theme";
+import { colors, radius, spacing, useTheme } from "@/theme";
 
 const SHOWN_SKILLS = 3;
 
@@ -30,16 +31,21 @@ function Meta({ Icon, text }: { Icon: (p: IconProps) => ReactElement; text: stri
  */
 export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
   const router = useRouter();
+  const theme = useTheme();
+  const { membership } = useMembership();
   const place = jobPlaceLabel(job);
   const where = `${job.companyName}${place ? ` · ${place}` : ""}`;
   const pay = jobSalaryText(job) ?? job.salaryNote;
   const experience = experienceLabel(job.experienceMin, job.experienceMax);
+  // The skills the reader has come first, marked as on the job's page, so they're among the few shown. Not on their own jobs.
+  const matched = job.isMine ? [] : skillMatch(job.skills, membership.skills).matched;
+  const shown = skillsMatchedFirst(job.skills, matched).slice(0, SHOWN_SKILLS);
   const more = job.skills.length - SHOWN_SKILLS;
   // A closed job takes no requests, whatever its poster offered.
   const referable = job.canRefer && !job.isClosed;
   const status = job.moderationStatus === "APPROVED" ? null : MODERATION_STATUS_LABELS[job.moderationStatus];
   const note = job.moderationNote && (job.moderationStatus === "REJECTED" || job.moderationStatus === "REMOVED") ? `Admin note: ${job.moderationNote}` : null;
-  const skills = job.skills.length ? `Skills: ${[...job.skills.slice(0, SHOWN_SKILLS), ...(more > 0 ? [`${more} more`] : [])].join(", ")}` : null;
+  const skills = job.skills.length ? `Skills: ${[...shown.map(({ skill, matched: has }) => (has ? `${skill} ${YOU_HAVE_THIS_TEXT}` : skill)), ...(more > 0 ? [`${more} more`] : [])].join(", ")}` : null;
   const posted = `Posted by ${job.author.fullName} (batch of ${job.author.batchYear}) · ${timeAgo(job.createdAt)}`;
   // The card's name stands in for everything inside it, so it says all the card shows, in its order, title first.
   const name = [job.title, where, referable && CAN_REFER_BADGE, job.isClosed && "Closed", status, JOB_TYPE_LABELS[job.jobType], experience, pay, note, job.summary, skills, posted]
@@ -78,15 +84,21 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
         </Text>
       )}
       {job.skills.length > 0 && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-          {job.skills.slice(0, SHOWN_SKILLS).map((skill) => (
-            <View key={skill} style={{ maxWidth: "100%", borderRadius: radius.full, backgroundColor: "#f1f5f9", paddingHorizontal: 8, paddingVertical: 2 }}>
-              <Text numberOfLines={1} style={{ fontSize: 12, color: "#334155" }}>
+        // One line, the chips shortening to fit, so a long skill or a mark never makes the card taller. The card's name
+        // says which the reader has.
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {shown.map(({ skill, matched: has }) => (
+            <View
+              key={skill}
+              style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 1, minWidth: 0, borderRadius: radius.full, backgroundColor: has ? theme.primarySoft : "#f1f5f9", paddingHorizontal: 8, paddingVertical: 2 }}
+            >
+              {has && <IconCheck size={12} strokeWidth={2.5} color={theme.primary} />}
+              <Text numberOfLines={1} style={[{ flexShrink: 1, fontSize: 12, color: "#334155" }, has ? { fontWeight: "600", color: theme.primary } : null]}>
                 {skill}
               </Text>
             </View>
           ))}
-          {more > 0 && <Text style={{ fontSize: 12, color: colors.muted }}>+{more} more</Text>}
+          {more > 0 && <Text style={{ flexShrink: 0, fontSize: 12, color: colors.muted }}>+{more} more</Text>}
         </View>
       )}
       <Muted>{posted}</Muted>

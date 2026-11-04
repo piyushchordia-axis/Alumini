@@ -2,6 +2,7 @@ import { jobsQuery, mentorsQuery, notificationTarget, type NotificationDto } fro
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
+import { IconBell, IconSettings } from "@/components/icons";
 import { Button, EmptyState, LoadMore, Loading, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -62,8 +63,9 @@ export function NotificationsPage() {
         title="Notifications"
         actions={
           <>
-            <Link to={`/t/${slug}/app/notifications/settings`} className="inline-flex h-8 items-center rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100">
-              ⚙️ Settings
+            <Link to={`/t/${slug}/app/notifications/settings`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100">
+              <IconSettings size={16} />
+              Settings
             </Link>
             <Button variant="outline" size="sm" onClick={() => readAll.mutate()} loading={readAll.isPending}>
               Mark all read
@@ -72,7 +74,7 @@ export function NotificationsPage() {
         }
       />
       {list.isLoading && <Loading />}
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon="🔔" title="You're all caught up" />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconBell size={32} className="text-slate-400" />} title="You're all caught up" />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.items.map((n) => {
           const to = linkFor(slug, n, isTenantAdmin);

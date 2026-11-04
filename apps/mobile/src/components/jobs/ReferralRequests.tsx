@@ -1,6 +1,7 @@
 import { CAN_REFER_LABEL, REFERRAL_BOX_LABELS, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
 import type { ReactElement } from "react";
 import { FlatList, Text, View } from "react-native";
+import { IconJobs, IconMail } from "@/components/icons";
 import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { useReferralList, useReferralRows } from "@/components/jobs/ReferralRows";
 import { Button, EmptyState, ErrorText, ListEmpty, Spinner, Tabs } from "@/components/ui";
@@ -43,13 +44,13 @@ export function ReferralRequests({
   const empty =
     box === "received" ? (
       <EmptyState
-        icon="📨"
+        icon={<IconMail size={32} color={colors.faint} />}
         title="No referral requests yet"
         description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
       />
     ) : (
       <View style={{ gap: spacing.md }}>
-        <EmptyState icon="💼" title="You haven't asked for a referral yet" description="When you ask a job's poster to refer you, your request and their answer show here." />
+        <EmptyState icon={<IconJobs size={32} color={colors.faint} />} title="You haven't asked for a referral yet" description="When you ask a job's poster to refer you, your request and their answer show here." />
         {!limited && onBrowse && <Button title="Find jobs that can refer" onPress={onBrowse} />}
       </View>
     );

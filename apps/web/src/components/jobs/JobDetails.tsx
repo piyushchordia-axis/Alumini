@@ -1,8 +1,23 @@
-import { COMPANY_SIZE_LABELS, INDUSTRY_LABELS, applicationsClosed, applicationsLine, jobFacts, jobPlaceLabel, type JobDto, type JobFactKey } from "@illuminize/shared";
+import {
+  ADD_SKILLS_TO_MATCH_TEXT,
+  COMPANY_SIZE_LABELS,
+  INDUSTRY_LABELS,
+  YOU_HAVE_THIS_TEXT,
+  applicationsClosed,
+  applicationsLine,
+  jobFacts,
+  jobPlaceLabel,
+  skillMatch,
+  skillMatchText,
+  type JobDto,
+  type JobFactKey,
+} from "@illuminize/shared";
 import clsx from "clsx";
 import { useId, type ReactElement, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { EXTERNAL_REL, RichText } from "@/components/common/RichText";
 import {
+  IconCheck,
   IconClock,
   IconDirectory,
   IconEvents,
@@ -56,6 +71,51 @@ function shownAddress(href: string): string {
   }
 }
 
+/** A member reading a job, so the skills on their profile that it asks for are marked. */
+export interface SkillsViewer {
+  skills: readonly string[];
+  /** My profile's Work section, offered when they list no skills. */
+  addSkillsTo: string;
+}
+
+/**
+ * A job's skills. For a `viewer`, each one they have is a filled chip with a check, so it never rests on colour alone, and
+ * says so to screen readers; a line under them says how many they have, or offers to add theirs if they list none.
+ */
+function JobSkills({ skills, viewer }: { skills: string[]; viewer?: SkillsViewer }) {
+  const match = viewer && viewer.skills.length > 0 ? skillMatch(skills, viewer.skills) : null;
+  const have = new Set(match?.matched);
+  return (
+    <div className="space-y-1.5">
+      <ul aria-label="Skills" className="flex flex-wrap gap-1.5">
+        {skills.map((skill) => {
+          const has = have.has(skill);
+          return (
+            <li
+              key={skill}
+              className={clsx(
+                "inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs [overflow-wrap:anywhere]",
+                has ? "bg-primary font-semibold text-white" : "bg-primary/10 font-medium text-primary",
+              )}
+            >
+              {has && <IconCheck size={14} strokeWidth={2.5} />}
+              <span className="min-w-0">{skill}</span>
+              {has && <span className="sr-only"> {YOU_HAVE_THIS_TEXT}</span>}
+            </li>
+          );
+        })}
+      </ul>
+      {match ? (
+        <p className="text-sm text-slate-600">{skillMatchText(match)}</p>
+      ) : viewer ? (
+        <Link to={viewer.addSkillsTo} className="inline-flex min-h-11 items-center text-sm text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900">
+          {ADD_SKILLS_TO_MATCH_TEXT}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function Section({ title, level, children }: { title: string; level: Level; children: ReactNode }) {
   const id = useId();
   const Heading = headings(level)[1];
@@ -85,6 +145,7 @@ export function JobDetails({
   badges,
   apply,
   showClosedSections = false,
+  viewer,
 }: {
   job: JobDto;
   now: number;
@@ -94,6 +155,8 @@ export function JobDetails({
   badges?: ReactNode;
   apply?: ReactNode;
   showClosedSections?: boolean;
+  /** Who's reading, to mark the skills they have. Left out for the job's poster and in the admin's preview, which mark none. */
+  viewer?: SkillsViewer;
 }) {
   const [Title] = headings(level);
   const place = jobPlaceLabel(job);
@@ -148,15 +211,7 @@ export function JobDetails({
           </div>
         )}
       </dl>
-      {job.skills.length > 0 && (
-        <ul aria-label="Skills" className="flex flex-wrap gap-1.5">
-          {job.skills.map((skill) => (
-            <li key={skill} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary [overflow-wrap:anywhere]">
-              {skill}
-            </li>
-          ))}
-        </ul>
-      )}
+      {job.skills.length > 0 && <JobSkills skills={job.skills} viewer={viewer} />}
       {apply}
       {sections.map(({ key, title }) => (
         <Section key={key} title={title} level={level}>

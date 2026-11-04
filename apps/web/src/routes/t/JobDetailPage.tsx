@@ -28,7 +28,7 @@ export function JobDetailRoute() {
 }
 
 function JobDetailPage({ jobId }: { jobId: string }) {
-  const { tenant } = useMembership();
+  const { tenant, membership } = useMembership();
   const slug = tenant.slug;
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -95,6 +95,8 @@ function JobDetailPage({ jobId }: { jobId: string }) {
           }
           // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
           apply={<JobApplyArea job={j} now={now} />}
+          // Their skills come with the membership the app already holds, which saving their profile updates.
+          viewer={j.isMine ? undefined : { skills: membership.skills, addSkillsTo: `/t/${slug}/app/profile#work` }}
         />
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <MemberLink slug={slug} member={j.author} meta={`Posted ${formatDate(j.createdAt)}`} />

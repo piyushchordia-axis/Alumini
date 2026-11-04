@@ -17,6 +17,7 @@ import {
   type IconProps,
 } from "@/components/icons";
 import { CompanyLogo } from "@/components/jobs/CompanyLogo";
+import { JobSkills, type SkillsViewer } from "@/components/jobs/JobSkills";
 import { ModerationNote } from "@/components/ModerationBadge";
 import { linkProps, RichText } from "@/components/RichText";
 import { Card } from "@/components/ui";
@@ -90,10 +91,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Everything a job says about the role, in the order both apps show it: the header (logo, title, company and place), its
  * facts, its skills, then `apply`, then its sections. The title is the only heading that holds it, so the company's card
  * is headed "About the company" (`AboutCompany`, shown apart). Once applications have closed, the How to apply section goes
- * with the apply area.
+ * with the apply area. `viewer` is who's reading, to mark the skills they have; left out for the job's poster.
  */
-export function JobDetails({ job, now, badges, apply }: { job: JobDto; now: number; badges?: ReactNode; apply?: ReactNode }) {
-  const theme = useTheme();
+export function JobDetails({ job, now, badges, apply, viewer }: { job: JobDto; now: number; badges?: ReactNode; apply?: ReactNode; viewer?: SkillsViewer }) {
   const place = jobPlaceLabel(job);
   const facts = jobFacts(job);
   const ended = applicationsClosed(job, now);
@@ -127,15 +127,7 @@ export function JobDetails({ job, now, badges, apply }: { job: JobDto; now: numb
           </View>
         )}
       </View>
-      {job.skills.length > 0 && (
-        <View role="list" aria-label="Skills" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-          {job.skills.map((skill) => (
-            <View key={skill} role="listitem" style={{ maxWidth: "100%", borderRadius: radius.full, backgroundColor: theme.primarySoft, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <Text style={{ fontSize: 12, fontWeight: "600", color: theme.primary }}>{skill}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {job.skills.length > 0 && <JobSkills skills={job.skills} viewer={viewer} />}
       {apply}
       {sections.map(({ key, title }) => (
         <Section key={key} title={title}>

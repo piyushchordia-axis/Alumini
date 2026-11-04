@@ -298,6 +298,26 @@ try {
     await page.getByRole("button", { name: "Clear filters" }).click();
     await backend.waitFor();
 
+    // With no skills on their profile yet, a job's page offers to add them, linking to My profile's Work section.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await backend.click();
+    await page.waitForSelector("h1:has-text('Backend Engineer (Node.js)')");
+    const addSkills = page.getByRole("link", { name: "Add your skills to see which you match", exact: true });
+    await addSkills.waitFor();
+    if (await page.getByText(/^You have \d+ of \d+ skills?$/).count()) throw new Error("a member with no skills is told how many of the job's they have");
+    await page.screenshot({ path: `${SHOTS}/06c-job-add-skills-phone.png`, fullPage: true });
+    await addSkills.click();
+    await page.waitForURL(/\/app\/profile#work$/);
+    await page.getByRole("heading", { name: "Work", exact: true }).waitFor();
+    // Opened at Work, not at the top of the page with Work further down.
+    await page.waitForFunction(() => {
+      const top = document.getElementById("work")?.getBoundingClientRect().top ?? -1;
+      return top >= 0 && top < 200;
+    });
+    await page.screenshot({ path: `${SHOTS}/06h-profile-work-from-job-phone.png` });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${BASE}/t/demo-university/app/jobs`);
+
     await page.click("text=+ Post a job");
     await page.fill('input[name="title"]', `Smoke Test Engineer ${unique}`);
     await page.fill('input[name="companyName"]', "Smoke Labs");
@@ -359,6 +379,8 @@ try {
     await apply.waitFor();
     if ((await apply.getAttribute("href")) !== applyUrl || (await apply.getAttribute("target")) !== "_blank" || !(await apply.getAttribute("rel"))?.includes("noopener"))
       throw new Error("Apply should open the job's apply link in a new tab, with noopener");
+    // Its poster's own skills aren't compared with it.
+    if (await page.getByText("Add your skills to see which you match", { exact: true }).count()) throw new Error("a job's poster is offered to add skills to match it");
     await shot("06-job-detail");
 
     // An edit that changes only the title keeps everything else the job says: the form gives back what it was given.
@@ -648,6 +670,10 @@ try {
     await skills.fill("Smoke testing,");
     await page.getByRole("button", { name: "Remove Smoke testing", exact: true }).waitFor();
     await page.getByRole("button", { name: "Remove Playwright", exact: true }).waitFor();
+    // Two that the seeded Backend job asks for, spelt as it doesn't: the jobs step after this finds them matched.
+    await skills.fill("typescript, aws");
+    await skills.press("Enter");
+    await page.getByRole("button", { name: "Remove aws", exact: true }).waitFor();
     // A handle becomes the site's address as you leave the box.
     const github = page.getByLabel("GitHub", { exact: true });
     await github.fill("@smoke-tester");
@@ -670,11 +696,12 @@ try {
     await page.getByRole("button", { name: "Edit QA engineer at Flaky Labs", exact: true }).waitFor();
     await shot("08g-profile-edit");
 
-    // The meter always shows, from what's saved: a link and a past role add 10 to registration's 55. Two skills aren't
-    // three yet, so skills are still to add, with a link to Work.
+    // The meter always shows, from what's saved: three or more skills, a link and a past role add 20 to registration's 55.
+    // The bio is still to add, with a link to About you.
     const strength = page.getByRole("region", { name: "Profile strength", exact: true });
-    await page.waitForFunction(() => document.querySelector('[role="meter"][aria-label="Profile strength"]')?.getAttribute("aria-valuenow") === "65");
-    if ((await strength.getByRole("link", { name: "Add at least 3 skills", exact: true }).getAttribute("href")) !== "#work") throw new Error("the meter's skills item doesn't open Work");
+    await page.waitForFunction(() => document.querySelector('[role="meter"][aria-label="Profile strength"]')?.getAttribute("aria-valuenow") === "75");
+    if ((await strength.getByRole("link", { name: "Write a short bio", exact: true }).getAttribute("href")) !== "#about") throw new Error("the meter's bio item doesn't open About you");
+    if (await strength.getByRole("link", { name: "Add at least 3 skills", exact: true }).count()) throw new Error("the meter still asks for skills after four were saved");
     if (await strength.getByRole("link", { name: "Add a link, such as LinkedIn", exact: true }).count()) throw new Error("the meter still asks for a link after one was saved");
 
     // A problem the server finds inside the list ("experiences.0.endYear") goes on that row's input too, opening the row.
@@ -715,6 +742,84 @@ try {
     const link = page.getByRole("link", { name: "GitHub", exact: true });
     if ((await link.getAttribute("href")) !== "https://github.com/smoke-tester" || !(await link.getAttribute("rel"))?.includes("nofollow")) throw new Error("the GitHub link isn't the saved address with nofollow");
     await shot("08i-profile-details");
+  });
+
+  await step("jobs: the skills on your profile are marked on a job's page and come first on its card", async () => {
+    // The step above gave this member "typescript" and "aws", the seeded Backend job's second and fourth skills. At a
+    // phone's width, where a card mustn't grow.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE + "/t/demo-university/app/jobs");
+    const card = page.getByRole("link", { name: /^Backend Engineer \(Node\.js\)/ });
+    await card.waitFor();
+    // The two come first, each with a check and the words for screen readers, and "+1 more" still counts the rest. The
+    // skills are the card's last list.
+    const cardSkills = card.getByRole("list").last();
+    const chips = cardSkills.getByRole("listitem");
+    const onCard = (await chips.allTextContents()).map((t) => t.trim());
+    if (onCard.join("|") !== "TypeScript (you have this)|AWS (you have this)|Node.js|+1 more") throw new Error(`the card's skills read ${onCard.join(", ")}, not this member's two first`);
+    if ((await chips.nth(1).locator("svg").count()) !== 1 || (await chips.nth(2).locator("svg").count()) !== 0) throw new Error("only the skills this member has should carry a check on the card");
+    const [row, chip] = [await cardSkills.boundingBox(), await chips.first().boundingBox()];
+    if (row.height > chip.height + 1) throw new Error(`the card's skills take ${row.height}px, more than one line of ${chip.height}px`);
+    // The card's name, which is all a screen reader says of it in a list of links, names the skills and which they have.
+    await page.getByRole("link", { name: /^Backend Engineer \(Node\.js\).* Skills: TypeScript \(you have this\) AWS \(you have this\) Node\.js \+1 more Posted by / }).waitFor();
+    // Clear of the bottom bar, which would cover its skills in the picture.
+    await card.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await card.screenshot({ path: `${SHOTS}/06d-job-card-skills-phone.png` });
+
+    // The job's page keeps its own order, marks the same two, and says how many of its skills this member has.
+    await card.click();
+    await page.waitForSelector("h1:has-text('Backend Engineer (Node.js)')");
+    await page.getByText("You have 2 of 4 skills", { exact: true }).waitFor();
+    const skills = page.getByRole("list", { name: "Skills" }).getByRole("listitem");
+    const onPage = (await skills.allTextContents()).map((t) => t.trim());
+    if (onPage.join("|") !== "Node.js|TypeScript (you have this)|PostgreSQL|AWS (you have this)") throw new Error(`the job's skills read ${onPage.join(", ")}`);
+    if ((await skills.filter({ hasText: "TypeScript" }).locator("svg").count()) !== 1 || (await skills.filter({ hasText: "Node.js" }).locator("svg").count()) !== 0)
+      throw new Error("only the skills this member has should carry a check on the job's page");
+    await page.screenshot({ path: `${SHOTS}/06e-job-skills-match-phone.png`, fullPage: true });
+
+    // A job asking for none of them says so, and marks nothing.
+    await page.goto(BASE + "/t/demo-university/app/jobs");
+    await page.getByRole("link", { name: /^Associate Product Manager/ }).click();
+    await page.getByText("You have 0 of 4 skills", { exact: true }).waitFor();
+    if (await page.getByText("(you have this)").count()) throw new Error("a job asking for none of this member's skills marks one");
+    await page.screenshot({ path: `${SHOTS}/06f-job-skills-none-phone.png`, fullPage: true });
+
+    // Their own job asks for TypeScript too, which they have, among skills too long for one line of a card here. Neither
+    // its page nor its card compares them with theirs, and the card's chips shorten rather than wrap.
+    const ownTitle = `Smoke Long Skills ${unique}`;
+    await page.goto(BASE + "/t/demo-university/app/jobs/new");
+    await page.fill('input[name="title"]', ownTitle);
+    await page.fill('input[name="companyName"]', "Long Skills Ltd");
+    await page.fill('textarea[name="description"]', "A job whose skills are too long for one line of a card.");
+    const ownSkills = page.getByLabel("Skills", { exact: true });
+    await ownSkills.fill("Distributed systems engineering, Site reliability engineering, TypeScript, Observability");
+    await ownSkills.press("Enter");
+    await page.getByRole("button", { name: "Remove Observability", exact: true }).waitFor();
+    await page.click('button:has-text("Post job")');
+    await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+$/);
+    await page.waitForSelector(`h1:has-text('${ownTitle}')`);
+    if (await page.getByText(/^You have \d+ of \d+ skills?$|^Add your skills|\(you have this\)/).count()) throw new Error("a job's page compares its poster's skills with it");
+    const ownPage = page.url();
+    await page.goto(BASE + "/t/demo-university/app/my-content?tab=jobs");
+    const own = page.getByRole("link", { name: new RegExp(`^${ownTitle}`) });
+    await own.waitFor();
+    const ownChips = own.getByRole("list").last().getByRole("listitem");
+    const ownShown = (await ownChips.allTextContents()).map((t) => t.trim());
+    if (ownShown.join("|") !== "Distributed systems engineering|Site reliability engineering|TypeScript|+1 more") throw new Error(`the poster's own card shows its skills as ${ownShown.join(", ")}`);
+    if (await own.getByRole("list").last().locator("svg").count()) throw new Error("the poster's own card marks a skill as theirs");
+    const [ownRow, ownChip] = [await own.getByRole("list").last().boundingBox(), await ownChips.first().boundingBox()];
+    if (ownRow.height > ownChip.height + 1) throw new Error(`the card's long skills take ${ownRow.height}px, more than one line of ${ownChip.height}px`);
+    // Each fits by shortening: the longest is cut off with an ellipsis rather than pushing the row past the card's edge.
+    const cut = await own.getByText("Distributed systems engineering", { exact: true }).evaluate((text) => text.scrollWidth > text.clientWidth);
+    const spill = await own.getByRole("list").last().evaluate((row) => row.scrollWidth > row.clientWidth);
+    if (!cut || spill) throw new Error(`the card's long skills ${spill ? "run past its edge" : "aren't shortened to fit"}`);
+    await own.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await own.screenshot({ path: `${SHOTS}/06g-own-job-card-long-skills-phone.png` });
+    await page.goto(ownPage);
+    await page.click('button:has-text("Delete")');
+    await page.locator('[role="dialog"]', { hasText: "Delete this job?" }).locator('button:has-text("Delete job")').click();
+    await page.waitForURL(/\/app\/jobs$/);
+    await page.setViewportSize({ width: 1280, height: 900 });
   });
 
   await step("joining a second institution offers the details given the first, keeps what's typed, and can be undone", async () => {
@@ -1851,7 +1956,7 @@ try {
   await step("notifications page, notification settings + sign out", async () => {
     await page.click('a[aria-label^="Notifications"]');
     await page.waitForSelector("h1:has-text('Notifications')");
-    await page.click("text=⚙️ Settings");
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
     await page.waitForSelector("h1:has-text('Notification settings')");
     // Mentorship is on here and this member can use it, so its requests and answers have a row of their own.
     await page.locator('[role="radiogroup"][aria-label="Mentorship and referrals"]').waitFor();

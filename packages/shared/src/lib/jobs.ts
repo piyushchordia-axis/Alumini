@@ -1,7 +1,7 @@
 import { JOB_SENIORITY_LABELS, JOB_TYPE_LABELS, WORK_MODE_LABELS, type ModerationStatus, type WorkMode } from "../constants";
 import type { JobCardDto, JobDto } from "../types/dto";
 import { formatSalary } from "./salary";
-import { skillKey } from "./skills";
+import { skillKey, type SkillMatch } from "./skills";
 import { localTimeZone, wallPartsInZone } from "./time";
 
 const instant = (at: number | Date | string): number => (typeof at === "number" ? at : typeof at === "string" ? Date.parse(at) : at.getTime());
@@ -87,6 +87,18 @@ export function jobFacts(job: JobFactsSource): JobFact[] {
   add("education", "Education", job.educationRequirement);
   return facts;
 }
+
+/**
+ * On a job's page, under its skills: how many of them the viewer has (skillMatch), "You have 3 of 5 skills". Neither app
+ * shows it to the job's poster.
+ */
+export function skillMatchText(match: Pick<SkillMatch, "count" | "total">): string {
+  return `You have ${match.count} of ${match.total} skill${match.total === 1 ? "" : "s"}`;
+}
+/** Said of a job's skill the viewer has: after it on web for screen readers only, and in its label on mobile. */
+export const YOU_HAVE_THIS_TEXT = "(you have this)";
+/** In place of skillMatchText when the viewer's profile lists no skills, linking to its Work section. */
+export const ADD_SKILLS_TO_MATCH_TEXT = "Add your skills to see which you match";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

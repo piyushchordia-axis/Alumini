@@ -162,6 +162,14 @@ export function IconBell({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconSettings({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="3" {...stroke(color)} />
+      <Path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" {...stroke(color)} />
+    </Base>
+  );
+}
 export function IconComment({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -322,6 +330,14 @@ export function IconTag({ size = 20, color }: Props) {
     </Base>
   );
 }
+/** `strokeWidth` draws it bolder, as on a skill the member has, where it marks the chip at a small size. */
+export function IconCheck({ size = 20, color, strokeWidth }: Props & { strokeWidth?: number }) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m5 12 5 5L20 7" {...stroke(color)} {...(strokeWidth ? { strokeWidth } : null)} />
+    </Base>
+  );
+}
 export function IconClose({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -329,10 +345,20 @@ export function IconClose({ size = 20, color }: Props) {
     </Base>
   );
 }
-export function IconCheck({ size = 20, color }: Props) {
+export function IconLock({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
-      <Path d="m5 12 5 5L20 7" {...stroke(color)} />
+      <Rect x="5" y="11" width="14" height="10" rx="2" {...stroke(color)} />
+      <Path d="M8 11V7a4 4 0 0 1 8 0v4" {...stroke(color)} />
+    </Base>
+  );
+}
+/** Something that couldn't load or went wrong. */
+export function IconAlert({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="9" {...stroke(color)} />
+      <Path d="M12 7.5V13M12 16.5h.01" {...stroke(color)} />
     </Base>
   );
 }

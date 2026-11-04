@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, Text } from "react-native";
+import { IconBell, IconMail, IconPosts } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
@@ -83,14 +84,17 @@ export default function MyProfileScreen() {
       {/* From what's saved, so it moves when a save lands. */}
       <ProfileStrengthPanel strength={profileStrength(membership, tenant)} slug={slug} />
       <Card>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" hitSlop={6}>
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>🗂️ My posts & listings</Text>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
+          <IconPosts size={18} color={theme.primary} />
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>My posts & listings</Text>
         </Pressable>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} accessibilityRole="link" hitSlop={6}>
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>🔔 Notifications</Text>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
+          <IconBell size={18} color={theme.primary} />
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>Notifications</Text>
         </Pressable>
-        <Pressable onPress={() => router.push(`/t/${slug}/profile/account`)} accessibilityRole="link" hitSlop={6}>
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>✉️ Email & account</Text>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/account`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
+          <IconMail size={18} color={theme.primary} />
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>Email & account</Text>
         </Pressable>
         {isTenantAdmin && <Muted>Admin tools (approvals, moderation, settings) are available on the web console.</Muted>}
       </Card>

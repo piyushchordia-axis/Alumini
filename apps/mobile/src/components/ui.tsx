@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ComponentRef, type ReactNode, type Ref } from "react";
-import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
+import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactNode, type Ref } from "react";
+import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StackHeader } from "@/components/StackHeader";
-import { IconProfile } from "@/components/icons";
+import { IconAlert, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -53,7 +53,9 @@ export function Screen({
 export function LoadError({ error, onRetry, onBack, backLabel = "Choose another institution" }: { error: unknown; onRetry?: () => void; onBack?: () => void; backLabel?: string }) {
   return (
     <SafeAreaView style={[styles.screen, { justifyContent: "center", padding: spacing.xl, gap: spacing.md }]}>
-      <Text style={{ fontSize: 40, textAlign: "center" }}>📡</Text>
+      <View style={{ alignItems: "center" }}>
+        <IconAlert size={40} color={colors.faint} />
+      </View>
       <Text style={[styles.title, { textAlign: "center", fontSize: 18 }]}>{"Couldn't load this"}</Text>
       <ErrorText error={error} />
       {onRetry && <Button title="Try again" onPress={onRetry} />}
@@ -123,7 +125,11 @@ export function Input({ label, error, hint, style, ref, ...rest }: TextInputProp
   );
 }
 
-/** Horizontal chip picker used as a lightweight select on mobile. `tall` makes each chip a full 44-point target. `emptyLabel` names the chip that picks nothing. */
+/**
+ * Horizontal chip picker used as a lightweight select on mobile. `tall` makes each chip a full 44-point target. `emptyLabel`
+ * names the chip that picks nothing. The chosen chip is kept in view, so on a narrow phone a choice past the edge (a saved
+ * "Executive", say) still shows.
+ */
 export function ChipSelect<T extends string>({
   label,
   options,
@@ -142,13 +148,64 @@ export function ChipSelect<T extends string>({
   tall?: boolean;
 }) {
   const theme = useTheme();
+  const scroller = useRef<ScrollViewInstance>(null);
+  // Where each chip is in the row, by its value ("" for the empty one), and the row's width, full width and scroll position.
+  const chips = useRef(new Map<string, { x: number; width: number }>());
+  const row = useRef({ width: 0, content: 0, x: 0 });
+  const chosen = value === "" ? (allowEmpty ? "" : null) : options.some((o) => o.value === value) ? value : null;
+
+  /**
+   * Scrolls the row as little as brings the chosen chip fully into view, with a little of the next one showing, and not at
+   * all when it's in view already, so the row stays where the member left it. Nothing until the row and the chip are laid
+   * out, which each call it again.
+   */
+  const reveal = (animated: boolean) => {
+    const chip = chosen === null ? undefined : chips.current.get(chosen);
+    const { width, content, x } = row.current;
+    if (!chip || !width) return;
+    let to = x;
+    if (chip.x < x) to = chip.x - spacing.lg;
+    else if (chip.x + chip.width > x + width) to = chip.x + chip.width - width + spacing.lg;
+    to = Math.max(0, Math.min(to, content - width));
+    if (Math.abs(to - x) < 1) return;
+    row.current.x = to;
+    scroller.current?.scrollTo({ x: to, animated });
+  };
+  // A press on a chip at the edge, or a value set from outside (a form filled in, filters cleared).
+  const revealChosen = useEffectEvent(() => reveal(true));
+  useEffect(() => revealChosen(), [chosen]);
+  const measured = (key: string, e: LayoutChangeEvent) => {
+    const { x, width } = e.nativeEvent.layout;
+    chips.current.set(key, { x, width });
+    // Its first layout, or it moved: options arriving late, or the labels around it changing.
+    if (key === chosen) reveal(false);
+  };
+
   return (
     <View style={{ gap: 6 }}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
-        {allowEmpty && <Chip label={emptyLabel} active={value === ""} onPress={() => onChange("")} color={theme.primary} tall={tall} />}
+      <ScrollView
+        ref={scroller}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ gap: 8 }}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          row.current.x = e.nativeEvent.contentOffset.x;
+        }}
+        onLayout={(e) => {
+          row.current.width = e.nativeEvent.layout.width;
+          reveal(false);
+        }}
+        onContentSizeChange={(width) => {
+          row.current.content = width;
+          reveal(false);
+        }}
+      >
+        {allowEmpty && <Chip label={emptyLabel} active={chosen === ""} onPress={() => onChange("")} onLayout={(e) => measured("", e)} color={theme.primary} tall={tall} />}
         {options.map((o) => (
-          <Chip key={o.value} label={o.label} active={value === o.value} onPress={() => onChange(o.value)} color={theme.primary} tall={tall} />
+          <Chip key={o.value} label={o.label} active={chosen === o.value} onPress={() => onChange(o.value)} onLayout={(e) => measured(o.value, e)} color={theme.primary} tall={tall} />
         ))}
       </ScrollView>
     </View>
@@ -178,11 +235,11 @@ export function focusOn(target: Focusable | null | undefined) {
 }
 
 /** `tall` makes it a full 44-point target, for a choice that matters, such as a report's reason. */
-export function Chip({ label, active, onPress, color, tall = false }: { label: string; active?: boolean; onPress?: () => void; color?: string; tall?: boolean }) {
+export function Chip({ label, active, onPress, color, tall = false, onLayout }: { label: string; active?: boolean; onPress?: () => void; color?: string; tall?: boolean; onLayout?: PressableProps["onLayout"] }) {
   const theme = useTheme();
   const c = color ?? theme.primary;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, tall ? styles.chipTall : null, active ? { backgroundColor: c, borderColor: c } : null]}>
+    <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, tall ? styles.chipTall : null, active ? { backgroundColor: c, borderColor: c } : null]}>
       <Text style={[styles.chipText, active ? { color: "#fff" } : null]}>{label}</Text>
     </Pressable>
   );

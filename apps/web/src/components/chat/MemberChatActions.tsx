@@ -2,6 +2,7 @@ import type { MemberProfileDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useQuery } from "@tanstack/react-query";
 import { BlockMemberButton } from "@/components/chat/BlockMemberButton";
+import { IconMessages } from "@/components/icons";
 import { LinkButton } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { api } from "@/lib/api";
@@ -13,7 +14,7 @@ export function MessageMemberButton({ slug, member }: { slug: string; member: Pi
   const id = existing.data?.conversationId;
   return (
     <LinkButton to={id ? `/t/${slug}/app/messages/${id}` : `/t/${slug}/app/messages/new?to=${member.id}`} size="md" className="min-h-11">
-      <span aria-hidden>✉️</span>
+      <IconMessages size={18} />
       Message this member
     </LinkButton>
   );

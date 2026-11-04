@@ -1,4 +1,5 @@
 import { CAN_REFER_LABEL, REFERRAL_BOX_LABELS, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
+import { IconJobs, IconMail } from "@/components/icons";
 import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { ReferralList, useReferralList } from "@/components/jobs/ReferralList";
 import { Button, EmptyState, ErrorBox, Loading, Tabs } from "@/components/ui";
@@ -15,13 +16,13 @@ export function ReferralRequests({ slug, box, onBoxChange, limited, onBrowse }: 
   const empty =
     box === "received" ? (
       <EmptyState
-        icon="📨"
+        icon={<IconMail size={32} className="text-slate-400" />}
         title="No referral requests yet"
         description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
       />
     ) : (
       <EmptyState
-        icon="💼"
+        icon={<IconJobs size={32} className="text-slate-400" />}
         title="You haven't asked for a referral yet"
         description="When you ask a job's poster to refer you, your request and their answer show here."
         action={

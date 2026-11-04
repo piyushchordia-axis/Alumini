@@ -256,6 +256,44 @@ try {
     if (width !== 512 || height !== 512 || !src.endsWith(".jpg")) throw new Error(`the saved photo is ${width}×${height} at ${src}, not a 512-pixel square JPEG`);
   });
 
+  await step("jobs: with no skills on their profile, a job's page offers to add them, opening the profile's Work section", async () => {
+    const shown = (locator) => locator.locator("visible=true").last();
+    // An edit left open on the Profile tab, unsaved: the job's link brings back that editor, draft and all, rather than
+    // stacking a second one whose save the first would later undo.
+    await page.goto(BASE + "/t/demo-university/profile");
+    await shown(page.getByRole("button", { name: "Edit profile" })).click();
+    await page.waitForURL("**/t/demo-university/profile/edit");
+    const draft = `Half-written headline ${unique}`;
+    await shown(page.getByLabel("Headline", { exact: true })).fill(draft);
+    await openSection("Jobs");
+    await page.waitForURL(/\/t\/demo-university\/jobs$/);
+    const backend = shown(page.getByRole("button", { name: /^Backend Engineer \(Node\.js\)/ }));
+    await backend.waitFor();
+    if ((await backend.getAttribute("aria-label")).includes("(you have this)")) throw new Error("a member with no skills has one marked on a card");
+    await backend.dispatchEvent("click");
+    await page.waitForURL(/\/t\/demo-university\/jobs\/[0-9a-f-]{36}$/);
+    const addSkills = shown(page.getByRole("link", { name: "Add your skills to see which you match", exact: true }));
+    await addSkills.waitFor();
+    if (await page.getByText(/^You have \d+ of \d+ skills?$/).locator("visible=true").count()) throw new Error("a member with no skills is told how many of the job's they have");
+    await addSkills.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await shot("m05c-job-add-skills");
+    await addSkills.click();
+    await page.waitForURL("**/t/demo-university/profile/edit?section=work");
+    // Opened at Work, as the profile's own section links do.
+    const work = shown(page.getByRole("heading", { name: "Work", exact: true }));
+    await work.waitFor();
+    let top = -1;
+    for (let i = 0; i < 30 && !(top > 0 && top < 250); i++) {
+      if (i) await page.waitForTimeout(100);
+      top = await work.evaluate((el) => el.getBoundingClientRect().top);
+    }
+    if (!(top > 0 && top < 250)) throw new Error(`the job's link left "Work" ${Math.round(top)}px down the screen`);
+    const headlines = page.getByLabel("Headline", { exact: true });
+    if ((await headlines.count()) !== 1) throw new Error(`the job's link left ${await headlines.count()} profile editors open, not the one already there`);
+    if ((await headlines.inputValue()) !== draft) throw new Error("the job's link opened a fresh profile editor, losing the one left open");
+    await shot("m05d-profile-edit-work-from-job");
+  });
+
   await step("edit profile in sections: a headline, a skill and a past role, saved together, show on the profile", async () => {
     const shown = (locator) => locator.locator("visible=true").last();
     await page.goto(BASE + "/t/demo-university/profile");
@@ -269,6 +307,10 @@ try {
     await skills.fill("React Native");
     await skills.press("Enter");
     await shown(page.getByRole("button", { name: "Remove React Native", exact: true })).waitFor();
+    // Two that the seeded Backend job asks for, spelt as it doesn't: the jobs step finds them matched.
+    await skills.fill("typescript, aws");
+    await skills.press("Enter");
+    await shown(page.getByRole("button", { name: "Remove aws", exact: true })).waitFor();
     // A past role is checked as it's folded away, its error on the input it's about.
     await shown(page.getByRole("button", { name: "Add a past role", exact: true })).click();
     const role = shown(page.getByRole("group", { name: "Past role 1", exact: true }));
@@ -299,11 +341,12 @@ try {
     await page.waitForURL("**/t/demo-university/profile");
     for (const text of [headline, "React Native", "QA engineer", "Flaky Labs", "2012–2016"]) await shown(page.getByText(text, { exact: true })).waitFor();
     await shot("m04h-profile-details");
-    // The meter follows what's saved: the photo (20), the headline (15) and a past role (5) of 100.
+    // The meter follows what's saved: the photo (20), the headline (15), three skills (10) and a past role (5) of 100.
     const meter = shown(page.getByRole("progressbar", { name: "Profile strength", exact: true }));
-    if ((await meter.getAttribute("aria-valuenow")) !== "40") throw new Error(`My profile's meter shows ${await meter.getAttribute("aria-valuenow")}, not 40`);
+    if ((await meter.getAttribute("aria-valuenow")) !== "50") throw new Error(`My profile's meter shows ${await meter.getAttribute("aria-valuenow")}, not 50`);
     await shown(page.getByText("Still to add", { exact: true })).waitFor();
     await shown(page.getByRole("link", { name: "Add the city you live in", exact: true })).waitFor();
+    if (await page.getByRole("link", { name: "Add at least 3 skills", exact: true }).locator("visible=true").count()) throw new Error("My profile still asks for skills after three were saved");
 
     // A link to a section opens the form there.
     await shown(page.getByRole("link", { name: "Edit About you", exact: true })).click();
@@ -386,6 +429,19 @@ try {
     await backend.getByText("₹25–40 LPA", { exact: true }).waitFor();
     await backend.getByText("3–6 years", { exact: true }).waitFor();
     await backend.getByText("+1 more", { exact: true }).waitFor();
+    // The profile step gave this member "typescript" and "aws", the job's second and fourth skills. They come first, each
+    // with a check, and the card's name says so; "+1 more" still counts the rest, and the skills stay on one line.
+    const cardName = await backend.getAttribute("aria-label");
+    if (!cardName.includes("Skills: TypeScript (you have this), AWS (you have this), Node.js, 1 more")) throw new Error(`the card's name lists its skills as: ${cardName}`);
+    const cardChip = (name) => backend.getByText(name, { exact: true }).locator("xpath=..");
+    const [tsChip, awsChip, nodeChip] = [cardChip("TypeScript"), cardChip("AWS"), cardChip("Node.js")];
+    const [tsBox, awsBox, nodeBox] = [await tsChip.boundingBox(), await awsChip.boundingBox(), await nodeChip.boundingBox()];
+    if (!(tsBox.x < awsBox.x && awsBox.x < nodeBox.x)) throw new Error("the skills this member has aren't shown first on the card");
+    if ((await tsChip.locator("svg").count()) !== 1 || (await awsChip.locator("svg").count()) !== 1 || (await nodeChip.locator("svg").count()) !== 0) throw new Error("only the skills this member has should carry a check on the card");
+    const skillRow = await tsChip.locator("xpath=..").boundingBox();
+    if (skillRow.height > tsBox.height + 1) throw new Error(`the card's skills take ${skillRow.height}px, more than one line of ${tsBox.height}px`);
+    await backend.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await backend.screenshot({ path: `${SHOTS}/m05e-job-card-skills.png` });
     // Each tab, and on Referrals each list, is in the URL, as a referral notification links to them.
     await tab("Looking for work", false).click();
     await tab("Looking for work", true).waitFor();
@@ -446,6 +502,28 @@ try {
       throw new Error("How to apply's address should be a link that opens in a new tab, with noopener");
     await onTop(page.getByRole("button", { name: "Apply", exact: true })).waitFor();
     await shot("m05b-job-detail");
+    // Its page keeps the job's own order, marks the same two, and says how many of its skills this member has.
+    await onTop(page.getByText("You have 2 of 4 skills", { exact: true })).waitFor();
+    const pageSkills = onTop(page.getByRole("list", { name: "Skills" }));
+    const pageChips = pageSkills.getByRole("listitem");
+    const onPage = (await pageChips.allTextContents()).map((t) => t.trim());
+    if (onPage.join("|") !== "Node.js|TypeScript (you have this)|PostgreSQL|AWS (you have this)") throw new Error(`the job's skills read ${onPage.join(", ")}`);
+    if ((await pageChips.filter({ hasText: "TypeScript" }).locator("svg").count()) !== 1 || (await pageChips.filter({ hasText: "Node.js" }).locator("svg").count()) !== 0)
+      throw new Error("only the skills this member has should carry a check on the job's page");
+    if (await page.getByRole("link", { name: "Add your skills to see which you match" }).locator("visible=true").count()) throw new Error("a member with skills is offered to add them");
+    await pageSkills.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await shot("m05f-job-skills-match");
+    await page.getByLabel(/back$/i).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/jobs$/);
+
+    // A job asking for none of them says so, and marks nothing.
+    await apm.dispatchEvent("click");
+    await page.waitForURL(/\/t\/demo-university\/jobs\/[0-9a-f-]{36}$/);
+    const none = onTop(page.getByText("You have 0 of 4 skills", { exact: true }));
+    await none.waitFor();
+    if (await page.getByText("(you have this)").count()) throw new Error("a job asking for none of this member's skills marks one");
+    await none.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await shot("m05g-job-skills-none");
     await page.getByLabel(/back$/i).locator("visible=true").first().click();
     await page.waitForURL(/\/t\/demo-university\/jobs$/);
   });
@@ -664,7 +742,7 @@ try {
     const group = () => page.locator('[role="radiogroup"][aria-label="Birthdays and anniversaries"]').locator("visible=true").first();
     const openSettings = async () => {
       await page.getByRole("button", { name: /^Notifications/ }).locator("visible=true").first().click();
-      await page.getByRole("button", { name: "⚙️ Settings" }).locator("visible=true").first().click();
+      await page.getByRole("button", { name: "Settings", exact: true }).locator("visible=true").first().click();
       await group().waitFor();
     };
     await openSection("Feed");
@@ -1434,6 +1512,7 @@ try {
     const sentList = /\/t\/demo-university\/jobs\?tab=referrals&box=sent$/;
     const engineer = `Mobile Referral Engineer ${unique}`;
     const analyst = `Mobile Referral Analyst ${unique}`;
+    const LONG_SKILLS = ["Distributed systems engineering", "Site reliability engineering"];
 
     // The poster offers referrals on two new jobs. What ticking the box means is said beside it, before anything is posted.
     // The analyst job is remote, gives skills, pay, its company's website and an email, which go once it closes; the
@@ -1449,16 +1528,19 @@ try {
       await shown(poster.getByLabel("About the role *", { exact: true })).fill("Help us keep the mobile smoke tests green.");
       // Work mode is one choice of three, on-site to start with, and the chosen one says so on the web build too.
       const mode = (name) => shown(poster.getByRole("group", { name: "Work mode", exact: true }).getByRole("button", { name, exact: true }));
+      const seniority = (name) => shown(poster.getByRole("group", { name: "Seniority", exact: true }).getByRole("button", { name, exact: true }));
       if ((await mode("On-site").getAttribute("aria-selected")) !== "true") throw new Error("a new job doesn't start out on-site");
       if (remote) {
         await mode("Remote").click();
         if ((await mode("Remote").getAttribute("aria-selected")) !== "true" || (await mode("On-site").getAttribute("aria-selected")) !== "false") throw new Error("the Remote work mode doesn't show as chosen");
-        // A comma adds the skill before it, and Return the one still typed.
+        // The last seniority, past the right edge of a phone's screen: the edit form has to bring it into view.
+        await seniority("Executive").click();
+        if ((await seniority("Executive").getAttribute("aria-selected")) !== "true") throw new Error("the Executive seniority doesn't show as chosen");
+        // A comma adds the skill before it, and Return the one still typed. Two are too long for one line of a card.
         const skills = shown(poster.getByLabel("Skills", { exact: true }));
-        await skills.fill("Playwright, TypeScript");
+        await skills.fill(`Playwright, TypeScript, ${LONG_SKILLS.join(", ")}`);
         await skills.press("Enter");
-        await shown(poster.getByRole("button", { name: "Remove Playwright", exact: true })).waitFor();
-        await shown(poster.getByRole("button", { name: "Remove TypeScript", exact: true })).waitFor();
+        for (const skill of ["Playwright", "TypeScript", ...LONG_SKILLS]) await shown(poster.getByRole("button", { name: `Remove ${skill}`, exact: true })).waitFor();
         await shown(poster.getByLabel("Minimum experience (years)", { exact: true })).fill("2");
         await shown(poster.getByLabel("Maximum experience (years)", { exact: true })).fill("5");
         // The pay is typed in full and previewed as the job will show it.
@@ -1501,8 +1583,10 @@ try {
           await shown(poster.getByText("Smoke Labs · Remote", { exact: true })).waitFor();
           // The facts: the pay in lakhs and its note, and the experience.
           for (const fact of ["₹18–25 LPA", "plus ESOPs", "2–5 years"]) await shown(poster.getByText(fact, { exact: true })).waitFor();
+          // Its poster has "typescript", but their own job compares nothing with it.
           const skills = await shown(poster.getByRole("list", { name: "Skills" })).getByRole("listitem").allInnerTexts();
-          if (skills.join(",") !== "Playwright,TypeScript") throw new Error(`the job's skills are ${skills.join(", ")}`);
+          if (skills.join(",") !== ["Playwright", "TypeScript", ...LONG_SKILLS].join(",")) throw new Error(`the job's skills are ${skills.join(", ")}`);
+          if (await poster.getByText(/^You have \d+ of \d+ skills?$|^Add your skills/).locator("visible=true").count()) throw new Error("a job's page compares its poster's skills with it");
           await shown(poster.getByRole("heading", { name: "Responsibilities", exact: true })).waitFor();
           await shown(poster.getByText("Fix what breaks", { exact: true })).waitFor();
           await shown(poster.getByRole("link", { name: "example.com/smoke-labs", exact: true })).waitFor();
@@ -1513,6 +1597,18 @@ try {
         await says(title);
         await shown(poster.getByRole("button", { name: "Edit", exact: true })).click();
         await poster.waitForURL(/\/jobs\/edit\/[0-9a-f-]{36}$/);
+        // Its saved seniority, the last chip of its row, is scrolled into view rather than left off the side of the screen.
+        const executive = seniority("Executive");
+        if ((await executive.getAttribute("aria-selected")) !== "true") throw new Error("the edit form doesn't show the job's seniority as chosen");
+        await shown(poster.getByRole("group", { name: "Seniority", exact: true })).evaluate((el) => el.scrollIntoView({ block: "center" }));
+        const width = poster.viewportSize().width;
+        let chip = null;
+        for (let i = 0; i < 30 && !(chip && chip.x >= 0 && chip.x + chip.width <= width); i++) {
+          if (i) await poster.waitForTimeout(100);
+          chip = await executive.boundingBox();
+        }
+        if (!(chip.x >= 0 && chip.x + chip.width <= width)) throw new Error(`the chosen seniority is drawn from ${Math.round(chip.x)} to ${Math.round(chip.x + chip.width)}px, off a ${width}px screen`);
+        await poster.screenshot({ path: `${SHOTS}/m13-job-edit-chosen-chip.png` });
         await shown(poster.getByLabel("Job title *", { exact: true })).fill(`${title} (remote)`);
         await shown(poster.getByRole("button", { name: "Save changes" })).click();
         await poster.waitForURL(jobPage);
@@ -1522,6 +1618,23 @@ try {
       return poster.url();
     };
     const analystPage = await postJob(analyst, { remote: true });
+    // Its card on the poster's list marks none of its skills, though they have "typescript", and its skills, too long for
+    // one line of a phone, shorten rather than wrap, so the card grows no taller.
+    await poster.goto(`${app}/jobs`);
+    const ownCard = shown(poster.getByRole("button", { name: new RegExp(`^${analyst} \\(remote\\)`) }));
+    await ownCard.waitFor();
+    const ownName = await ownCard.getAttribute("aria-label");
+    if (!ownName.includes(`Skills: Playwright, TypeScript, ${LONG_SKILLS[0]}, 1 more`) || ownName.includes("(you have this)")) throw new Error(`the poster's own card names its skills as: ${ownName}`);
+    const ownChips = ["Playwright", "TypeScript", LONG_SKILLS[0]].map((name) => ownCard.getByText(name, { exact: true }).locator("xpath=.."));
+    for (const chip of ownChips) if (await chip.locator("svg").count()) throw new Error("the poster's own card marks a skill as theirs");
+    const [ownRow, ownChip] = [await ownChips[0].locator("xpath=..").boundingBox(), await ownChips[0].boundingBox()];
+    if (ownRow.height > ownChip.height + 1) throw new Error(`the card's long skills take ${ownRow.height}px, more than one line of ${ownChip.height}px`);
+    // Each fits by shortening: the longest is cut off with an ellipsis rather than pushing the row past the card's edge.
+    const cut = await ownCard.getByText(LONG_SKILLS[0], { exact: true }).evaluate((text) => text.scrollWidth > text.clientWidth);
+    const spill = await ownChips[0].locator("xpath=..").evaluate((row) => row.scrollWidth > row.clientWidth);
+    if (!cut || spill) throw new Error(`the card's long skills ${spill ? "run past its edge" : "aren't shortened to fit"}`);
+    await ownCard.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await ownCard.screenshot({ path: `${SHOTS}/m13c-own-job-card-long-skills.png` });
     const engineerPage = await postJob(engineer);
     // The poster's own page waits for requests, which have to arrive here live.
     await shown(poster.getByText("Can refer", { exact: true })).waitFor();

@@ -30,7 +30,7 @@ export default function JobDetailScreen() {
 }
 
 function JobDetail({ jobId }: { jobId: string }) {
-  const { tenant } = useMembership();
+  const { tenant, membership } = useMembership();
   const slug = tenant.slug;
   const router = useRouter();
   const qc = useQueryClient();
@@ -89,6 +89,9 @@ function JobDetail({ jobId }: { jobId: string }) {
           }
           // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
           apply={<JobApplyArea job={j} now={now} />}
+          // Their skills come with the membership the app already holds, which saving their profile updates. withAnchor puts
+          // My profile under the form, which is where saving it goes back to.
+          viewer={j.isMine ? undefined : { skills: membership.skills, onAddSkills: () => router.push(`/t/${slug}/profile/edit?section=work`, { withAnchor: true }) }}
         />
         <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
           <MemberRow slug={slug} member={j.author} meta={`Posted ${formatDate(j.createdAt)}`} />

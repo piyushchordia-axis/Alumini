@@ -2,6 +2,7 @@ import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MemberCard } from "@/components/directory/MemberCard";
+import { IconDirectory } from "@/components/icons";
 import { Button, EmptyState, ErrorBox, Input, LoadMore, Loading, PageHeader, Select } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -178,7 +179,7 @@ export function DirectoryPage() {
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState title="No members match" description="Try removing a filter." />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconDirectory size={32} className="text-slate-400" />} title="No members match" description="Try removing a filter." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

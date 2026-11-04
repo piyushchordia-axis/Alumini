@@ -1,4 +1,4 @@
-import { normalizeSkills, skillKey, skillListSchema } from "@illuminize/shared";
+import { normalizeSkills, skillKey, skillListSchema, skillMatch, skillMatchText, skillsMatchedFirst } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("normalizeSkills", () => {
@@ -70,5 +70,59 @@ describe("skillListSchema", () => {
     expect(profileSkills.parse([])).toEqual([]);
     expect(profileSkills.safeParse("React").success).toBe(false);
     expect(profileSkills.safeParse([1, 2]).success).toBe(false);
+  });
+});
+
+describe("skillMatch", () => {
+  const job = ["Node.js", "TypeScript", "PostgreSQL", "AWS"];
+
+  it("matches regardless of case, spacing or full-width letters, giving the job's skills in its order and spelling", () => {
+    expect(skillMatch(job, ["  aws ", "typescript", "Ｎｏｄｅ.js"])).toEqual({ matched: ["Node.js", "TypeScript", "AWS"], count: 3, total: 4 });
+    expect(skillMatch(["Machine Learning"], ["machine   learning"])).toEqual({ matched: ["Machine Learning"], count: 1, total: 1 });
+  });
+
+  it("doesn't match a skill that only looks alike", () => {
+    expect(skillMatch(["C++", "Java"], ["C#", "JavaScript", "c"])).toEqual({ matched: [], count: 0, total: 2 });
+  });
+
+  it("counts a skill once, however often either list repeats it", () => {
+    expect(skillMatch(["SQL", "sql", "Excel", " SQL "], ["Sql", "SQL", "sql"])).toEqual({ matched: ["SQL"], count: 1, total: 2 });
+  });
+
+  it("matches nothing when either list is empty, and leaves blanks out of the total", () => {
+    expect(skillMatch(job, [])).toEqual({ matched: [], count: 0, total: 4 });
+    expect(skillMatch([], ["TypeScript"])).toEqual({ matched: [], count: 0, total: 0 });
+    expect(skillMatch([], [])).toEqual({ matched: [], count: 0, total: 0 });
+    expect(skillMatch(["", "  ", "Go"], ["", "go"])).toEqual({ matched: ["Go"], count: 1, total: 1 });
+  });
+
+  it("counts only the job's skills when the member lists more", () => {
+    const member = ["Go", "Kubernetes", "AWS", "Terraform", "TypeScript", "React", "Docker", "Python"];
+    expect(skillMatch(job, member)).toEqual({ matched: ["TypeScript", "AWS"], count: 2, total: 4 });
+  });
+
+  it("is said as how many of the job's skills the member has", () => {
+    expect(skillMatchText(skillMatch(job, ["aws", "typescript"]))).toBe("You have 2 of 4 skills");
+    expect(skillMatchText(skillMatch(job, ["Rust"]))).toBe("You have 0 of 4 skills");
+    expect(skillMatchText(skillMatch(["ROS2"], ["ros2"]))).toBe("You have 1 of 1 skill");
+  });
+});
+
+describe("skillsMatchedFirst", () => {
+  const job = ["Node.js", "TypeScript", "PostgreSQL", "AWS"];
+
+  it("puts the skills the member has first, each part in the job's order, so a card's first three show them", () => {
+    const { matched } = skillMatch(job, ["aws", "typescript"]);
+    expect(skillsMatchedFirst(job, matched)).toEqual([
+      { skill: "TypeScript", matched: true },
+      { skill: "AWS", matched: true },
+      { skill: "Node.js", matched: false },
+      { skill: "PostgreSQL", matched: false },
+    ]);
+  });
+
+  it("keeps the job's order when nothing matches", () => {
+    expect(skillsMatchedFirst(job, []).map((s) => s.skill)).toEqual(job);
+    expect(skillsMatchedFirst([], ["AWS"])).toEqual([]);
   });
 });

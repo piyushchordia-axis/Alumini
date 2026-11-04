@@ -337,6 +337,23 @@ export function IconClose(p: IconProps) {
     </Svg>
   );
 }
+export function IconLock(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </Svg>
+  );
+}
+/** Something that couldn't load or went wrong. */
+export function IconAlert(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5V13M12 16.5h.01" />
+    </Svg>
+  );
+}
 
 /* Job facts, contacts and company details. The mobile set draws each the same way. */
 export function IconMapPin(p: IconProps) {

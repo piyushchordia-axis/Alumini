@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
+import { IconBell, IconSettings } from "@/components/icons";
 import { Button, EmptyState, ListEmpty, Muted, StackScreen } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -30,7 +31,7 @@ export default function NotificationsScreen() {
           <Button title="Mark all read" variant="outline" onPress={() => readAll.mutate()} loading={readAll.isPending} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button title="⚙️ Settings" variant="ghost" onPress={() => router.push(`/t/${slug}/profile/notification-settings`)} />
+          <Button title="Settings" variant="ghost" icon={(color) => <IconSettings size={18} color={color} />} onPress={() => router.push(`/t/${slug}/profile/notification-settings`)} />
         </View>
       </View>
       <FlatList
@@ -41,7 +42,7 @@ export default function NotificationsScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon="🔔" title="You're all caught up" />
+            <EmptyState icon={<IconBell size={32} color={colors.faint} />} title="You're all caught up" />
           </ListEmpty>
         }
         renderItem={({ item: n }) => {
