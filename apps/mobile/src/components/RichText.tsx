@@ -13,11 +13,11 @@ function openLink(href: string) {
 
 /**
  * On the web export a link is a real anchor that the browser opens, from the keyboard too; react-native-web only makes an
- * anchor of a Text with `href`, which React Native's types don't know. A mail link opens in place.
+ * anchor of a Text or View with `href`, which React Native's types don't know. A mail link opens in place.
  */
-function linkProps(href: string): object {
+export function linkProps(href: string, rel: string = EXTERNAL_REL): object {
   if (Platform.OS !== "web") return { onPress: () => openLink(href) };
-  return { href, hrefAttrs: href.startsWith("mailto:") ? { rel: EXTERNAL_REL } : { target: "_blank", rel: EXTERNAL_REL } };
+  return { href, hrefAttrs: href.startsWith("mailto:") ? { rel } : { target: "_blank", rel } };
 }
 
 function Inlines({ nodes, linkColor }: { nodes: RichInline[]; linkColor: string }) {

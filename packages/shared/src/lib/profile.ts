@@ -72,6 +72,35 @@ export function profileStepOf(path: string, fields: readonly FieldPlacement[] = 
   return (PROFILE_SECTIONS.indexOf(profileSectionOf(path, fields)) + 1) as ProfileStep;
 }
 
+/** Inputs the profile forms leave out for some members. See hiddenProfileKeys. */
+export type HiddenProfileKey = "careerStartYear" | "degree" | "fieldOfStudy" | "linkedinUrl" | "websiteUrl" | "githubUrl" | "instagramUrl" | "xUrl" | "openTo";
+
+/**
+ * The inputs the profile forms don't show this member, judged from the form as it stands: the year they started working
+ * to a student, degree and field of study here at a school, and links and Open to to a current pupil. A form neither
+ * checks nor sends these (withoutHiddenProfileKeys), so a value the member can't see can't block a save; the API keeps
+ * what's stored for a key that isn't sent.
+ */
+export function hiddenProfileKeys(
+  tenant: { type: TenantType; timezone: string },
+  m: { professionType: string; batchYear: number; dateOfBirth: string | null },
+  now: Date = new Date(),
+): HiddenProfileKey[] {
+  const hidden: HiddenProfileKey[] = [];
+  if (m.professionType === "STUDENT") hidden.push("careerStartYear");
+  if (tenant.type === "SCHOOL") hidden.push("degree", "fieldOfStudy");
+  if (isCurrentPupil(tenant, m, now)) hidden.push("linkedinUrl", "websiteUrl", "githubUrl", "instagramUrl", "xUrl", "openTo");
+  return hidden;
+}
+
+/** A copy of a form's values without the `hidden` keys, each of which the profile schema treats as optional. */
+export function withoutHiddenProfileKeys<T extends Partial<Record<HiddenProfileKey, unknown>>>(values: T, hidden: readonly HiddenProfileKey[]): T {
+  if (hidden.length === 0) return values;
+  const out = { ...values };
+  for (const key of hidden) delete out[key];
+  return out;
+}
+
 export type SocialLinkKind = "linkedin" | "github" | "instagram" | "x" | "website";
 
 const HANDLES: Record<Exclude<SocialLinkKind, "website">, { pattern: RegExp; url: (handle: string) => string }> = {
@@ -106,6 +135,28 @@ export function socialUrlFromInput(kind: SocialLinkKind, input: string | null | 
 export function yearsOfExperience(careerStartYear: number | null | undefined, now: Date = new Date()): number | null {
   if (careerStartYear == null) return null;
   return Math.max(0, now.getFullYear() - careerStartYear);
+}
+
+/**
+ * yearsOfExperience as both apps say it: "8 years of experience", "1 year of experience", and "Started working in 2026"
+ * in the year they started, when "0 years" would undersell it. Null when they haven't said.
+ */
+export function yearsOfExperienceLabel(careerStartYear: number | null | undefined, now: Date = new Date()): string | null {
+  const years = yearsOfExperience(careerStartYear, now);
+  if (years === null) return null;
+  if (years === 0) return `Started working in ${careerStartYear}`;
+  return `${years} ${years === 1 ? "year" : "years"} of experience`;
+}
+
+/**
+ * A past role's or a course's years as both apps show them: "2015–2019", "2019" when it began and ended that year,
+ * "From 2015" or "Until 2019" with one of them, and "" with neither.
+ */
+export function profileYearsLabel(startYear: number | null | undefined, endYear: number | null | undefined): string {
+  if (startYear != null && endYear != null) return startYear === endYear ? String(startYear) : `${startYear}–${endYear}`;
+  if (startYear != null) return `From ${startYear}`;
+  if (endYear != null) return `Until ${endYear}`;
+  return "";
 }
 
 interface Dated {

@@ -164,6 +164,36 @@ export function IconCamera(p: IconProps) {
     </Svg>
   );
 }
+export function IconLink(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </Svg>
+  );
+}
+export function IconCode(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" />
+    </Svg>
+  );
+}
+export function IconAt(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+    </Svg>
+  );
+}
+export function IconChevronDown(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}
 export function IconPoll(p: IconProps) {
   return (
     <Svg {...p}>
@@ -304,6 +334,23 @@ export function IconClose(p: IconProps) {
   return (
     <Svg {...p}>
       <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}
+
+export function IconGraduationCap(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2 9l10-5 10 5-10 5z" />
+      <path d="M6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6" />
+    </Svg>
+  );
+}
+export function IconGlobe(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
     </Svg>
   );
 }

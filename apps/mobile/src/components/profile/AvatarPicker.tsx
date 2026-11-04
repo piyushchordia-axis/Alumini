@@ -1,21 +1,12 @@
-import { useEffect, useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import { IconCamera } from "@/components/icons";
-import { Avatar, Button, FieldError, Row } from "@/components/ui";
+import { Avatar, Button, FieldError, Row, focusOn, type Focusable } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 import { colors, elevation, radius, spacing } from "@/theme";
 
 const SIZE = 96;
 const HINT = "Members recognise faces first. A JPEG, PNG or WebP up to 5 MB.";
-
-type Focusable = ComponentRef<typeof View>;
-
-/** Moves screen-reader focus (and, in the browser build, keyboard focus) to `target`. */
-function focusOn(target: Focusable | null) {
-  if (!target) return;
-  if (Platform.OS === "web") (target as unknown as { focus?: () => void }).focus?.();
-  else AccessibilityInfo.sendAccessibilityEvent(target, "focus");
-}
 
 /**
  * The member's profile photo: a round preview (initials until there is one), and buttons to add, change or remove it, as

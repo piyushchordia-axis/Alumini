@@ -1,9 +1,8 @@
-import { COUNTRY_NAME_BY_CODE, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
-import { RichText } from "@/components/common/RichText";
-import { Avatar, Badge, Card, ErrorBox, Loading } from "@/components/ui";
+import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { Badge, Card, ErrorBox, Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -28,43 +27,19 @@ export function MemberProfilePage() {
         ← Directory
       </Link>
       <Card className="p-6">
-        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-          <Avatar name={m.fullName} src={m.avatarUrl} size="xl" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <h1 className="text-2xl font-semibold text-slate-900">{m.fullName}</h1>
-              {m.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}
-              {m.isOpenToWork && <Badge tone="success">Open to work</Badge>}
+        <ProfileSummary profile={m} nameExtras={m.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}>
+          {isSelf && (
+            <Link to={`/t/${slug}/app/profile`} className="mt-2 inline-block text-sm text-primary underline">
+              Edit my profile
+            </Link>
+          )}
+          {chatOn && m.canMessage && (
+            <div className="mt-3">
+              <MessageMemberButton slug={slug} member={m} />
             </div>
-            <p className="text-slate-600">
-              {m.designation ? `${m.designation}` : PROFESSION_TYPE_LABELS[m.professionType]}
-              {m.companyName ? ` at ${m.companyName}` : ""}
-            </p>
-            <p className="text-sm text-slate-500">
-              Batch of {m.batchYear}
-              {m.city ? ` · ${m.city}` : ""}
-              {m.country ? `, ${COUNTRY_NAME_BY_CODE[m.country] ?? m.country}` : ""}
-            </p>
-            {isSelf && (
-              <Link to={`/t/${slug}/app/profile`} className="mt-2 inline-block text-sm text-primary underline">
-                Edit my profile
-              </Link>
-            )}
-            {chatOn && m.canMessage && (
-              <div className="mt-3">
-                <MessageMemberButton slug={slug} member={m} />
-              </div>
-            )}
-          </div>
-        </div>
-        <RichText text={m.bio} className="mt-5" />
-        {m.interests.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {m.interests.map((i) => (
-              <Badge key={i}>{i}</Badge>
-            ))}
-          </div>
-        )}
+          )}
+        </ProfileSummary>
+        <ProfileDetails profile={m} tenant={tenant} className="mt-6 border-t border-slate-100 pt-5" />
         <dl className="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2">
           {m.phone && (
             <div>
@@ -75,16 +50,6 @@ export function MemberProfilePage() {
                 </a>{" "}
                 <a href={`https://wa.me/${m.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-emerald-600">
                   WhatsApp
-                </a>
-              </dd>
-            </div>
-          )}
-          {m.linkedinUrl && (
-            <div>
-              <dt className="text-slate-500">LinkedIn</dt>
-              <dd>
-                <a href={m.linkedinUrl} target="_blank" rel="noreferrer" className="text-primary underline">
-                  View profile ↗
                 </a>
               </dd>
             </div>

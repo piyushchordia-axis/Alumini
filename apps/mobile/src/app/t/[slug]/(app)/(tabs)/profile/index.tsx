@@ -1,17 +1,19 @@
-import { countryName, PROFESSION_TYPE_LABELS } from "@illuminize/shared";
+import { PROFILE_SECTIONS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
-import { RichText } from "@/components/RichText";
+import { Alert, Pressable, Text } from "react-native";
+import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { PROFILE_SECTION_TITLES } from "@/components/profile/useProfileDraft";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { useDeleteAccount, useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
-import { colors, useTheme } from "@/theme";
+import { colors, radius, spacing, useTheme } from "@/theme";
 
 export default function MyProfileScreen() {
   const { tenant, membership, isTenantAdmin } = useMembership();
@@ -25,11 +27,16 @@ export default function MyProfileScreen() {
   const signOut = useSignOut();
   const deleteAccount = useDeleteAccount();
   const [deleting, setDeleting] = useState(false);
-  // The institution list can change elsewhere (approved, joined on the web), so refresh it whenever this screen shows.
+  // Mentor and Open to work aren't on the membership: they come with the profile other members open.
+  const asOthersSeeIt = useQuery({ queryKey: qk.member(slug, membership.id), queryFn: () => api.directory.profile(slug, membership.id), enabled: tenant.settings.features.directory });
+  const summary = { ...membership, isMentor: asOthersSeeIt.data?.isMentor, isOpenToWork: asOthersSeeIt.data?.isOpenToWork };
+  // The institution list can change elsewhere (approved, joined on the web), and so can being a mentor or looking for
+  // work (below), so refresh them whenever this screen shows.
   useFocusEffect(
     useCallback(() => {
       void qc.invalidateQueries({ queryKey: qk.me });
-    }, [qc]),
+      void qc.invalidateQueries({ queryKey: qk.member(slug, membership.id) });
+    }, [qc, slug, membership.id]),
   );
   const confirmDelete = () =>
     Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. Messages you sent stay in other people's chats and groups, shown as from a Deleted member, and groups you own pass to the member who has been in them longest. It cannot be undone.", [
@@ -51,28 +58,27 @@ export default function MyProfileScreen() {
     ]);
   return (
     <Screen title="My profile">
-      <Card>
-        <Row gap={12}>
-          <Avatar name={membership.fullName} src={membership.avatarUrl} size={64} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>{membership.fullName}</Text>
-            <Muted size={13}>
-              {membership.designation ?? PROFESSION_TYPE_LABELS[membership.professionType]}
-              {membership.companyName ? ` at ${membership.companyName}` : ""}
-            </Muted>
-            <Muted>
-              Batch of {membership.batchYear}
-              {membership.city ? ` · ${membership.city}` : ""}
-              {membership.country ? `, ${countryName(membership.country)}` : ""}
-            </Muted>
-          </View>
-        </Row>
-        <RichText text={membership.bio} style={{ fontSize: 14, lineHeight: 20, color: "#334155" }} />
-        <Row>
-          {membership.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />}
-          <Muted>{user?.phone}</Muted>
-        </Row>
+      {/* What's saved, laid out as on the member's own page. A current pupil sees their links here; nobody else does. */}
+      <Card style={{ gap: spacing.md }}>
+        <ProfileSummary profile={summary} nameExtras={membership.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />}>
+          <Muted>Signed in as {user?.phone}</Muted>
+        </ProfileSummary>
         <Button title="Edit profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />
+        <Row gap={6}>
+          <Muted size={13}>Or edit</Muted>
+          {PROFILE_SECTIONS.map((s) => (
+            <Pressable
+              key={s}
+              onPress={() => router.push(`/t/${slug}/profile/edit?section=${s}`)}
+              role="link"
+              accessibilityLabel={`Edit ${PROFILE_SECTION_TITLES[s]}`}
+              style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 14, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.bg : colors.card })}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "500", color: "#334155" }}>{PROFILE_SECTION_TITLES[s]}</Text>
+            </Pressable>
+          ))}
+        </Row>
+        <ProfileDetails profile={membership} tenant={tenant} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, marginTop: spacing.xs }} />
       </Card>
       <Card>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" hitSlop={6}>

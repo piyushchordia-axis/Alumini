@@ -163,6 +163,64 @@ try {
       return [img.naturalWidth, img.naturalHeight, img.src];
     });
     if (width !== 512 || height !== 512 || !src.endsWith(".jpg")) throw new Error(`the saved photo is ${width}×${height} at ${src}, not a 512-pixel square JPEG`);
+  });
+
+  await step("edit profile in sections: a headline, a skill and a past role, saved together, show on the profile", async () => {
+    const shown = (locator) => locator.locator("visible=true").last();
+    await page.goto(BASE + "/t/demo-university/profile");
+    await shown(page.getByRole("button", { name: "Edit profile" })).click();
+    await page.waitForURL("**/t/demo-university/profile/edit");
+    for (const name of ["Basics", "Work", "About you"]) await shown(page.getByRole("heading", { name, exact: true })).waitFor();
+    const headline = `Keeps the mobile smoke ${unique} green`;
+    await shown(page.getByLabel("Headline", { exact: true })).fill(headline);
+    // Skills are chips: Return adds one.
+    const skills = shown(page.getByLabel("Skills", { exact: true }));
+    await skills.fill("React Native");
+    await skills.press("Enter");
+    await shown(page.getByRole("button", { name: "Remove React Native", exact: true })).waitFor();
+    // A past role is checked as it's folded away, its error on the input it's about.
+    await shown(page.getByRole("button", { name: "Add a past role", exact: true })).click();
+    const role = shown(page.getByRole("group", { name: "Past role 1", exact: true }));
+    await role.getByLabel("Job title *", { exact: true }).fill("QA engineer");
+    await role.getByLabel("Company *", { exact: true }).fill("Flaky Labs");
+    await role.getByLabel("Start year", { exact: true }).fill("2012");
+    await role.getByLabel("End year", { exact: true }).fill("2010");
+    await role.getByRole("button", { name: "Done with past role 1", exact: true }).click();
+    await role.getByText("Can't be before the start year", { exact: true }).waitFor();
+    await role.getByLabel("End year", { exact: true }).fill("2016");
+    await role.getByRole("button", { name: "Done with past role 1", exact: true }).click();
+    await shown(page.getByRole("button", { name: "Edit QA engineer at Flaky Labs", exact: true })).waitFor();
+    await shot("m04g-profile-edit");
+    // A problem the server finds inside the list ("experiences.0.endYear") goes on that row's input too, by its full
+    // path, opening the row, and the note by the button says which section to look in.
+    const me = "**/api/v1/t/demo-university/memberships/me";
+    const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "experiences.0.endYear", message: "The server can't take this year" }] } };
+    await page.route(me, (route) =>
+      route.request().method() === "PATCH"
+        ? route.fulfill({ status: 400, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(refusal) })
+        : route.fallback(),
+    );
+    await tap("Save profile");
+    await role.getByText("The server can't take this year", { exact: true }).waitFor();
+    await shown(page.getByText("Check the details marked in Work.", { exact: true })).waitFor();
+    await page.unroute(me);
+    await tap("Save profile");
+    await page.waitForURL("**/t/demo-university/profile");
+    for (const text of [headline, "React Native", "QA engineer", "Flaky Labs", "2012–2016"]) await shown(page.getByText(text, { exact: true })).waitFor();
+    await shot("m04h-profile-details");
+
+    // A link to a section opens the form there.
+    await shown(page.getByRole("link", { name: "Edit About you", exact: true })).click();
+    await page.waitForURL("**/t/demo-university/profile/edit?section=about");
+    const about = shown(page.getByRole("heading", { name: "About you", exact: true }));
+    await about.waitFor();
+    let top = -1;
+    for (let i = 0; i < 30 && !(top > 0 && top < 250); i++) {
+      if (i) await page.waitForTimeout(100);
+      top = await about.evaluate((el) => el.getBoundingClientRect().top);
+    }
+    if (!(top > 0 && top < 250)) throw new Error(`?section=about left "About you" ${Math.round(top)}px down the screen`);
+    await shot("m04i-profile-edit-about");
     // The next step starts on the feed.
     await page.goto(BASE + "/t/demo-university/feed");
     await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();
@@ -177,7 +235,7 @@ try {
       ["Feed", "feed", page.getByRole("button", { name: "New post" })],
       ["Messages", "messages", page.getByText("No conversations yet", { exact: true })],
       ["Jobs", "jobs", page.getByText("Backend Engineer (Node.js)")],
-      ["Directory", "directory", page.getByPlaceholder("Name, company, role")],
+      ["Directory", "directory", page.getByPlaceholder("Name, company, role or skill")],
       ["Events", "events", page.getByText("Mumbai alumni coffee meetup")],
       ["Groups", "groups", page.getByRole("link", { name: /^London & UK alumni/ })],
       ["Mentors", "mentors", page.locator('[role="tab"][aria-selected="true"]').getByText("Find mentors", { exact: true })],
@@ -262,20 +320,48 @@ try {
     void before;
   });
 
-  await step("directory search and member profile", async () => {
+  await step("directory search, its new filters and a member's full profile", async () => {
     await openSection("Directory");
     await page.getByRole("button", { name: /^Filters/ }).locator("visible=true").first().click();
     await page.getByText("Company", { exact: true }).locator("visible=true").first().waitFor();
     await page.getByText("Country", { exact: true }).locator("visible=true").first().waitFor();
-    await page.getByPlaceholder("Name, company, role").fill("Priya");
+    const search = page.getByPlaceholder("Name, company, role or skill", { exact: true }).locator("visible=true").first();
+    // A seeded skill finds the member who lists it, though her name, company, role and headline don't say it.
+    await search.fill("Distributed systems");
+    const sneha = page.getByRole("button", { name: /^Sneha Kulkarni, / }).locator("visible=true").first();
+    await sneha.waitFor();
+    // What she's open to is on her card, short, and in full in the card's name.
+    await sneha.getByText("Investing", { exact: true }).waitFor();
+    if (!(await sneha.getAttribute("aria-label")).includes("Open to investing")) throw new Error(`Sneha's card is named "${await sneha.getAttribute("aria-label")}", without what she's open to`);
+    // The Open to filter keeps her, and leaves out Priya, who is open to hiring.
+    await page.getByRole("button", { name: "Investing", exact: true }).locator("visible=true").first().click();
+    await search.fill("Sneha");
+    await sneha.waitFor();
+    await search.fill("Priya");
+    await page.getByText("No members match", { exact: true }).locator("visible=true").first().waitFor();
+    await page.getByRole("button", { name: "Clear filters", exact: true }).locator("visible=true").first().click();
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
-    // A seeded mentor: her card says so, to the eye and in its name.
+    // A seeded mentor: her card says so, to the eye and in its name, with her headline in place of her role.
     const card = page.getByRole("button", { name: /^Priya Nair, .*Mentor/ }).locator("visible=true").first();
     await card.getByText("Mentor", { exact: true }).waitFor();
+    await card.getByText("Product manager at Google, working on consumer apps", { exact: true }).waitFor();
+    await shot("m07-directory-filters");
     // inactive tab stacks stay mounted on web and overlap; dispatch the click straight to the card
     await hit.dispatchEvent("click");
     await page.getByText("Member since").waitFor();
+    // Her profile: the headline, skills, her current role then her past one, studies here and elsewhere, and a LinkedIn
+    // link that opens in a new tab and passes nothing on. The screen on top is the last match.
+    const onTop = (text) => page.getByText(text, { exact: true }).locator("visible=true").last();
+    for (const text of ["Product manager at Google, working on consumer apps", "User research", "Product Manager", "Software engineer", "London Business School", "B.Tech, Electronics"]) await onTop(text).waitFor();
+    const roles = await onTop("Experience")
+      .locator("xpath=../..")
+      .locator('[role="listitem"]')
+      .evaluateAll((items) => items.map((item) => item.firstElementChild?.nextElementSibling?.textContent));
+    if (roles.join() !== "Product Manager,Software engineer") throw new Error(`her roles read ${roles.join(", ")}, expected her current role, then her past one`);
+    const linkedin = page.getByRole("link", { name: "LinkedIn", exact: true }).locator("visible=true").last();
+    if ((await linkedin.getAttribute("href")) !== "https://www.linkedin.com/in/priya-nair-product") throw new Error("the LinkedIn link goes somewhere else");
+    if ((await linkedin.getAttribute("target")) !== "_blank" || !/\bnoopener\b.*\bnoreferrer\b.*\bnofollow\b/.test((await linkedin.getAttribute("rel")) ?? "")) throw new Error("a member's link should open in a new tab with noopener, noreferrer and nofollow");
     await shot("m07-member");
   });
 
@@ -541,7 +627,7 @@ try {
 
     // A asks from B's profile. The first message goes as a request, and nothing more can follow it until B answers.
     await pageA.goto(`${app}/directory`);
-    await shown(pageA.getByPlaceholder("Name, company, role")).fill("Vikram");
+    await shown(pageA.getByPlaceholder("Name, company, role or skill")).fill("Vikram");
     const hit = shown(pageA.getByText("Vikram Desai"));
     await hit.waitFor();
     await hit.dispatchEvent("click");
@@ -946,6 +1032,12 @@ try {
     await shown(mentor.getByRole("heading", { name: "You're listed as a mentor" })).waitFor();
     await shown(mentor.getByText(/^You'll leave the Mentors list, and requests waiting for you will be declined\./)).waitFor();
     await shown(mentor.getByRole("button", { name: "Stop mentoring" })).waitFor();
+    // Their own profile says so now, as other members' view of it does.
+    await mentor.goto(`${app}/profile`);
+    await shown(mentor.getByRole("heading", { name: mentorName, exact: true })).waitFor();
+    await shown(mentor.getByText("Mentor", { exact: true })).waitFor();
+    await mentor.goto(`${app}/mentors`);
+    await tab(mentor, "Find mentors", true).waitFor();
 
     // The mentor waits on Requests, so the request has to arrive there live.
     await tab(mentor, "Requests").click();
@@ -1157,7 +1249,7 @@ try {
 
     // The directory marks a mentor's card.
     await mentee.goto(`${app}/directory`);
-    await shown(mentee.getByPlaceholder("Name, company, role")).fill(mentorName);
+    await shown(mentee.getByPlaceholder("Name, company, role or skill")).fill(mentorName);
     await shown(mentee.getByRole("button", { name: new RegExp(`^${mentorName}, .*Mentor`) })).getByText("Mentor", { exact: true }).waitFor();
     await mentor.close();
     await mentee.close();

@@ -1,9 +1,12 @@
+import { PROFILE_SECTIONS, type ProfileSection } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EmailSettings } from "@/components/profile/EmailSettings";
-import { ProfileForm } from "@/components/profile/ProfileForm";
-import { Avatar, Button, Card, Loading, PageHeader } from "@/components/ui";
+import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { PROFILE_SECTION_TITLES, ProfileForm } from "@/components/profile/ProfileForm";
+import { Avatar, Badge, Button, Card, Loading, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
 import { api } from "@/lib/api";
@@ -20,35 +23,70 @@ export function MyProfilePage() {
   const refreshToken = useAuthStore((s) => s.refreshToken);
   const others = memberships.filter((m) => m.tenant.slug !== tenant.slug);
   const fields = useProfileFields(tenant.slug);
+  const { hash } = useLocation();
+  // Mentor and Open to work aren't on the membership: they come with the profile other members open, fetched afresh
+  // each visit, so offering to mentor or looking for work elsewhere shows on return.
+  const asOthersSeeIt = useQuery({
+    queryKey: qk.member(tenant.slug, membership.id),
+    queryFn: () => api.directory.profile(tenant.slug, membership.id),
+    enabled: tenant.settings.features.directory,
+    staleTime: 0,
+  });
+  const summary = { ...membership, isMentor: asOthersSeeIt.data?.isMentor, isOpenToWork: asOthersSeeIt.data?.isOpenToWork };
+  const formReady = !fields.isLoading;
+  // A link to a section (#work, from the profile checklist) lands on it once the form is there to scroll to.
+  useEffect(() => {
+    const section = hash.slice(1);
+    if (formReady && (PROFILE_SECTIONS as readonly string[]).includes(section)) document.getElementById(section)?.scrollIntoView({ block: "start" });
+  }, [formReady, hash]);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="My profile" subtitle={`Signed in as ${user?.phone ?? ""}`} />
+      {/* What's saved, laid out as on the member's own page. A current pupil sees their links here; nobody else does. */}
       <Card className="p-5">
-        {/* The form starts once the institution's questions are in, so nothing typed or uploaded is lost to a remount. */}
-        {fields.isLoading ? (
-          <Loading />
-        ) : (
-          <ProfileForm
-            tenant={tenant}
-            initial={membership}
-            customFields={fields.data ?? []}
-            submitLabel="Save profile"
-            onSubmit={async (values) => {
-              try {
-                const updated = await api.membership.updateMe(tenant.slug, values);
-                qc.setQueryData(qk.membership(tenant.slug), updated);
-                void qc.invalidateQueries({ queryKey: qk.me });
-                void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
-                void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
-                toast.success("Profile saved");
-              } catch (err) {
-                toast.error(errorMessage(err));
-                throw err;
-              }
-            }}
-          />
-        )}
+        <ProfileSummary profile={summary} nameAs="h2" nameExtras={membership.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>} />
+        <ProfileDetails profile={membership} tenant={tenant} headingLevel={3} className="mt-5 border-t border-slate-100 pt-5" />
       </Card>
+      <nav aria-label="Profile sections" className="flex flex-wrap items-center gap-2 pt-2 text-sm">
+        <span className="text-slate-500">Edit</span>
+        {PROFILE_SECTIONS.map((s: ProfileSection) => (
+          <a
+            key={s}
+            href={`#${s}`}
+            aria-label={`Edit ${PROFILE_SECTION_TITLES[s]}`}
+            className="inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            {PROFILE_SECTION_TITLES[s]}
+          </a>
+        ))}
+      </nav>
+      {/* The form starts once the institution's questions are in, so nothing typed or uploaded is lost to a remount. */}
+      {formReady ? (
+        <ProfileForm
+          tenant={tenant}
+          initial={membership}
+          customFields={fields.data ?? []}
+          submitLabel="Save profile"
+          onSubmit={async (values) => {
+            try {
+              const updated = await api.membership.updateMe(tenant.slug, values);
+              qc.setQueryData(qk.membership(tenant.slug), updated);
+              void qc.invalidateQueries({ queryKey: qk.me });
+              void qc.invalidateQueries({ queryKey: ["directory", tenant.slug] });
+              void qc.invalidateQueries({ queryKey: qk.member(tenant.slug, updated.id) });
+              toast.success("Profile saved");
+              return updated;
+            } catch (err) {
+              toast.error(errorMessage(err));
+              throw err;
+            }
+          }}
+        />
+      ) : (
+        <Card className="p-5">
+          <Loading />
+        </Card>
+      )}
       <Card className="p-5">
         <EmailSettings />
       </Card>

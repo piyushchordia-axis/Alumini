@@ -9,17 +9,36 @@ import { colors, radius, spacing, useTheme } from "@/theme";
 /**
  * Standard screen container. Pass `topInset` on screens without a navigation header so content clears the status bar
  * and notch. Pass `title` on pushed stack screens (profile, settings) to draw an in-tree back bar instead of a native
- * header that can float over content. The content moves up with the keyboard on iOS (Android resizes the window itself).
+ * header that can float over content, and `actions` for buttons at its end. The content moves up with the keyboard on
+ * iOS (Android resizes the window itself). `scrollRef` reaches the scroll view, to bring part of a long form into view.
  */
-export function Screen({ children, scroll = true, padded = true, topInset = false, title, style }: { children: ReactNode; scroll?: boolean; padded?: boolean; topInset?: boolean; title?: string; style?: ViewStyle }) {
+export function Screen({
+  children,
+  scroll = true,
+  padded = true,
+  topInset = false,
+  title,
+  actions,
+  scrollRef,
+  style,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  padded?: boolean;
+  topInset?: boolean;
+  title?: string;
+  actions?: ReactNode;
+  scrollRef?: Ref<ScrollViewInstance>;
+  style?: ViewStyle;
+}) {
   const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={[{ flex: scroll ? undefined : 1 }, style]}>{children}</View>;
   const edges: Edge[] = topInset && title == null ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
   return (
     <SafeAreaView style={styles.screen} edges={edges}>
-      {title != null && <StackHeader title={title} />}
+      {title != null && <StackHeader title={title} actions={actions} />}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {scroll ? (
-          <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
+          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
             {content}
           </ScrollView>
         ) : (
@@ -87,11 +106,18 @@ export function Button({
   );
 }
 
-export function Input({ label, error, hint, style, ...rest }: TextInputProps & { label?: string; error?: string; hint?: string }) {
+/** `ref` reaches the text box, to focus it. */
+export function Input({ label, error, hint, style, ref, ...rest }: TextInputProps & { label?: string; error?: string; hint?: string; ref?: Ref<ComponentRef<typeof TextInput>> }) {
   return (
     <View style={{ gap: 4 }}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <TextInput placeholderTextColor={colors.faint} accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder} style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, style]} {...rest} />
+      <TextInput
+        ref={ref}
+        placeholderTextColor={colors.faint}
+        accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
+        style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, style]}
+        {...rest}
+      />
       {error ? <Text style={styles.error}>{error}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
@@ -134,6 +160,22 @@ export function ChipSelect<T extends string>({
  * isn't valid on role="button" in a browser, so the web build also needs aria-pressed. React Native's types omit it.
  */
 export const toggleState = (on: boolean) => ({ "aria-selected": on, "aria-pressed": on }) as { "aria-selected": boolean };
+
+/**
+ * A heading at `level`. The web build makes it an <h2>, <h3> and so on from aria-level, which React Native's types omit;
+ * phones have one heading role and no levels.
+ */
+export const headingRole = (level: 2 | 3 | 4) => ({ role: "heading", "aria-level": level }) as { role: "heading" };
+
+/** Something focus can be moved to: a view or pressable, such as a Button through its `ref`. */
+export type Focusable = ComponentRef<typeof View>;
+
+/** Moves screen-reader focus (and, in the browser build, keyboard focus) to `target`. */
+export function focusOn(target: Focusable | null | undefined) {
+  if (!target) return;
+  if (Platform.OS === "web") (target as unknown as { focus?: () => void }).focus?.();
+  else AccessibilityInfo.sendAccessibilityEvent(target, "focus");
+}
 
 /** `tall` makes it a full 44-point target, for a choice that matters, such as a report's reason. */
 export function Chip({ label, active, onPress, color, tall = false }: { label: string; active?: boolean; onPress?: () => void; color?: string; tall?: boolean }) {

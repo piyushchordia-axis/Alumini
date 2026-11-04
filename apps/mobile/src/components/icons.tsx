@@ -102,6 +102,36 @@ export function IconCamera({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconLink({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" {...stroke(color)} />
+      <Path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconCode({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconAt({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="4" {...stroke(color)} />
+      <Path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconChevronDown({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m6 9 6 6 6-6" {...stroke(color)} />
+    </Base>
+  );
+}
 export function IconMore({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -192,6 +222,30 @@ export function IconSpark({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
       <Path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5z" {...stroke(color)} />
+    </Base>
+  );
+}
+
+export function IconGraduationCap({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M2 9l10-5 10 5-10 5z" {...stroke(color)} />
+      <Path d="M6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconGlobe({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="9" {...stroke(color)} />
+      <Path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconClose({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M6 6l12 12M18 6 6 18" {...stroke(color)} />
     </Base>
   );
 }

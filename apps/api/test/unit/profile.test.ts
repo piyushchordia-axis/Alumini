@@ -1,6 +1,7 @@
 import {
   PROFILE_NUDGE_SNOOZE_DAYS,
   PROFILE_STRENGTH_HIDE_AT,
+  hiddenProfileKeys,
   hostUrlSchema,
   linkUrlSchema,
   membershipProfileSchema,
@@ -8,11 +9,14 @@ import {
   profileSectionOf,
   profileStepOf,
   profileStrength,
+  profileYearsLabel,
   showProfileNudge,
   socialUrlFromInput,
   sortEducation,
   sortExperiences,
+  withoutHiddenProfileKeys,
   yearsOfExperience,
+  yearsOfExperienceLabel,
   type ProfileStrengthInput,
 } from "@illuminize/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -172,6 +176,40 @@ describe("profileStepOf", () => {
   });
 });
 
+describe("hiddenProfileKeys", () => {
+  const LINKS_AND_OPEN_TO = ["linkedinUrl", "websiteUrl", "githubUrl", "instagramUrl", "xUrl", "openTo"];
+  const alum = { professionType: "EMPLOYED", batchYear: 2012, dateOfBirth: null };
+
+  it("hides nothing from an alum outside a school", () => {
+    expect(hiddenProfileKeys(college, alum, NOW)).toEqual([]);
+  });
+
+  it("hides the year they started working from a student, as the forms do", () => {
+    expect(hiddenProfileKeys(college, { ...alum, professionType: "STUDENT" }, NOW)).toEqual(["careerStartYear"]);
+  });
+
+  it("hides degree and field of study at a school, and links and Open to from a current pupil there", () => {
+    expect(hiddenProfileKeys(school, alum, NOW)).toEqual(["degree", "fieldOfStudy"]);
+    expect(hiddenProfileKeys(school, { ...alum, batchYear: 2028 }, NOW)).toEqual(["degree", "fieldOfStudy", ...LINKS_AND_OPEN_TO]);
+    // An adult in this year's batch has left school; a 15-year-old in an old batch hasn't.
+    expect(hiddenProfileKeys(school, { ...alum, batchYear: 2026, dateOfBirth: "2000-01-01" }, NOW)).toEqual(["degree", "fieldOfStudy"]);
+    expect(hiddenProfileKeys(school, { ...alum, batchYear: 2020, dateOfBirth: "2011-01-01" }, NOW)).toEqual(["degree", "fieldOfStudy", ...LINKS_AND_OPEN_TO]);
+  });
+
+  it("leaves out only those keys, so the schema neither checks nor sends what the member can't see", () => {
+    const form = { fullName: "Naina Sen", batchYear: 2028, dateOfBirth: null, professionType: "STUDENT" as const, careerStartYear: 20, githubUrl: "my github", openTo: ["HIRING" as const], bio: "Hi" };
+    const hidden = hiddenProfileKeys(school, form, NOW);
+    const sent = withoutHiddenProfileKeys(form, hidden);
+    expect(sent).toEqual({ fullName: "Naina Sen", batchYear: 2028, dateOfBirth: null, professionType: "STUDENT", bio: "Hi" });
+    expect(form.githubUrl).toBe("my github"); // the form's own values are left alone
+    // Unstripped, the hidden year and link would block the save with errors no input shows.
+    expect(membershipProfileSchema.safeParse(form).success).toBe(false);
+    const parsed = membershipProfileSchema.parse(sent);
+    for (const key of hidden) expect(parsed).not.toHaveProperty(key);
+    expect(withoutHiddenProfileKeys(form, [])).toBe(form);
+  });
+});
+
 describe("sortExperiences and sortEducation", () => {
   const role = (company: string, startYear: number | null, endYear: number | null) => ({ company, title: "Engineer", startYear, endYear });
 
@@ -237,6 +275,23 @@ describe("yearsOfExperience", () => {
     expect(yearsOfExperience(2015, NOW)).toBe(11);
     expect(yearsOfExperience(2026, NOW)).toBe(0);
     expect(yearsOfExperience(2030, NOW)).toBe(0);
+  });
+
+  it("is said in words, with the first year named rather than called zero years", () => {
+    expect(yearsOfExperienceLabel(null, NOW)).toBeNull();
+    expect(yearsOfExperienceLabel(2015, NOW)).toBe("11 years of experience");
+    expect(yearsOfExperienceLabel(2025, NOW)).toBe("1 year of experience");
+    expect(yearsOfExperienceLabel(2026, NOW)).toBe("Started working in 2026");
+  });
+});
+
+describe("profileYearsLabel", () => {
+  it("shows a range, a single year, or the one end that's known", () => {
+    expect(profileYearsLabel(2015, 2019)).toBe("2015–2019");
+    expect(profileYearsLabel(2019, 2019)).toBe("2019");
+    expect(profileYearsLabel(2015, null)).toBe("From 2015");
+    expect(profileYearsLabel(undefined, 2019)).toBe("Until 2019");
+    expect(profileYearsLabel(null, null)).toBe("");
   });
 });
 

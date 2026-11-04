@@ -87,23 +87,60 @@ export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
 /**
  * A label + control + error/hint stack. Wrap a single input (the default) so clicking the label focuses it. Pass
  * `group` when the children are several controls or buttons (colour pickers, image uploaders): a wrapping <label>
- * would forward clicks on the caption to the first button inside.
+ * would forward clicks on the caption to the first button inside. Pass `htmlFor` for one input with buttons beside it
+ * (a chip input): the caption labels that input alone, and the error or hint has the id `${htmlFor}-desc` for its
+ * aria-describedby.
  */
-export function FormField({ label, error, hint, children, required, group }: { label: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; required?: boolean; group?: boolean }) {
+export function FormField({
+  label,
+  error,
+  hint,
+  children,
+  required,
+  group,
+  htmlFor,
+}: {
+  label: ReactNode;
+  error?: string;
+  hint?: ReactNode;
+  children: ReactNode;
+  required?: boolean;
+  group?: boolean;
+  htmlFor?: string;
+}) {
   const id = useId();
-  const caption = (
-    <span id={id} className="mb-1 block text-sm font-medium text-slate-700">
+  const captionClass = "mb-1 block text-sm font-medium text-slate-700";
+  const captionText = (
+    <>
       {label}
       {required && <span className="text-red-500"> *</span>}
+    </>
+  );
+  const caption = (
+    <span id={id} className={captionClass}>
+      {captionText}
     </span>
   );
+  const descId = htmlFor ? `${htmlFor}-desc` : undefined;
   const footer = error ? (
-    <span className="mt-1 block text-xs text-red-600" role="alert">
+    <span id={descId} className="mt-1 block text-xs text-red-600" role="alert">
       {error}
     </span>
   ) : hint ? (
-    <span className="mt-1 block text-xs text-slate-500">{hint}</span>
+    <span id={descId} className="mt-1 block text-xs text-slate-500">
+      {hint}
+    </span>
   ) : null;
+  if (htmlFor)
+    return (
+      <div className="block">
+        <label htmlFor={htmlFor} id={id} className={captionClass}>
+          {captionText}
+        </label>
+        {children}
+        {footer}
+      </div>
+    );
   if (group)
     return (
       <div role="group" aria-labelledby={id} className="block">

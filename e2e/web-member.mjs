@@ -209,12 +209,44 @@ try {
 
   await step("directory search and profile", async () => {
     await page.click('nav >> text=Directory');
-    await page.fill('input[placeholder="Name, company, role"]', "Priya");
+    const search = page.locator('input[placeholder="Name, company, role or skill"]');
+    // A seeded skill finds the member who lists it, though her name, company, role and headline don't say it.
+    await search.fill("Distributed systems");
+    const sneha = page.locator("a", { hasText: "Sneha Kulkarni" });
+    await sneha.waitFor();
+    // What she's open to shows on her card, and filters the directory from behind More filters.
+    await sneha.getByText("Open to Investing", { exact: true }).waitFor();
+    await page.click('button:has-text("More filters")');
+    const openTo = page.getByLabel("Open to", { exact: true });
+    await openTo.selectOption("INVESTING");
+    await search.fill("Sneha");
+    await sneha.waitFor();
+    // It leaves out Priya, who is open to hiring: the list comes back empty (not merely loading), and without the filter
+    // the same search finds her.
+    await search.fill("Priya");
+    await page.getByText("No members match", { exact: true }).waitFor();
+    if (await page.locator("a", { hasText: "Priya Nair" }).count()) throw new Error("the Open to filter kept Priya, who isn't open to investing");
+    await openTo.selectOption("");
+    await page.click('button:has-text("Hide filters")');
+
     await page.waitForSelector("text=Priya Nair");
-    // A seeded mentor, which the directory says on her card.
-    await page.locator("a", { hasText: "Priya Nair" }).getByText("Mentor", { exact: true }).waitFor();
+    // A seeded mentor, which the directory says on her card, with her headline in place of her role.
+    const priya = page.locator("a", { hasText: "Priya Nair" });
+    await priya.getByText("Mentor", { exact: true }).waitFor();
+    await priya.getByText("Product manager at Google, working on consumer apps").waitFor();
     await page.click("text=Priya Nair");
     await page.waitForSelector("h1:has-text('Priya Nair')");
+    // Her profile: headline, skills, her current role then her past one, studies here and elsewhere, and a LinkedIn link
+    // that opens in a new tab and passes nothing on.
+    await page.getByText("Product manager at Google, working on consumer apps", { exact: true }).waitFor();
+    await page.getByText("User research", { exact: true }).waitFor();
+    const roles = await page.getByRole("heading", { name: "Experience", exact: true }).locator("xpath=..").locator("li p.font-medium").allInnerTexts();
+    if (roles.join() !== "Product Manager,Software engineer") throw new Error(`her roles read ${roles.join(", ")}, expected her current role, then her past one`);
+    await page.getByText("London Business School", { exact: true }).waitFor();
+    await page.getByText("B.Tech, Electronics", { exact: true }).waitFor();
+    const linkedin = page.getByRole("link", { name: "LinkedIn", exact: true });
+    if ((await linkedin.getAttribute("href")) !== "https://www.linkedin.com/in/priya-nair-product") throw new Error("the LinkedIn link goes somewhere else");
+    if ((await linkedin.getAttribute("target")) !== "_blank" || !/\bnoopener\b.*\bnoreferrer\b.*\bnofollow\b/.test((await linkedin.getAttribute("rel")) ?? "")) throw new Error("a member's link should open in a new tab with noopener, noreferrer and nofollow");
     await shot("08-member");
   });
 
@@ -376,6 +408,80 @@ try {
     await page.unroute(images);
   });
 
+  await step("my profile: a headline, skills, a link and a past role, saved together, show on the profile members see", async () => {
+    await page.goto(BASE + "/t/demo-university/app/profile");
+    await page.waitForSelector('h1:has-text("My profile")');
+    const headline = `Keeps smoke run ${unique} green`;
+    await page.fill('input[name="headline"]', headline);
+    // Skills are chips: Enter adds one, and so does a comma.
+    const skills = page.getByLabel("Skills", { exact: true });
+    await skills.fill("Playwright");
+    await skills.press("Enter");
+    await skills.fill("Smoke testing,");
+    await page.getByRole("button", { name: "Remove Smoke testing", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Remove Playwright", exact: true }).waitFor();
+    // A handle becomes the site's address as you leave the box.
+    const github = page.getByLabel("GitHub", { exact: true });
+    await github.fill("@smoke-tester");
+    await github.blur();
+    if ((await github.inputValue()) !== "https://github.com/smoke-tester") throw new Error(`the GitHub handle became ${await github.inputValue()}, not its address`);
+
+    await page.getByRole("button", { name: "Add a past role", exact: true }).click();
+    const role = page.getByRole("group", { name: "Past role 1", exact: true });
+    await role.getByLabel("Job title").fill("QA engineer");
+    await role.getByLabel("Company").fill("Flaky Labs");
+    await role.getByLabel("Start year").selectOption("2012");
+    await role.getByLabel("End year").selectOption("2010");
+    // The error is put on the input it's about, inside the list.
+    await page.click('button:has-text("Save profile")');
+    await role.getByText("Can't be before the start year").waitFor();
+    await role.getByLabel("End year").selectOption("2016");
+    await page.click('button:has-text("Save profile")');
+    await page.waitForSelector("text=Profile saved");
+    // Saved, the role folds into a summary that can be opened again.
+    await page.getByRole("button", { name: "Edit QA engineer at Flaky Labs", exact: true }).waitFor();
+    await shot("08g-profile-edit");
+
+    // A problem the server finds inside the list ("experiences.0.endYear") goes on that row's input too, opening the row.
+    const me = "**/api/v1/t/demo-university/memberships/me";
+    const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "experiences.0.endYear", message: "The server can't take this year" }] } };
+    await page.route(me, (route) => (route.request().method() === "PATCH" ? route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify(refusal) }) : route.fallback()));
+    await page.click('button:has-text("Save profile")');
+    await role.getByText("The server can't take this year", { exact: true }).waitFor();
+    if ((await role.getByLabel("End year").getAttribute("aria-invalid")) !== "true") throw new Error("the server's error on a past role isn't marked on its end year");
+    await page.unroute(me);
+
+    // A phone fits the sections without scrolling sideways, and a link to one lands on it.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(BASE + "/t/demo-university/app/profile#work");
+    await page.getByRole("heading", { name: "Work", exact: true }).waitFor();
+    await page.waitForFunction(() => {
+      const top = document.getElementById("work")?.getBoundingClientRect().top ?? -1;
+      return top >= 0 && top < 200;
+    });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) throw new Error(`My profile scrolls sideways by ${overflow}px on a phone`);
+    await page.screenshot({ path: `${SHOTS}/08h-profile-edit-phone.png` });
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // Found by the new headline, which the card shows in place of the role.
+    await page.goto(BASE + "/t/demo-university/app/directory");
+    await page.fill('input[placeholder="Name, company, role or skill"]', `smoke run ${unique}`);
+    const card = page.locator("a", { hasText: "Smoke Tester" });
+    await card.getByText(headline, { exact: true }).waitFor();
+    await card.click();
+    await page.waitForSelector("h1:has-text('Smoke Tester')");
+    await page.getByText(headline, { exact: true }).waitFor();
+    await page.getByText("Playwright", { exact: true }).waitFor();
+    await page.getByText("Smoke testing", { exact: true }).waitFor();
+    await page.getByText("QA engineer", { exact: true }).waitFor();
+    await page.getByText("Flaky Labs", { exact: true }).waitFor();
+    await page.getByText("2012–2016", { exact: true }).waitFor();
+    const link = page.getByRole("link", { name: "GitHub", exact: true });
+    if ((await link.getAttribute("href")) !== "https://github.com/smoke-tester" || !(await link.getAttribute("rel"))?.includes("nofollow")) throw new Error("the GitHub link isn't the saved address with nofollow");
+    await shot("08i-profile-details");
+  });
+
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
   const expectMoreActive = async (active, where) => {
     const current = (await moreButton.getAttribute("aria-current")) === "true";
@@ -391,7 +497,7 @@ try {
       ["Feed", /\/app\/feed$/, "text=Welcome to the official Demo University alumni network"],
       ["Messages", /\/app\/messages$/, "main >> text=Messages"],
       ["Jobs", /\/app\/jobs$/, "text=Backend Engineer (Node.js)"],
-      ["Directory", /\/app\/directory$/, 'input[placeholder="Name, company, role"]'],
+      ["Directory", /\/app\/directory$/, 'input[placeholder="Name, company, role or skill"]'],
     ];
     for (const [label, url, content] of sections) {
       await bar.locator(`a:has-text("${label}")`).click();
@@ -614,7 +720,7 @@ try {
 
     // A asks from B's profile. The first message goes as a request, and nothing more can follow it until B answers.
     await pageA.goto(`${app}/directory`);
-    await pageA.fill('input[placeholder="Name, company, role"]', "Sneha");
+    await pageA.fill('input[placeholder="Name, company, role or skill"]', "Sneha");
     await pageA.click("text=Sneha Kulkarni");
     await pageA.getByRole("link", { name: "Message this member" }).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
@@ -1029,6 +1135,11 @@ try {
     await mentor.getByRole("button", { name: "Save mentor profile" }).click();
     await mentor.getByRole("heading", { name: "You're listed as a mentor" }).waitFor();
     await mentor.getByRole("button", { name: "Stop mentoring" }).waitFor();
+    // Their own profile says so now, as other members' view of it does.
+    await mentor.goto(`${app}/profile`);
+    await mentor.getByRole("heading", { name: LISTENER, exact: true }).waitFor();
+    await mentor.getByText("Mentor", { exact: true }).waitFor();
+    await mentor.goto(`${app}/mentors`);
 
     // The mentor waits on Requests, so the request has to arrive there live.
     await mentor.getByRole("tab", { name: "Requests" }).click();
@@ -1214,7 +1325,7 @@ try {
 
     // The directory marks a mentor's card.
     await mentee.goto(`${app}/directory`);
-    await mentee.fill('input[placeholder="Name, company, role"]', LISTENER);
+    await mentee.fill('input[placeholder="Name, company, role or skill"]', LISTENER);
     await mentee.locator("a", { hasText: LISTENER }).getByText("Mentor", { exact: true }).waitFor();
   });
 

@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
-import { Avatar, Button, Card, ErrorBox, Loading } from "@/components/ui";
+import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { Button, Card, ErrorBox, Loading } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -25,18 +26,15 @@ export function AdminMemberDetailPage() {
   if (q.error || !q.data) return <ErrorBox error={q.error ?? "Not found"} />;
   const m = q.data;
   const isSelf = m.id === me?.id;
+  // The work, studies, links and bio are in ProfileDetails below; these are the facts it doesn't show.
   const fields: Array<[string, string | number | null | undefined]> = [
     ["Phone", m.phone],
     ["Batch", m.batchYear],
     ["Profession", PROFESSION_TYPE_LABELS[m.professionType]],
-    ["Company", m.companyName],
-    ["Designation", m.designation],
     ["City", [m.city, countryName(m.country)].filter(Boolean).join(", ")],
     ["Date of birth", m.dateOfBirth ? formatDate(m.dateOfBirth) : null],
     ["Marital status", m.maritalStatus ? MARITAL_STATUS_LABELS[m.maritalStatus] : null],
     ["Kids", m.kidsCount],
-    ["LinkedIn", m.linkedinUrl],
-    ["Interests", m.interests.join(", ")],
     ["Member since", formatDate(m.createdAt)],
     ["Last active", m.lastActiveAt ? formatDateTime(m.lastActiveAt) : "never"],
     ["Last login", m.lastLoginAt ? formatDateTime(m.lastLoginAt) : "never"],
@@ -47,27 +45,26 @@ export function AdminMemberDetailPage() {
         ← Members
       </Link>
       <Card className="p-5">
-        <div className="flex flex-wrap items-start gap-4">
-          <Avatar name={m.fullName} src={m.avatarUrl} size="xl" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold text-slate-900">{m.fullName}</h1>
+        <ProfileSummary
+          profile={{ ...m, isMentor: !!m.mentorProfile?.isActive }}
+          nameExtras={
+            <>
               <MemberStatusBadge status={m.status} />
               {m.role === "TENANT_ADMIN" && <span className="rounded bg-primary/10 px-1.5 text-xs text-primary">Admin</span>}
-            </div>
-            {m.statusReason && <p className="text-sm text-slate-500">Reason: {m.statusReason}</p>}
-            {m.bio && <p className="mt-2 text-sm text-slate-700">{m.bio}</p>}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {!isSelf && <MemberActionButtons member={m} actions={actions} />}
-              {!isSelf && m.status === "APPROVED" && (
-                <Button variant="ghost" onClick={() => actions.setRole.mutate({ id: m.id, role: m.role === "TENANT_ADMIN" ? "MEMBER" : "TENANT_ADMIN" })} loading={actions.setRole.isPending}>
-                  {m.role === "TENANT_ADMIN" ? "Remove admin role" : "Make admin"}
-                </Button>
-              )}
-              {isSelf && <span className="text-sm text-slate-400">This is you.</span>}
-            </div>
+            </>
+          }
+        >
+          {m.statusReason && <p className="mt-1 text-sm text-slate-500">Reason: {m.statusReason}</p>}
+          <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+            {!isSelf && <MemberActionButtons member={m} actions={actions} />}
+            {!isSelf && m.status === "APPROVED" && (
+              <Button variant="ghost" onClick={() => actions.setRole.mutate({ id: m.id, role: m.role === "TENANT_ADMIN" ? "MEMBER" : "TENANT_ADMIN" })} loading={actions.setRole.isPending}>
+                {m.role === "TENANT_ADMIN" ? "Remove admin role" : "Make admin"}
+              </Button>
+            )}
+            {isSelf && <span className="text-sm text-slate-400">This is you.</span>}
           </div>
-        </div>
+        </ProfileSummary>
         <dl className="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
           {fields.map(([k, v]) => (
             <div key={k}>
@@ -76,6 +73,7 @@ export function AdminMemberDetailPage() {
             </div>
           ))}
         </dl>
+        <ProfileDetails profile={m} tenant={tenant} className="mt-5 border-t border-slate-100 pt-5" />
       </Card>
       <AdminFieldAnswers member={m} />
       {m.mentorProfile && <MentorProfileCard slug={slug} membershipId={m.id} profile={m.mentorProfile} />}

@@ -62,6 +62,20 @@ try {
     await shot("a02-members");
   });
 
+  await step("a member's page shows the admin their whole profile", async () => {
+    await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
+    await page.getByLabel("Search members").fill("Kiran Joshi");
+    await page.locator("a", { hasText: "Kiran Joshi" }).first().click();
+    await page.waitForURL(/\/admin\/members\/[0-9a-f-]+$/);
+    await page.waitForSelector("h1:has-text('Kiran Joshi')");
+    await page.getByText("Founder of Joshi Robotics: warehouse robots for Indian logistics firms", { exact: true }).waitFor();
+    await page.getByText("Warehouse automation", { exact: true }).waitFor();
+    await page.getByText("Automation engineer", { exact: true }).waitFor();
+    await page.getByText("IIT Bombay", { exact: true }).waitFor();
+    await page.getByText("Open to hiring", { exact: true }).waitFor();
+    await shot("a02b-member-detail");
+  });
+
   await step("reject a pending member with a reason", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
     const row = page.locator("li", { hasText: "Amit Verma" }).first();
