@@ -1,4 +1,20 @@
-import { applicationsClosed, applicationsLine, experienceLabel, jobFacts, jobIsOpen, jobPlaceLabel, jobSalaryText, toMinor, type JobFactsSource } from "@illuminize/shared";
+import {
+  applicationsClosed,
+  applicationsLine,
+  companyDetailsOf,
+  companyDetailsToFill,
+  companyReuseText,
+  experienceLabel,
+  jobFacts,
+  jobIsOpen,
+  jobPlaceLabel,
+  jobSalaryText,
+  latestJobAtCompany,
+  sameCompany,
+  toMinor,
+  type JobFactsSource,
+  type ModerationStatus,
+} from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 const NOW = Date.parse("2026-11-04T06:30:00Z");
@@ -177,5 +193,55 @@ describe("applicationsLine", () => {
 
   it("falls back to UTC for a time zone it doesn't know", () => {
     expect(applicationsLine({ isClosed: false, expiresAt: "2026-12-11T20:00:00Z" }, NOW, "Not/AZone")).toBe("Applications close 11 Dec");
+  });
+});
+
+describe("company details from an earlier job", () => {
+  it("treats names that differ only in case, spacing or full-width letters as one company", () => {
+    expect(sameCompany("Zylo Labs", "  zylo   labs ")).toBe(true);
+    expect(sameCompany("Ｚｙｌｏ Labs", "Zylo Labs")).toBe(true);
+    expect(sameCompany("Zylo Labs", "Zylo")).toBe(false);
+    expect(sameCompany("", "  ")).toBe(false);
+  });
+
+  it("picks the newest of the poster's jobs at the company, skipping removed ones and the job being edited", () => {
+    const job = (id: string, companyName: string, moderationStatus: ModerationStatus = "APPROVED") => ({ id, companyName, moderationStatus });
+    // Newest first, as the API lists the poster's own jobs; a search for "Zylo" also finds "Zylo Labs Europe".
+    const mine = [job("e", "Zylo Labs Europe"), job("d", "Zylo Labs", "REMOVED"), job("c", "zylo labs", "REJECTED"), job("b", "Zylo Labs"), job("a", "Zylo Labs")];
+    expect(latestJobAtCompany(mine, "Zylo Labs")?.id).toBe("c");
+    expect(latestJobAtCompany(mine, "Zylo Labs", "c")?.id).toBe("b");
+    expect(latestJobAtCompany(mine, "Zylo")).toBeNull();
+    expect(latestJobAtCompany([], "Zylo Labs")).toBeNull();
+  });
+
+  it("gives the five company fields, or nothing when the job has none of them", () => {
+    const none = { companyLogoUrl: null, companyWebsite: null, companyIndustry: null, companySize: null, aboutCompany: null };
+    expect(companyDetailsOf(none)).toBeNull();
+    expect(companyDetailsOf({ ...none, aboutCompany: "   " })).toBeNull();
+    expect(companyDetailsOf({ ...none, companySize: "SIZE_11_50" })).toEqual({ ...none, companySize: "SIZE_11_50" });
+    const full = { companyLogoUrl: "https://example.com/logo.png", companyWebsite: "https://example.com", companyIndustry: "SOFTWARE_INTERNET" as const, companySize: "SIZE_11_50" as const, aboutCompany: "Lending software." };
+    // Only those five, whatever else the job carries.
+    expect(companyDetailsOf({ ...full, title: "Backend Engineer", contactEmail: "jobs@example.com" } as typeof full)).toEqual(full);
+  });
+
+  it("fills only the fields the form holds nothing in, so nothing typed is replaced", () => {
+    const none = { companyLogoUrl: null, companyWebsite: null, companyIndustry: null, companySize: null, aboutCompany: null };
+    const earlier = { companyLogoUrl: "https://example.com/logo.png", companyWebsite: "https://example.com", companyIndustry: "SOFTWARE_INTERNET" as const, companySize: "SIZE_11_50" as const, aboutCompany: "Lending software." };
+    // An empty form takes all five.
+    expect(companyDetailsToFill(earlier, none)).toEqual(earlier);
+    // What the poster typed stays, a blank "about" counts as empty, and what the earlier job doesn't give isn't offered.
+    const typed = { ...none, companyWebsite: "https://example.org", companySize: "SIZE_51_200" as const, aboutCompany: "  " };
+    expect(companyDetailsToFill(earlier, typed)).toEqual({ companyLogoUrl: earlier.companyLogoUrl, companyIndustry: earlier.companyIndustry, aboutCompany: earlier.aboutCompany });
+    expect(companyDetailsToFill({ ...none, companyWebsite: "https://example.com" }, typed)).toEqual({});
+    // A form already holding every field, as an edit of a full job does, is offered nothing.
+    expect(companyDetailsToFill(earlier, { ...earlier, aboutCompany: "Newer words." })).toEqual({});
+  });
+
+  it("names only the fields the offer would fill", () => {
+    expect(companyReuseText("Zylo Labs", { companyWebsite: "https://example.com" })).toBe("You've posted a job at Zylo Labs before. Its website can fill in here.");
+    expect(companyReuseText("Zylo Labs", { aboutCompany: "Lending.", companyLogoUrl: "https://example.com/logo.png" })).toBe("You've posted a job at Zylo Labs before. Its logo and about can fill in here.");
+    expect(
+      companyReuseText("Zylo Labs", { companyLogoUrl: "a", companyWebsite: "b", companyIndustry: "SOFTWARE_INTERNET", companySize: "SIZE_11_50", aboutCompany: "c" }),
+    ).toBe("You've posted a job at Zylo Labs before. Its logo, website, industry, size and about can fill in here.");
   });
 });

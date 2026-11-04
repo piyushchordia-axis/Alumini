@@ -78,6 +78,12 @@ try {
     await row.waitFor();
     await row.locator('button:has-text("View full content")').click();
     await page.waitForSelector("text=ROS2");
+    // The whole job, not just its description: the seeded stipend among its facts.
+    await row.getByText("Stipend", { exact: true }).waitFor();
+    await row.getByText("₹25,000–35,000/mo", { exact: true }).waitFor();
+    // Under the page's h1, the job's title is an h2 and its parts h3s, so no heading level is skipped.
+    await row.getByRole("heading", { level: 2, name: "Robotics Intern", exact: true }).waitFor();
+    await row.getByRole("heading", { level: 3, name: "About the company", exact: true }).waitFor();
     await row.locator('button:has-text("Approve")').click();
     await page.waitForSelector("text=Job approved");
     await shot("a03-moderation");

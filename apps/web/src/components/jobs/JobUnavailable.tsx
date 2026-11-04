@@ -1,4 +1,5 @@
 import { errorMessage, isApiClientError, isTransientError } from "@illuminize/shared/client";
+import { IconJobs } from "@/components/icons";
 import { Button, EmptyState, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { jobsPath } from "@/lib/referrals";
@@ -21,7 +22,7 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon="💼"
+        icon={<IconJobs size={32} className="text-slate-400" />}
         title={title ?? said.heading}
         description={text ?? said.body}
         action={

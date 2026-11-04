@@ -7,7 +7,7 @@ import { colors, spacing, useTheme } from "@/theme";
 const EXTERNAL_REL = "noopener noreferrer nofollow ugc";
 
 /** A phone with nothing to open the link (no mail app, say) leaves the screen as it was rather than throwing. */
-function openLink(href: string) {
+export function openLink(href: string) {
   Linking.openURL(href).catch(() => undefined);
 }
 
@@ -15,7 +15,7 @@ function openLink(href: string) {
  * On the web export a link is a real anchor that the browser opens, from the keyboard too; react-native-web only makes an
  * anchor of a Text with `href`, which React Native's types don't know. A mail link opens in place.
  */
-function linkProps(href: string): object {
+export function linkProps(href: string): object {
   if (Platform.OS !== "web") return { onPress: () => openLink(href) };
   return { href, hrefAttrs: href.startsWith("mailto:") ? { rel: EXTERNAL_REL } : { target: "_blank", rel: EXTERNAL_REL } };
 }

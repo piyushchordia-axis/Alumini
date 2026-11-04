@@ -1,6 +1,7 @@
 import { JOB_SENIORITY_LABELS, JOB_TYPE_LABELS, WORK_MODE_LABELS, type ModerationStatus, type WorkMode } from "../constants";
 import type { JobCardDto, JobDto } from "../types/dto";
 import { formatSalary } from "./salary";
+import { skillKey } from "./skills";
 import { localTimeZone, wallPartsInZone } from "./time";
 
 const instant = (at: number | Date | string): number => (typeof at === "number" ? at : typeof at === "string" ? Date.parse(at) : at.getTime());
@@ -102,6 +103,65 @@ function shortDate(at: number, now: number, timeZone: string): string {
     thisYear = new Date(now).getUTCFullYear();
   }
   return `${day.day} ${MONTHS[day.month - 1]}${day.year === thisYear ? "" : ` ${day.year}`}`;
+}
+
+/** What a job says about its company beyond the name, which a new job at the same company can copy. */
+export const COMPANY_DETAIL_KEYS = ["companyLogoUrl", "companyWebsite", "companyIndustry", "companySize", "aboutCompany"] as const;
+export type CompanyDetails = Pick<JobDto, (typeof COMPANY_DETAIL_KEYS)[number]>;
+
+/** Whether two company names are one company, compared as skills are: "Zylo Labs" and " zylo  labs" are. */
+export function sameCompany(a: string, b: string): boolean {
+  const key = skillKey(a);
+  return key !== "" && key === skillKey(b);
+}
+
+/**
+ * The poster's latest job at `company`, from their own jobs newest first (as `mine=true` lists them), so a new job can reuse
+ * its company details. Skips a removed job, whose page even its poster can't open, and `excludeId`, the job being edited.
+ */
+export function latestJobAtCompany<T extends Pick<JobCardDto, "id" | "companyName" | "moderationStatus">>(jobs: readonly T[], company: string, excludeId?: string): T | null {
+  return jobs.find((job) => job.id !== excludeId && job.moderationStatus !== "REMOVED" && sameCompany(job.companyName, company)) ?? null;
+}
+
+/** A job's company details, or null when it gives none worth copying. */
+export function companyDetailsOf(job: CompanyDetails): CompanyDetails | null {
+  const details: CompanyDetails = {
+    companyLogoUrl: job.companyLogoUrl,
+    companyWebsite: job.companyWebsite,
+    companyIndustry: job.companyIndustry,
+    companySize: job.companySize,
+    aboutCompany: job.aboutCompany?.trim() ? job.aboutCompany : null,
+  };
+  return COMPANY_DETAIL_KEYS.some((key) => details[key]) ? details : null;
+}
+
+/**
+ * What an earlier job's company details can fill in on a form: the fields it gives that the form holds nothing in yet. A
+ * field the poster has filled is never in it, so using it can't replace what they typed, and an empty result means there
+ * is nothing left to offer.
+ */
+export function companyDetailsToFill(from: CompanyDetails, current: CompanyDetails): Partial<CompanyDetails> {
+  const fill: Record<string, string> = {};
+  for (const key of COMPANY_DETAIL_KEYS) {
+    const given = from[key];
+    if (given?.trim() && !current[key]?.trim()) fill[key] = given;
+  }
+  return fill as Partial<CompanyDetails>;
+}
+
+const COMPANY_DETAIL_NAMES: Record<(typeof COMPANY_DETAIL_KEYS)[number], string> = {
+  companyLogoUrl: "logo",
+  companyWebsite: "website",
+  companyIndustry: "industry",
+  companySize: "size",
+  aboutCompany: "about",
+};
+
+/** The offer to reuse an earlier job's company details, naming only the fields it would fill: "Its logo and website can fill in here." */
+export function companyReuseText(companyName: string, fill: Partial<CompanyDetails>): string {
+  const names = COMPANY_DETAIL_KEYS.filter((key) => fill[key] != null).map((key) => COMPANY_DETAIL_NAMES[key]);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : (names[0] ?? "details");
+  return `You've posted a job at ${companyName} before. Its ${list} can fill in here.`;
 }
 
 /**

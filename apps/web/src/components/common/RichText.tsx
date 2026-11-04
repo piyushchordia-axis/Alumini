@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { Fragment, useMemo } from "react";
 
 /** Members write these links, so they pass no referrer, no opener and no search-engine credit. */
-const EXTERNAL_REL = "noopener noreferrer nofollow ugc";
+export const EXTERNAL_REL = "noopener noreferrer nofollow ugc";
 
 function Inlines({ nodes }: { nodes: RichInline[] }) {
   return nodes.map((node, i) =>

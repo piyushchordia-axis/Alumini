@@ -1,18 +1,18 @@
-import { CAN_REFER_BADGE, JOB_DELETED_TEXT, JOB_TYPE_LABELS, applicationsClosed, applicationsLine, jobFacts, jobPlaceLabel, waitingReferralsCloseText } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_DELETED_TEXT, waitingReferralsCloseText } from "@illuminize/shared";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Linking, Text } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { JobApplyArea } from "@/components/jobs/JobApplyArea";
+import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
+import { ModerationBadge } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { RichText } from "@/components/RichText";
-import { Badge, Button, Card, ErrorText, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorText, Row, Screen, Spinner } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -21,7 +21,7 @@ import { formatDate } from "@/lib/format";
 import { leaveGroupNotice, useGroupNotice } from "@/lib/groups";
 import { qk } from "@/lib/queryKeys";
 import { refreshReferrals } from "@/lib/referrals";
-import { colors } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 export default function JobDetailScreen() {
   const { jobId = "" } = useLocalSearchParams<{ jobId: string }>();
@@ -71,44 +71,25 @@ function JobDetail({ jobId }: { jobId: string }) {
   const j = job.data;
   const waiting = j.pendingReferralCount ?? 0;
   const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;
-  const place = jobPlaceLabel(j);
-  const pay = jobFacts(j)
-    .filter((f) => f.key === "salary" || f.key === "salaryNote")
-    .map((f) => `${f.label}: ${f.value}`)
-    .join(" · ");
-  // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
-  const ended = applicationsClosed(j, now);
-  const applications = applicationsLine(j, now);
   return (
     <Screen title="Job">
-      <Card>
-        <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
-          {j.title}
-        </Text>
-        <Muted size={14}>
-          {j.companyName}
-          {place ? ` · ${place}` : ""}
-        </Muted>
-        <Row>
-          <Badge label={JOB_TYPE_LABELS[j.jobType]} tone="info" />
-          {/* A closed job takes no requests, whatever its poster offered. */}
-          {j.canRefer && !j.isClosed && <Badge label={CAN_REFER_BADGE} tone="success" />}
-          {j.isClosed && <Badge label="Closed" />}
-          <ModerationBadge status={j.moderationStatus} />
-        </Row>
-        <ModerationNote status={j.moderationStatus} note={j.moderationNote} />
-        {!!pay && <Muted size={13}>{pay}</Muted>}
-        {!ended && !!applications && <Muted>{applications}</Muted>}
-        <RichText text={j.description} />
-        {ended ? (
-          <Text style={{ fontWeight: "600", color: colors.text }}>{applications}</Text>
-        ) : (
-          <>
-            {j.applyUrl && <Button title="Apply ↗" onPress={() => void Linking.openURL(j.applyUrl!)} />}
-            {j.contactEmail && <Button title={`Email ${j.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${j.contactEmail}`)} />}
-            {j.contactPhone && <Button title={`Call ${j.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${j.contactPhone}`)} />}
-          </>
-        )}
+      <Card style={{ gap: spacing.md }}>
+        <JobDetails
+          job={j}
+          now={now}
+          badges={
+            // A closed job takes no requests, whatever its poster offered. The job type is among the facts.
+            j.canRefer || j.isClosed || j.moderationStatus !== "APPROVED" ? (
+              <>
+                {j.canRefer && !j.isClosed && <Badge label={CAN_REFER_BADGE} tone="success" />}
+                {j.isClosed && <Badge label="Closed" />}
+                <ModerationBadge status={j.moderationStatus} />
+              </>
+            ) : null
+          }
+          // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
+          apply={<JobApplyArea job={j} now={now} />}
+        />
         <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
           <MemberRow slug={slug} member={j.author} meta={`Posted ${formatDate(j.createdAt)}`} />
           {!j.isMine && <ReportButton slug={slug} contentType="JOB" contentId={j.id} />}
@@ -143,6 +124,7 @@ function JobDetail({ jobId }: { jobId: string }) {
         {!confirming && <ErrorText error={close.error} />}
         <StatusLine flush text={status} />
       </Card>
+      <AboutCompany job={j} />
       {j.isMine ? <JobReferrals slug={slug} job={j} /> : <MyReferral slug={slug} job={j} />}
       <ConfirmSheet
         open={confirming === "close"}

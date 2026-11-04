@@ -197,9 +197,12 @@ try {
     // A job whose poster offers referrals says so on its card.
     const backend = page.getByRole("button", { name: /^Backend Engineer \(Node\.js\)/ }).locator("visible=true").first();
     await backend.getByText("Can refer", { exact: true }).waitFor();
-    // Where it's done and what it pays, written from its work mode and its pay range.
+    // Where it's done and what it pays, written from its work mode and its pay range, with its experience, and three of
+    // its four skills with the rest counted.
     await backend.getByText("Zylo Labs · Mumbai · Remote", { exact: true }).waitFor();
-    await backend.getByText(/ · ₹25–40 LPA$/).waitFor();
+    await backend.getByText("₹25–40 LPA", { exact: true }).waitFor();
+    await backend.getByText("3–6 years", { exact: true }).waitFor();
+    await backend.getByText("+1 more", { exact: true }).waitFor();
     // Each tab, and on Referrals each list, is in the URL, as a referral notification links to them.
     await tab("Looking for work", false).click();
     await tab("Looking for work", true).waitFor();
@@ -215,6 +218,53 @@ try {
     await page.waitForURL(/\/t\/demo-university\/jobs$/);
     await tab("Openings", true).waitFor();
     await shot("m05-jobs");
+
+    // Work mode, seniority and experience wait behind Filters. Remote leaves out the on-site internship; one year of
+    // experience is too little for 3–6 years, enough for 1–3, and a job that asks for none still fits.
+    const onTop = (locator) => locator.locator("visible=true").last();
+    const intern = onTop(page.getByRole("button", { name: /^Summer Intern – Strategy/ }));
+    const apm = onTop(page.getByRole("button", { name: /^Associate Product Manager/ }));
+    await intern.waitFor();
+    await onTop(page.getByRole("button", { name: "Filters", exact: true })).click();
+    const workModes = onTop(page.getByRole("group", { name: "Work mode", exact: true }));
+    await workModes.getByRole("button", { name: "Remote", exact: true }).click();
+    if ((await workModes.getByRole("button", { name: "Remote", exact: true }).getAttribute("aria-selected")) !== "true") throw new Error("the Remote filter doesn't show as chosen");
+    // The cards also go while the list loads, filtered or not, so what's left out is checked once the filtered list is in.
+    const listed = (name) => page.getByRole("button", { name }).locator("visible=true").count();
+    await intern.waitFor({ state: "hidden" });
+    await backend.waitFor();
+    if (await listed(/^Summer Intern – Strategy/)) throw new Error("Remote still lists the on-site internship");
+    await workModes.getByRole("button", { name: "Any", exact: true }).click();
+    await intern.waitFor();
+    await onTop(page.getByLabel("Your experience (years)", { exact: true })).fill("1");
+    await backend.waitFor({ state: "hidden" });
+    await apm.waitFor();
+    await intern.waitFor();
+    if (await listed(/^Backend Engineer \(Node\.js\)/)) throw new Error("one year of experience still lists the 3–6 year Backend job");
+    await shot("m05a-jobs-filters");
+    await onTop(page.getByRole("button", { name: "Clear filters", exact: true })).click();
+    await backend.waitFor();
+    await onTop(page.getByRole("button", { name: "Hide filters", exact: true })).click();
+
+    // The seeded job's own page: its facts, its sections under their headings, and the address in How to apply a link
+    // that opens apart from the app. The title is its only heading.
+    await backend.dispatchEvent("click");
+    await page.waitForURL(/\/t\/demo-university\/jobs\/[0-9a-f-]{36}$/);
+    await onTop(page.getByRole("heading", { name: "Backend Engineer (Node.js)", exact: true })).waitFor();
+    const titled = await page.getByRole("heading", { name: "Backend Engineer (Node.js)" }).locator("visible=true").count();
+    if (titled !== 1) throw new Error(`${titled} headings hold the job's title`);
+    await onTop(page.getByText("₹25–40 LPA", { exact: true })).waitFor();
+    await onTop(page.getByText("Remote", { exact: true })).waitFor();
+    await onTop(page.getByRole("heading", { name: "Responsibilities", exact: true })).waitFor();
+    await onTop(page.getByRole("heading", { name: "About the company", exact: true })).waitFor();
+    const applyAt = "https://example.com/zylo/backend";
+    const howToApply = onTop(page.getByRole("link", { name: applyAt, exact: true }));
+    if ((await howToApply.getAttribute("href")) !== applyAt || (await howToApply.getAttribute("target")) !== "_blank" || !(await howToApply.getAttribute("rel"))?.includes("noopener"))
+      throw new Error("How to apply's address should be a link that opens in a new tab, with noopener");
+    await onTop(page.getByRole("button", { name: "Apply", exact: true })).waitFor();
+    await shot("m05b-job-detail");
+    await page.getByLabel(/back$/i).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/jobs$/);
   });
 
   await step("RSVP to an event", async () => {
@@ -1169,23 +1219,46 @@ try {
     const analyst = `Mobile Referral Analyst ${unique}`;
 
     // The poster offers referrals on two new jobs. What ticking the box means is said beside it, before anything is posted.
-    // The analyst job is remote and gives an email, which go once it closes.
+    // The analyst job is remote, gives skills, pay, its company's website and an email, which go once it closes; the
+    // engineer job takes its company details from it.
     const contactEmail = "smoke-mobile-jobs@example.com";
+    const website = "https://example.com/smoke-labs";
     const postJob = async (title, { remote = false } = {}) => {
       await poster.goto(`${app}/jobs`);
       await shown(poster.getByRole("button", { name: "Post a job" })).click();
       await poster.waitForURL(/\/jobs\/new$/);
       await shown(poster.getByLabel("Job title *", { exact: true })).fill(title);
       await shown(poster.getByLabel("Company *", { exact: true })).fill("Smoke Labs");
-      await shown(poster.getByLabel("Description *", { exact: true })).fill("Help us keep the mobile smoke tests green.");
+      await shown(poster.getByLabel("About the role *", { exact: true })).fill("Help us keep the mobile smoke tests green.");
       // Work mode is one choice of three, on-site to start with, and the chosen one says so on the web build too.
       const mode = (name) => shown(poster.getByRole("group", { name: "Work mode", exact: true }).getByRole("button", { name, exact: true }));
       if ((await mode("On-site").getAttribute("aria-selected")) !== "true") throw new Error("a new job doesn't start out on-site");
       if (remote) {
         await mode("Remote").click();
         if ((await mode("Remote").getAttribute("aria-selected")) !== "true" || (await mode("On-site").getAttribute("aria-selected")) !== "false") throw new Error("the Remote work mode doesn't show as chosen");
+        // A comma adds the skill before it, and Return the one still typed.
+        const skills = shown(poster.getByLabel("Skills", { exact: true }));
+        await skills.fill("Playwright, TypeScript");
+        await skills.press("Enter");
+        await shown(poster.getByRole("button", { name: "Remove Playwright", exact: true })).waitFor();
+        await shown(poster.getByRole("button", { name: "Remove TypeScript", exact: true })).waitFor();
+        await shown(poster.getByLabel("Minimum experience (years)", { exact: true })).fill("2");
+        await shown(poster.getByLabel("Maximum experience (years)", { exact: true })).fill("5");
+        // The pay is typed in full and previewed as the job will show it.
+        await shown(poster.getByLabel("Minimum pay", { exact: true })).fill("1800000");
+        await shown(poster.getByLabel("Maximum pay", { exact: true })).fill("2500000");
+        await shown(poster.getByText("₹18–25 LPA", { exact: true })).waitFor();
+        await shown(poster.getByLabel("Pay note", { exact: true })).fill("plus ESOPs");
+        await shown(poster.getByLabel("Responsibilities", { exact: true })).fill("- Run the suites\n- Fix what breaks");
+        await shown(poster.getByLabel("Website", { exact: true })).fill(website);
         await shown(poster.getByLabel("Contact email", { exact: true })).fill(contactEmail);
-        await shown(poster.getByLabel("Pay note", { exact: true })).fill("₹18–25 LPA plus ESOPs");
+        await poster.screenshot({ path: `${SHOTS}/m13-job-form.png` });
+      } else {
+        // The analyst job, posted just now at the same company, offers its company details.
+        await shown(poster.getByRole("button", { name: "Use details from your last job at Smoke Labs", exact: true })).click();
+        await shown(poster.getByText("Filled in from your last job at Smoke Labs. Check them before you post.", { exact: true })).waitFor();
+        const filled = await shown(poster.getByLabel("Website", { exact: true })).inputValue();
+        if (filled !== website) throw new Error(`the company's website filled in as "${filled}"`);
       }
       await shown(poster.getByText("Members can ask you for a referral with a short note. If you accept, it opens a private chat between you.", { exact: true })).waitFor();
       const offer = shown(poster.getByRole("checkbox", { name: "I can refer people for this job", exact: true }));
@@ -1197,9 +1270,29 @@ try {
       await shown(poster.getByRole("heading", { name: title })).waitFor();
       await shown(poster.getByText("Job published", { exact: true })).waitFor();
       if (remote) {
-        await shown(poster.getByText("Smoke Labs · Remote", { exact: true })).waitFor();
-        await shown(poster.getByText("Pay note: ₹18–25 LPA plus ESOPs", { exact: true })).waitFor();
-        await shown(poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true })).waitFor();
+        const jobPage = poster.url();
+        // What the job says, after posting it and again after an edit that changes only its title: the form gives back
+        // everything it was given, so saving the edit keeps the rest.
+        const says = async (heading) => {
+          await shown(poster.getByRole("heading", { name: heading, exact: true })).waitFor();
+          await shown(poster.getByText("Smoke Labs · Remote", { exact: true })).waitFor();
+          // The facts: the pay in lakhs and its note, and the experience.
+          for (const fact of ["₹18–25 LPA", "plus ESOPs", "2–5 years"]) await shown(poster.getByText(fact, { exact: true })).waitFor();
+          const skills = await shown(poster.getByRole("list", { name: "Skills" })).getByRole("listitem").allInnerTexts();
+          if (skills.join(",") !== "Playwright,TypeScript") throw new Error(`the job's skills are ${skills.join(", ")}`);
+          await shown(poster.getByRole("heading", { name: "Responsibilities", exact: true })).waitFor();
+          await shown(poster.getByText("Fix what breaks", { exact: true })).waitFor();
+          await shown(poster.getByRole("link", { name: "example.com/smoke-labs", exact: true })).waitFor();
+          await shown(poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true })).waitFor();
+        };
+        await says(title);
+        await shown(poster.getByRole("button", { name: "Edit", exact: true })).click();
+        await poster.waitForURL(/\/jobs\/edit\/[0-9a-f-]{36}$/);
+        await shown(poster.getByLabel("Job title *", { exact: true })).fill(`${title} (remote)`);
+        await shown(poster.getByRole("button", { name: "Save changes" })).click();
+        await poster.waitForURL(jobPage);
+        await shown(poster.getByText("Changes saved", { exact: true })).waitFor();
+        await says(`${title} (remote)`);
       }
       return poster.url();
     };
@@ -1374,6 +1467,7 @@ try {
     // Closed, it takes no more applications: its contacts go from the page, its poster's too, and the page says so.
     await shown(poster.getByText("Applications closed", { exact: true })).waitFor();
     if (await poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true }).locator("visible=true").count()) throw new Error("a closed job still shows its contact email");
+    await poster.screenshot({ path: `${SHOTS}/m13d2-job-closed.png` });
     await closing.getByText("Closed", { exact: true }).waitFor(live);
     if (await closing.getByRole("button", { name: "Withdraw request" }).count()) throw new Error("a request closed with its job can still be withdrawn");
     await sent.getByText("Accepted", { exact: true }).waitFor();

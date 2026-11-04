@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { IconMail } from "@/components/icons";
 import { ReferralList, useJobReferralList } from "@/components/jobs/ReferralList";
 import { Badge, Button, EmptyState, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -131,7 +132,7 @@ export function JobReferrals({ slug, job }: { slug: string; job: JobDetailDto })
           list={list}
           limited={!available}
           showJob={false}
-          empty={<EmptyState icon="📨" title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />}
+          empty={<EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />}
         />
       </div>
     </Section>

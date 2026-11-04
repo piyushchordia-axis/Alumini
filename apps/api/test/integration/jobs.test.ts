@@ -382,7 +382,8 @@ describe.skipIf(!dbAvailable)("jobs + seekers", () => {
   it("keeps the fields an app's job form doesn't show when it saves an edit", async () => {
     const { base, author } = await setup();
     const id = (await api().post(base).set(author.headers).send(FULL)).body.data.id;
-    // What the web and mobile forms send: their own fields, validated with the create schema, as JSON.
+    // What a form showing only some fields sends, as an app installed before the full job form does: its own fields,
+    // validated with the create schema, as JSON.
     const shown = ["title", "companyName", "location", "workMode", "jobType", "description", "applyUrl", "contactEmail", "contactPhone", "salaryNote", "expiresAt"];
     const sent = JSON.parse(JSON.stringify(jobCreateSchema.parse({ ...pick(FULL, shown), title: "Platform Engineer II", canRefer: undefined }))) as Record<string, unknown>;
     expect(Object.keys(sent).sort()).toEqual([...shown].sort());

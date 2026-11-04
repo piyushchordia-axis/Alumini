@@ -16,6 +16,7 @@ export default function NewJobScreen() {
   return (
     <Screen title="Post a job">
       <JobForm
+        slug={tenant.slug}
         submitLabel="Post job"
         offerReferrals={offerReferrals}
         onSubmit={async (input) => {

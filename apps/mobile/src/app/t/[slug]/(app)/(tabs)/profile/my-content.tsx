@@ -1,8 +1,9 @@
-import type { ChatGroupDto } from "@illuminize/shared";
+import type { ChatGroupDto, JobCardDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useState } from "react";
 import { FlatList, View , Text } from "react-native";
 import { OwnedGroupCard } from "@/components/groups/GroupCards";
+import { JobCard } from "@/components/jobs/JobCard";
 import { PostCard } from "@/components/PostCard";
 import { ModerationBadge } from "@/components/ModerationBadge";
 import { Card, EmptyState, ListEmpty, Muted, Row, StackScreen, Tabs } from "@/components/ui";
@@ -76,6 +77,8 @@ export default function MyContentScreen() {
         renderItem={({ item }) =>
           tab === "posts" ? (
             <PostCard slug={slug} post={item as Parameters<typeof PostCard>[0]["post"]} />
+          ) : tab === "jobs" ? (
+            <JobCard slug={slug} job={item as unknown as JobCardDto} />
           ) : tab === "groups" ? (
             <OwnedGroupCard slug={slug} group={item as unknown as ChatGroupDto} />
           ) : (

@@ -300,6 +300,94 @@ export function IconClose(p: IconProps) {
   );
 }
 
+/* Job facts, contacts and company details. The mobile set draws each the same way. */
+export function IconMapPin(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </Svg>
+  );
+}
+export function IconClock(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </Svg>
+  );
+}
+export function IconGraduationCap(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2 9l10-5 10 5-10 5z" />
+      <path d="M6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5M22 9v6" />
+    </Svg>
+  );
+}
+export function IconGlobe(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </Svg>
+  );
+}
+export function IconExternalLink(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </Svg>
+  );
+}
+export function IconPhone(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />
+    </Svg>
+  );
+}
+export function IconBuilding(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18" />
+      <path d="M8 7h4M8 11h4M8 15h4" />
+    </Svg>
+  );
+}
+export function IconWallet(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3M3 6v12a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" />
+      <path d="M21 12h-4a2 2 0 0 0 0 4h4z" />
+    </Svg>
+  );
+}
+export function IconLaptop(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="4" y="5" width="16" height="11" rx="1.5" />
+      <path d="M2 19h20" />
+    </Svg>
+  );
+}
+export function IconStairs(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 20h4v-5h4v-5h4V5h4" />
+    </Svg>
+  );
+}
+export function IconTag(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M3 4v7.5l9.5 9.5 8.5-8.5L11.5 3H4a1 1 0 0 0-1 1z" />
+      <circle cx="7.5" cy="7.5" r="1.5" />
+    </Svg>
+  );
+}
+
 export type NavIconName =
   | "feed"
   | "messages"

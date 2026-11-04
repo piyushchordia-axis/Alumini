@@ -5,13 +5,20 @@ import { useState } from "react";
 import { Alert, Platform } from "react-native";
 import { api } from "@/lib/api";
 
-/** Picks an image from the library and uploads it to the tenant; resolves with the public URL. */
-export function useImageUpload(slug: string) {
+/**
+ * Picks an image from the library and uploads it to the tenant; resolves with the public URL. Problems are shown with
+ * Alert.alert, unless `onError` takes them to show beside the control: Alert.alert shows nothing on the web export.
+ */
+export function useImageUpload(slug: string, { onError }: { onError?: (message: string) => void } = {}) {
   const [busy, setBusy] = useState(false);
+  const fail = (title: string, message: string) => {
+    if (onError) onError(`${title}. ${message}`);
+    else Alert.alert(title, message);
+  };
   const pickAndUpload = async (): Promise<string | null> => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission needed", "Allow photo access to attach an image.");
+      fail("Permission needed", "Allow photo access to attach an image.");
       return null;
     }
     // quality < 1 makes iOS re-encode HEIC photos as JPEG, which the API accepts.
@@ -23,12 +30,12 @@ export function useImageUpload(slug: string) {
     const type = webFile?.type || asset.mimeType || "image/jpeg";
     // Check before uploading so a large or unsupported photo fails fast instead of after a slow upload.
     if (!(ALLOWED_IMAGE_MIME as readonly string[]).includes(type)) {
-      Alert.alert("Unsupported image", "Choose a JPEG, PNG or WebP photo.");
+      fail("Unsupported image", "Choose a JPEG, PNG or WebP photo.");
       return null;
     }
     const size = webFile?.size ?? asset.fileSize;
     if (size && size > MAX_UPLOAD_BYTES) {
-      Alert.alert("Image too large", `Choose a photo under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB.`);
+      fail("Image too large", `Choose a photo under ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB.`);
       return null;
     }
     setBusy(true);
@@ -40,7 +47,7 @@ export function useImageUpload(slug: string) {
       const { url } = await api.uploads.upload(slug, file);
       return url;
     } catch (err) {
-      Alert.alert("Upload failed", errorMessage(err));
+      fail("Upload failed", errorMessage(err));
       return null;
     } finally {
       setBusy(false);

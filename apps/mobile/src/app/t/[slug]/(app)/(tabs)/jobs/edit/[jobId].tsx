@@ -27,6 +27,7 @@ export default function EditJobScreen() {
   return (
     <Screen title="Edit job">
       <JobForm
+        slug={slug}
         initial={job.data}
         submitLabel="Save changes"
         offerReferrals={offerReferrals}

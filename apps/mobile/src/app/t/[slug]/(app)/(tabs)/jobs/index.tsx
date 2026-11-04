@@ -1,54 +1,44 @@
-import { CAN_REFER_BADGE, JOB_TYPES, JOB_TYPE_LABELS, JOBS_TAB_LABELS, JOBS_TABS, jobPlaceLabel, jobSalaryText, jobsTabFrom, referralBoxFrom, type JobCardDto, type JobSeekerDto, type JobsTab, type JobType, type ReferralBox } from "@illuminize/shared";
+import {
+  CAN_REFER_BADGE,
+  JOB_EXPERIENCE_MAX_YEARS,
+  JOB_SENIORITIES,
+  JOB_SENIORITY_LABELS,
+  JOB_TYPES,
+  JOB_TYPE_LABELS,
+  JOBS_TAB_LABELS,
+  JOBS_TABS,
+  WORK_MODES,
+  WORK_MODE_LABELS,
+  jobsTabFrom,
+  referralBoxFrom,
+  type JobSeekerDto,
+  type JobSeniority,
+  type JobsTab,
+  type JobType,
+  type ReferralBox,
+  type WorkMode,
+} from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState, type ComponentRef } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
+import { IconJobs, IconProfile } from "@/components/icons";
+import { JobCard } from "@/components/jobs/JobCard";
 import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralRequests";
 import { useReferralList } from "@/components/jobs/ReferralRows";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
+import { Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
+import { moveFocus } from "@/lib/focus";
 import { useGroupNotice } from "@/lib/groups";
 import { qk } from "@/lib/queryKeys";
-import { jobHref, useReferralsAvailable, useReferralsWayOut } from "@/lib/referrals";
+import { useReferralsAvailable, useReferralsWayOut } from "@/lib/referrals";
 import { colors, spacing, useTheme } from "@/theme";
 
-function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
-  const router = useRouter();
-  const place = jobPlaceLabel(job);
-  const pay = jobSalaryText(job) ?? job.salaryNote;
-  return (
-    <Card onPress={() => router.push(jobHref(slug, job.id))}>
-      {/* The badges have a line of their own, so a long title keeps the width. */}
-      <Text style={{ fontWeight: "700", color: colors.text }} numberOfLines={2}>
-        {job.title}
-      </Text>
-      <Row gap={6}>
-        <Badge label={JOB_TYPE_LABELS[job.jobType]} tone="info" />
-        {/* A closed job takes no requests, whatever its poster offered. */}
-        {job.canRefer && !job.isClosed && <Badge label={CAN_REFER_BADGE} tone="success" />}
-        {job.isClosed && <Badge label="Closed" />}
-        <ModerationBadge status={job.moderationStatus} />
-      </Row>
-      <Muted size={13}>
-        {job.companyName}
-        {place ? ` · ${place}` : ""}
-      </Muted>
-      <Text numberOfLines={2} style={{ color: "#475569" }}>
-        {job.summary}
-      </Text>
-      <Muted>
-        {job.author.fullName} · {timeAgo(job.createdAt)}
-        {pay ? ` · ${pay}` : ""}
-      </Muted>
-    </Card>
-  );
-}
+const emptyIcon = (Icon: typeof IconJobs) => <Icon size={32} color={colors.faint} />;
 
 function SeekerCard({ slug, seeker }: { slug: string; seeker: JobSeekerDto }) {
   return (
@@ -90,7 +80,29 @@ export default function JobsScreen() {
   const [q, setQ] = useState("");
   const [jobType, setJobType] = useState<JobType | "">("");
   const [canRefer, setCanRefer] = useState(false);
-  const filters = { q: q || undefined, jobType: jobType || undefined, canRefer: (available && canRefer) || undefined };
+  const [showFilters, setShowFilters] = useState(false);
+  const [workMode, setWorkMode] = useState<WorkMode | "">("");
+  const [seniority, setSeniority] = useState<JobSeniority | "">("");
+  const [experience, setExperience] = useState("");
+  // Whole years in range, or no filter: the API refuses anything else, and a half-typed box shouldn't empty the list.
+  const years = /^\d{1,2}$/.test(experience.trim()) && Number(experience) <= JOB_EXPERIENCE_MAX_YEARS ? Number(experience) : undefined;
+  const filters = {
+    q: q || undefined,
+    jobType: jobType || undefined,
+    workMode: workMode || undefined,
+    seniority: seniority || undefined,
+    experience: years,
+    canRefer: (available && canRefer) || undefined,
+  };
+  const moreActive = [workMode, seniority, years !== undefined].filter(Boolean).length;
+  const filtersToggle = useRef<ComponentRef<typeof View>>(null);
+  const clearMore = () => {
+    setWorkMode("");
+    setSeniority("");
+    setExperience("");
+    // The button goes with the filters it cleared, so focus moves to the toggle beside it.
+    moveFocus(filtersToggle.current);
+  };
   const jobs = useInfiniteList(qk.jobs(slug, filters), (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), tab === "openings");
   const seekers = useInfiniteList(qk.seekers(slug), (cursor) => api.jobs.seekers.list(slug, { cursor, limit: 20 }), tab === "seekers");
   const [status, setStatus] = useStatus();
@@ -124,18 +136,55 @@ export default function JobsScreen() {
               refreshing={jobs.isRefetching && !jobs.isFetchingNextPage}
               onRefresh={() => void jobs.refetch()}
               // With the list, so the filters scroll out of the way of the jobs they found.
+              // Search, type and Can refer stay in view; the rest waits behind Filters, as on the directory.
               ListHeaderComponent={
                 <View style={{ gap: spacing.sm }}>
-                  <ChipSelect options={JOB_TYPES.map((t) => ({ value: t, label: JOB_TYPE_LABELS[t] }))} value={jobType} onChange={setJobType} allowEmpty />
+                  <View role="group" aria-label="Job type">
+                    <ChipSelect tall options={JOB_TYPES.map((t) => ({ value: t, label: JOB_TYPE_LABELS[t] }))} value={jobType} onChange={setJobType} allowEmpty emptyLabel="All types" />
+                  </View>
                   {available && <Choice kind="checkbox" label={CAN_REFER_BADGE} checked={canRefer} onPress={() => setCanRefer(!canRefer)} />}
+                  <Row style={{ justifyContent: "space-between" }}>
+                    <Pressable ref={filtersToggle} onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" aria-expanded={showFilters} style={{ minHeight: 44, justifyContent: "center" }}>
+                      <Text style={{ color: theme.primary, fontWeight: "600" }}>
+                        {showFilters ? "Hide filters" : "Filters"}
+                        {moreActive ? ` (${moreActive})` : ""}
+                      </Text>
+                    </Pressable>
+                    {moreActive > 0 && (
+                      <Pressable onPress={clearMore} accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center" }}>
+                        <Text style={{ color: colors.muted }}>Clear filters</Text>
+                      </Pressable>
+                    )}
+                  </Row>
+                  {showFilters && (
+                    <View style={{ gap: spacing.sm, paddingBottom: spacing.xs }}>
+                      <View role="group" aria-label="Work mode">
+                        <ChipSelect tall label="Work mode" options={WORK_MODES.map((m) => ({ value: m, label: WORK_MODE_LABELS[m] }))} value={workMode} onChange={setWorkMode} allowEmpty />
+                      </View>
+                      <View role="group" aria-label="Seniority">
+                        <ChipSelect tall label="Seniority" options={JOB_SENIORITIES.map((s) => ({ value: s, label: JOB_SENIORITY_LABELS[s] }))} value={seniority} onChange={setSeniority} allowEmpty />
+                      </View>
+                      <Input
+                        label="Your experience (years)"
+                        value={experience}
+                        onChangeText={setExperience}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        hint="Lists the jobs whose experience range fits you."
+                        style={{ width: 120 }}
+                      />
+                    </View>
+                  )}
                 </View>
               }
               ListEmptyComponent={
                 <ListEmpty loading={jobs.isLoading} error={jobs.error} onRetry={() => void jobs.refetch()}>
                   {filters.canRefer ? (
-                    <EmptyState icon="🤝" title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
+                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
+                  ) : moreActive || filters.q || filters.jobType ? (
+                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings match" description="Try removing a filter." />
                   ) : (
-                    <EmptyState icon="💼" title="No openings right now" description="Know of a role? Post it for your batchmates." />
+                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings right now" description="Know of a role? Post it for your batchmates." />
                   )}
                 </ListEmpty>
               }
@@ -164,7 +213,7 @@ export default function JobsScreen() {
               onRefresh={() => void seekers.refetch()}
               ListEmptyComponent={
                 <ListEmpty loading={seekers.isLoading} error={seekers.error} onRetry={() => void seekers.refetch()}>
-                  <EmptyState icon="🙋" title="Nobody is looking right now" />
+                  <EmptyState icon={emptyIcon(IconProfile)} title="Nobody is looking right now" />
                 </ListEmpty>
               }
               renderItem={({ item }) => <SeekerCard slug={slug} seeker={item} />}
