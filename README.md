@@ -5,7 +5,8 @@ branded starting page; alumni sign in with their mobile number (OTP over WhatsAp
 are approved automatically or by the institution's admins, and then use the community. Illuminize staff onboard
 institutions and keep offline billing (chargeback) records from a platform console.
 
-- **Members** (web and phone app): a community feed with polls and announcements, a jobs board with referral requests,
+- **Members** (web and phone app): a profile with work and study history, skills and links (set up in three guided
+  steps), a community feed with polls and announcements, a jobs board with structured job posts and referral requests,
   a funding board, a business directory, the batch directory, events with RSVPs, birthdays and anniversaries, a weekly
   digest, and private contact: direct messages (each starting as a request), group chats and mentorship.
 - **Institution admins** (web): member approval, content moderation and reports, chat reports with an audited view,
@@ -130,6 +131,30 @@ database, once migrated, gets it from the next `pnpm db:seed`.
 | Referral jobs | Rahul's "Backend Engineer (Node.js)" and Priya's "Associate Product Manager" take referral requests; one waits for Priya; Rahul accepted one from Gaurav Chatterjee, with its chat | Priya (a request to answer), Rahul (an accepted one) |
 | A current pupil | Naina Sen in Demo School (see above) | `+919100000026` |
 
+The seed also fills in profiles and job posts, on a fresh database (`pnpm db:reset`): on an existing one it leaves the
+members, profile questions and jobs already there as they are.
+
+- **Full profiles** for seven named members, matching their posts and listings: in Demo University Rahul
+  (`+919100000001`, founder of Zylo Labs), Priya (`+919100000002`, product at Google), Vikram (`+919100000005`, an MBA
+  student and the seeded job seeker) and Sneha (`+919100000006`, distributed systems, open to investing); in Demo
+  College Kiran Joshi (`+919100000011`) and Neha Sharma (`+919100000012`); and in Demo School Nikhil Bose
+  (`+919100000023`), whose college and MBA are studies elsewhere. Each has a headline, skills, past roles and at least
+  one link, and all but Vikram say what they're open to.
+- **Partial profiles** for about 60% of the generated members: some of a headline, industry, skills, the year they
+  started working, past roles, a degree here, studies elsewhere, links and Open to. They come from a random stream of
+  their own, so every other generated value is as it was.
+- **Profile questions.** Demo University no longer asks "Department", which field of study replaces, and its waiting
+  invitation for Harsh Vora prefills Hostel instead. Demo College's "Branch" and "Higher studies" became one filterable
+  multiple-choice question, "Clubs and societies".
+- **Rich jobs.** Rahul's "Backend Engineer (Node.js)" at Zylo Labs fills in nearly everything: Remote from Mumbai,
+  Mid level, 3–6 years, four skills, two openings, "₹25–40 LPA" with the pay note "Plus ESOPs", bulleted
+  Responsibilities, Requirements and Benefits, How to apply with a link, and About the company. Priya's "Associate
+  Product Manager" at Google is Hybrid in London, Entry level, 1–3 years and "£55k–70k/yr". Kiran's "Robotics Intern"
+  waits in Demo College's Moderation (the admin `+919000000002`), so the preview shows a "₹25,000–35,000/mo" stipend,
+  "Open to freshers", three openings, an education requirement and skills including ROS2. The other jobs stay short.
+- **Rich text.** The Zylo Labs business listing (bullets, a numbered list and a link) and the Mumbai coffee meetup
+  (bullets, a link and an email) show how descriptions render.
+
 The e2e journeys change some of this (the admin journey removes the reported message, for one), so run `pnpm db:reset`
 before showing the demo.
 
@@ -138,13 +163,14 @@ before showing the demo.
 ### Tenants and membership
 
 - A **user** is a phone number (global). A **membership** is that user inside one tenant and carries the profile
-  (name, batch year, date of birth, profession, company, designation, city/country, optional marital status, kids,
-  bio, LinkedIn, interests, and the institution's own profile questions) and the approval state. One person can belong
-  to several institutions.
+  (name, batch year, photo, date of birth, profession, company, designation, city/country, headline, work and study
+  history, skills, links, optional marital status and kids, bio, interests, and the institution's own profile
+  questions: see **Profiles and onboarding**) and the approval state. One person can belong to several institutions.
 - **Profile questions** are defined per institution (up to 30: text, long text, number, date, single or multiple
   choice, yes/no). Each can be required (asked at sign-up), visible to members or to admins only, editable by the
   member or set by admins, and choice questions can filter the directory (`?field=key:value`, repeatable). Values are
-  validated by the same shared schema in the API, web and mobile apps.
+  validated by the same shared schema in the API, web and mobile apps. Degree and field of study are built into every
+  profile outside schools, as **Admin → Profile fields** says, so they need no question.
 - Per-tenant **member approval mode**: `AUTO_APPROVE` or `ADMIN_APPROVAL`. Pending members see a waiting screen and
   are notified when approved or rejected (with the reason). Rejected members can update their details and re-apply;
   admins can suspend and reinstate.
@@ -202,6 +228,202 @@ Current pupils can't use messages, groups, mentorship or referral requests, what
 The membership DTO carries `chatEligible` and member profiles carry `canMessage` (never false because of a block,
 which would give it away). Both apps hide every entry point when these are false.
 
+Other members never see a current pupil's profile links or Open to (admins still see any that are stored, on the
+member's page and in the members CSV), the forms don't ask them for either, and every save clears their Open to (see
+**Profiles and onboarding**).
+
+### Profiles and onboarding
+
+A profile belongs to a membership, so someone in two institutions has two: the batch, the degree and admins' edits
+are the institution's own, and each admin's CSV export covers only their members. **Use details from …** (below)
+saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts` and `schemas/membership.ts`, so both apps
+and the API agree.
+
+- **Fields.** Besides name (2 to 100 characters), batch, date of birth, what they do, company and role (120 each),
+  city (80), country, bio (1000) and interests (20, of 40 characters each), a profile holds:
+  - a photo (see **Photos and uploads**);
+  - a **headline** of up to 120 characters on one line (runs of spaces and line breaks become one space), shown under
+    the name;
+  - an **industry**, from a fixed list of 24 (`INDUSTRIES`, which jobs share);
+  - the **year they started working**, from which the apps show "8 years of experience" ("Started working in 2026" in
+    that year), so it never goes stale;
+  - up to 20 **skills** of 40 characters each;
+  - their **degree** and **field of study** here (80 each);
+  - up to 15 **past roles** (company and title, 120 each, with optional start and end years); the current role stays
+    the company and role fields;
+  - up to 10 **studies elsewhere** (institution 120, degree and field of study 80 each, and years);
+  - **links**: LinkedIn, website, GitHub, Instagram and X (500 characters each);
+  - **Open to**: Hiring, Collaborating and Investing. Open to work stays the job-seeker profile, and Mentor comes from
+    the mentor profile: profiles and directory cards carry `isMentor` by the Mentors list's own rule, and the edit
+    screen links to **Offer to mentor** for a member who can mentor and doesn't yet.
+- **Years** run from 1940 to this year, judged when the input is parsed rather than when the server started; studies
+  elsewhere may end up to 10 years ahead. An entry can't end before it starts.
+- **Lists** travel whole in the same body as the rest of the profile and replace what's stored. The server stores past
+  roles and studies newest first: by end year (or the start year when there's no end), then start year, with entries
+  that have no years last.
+- **Links are checked by their real hostname** (`hostUrlSchema`): LinkedIn on linkedin.com or a subdomain, GitHub on
+  github.com, Instagram on instagram.com and X on x.com or twitter.com, so "https://evil.com/?linkedin.com/" no longer
+  passes as LinkedIn. No link may carry a user name or password, and each is stored as the URL parser reads it
+  (`URL.href`), so whatever opens it goes where the check looked: "https://linkedin.com\@evil.com" is stored as
+  "https://linkedin.com/@evil.com". The forms turn a handle ("@asha" or "asha") into that site's profile address and
+  put "https://" in front of "github.com/asha", as the member leaves the box and again on save; the API takes full URLs
+  only. Migration 0028 cleared stored LinkedIn values a host check refuses, and profiles shown to other members leave
+  out any other stored link today's rules refuse.
+- **Skills** go through `normalizeSkills` (`lib/skills.ts`), on profiles and jobs alike: each is trimmed with inner
+  spaces collapsed, blanks are dropped, and repeats are dropped ignoring case and full-width letters (`skillKey`),
+  keeping the first spelling and the member's order. An over-long skill is an error at its place in the list, and too
+  many is an error rather than a list cut short.
+- **Who is asked what.** Students aren't asked the year they started working. Schools don't ask for a degree or field
+  of study here: their forms hide both, every save at a school clears them, retyping an institution to a school clears
+  every member's (counted in the audit log), and the members CSV leaves the two columns out. Current pupils aren't asked
+  for links or Open to: the API clears their Open to on every save, whatever was sent or stored, other members never
+  see their links or Open to (admins still see any that are stored, on the member's page and in the members CSV), and
+  the directory's Open to filter never finds them. An input a form hides is neither checked nor sent
+  (`hiddenProfileKeys`), so a value the member can't see can't block a save. A profile edit (PATCH) leaves any key it
+  doesn't send as stored (null or `[]` clears it), so leaving a hidden input out loses nothing beyond the school rule
+  above.
+- **Profile pages.** A member's profile, My profile and the admin's member page share one layout on both apps: photo,
+  name, the headline (or else the role line, such as "CEO at Zylo Labs"), batch and place, and badges (Open to work,
+  Mentor, each Open to choice); then links (a website named by its host, `rel="noopener noreferrer nofollow"`), the bio
+  as rich text, skills, "N years of experience · industry", a timeline with the current role first and then past roles,
+  studies here (not at schools) and elsewhere, and interests. Empty parts are left out. The edit form (under the
+  profile on My profile on web, **Edit profile** on mobile) has the registration steps' three sections, Basics, Work
+  and About you (`#basics`, `#work`, `#about` on web; `?section=` on mobile), saved with one PATCH. Past roles and
+  studies elsewhere are list editors (Add, Edit, Remove, Done), and a server error lands on its exact field, list rows
+  included (`experiences.1.endYear`).
+
+**Registration** walks through the same three sections on both apps, under a step bar: "Step 1 of 3 · Basics", then
+Work and About you.
+
+1. **Basics**: the photo, name and batch (still the first two inputs), what they do, date of birth, city and country,
+   and the institution's required questions. Everything registration requires is on this step, so skipping the others
+   is always safe.
+2. **Work**: headline, company, role, industry, the year they started working, skills and past roles.
+3. **About you**: bio, interests, degree and field of study, studies elsewhere, links and Open to, the institution's
+   optional questions, a **Personal** disclosure (marital status and kids) and the sharing switches.
+
+Each step leaves out what the member isn't asked (see "Who is asked what" above).
+
+- **Continue** checks the step it leaves. **Skip for now** on Work puts back the values it last accepted. The last step
+  has **Back** and **Join the network** or **Submit for approval**, by the server's rule (an institution that approves
+  members automatically, or an invitation it lets straight in), with "An admin at … will review your profile before you
+  can join." under it when approval is needed. The step bar opens any step already visited.
+- **One POST at the end** (`POST /t/:slug/memberships`), so admins hear only of complete applications. A server error
+  opens the earliest step holding a field it names (`profileStepOf`) and marks the field.
+- Each step starts at the top with its heading focused. Browser Back (web) and Android's back button go to the step
+  before; iOS swipe-back is off after step 1; a double tap moves one step.
+- **Re-applying** after a rejection prefills every step and shows the reason above each. On a first registration the
+  name comes from the invitation, or else from the account.
+- **The draft stays in memory only**, as it holds personal details, and survives a background refetch failing.
+
+**Use details from another institution.** Step 1 offers "You have a profile at …" with a **Use details from …** button
+(`GET /me/profile-copy?exclude=<slug>`), from the member's most recently updated approved membership at another
+institution (never one waiting, rejected or suspended, nor at a suspended or archived institution).
+
+- It brings only details that belong to the person: city and country, headline, company, role, industry, the year they
+  started working, skills, past roles, bio, interests, studies elsewhere (the degree and field of study there become one
+  entry named after that institution), links (checked against today's rules) and Open to. Never the batch, the
+  institution's questions, the **Personal** details (marital status and kids), the phone setting or the photo.
+- The date of birth comes only when that profile shows the birthday on its feed, because a new profile celebrates it
+  until the member turns that off.
+- It fills only inputs the member hasn't changed, skips inputs the form hides, and says what it did: "Filled in your
+  city, headline, company and 6 more from Demo University. Kept what you'd entered for your country."
+- **Undo** puts back only what still holds what the copy put there, and says which later changes it kept.
+- It isn't offered when re-applying, or when it would add nothing.
+
+**Profile strength** (`profileStrength`) weighs what's filled in:
+
+| Item | Weight | Left out for |
+| --- | --- | --- |
+| Photo | 20 | |
+| Headline | 15 | |
+| Current role (company or role) | 10 | |
+| City | 10 | |
+| 3 or more skills | 10 | |
+| Bio | 10 | |
+| Industry | 5 | |
+| The year they started working | 5 | students and current pupils |
+| A link | 5 | current pupils |
+| Degree or field of study here | 5 | schools |
+| A past role or studies elsewhere | 5 | |
+
+The score is the weight done out of the weight that applies to the member. The feed opens with a "Complete your
+profile" card (a section, not a post) showing the score and the three heaviest missing items, each linking to its
+section of the edit form; it hides at 90% or above. **Not now** (`POST /memberships/me/profile-nudge/dismiss`) stamps
+`profile_nudge_dismissed_at`, so the card stays away for 14 days on every device, and leaves "Hidden for 14 days. My
+profile always shows what's left to add." in its place. My profile always shows the meter and everything still to add.
+
+**Directory.** `q` also matches the headline and any skill. New filters for industry, skill (one, matched whole and
+regardless of case), field of study (matched whole, like city) and Open to sit behind **More filters** (web) and
+**Filters** (mobile). `GET /directory/filters` returns the industries present and the 50 commonest skills and fields of
+study, merged across case and spelled as most members spell them (cached for five minutes). Cards show the headline (or
+the role line) and short Open to badges that screen readers hear in full.
+
+### Photos and uploads
+
+Every image goes through `POST /t/:slug/uploads` (a JPEG, PNG or WebP of at most 5 MB in the `file` field, its type
+read from its bytes) and is re-encoded with sharp before it's stored (`apps/api/src/lib/images.ts`):
+
+- turned upright from its EXIF orientation, with all metadata dropped, GPS position included;
+- scaled down to at most 2048 pixels on the longest side (never enlarged), keeping its format, and re-encoded smaller
+  if that's what it takes to stay under the size limit;
+- refused with 413 above 40 megapixels or when its decoded bitmap would be too large, and with 415 (`UNSUPPORTED_MEDIA`)
+  when it won't decode. Each API process works on at most two images at once.
+
+`?purpose=avatar` (the default is `image`) makes a profile photo: a 512×512 JPEG cropped around the most interesting
+part, with any transparency on white. A purpose the API doesn't know is refused before the rate limits count it.
+
+- **Who may upload:** members (approved, or pending or rejected while they fix their registration; not suspended),
+  anyone registering where self-registration is open, anyone holding an open invitation (so an invitee at a closed
+  institution can add a photo while registering), and Illuminize staff. 20 uploads an hour per user, and
+  `UPLOADS_PER_TENANT_DAILY_CAP` per institution.
+- **The ledger.** The `uploads` table records each stored file: institution, uploader, storage key, purpose, type and
+  size. The row outlives its uploader (`user_id` becomes null).
+- **A profile photo must be your own.** A changed `avatarUrl` (on registering, editing or an admin's edit) must be an
+  avatar uploaded to this institution by the member, or by the admin making the edit; otherwise 400 on `avatarUrl`.
+  That keeps out third-party addresses, which would log everyone who opens the directory, and other people's photos.
+  An unchanged value always passes, so photos saved before this rule, or before a switch of storage provider, keep
+  working. The apps send `avatarUrl` only when it changed.
+- **Clean-up.** After the change commits, a replaced or removed photo's file and ledger row are deleted when no profile
+  in the institution still shows it. The save and the delete both lock the photo's ledger row, so a concurrent save
+  can't lose a photo in use. Deleting an account deletes the user's photos that nothing else shows. The
+  `uploads.sweepAvatars` job runs every six hours and deletes avatar uploads more than two days old that no profile
+  shows (photos picked in a form that was never saved). Storage errors are logged and never fail a request; the row
+  stays, so the sweep tries again. Only profile photos are ever deleted.
+- **CDN copies.** S3 objects are cached as immutable for a year, so a CDN in front of the bucket may keep serving a
+  deleted photo until its copy expires.
+- **Both apps** use an `AvatarPicker`: a 96px round preview with initials, **Add photo**, **Change photo** and **Remove
+  photo**, the server's type and size checks before sending (`imageFileProblem`), a large photo shrunk to 1024 pixels
+  in the browser first, progress, and cancel with a 90-second timeout. Errors show inline and are announced. Saving
+  waits while a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop.
+  An avatar shows initials until its photo loads, and falls back to them if it fails.
+
+### Rich text
+
+Long descriptions take bullet lists and clickable links, with no other formatting: the parser is
+`parseRichText` in `packages/shared/src/lib/richText.ts`, pure and linear in the length of the text (checked on
+50,000-character pathological inputs).
+
+- A line starting with `-`, `*`, `•`, `●`, `▪`, `◦` or `–` and a space is a bullet ("-5°C" isn't). `1.` or `1)` and a
+  space starts a numbered list, which keeps its starting number. A line indented by two spaces (or a tab) continues the
+  item above; a blank line ends a list or paragraph, and a paragraph keeps its line breaks.
+- `http(s)` addresses and bare email addresses become links, and the link text is exactly what was written.
+  Punctuation that ends a sentence is left out of an address, curly quotes, the em dash and CJK punctuation end one
+  wherever they are, and a closing bracket stays only when the address opened it.
+- A link must pass `new URL()`: http, https or mailto only, a host, no user name or password
+  ("https://google.com@evil.com" stays text), and at most 2048 characters. A host written beyond ASCII also stays text,
+  so the text shown always matches where the link goes. Zero-width and bidirectional control characters are stripped
+  first.
+- The `RichText` component on web (`components/common/RichText.tsx`) and mobile (`components/RichText.tsx`) builds
+  React elements only, never `dangerouslySetInnerHTML`. Links carry `rel="noopener noreferrer nofollow ugc"` (real
+  anchors on the web export), screen readers hear list numbers but not bullets, and right-to-left lists lay out from
+  their first letter (`dir="auto"` on web, `textDirection` on mobile).
+- It renders a job's About the role and other sections and its About the company, event details, funding pitches,
+  business descriptions and member bios. `RICH_TEXT_HINT` ("Start a line with - for a bullet point. Links become
+  clickable.") sits under those fields in the forms, and cards show a plain excerpt with the markers gone
+  (`plainExcerpt`).
+- Posts, comments and chat stay plain text on purpose: links in the feed invite spam, and chat is text only.
+
 ### Billing / chargeback (offline)
 
 Billing is settled outside the product. The platform console records a **plan** per institution (per active member,
@@ -241,7 +463,8 @@ OTP delivery is pluggable (`OTP_PROVIDER`):
 ### Background jobs
 
 Work that can wait (push notifications and Expo receipts, outbound messages, invitations, announcements, celebrations,
-the weekly digest and chat pushes) runs on BullMQ queues in Redis: `jobs`, `messages` and `chat`. Code inside a request
+the weekly digest, chat pushes and the sweep of unsaved profile photos) runs on BullMQ queues in Redis: `jobs`,
+`messages` and `chat`. Code inside a request
 queues a job; it never calls slow providers itself.
 
 - **Where workers run.** `WORKER_MODE=inline` (the default outside production, so `pnpm demo` needs nothing extra)
@@ -342,10 +565,82 @@ needed. Bulk notifications are written in chunks of 1000 with dedupe keys and br
 zone): new and active members per week (active means the same as for billing), posts, comments, jobs and events per
 week, and who the members are (batches, cities, countries, professions, profile completeness, answers to choice
 questions, invitation funnel), with each headline number compared with the period before. Every chart has a table
-view. *Members CSV* exports every member with all profile answers (admin-only ones included) and confirmed email;
-*Activity CSV* gives active days and content per member for the chosen period. Exports stream in batches of 1000,
+view. Profile completeness counts photo, headline, city, company, industry, skills, past roles, education (a degree or
+field of study here, or studies elsewhere), birthday, LinkedIn, any link and confirmed email. *Members CSV* exports
+every member with all profile answers (admin-only ones included) and confirmed email, and after "Last active" the
+profile's own details: headline, industry, the year they started working, skills, degree, field of study, past roles,
+studies elsewhere, each link and Open to (a list in one cell; no degree columns at a school). *Activity CSV* gives
+active days and content per member for the chosen period. Exports stream in batches of 1000,
 start with a UTF-8 BOM so Excel reads them correctly, prefix cells starting with `= + - @` with `'` so spreadsheets
 don't run them as formulas (this includes `+91…` phone numbers), and are audited and rate-limited.
+
+### Jobs
+
+Members post jobs under **Jobs**, following the institution's content moderation. A job carries what someone needs
+before applying, laid out the same way on both apps; the rules are in `packages/shared/src/schemas/jobs.ts` and
+`lib/jobs.ts`. The form has six sections (limits in characters unless noted):
+
+| Section | Fields |
+| --- | --- |
+| Basics | Job title (3–150), Company (120), Type (Full time, Part time, Contract, Internship, Freelance), Work mode (On-site, Hybrid or Remote; On-site when not given), Location (120) |
+| Requirements | Seniority (Entry level, Mid level, Senior, Lead, Manager, Executive), Minimum and Maximum experience (0–50 years), Skills (up to 15 of 40 characters, normalised as on profiles), Education (120) |
+| Pay | Currency (INR, USD, EUR, GBP, AED, SGD, CAD or AUD; INR when not given), Pay period (Per year, Per month, Per hour), Minimum and Maximum pay, Pay note (80, such as "Plus ESOPs"), Openings (1–1000) |
+| About the role | About the role (the `description` field, 10–5000, required), Responsibilities, Requirements and Benefits (3000 each), all rich text |
+| Company | Logo (an upload), Website, Industry (the profiles' 24), Company size (1–10, 11–50, 51–200, 201–1,000, 1,001–5,000, 5,001+), About the company (1500) |
+| How to apply | Apply link, Contact email, Contact phone (24), Applications close, How to apply (3000), and "I can refer people for this job" |
+
+- **Rules.** A maximum must be at least its minimum, for experience and for pay. An edit's ranges are checked again
+  against what's stored, under the row lock, so a PATCH of only a maximum below the stored minimum gets 400 on that
+  field; CHECK constraints back this up. A field an edit leaves out stays as it is (null clears it, `[]` the skills),
+  so a form that doesn't show a field can't wipe it. The apply link, company website and logo are http or https with no
+  user name or password, at most 2048 characters, and stored as the URL parser reads them, like profile links
+  (`linkUrlSchemaUpTo`). `jobs.company_industry` uses the same `industry` enum as `memberships.industry`.
+- **Experience** shows as "3–6 years", "3+ years", "Up to 2 years" or "Open to freshers" (`experienceLabel`).
+- **Pay** is stored in whole minor units (paise, cents) with its currency and period. The form takes amounts in full
+  ("2500000, not 25 L") and converts them with `toMinor`, which rounds half away from zero on the decimal text.
+  `formatSalary` (`lib/salary.ts`) writes pay without Intl number formatting, which Hermes may lack: "₹25–40 LPA" for
+  rupees a year (crores from 100 lakh: "₹1.2 Cr"), "₹40,000–60,000/mo" with Indian digit grouping for rupees a month
+  or an hour, "$120k–150k/yr" for other currencies a year or a month, "$40–62.50/hr" by the hour, and "From …" or "Up
+  to …" with only one end. The form previews pay and experience as "Shows as: …". An internship's pay is its
+  "Stipend". The Pay note shows as a fact of its own, and on cards when there's no amount; migration 0029 copied the
+  old free-text salary into it.
+- **Where.** `workMode` replaced the remote flag (0029 turned `is_remote` into Remote, and 0030 dropped it).
+  `jobPlaceLabel` writes the place the same way on cards, the job's page, the digest email and both digest pages:
+  "Mumbai · Remote", "Remote", or the location alone for an on-site job.
+- **Cards and the page.** Lists return `JobCardDto`, built field by field: title, company and logo, place and work
+  mode, type, seniority, experience, skills, pay and pay note, and a `summary` the API makes from About the role (one
+  plain line of up to 200 characters). They carry no apply link, email, phone, sections or company details, so a page of
+  results isn't a contact scrape. `GET /jobs/:id` returns the full `JobDto`, which the admin preview and the edit form
+  use too. A card puts the title first for screen readers, draws the logo on the left without announcing it, and shows
+  place, type, experience, pay, two lines of summary and up to three skills, on one line, with "+N more". The page has
+  a header with the logo (or initials), title, company and place; the key facts with SVG icons (`jobFacts`: type, work
+  mode, location, pay or stipend, pay note, experience, seniority, openings, education, and "Applications close 12 Dec"
+  while open); skill chips; Apply, email and phone; the sections as rich text; and an "About the company" card.
+- **Closed or expired.** A job is open (`jobIsOpen`) while it's approved, not closed by its poster and not past its
+  closing date. Once it isn't, the API leaves out its apply link, email, phone and How to apply for everyone but its
+  poster and admins, and both apps show "Applications closed" (with the date, for one that expired) where the buttons
+  were. Closed and expired jobs leave the board unless `includeClosed` is set; the poster's own list keeps them.
+  Referral requests follow the same rule: a job takes them only while it's open and its poster offered.
+- **Filters.** Search ("title, company or skill"), Type and Can refer stay in view; Work mode, Seniority and "Your
+  experience (years)" sit behind **More filters** (web) or **Filters** (mobile), with **Clear filters**. `experience`
+  finds jobs whose range fits that many years: an open end never rules a job out, and a blank value is no filter.
+- **Reusing company details.** Once a company is typed, the form looks for the poster's latest job at the same company
+  (`mine=true&q=`, names compared as skills are, skipping removed jobs and the job being edited) and offers **Use
+  details from your last job at …**. It names the details it would fill, fills only the logo, website, industry, size
+  and about that are still empty, then says "Filled in from your last job at …. Check them before you post."
+- **Matching skills.** On a job's page, each of its skills that the viewer lists on their own profile here is a filled
+  chip with a check mark (screen readers hear "(you have this)"), in the job's own order, and a line under the chips
+  says "You have N of M skills", even at 0. A viewer whose profile lists no skills sees "Add your skills to see which
+  you match" there instead, which opens Work: `#work` on My profile on the web, **Edit profile** at Work on the phone
+  app. A card puts the matched skills first, with the same check, so the three it shows start with them, and "+N more"
+  counts the rest; the skills stay on one line, a long one cut short, and the card's accessible name lists them with
+  "(you have this)" after each match. Nothing is compared for the job's poster, on its page or its card (on the board
+  and in My posts), in the admin preview, or for a job with no skills. Skills match whole by `skillKey` (`skillMatch`
+  and `skillsMatchedFirst` in `lib/skills.ts`), so case, spacing and full-width letters don't matter, and "SQL" isn't
+  "PostgreSQL". The viewer's skills come from the membership each app already holds, so there's no extra request.
+- **The admin preview.** **Admin → Moderation** shows a job in full, as its page does, with headings that fit under the
+  Moderation page's own, its apply link, email, phone and website as text rather than links, How to apply even once
+  closed, and none of its skills marked. A member's edit still goes back for review where admins approve content.
 
 ### Business directory
 
@@ -354,6 +649,9 @@ website, and a contact email and phone. Each member may have up to five listings
 
 - Listings follow the institution's content moderation, can be reported (they go to **Admin → Reports**), and show in
   the author's My posts.
+- The description is rich text (bullets and links) on the listing's page, and a plain excerpt on cards. The apps upload
+  the logo, which is processed like every image (see **Photos and uploads**); the API itself still takes any http(s)
+  address for it (see Known gaps).
 - Search covers the name and description, with category and city filters.
 - Lists never carry the email or phone: only a listing's own page does, so a page of results can't be scraped for
   contacts. Contact details are typed by the author, never filled in from their account. Website and logo links must
@@ -521,7 +819,8 @@ because admins can read everything in that view. Instead:
   without notifying anyone. Accepted referrals stay accepted.
 - Their business listings go, and the open reports on them are resolved. Chat reports survive with the deleted party
   left empty.
-- All sessions are revoked once it commits, and their devices' push tokens are forgotten.
+- All sessions are revoked once it commits, and their devices' push tokens are forgotten. Their profile photos that no
+  other profile shows are deleted then too.
 
 **Suspending a member** blocks their REST calls in that institution and stops chat delivery to them (`chatRecipients()`
 leaves them out). Their live connection stays open, because they may be active in other institutions. Their chat
@@ -587,6 +886,7 @@ server validates the caller's membership on every tenant route. Platform routes 
 apps/api/src
   config/         zod-validated environment
   db/schema/      Drizzle tables, enums and the moderation_items view; db/seed.ts demo data
+  lib/            errors, transactions, pagination, phone numbers; images.ts (sharp: every upload re-encoded)
   middleware/     auth, tenant resolution + membership, feature and pupil guards, validation, rate limiting, errors
   services/       approval & moderation state machines, OTP, tokens, membership, content, billing, stats
   services/chat/  direct messages, groups, delivery (fanout.ts), pushes, blocks, reports and the admins' audited view
@@ -594,16 +894,20 @@ apps/api/src
   repositories/   all SQL (Drizzle) grouped by table
   routes/         public, auth, me, tenant (member + admin), platform
   services/otp/   console / WhatsApp Cloud / MSG91 senders behind one interface
-apps/api/drizzle  SQL migrations (generated; some hand-written parts: pg_trgm, the moderation_items view, and the
-                  content_type rebuilds in 0019 and 0023)
-apps/api/test     vitest unit + integration tests (real Postgres, in-memory Redis)
-apps/web/src      routes/ (member app, t/admin, platform), components/ (ui, icons, feed, layout…), hooks/, stores/;
-                  design tokens in index.css (Manrope + Source Sans 3, elevation ladder)
+apps/api/drizzle  SQL migrations (generated; some hand-written parts: pg_trgm, the moderation_items view, the
+                  content_type rebuilds in 0019 and 0023, the LinkedIn clean-up in 0028 and the jobs backfill in 0029)
+apps/api/test     vitest unit + integration tests (real Postgres, in-memory Redis; helpers/images.ts makes real images)
+apps/web/src      routes/ (member app, t/admin, platform), components/ (ui, icons, feed, layout, profile, jobs,
+                  common/RichText…), hooks/, stores/; design tokens in index.css (Manrope + Source Sans 3,
+                  elevation ladder)
 apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and other stacked screens above them),
-                  components/ (ui, icons via react-native-svg…), hooks/, stores/, theme/
-packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client),
-                  realtime/ (events and client), chat/ (chat cache and live sync, no React),
-                  lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections)
+                  components/ (ui, icons via react-native-svg, profile, jobs, RichText…), hooks/, stores/, theme/
+packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client, upload
+                  helpers), realtime/ (events and client), chat/ (chat cache and live sync, no React),
+                  lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections;
+                  profile.ts: profile sections, registration steps, strength and "Use details from"; skills.ts;
+                  salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
+                  phone.ts: national-number lengths)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 
@@ -616,12 +920,21 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 | --- | --- |
 | Public | `GET /tenants`, `GET /tenants/:slug`, `GET /invites/:token`, `GET/POST /unsubscribe`, `GET /health`, `POST /webhooks/razorpay` |
 | Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`, `POST /auth/email/verify` |
-| Me | `GET /me`, `GET/POST/DELETE /me/email`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
-| Tenant `/t/:slug` | `memberships` (register, me, update, invitation), `profile-fields`, `uploads`, `directory`, `jobs` (+ `seekers`, and referral requests: `jobs/:id/referrals`, `jobs/referrals/mine`, `jobs/referrals/summary`, `jobs/referrals/:id/accept/decline/withdraw/report`), `funding`, `businesses`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
+| Me | `GET /me`, `GET /me/profile-copy` (`?exclude=<slug>`), `GET/POST/DELETE /me/email`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
+| Tenant `/t/:slug` | `memberships` (register, me, update, invitation, `me/profile-nudge/dismiss`), `profile-fields`, `uploads` (`?purpose=image\|avatar`), `directory` (+ `filters`, and one member's profile), `jobs` (+ `seekers`, and referral requests: `jobs/:id/referrals`, `jobs/referrals/mine`, `jobs/referrals/summary`, `jobs/referrals/:id/accept/decline/withdraw/report`), `funding`, `businesses`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
 | Tenant chat `/t/:slug/chat` | `direct` (send a first message; `direct/:membershipId` finds a thread), `conversations` (`?inbox=MAIN\|REQUESTS`; one; `messages` with `?cursor` or `?afterSeq`; send; `read`, `mute`, `accept`, `decline`), `badge`, `blocks` (list, block, unblock), `messages/:id/report`, `groups` (list, create, `invites` for the member's own invitations; per group: get, edit or archive, `members`, `invite-candidates`, `join`, `leave`, `invites` to invite, `invites/accept`, `invites/decline`, `members/:membershipId` to remove) |
 | Tenant mentorship `/t/:slug/mentorship` | `me` (get, save, stop mentoring), `summary`, `mentors` (+ one), `requests` (send, list, `accept/decline/withdraw/end/report`) |
 | Tenant admin `/t/:slug/admin` | `dashboard`, `analytics`, `exports/members.csv`, `exports/activity.csv`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `mentors/:membershipId/remove`, `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `chat-reports` (list; `view`, `resolve`, `dismiss` are POSTs), `settings`, `branding`, `profile-fields`, `invitations` (import/send/revoke), `announcements/audience`, `audit` |
 | Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `analytics/comparison`, `exports/comparison.csv`, `jobs/run`, `users` (platform-admin toggle), `audit`, `messages` (test send, status), `chat-reports` (escalated, no text) |
+
+The directory and the jobs board filter by query parameter, besides `cursor` and `limit`:
+
+- `GET /t/:slug/directory`: `q` (name, company, role, headline or skill), `batchYear`, `city`, `country`,
+  `professionType`, `company`, `industry`, `skill`, `fieldOfStudy`, `openTo`, and `field=key:value` (repeatable).
+  `GET /directory/filters` lists the choices.
+- `GET /t/:slug/jobs`: `q` (title, company or skill), `jobType`, `workMode` (which replaced `remote`), `seniority`,
+  `experience` (years), `location`, `canRefer`, `mine` and `includeClosed`. It returns `JobCardDto`s; `GET /jobs/:id`
+  returns the full job.
 
 ### Rate limits
 
@@ -665,6 +978,20 @@ Integration tests skip when the test database is unreachable; set `REQUIRE_DB=1`
 BullMQ and Socket.IO adapter tests) to make them fail instead, as CI does. In PowerShell: `$env:REQUIRE_DB="1"`.
 `CLAUDE.md` summarises the conventions for anyone (or any Claude Code session) working on the code.
 
+Uploads are decoded and re-encoded with **sharp** (`apps/api/src/lib/images.ts`), so tests upload real images made at
+test time (`test/helpers/images.ts`); a few fake bytes after a PNG header now get 415. sharp ships its native library
+as per-platform packages (`@img/sharp-*`) with no install script, so it needs no entry in pnpm's build-script allowlist
+(`onlyBuiltDependencies` in `pnpm-workspace.yaml`, which lists only esbuild), installs on Windows, Linux and Alpine
+without a compiler, and survives the Dockerfile's `pnpm install --ignore-scripts`. pnpm installs the package for the
+machine it runs on, which is one more reason not to share `node_modules` between Windows and a dev container. Both CI
+workflows check that sharp loads right after installing.
+
+**Migrations that replace columns** go in two steps, as 0029 and 0030 do for jobs: add the new columns and backfill
+them while the old ones are still there, then drop the old ones in a second migration. Generated in one step,
+drizzle-kit stops to ask whether a column was renamed. And when merging a branch that adds migrations, regenerate them
+after the other branch's rather than renumbering them: Drizzle applies only migrations newer than the last one a
+database has.
+
 `e2e/README.md` explains how to run the Playwright smoke scripts that walk the member, admin and platform journeys,
 and how to export the Expo app for the web to exercise the mobile screens in a browser.
 
@@ -676,10 +1003,12 @@ cp .env.example .env                 # EXPO_PUBLIC_API_URL=http://10.0.2.2:4000 
 npx expo start                        # then press a / i, or scan with Expo Go
 ```
 
-`expo-notifications`, `expo-image-picker` and `expo-secure-store` are native modules: use a development build
-(`npx expo run:android`, or `npx expo run:ios` on a Mac) rather than Expo Go for push notifications. EAS Build works
-too, but the repo has no `eas.json` yet: run `npx expo install expo-dev-client` and `eas build:configure` first, then
-`eas build --profile development`. Images and tokens degrade gracefully on the web export.
+`expo-notifications`, `expo-image-picker`, `expo-secure-store` and `react-native-svg` are native modules: use a
+development build (`npx expo run:android`, or `npx expo run:ios` on a Mac) rather than Expo Go for push notifications.
+A development build made before `react-native-svg` was added (it draws every icon) lacks it and must be rebuilt; Expo
+Go already includes it. EAS Build works too, but the repo has no `eas.json` yet: run `npx expo install expo-dev-client`
+and `eas build:configure` first, then `eas build --profile development`. Images and tokens degrade gracefully on the web
+export.
 
 #### Push notifications
 
@@ -702,22 +1031,32 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   persistent (AOF) mode.
 - `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) limits image uploads per institution per day; `BILLING_TIMEZONE` sets the
   billing calendar.
+- Every upload is re-encoded with sharp inside the API process, at most two images at a time per process, and each can
+  hold a decoded bitmap of up to 160 MB (40 megapixels of 8-bit RGBA): allow for that in the API's memory. The image
+  gets sharp's Alpine (musl) build from the lockfile and needs no build tools.
 - `WEB_APP_URL` is the web app's public origin, used for links in invitations, announcements, digests and confirmation
   emails. It defaults to `http://localhost:5173` outside production; in production it is required once any outbound
   channel is configured (otherwise the API logs a warning at start). Also: `WHATSAPP_TEMPLATES`, `INVITES_DAILY_LIMIT`,
   `EMAIL_VERIFY_GLOBAL_DAILY_CAP` (see `apps/api/.env.example`).
 - Deploy the worker together with, or before, the API: new job types (announcement fan-out, celebrations, digest, and
-  the chat pushes on the `chat` queue) are queued by the API and must have a worker that knows them.
+  the chat pushes on the `chat` queue) are queued by the API and must have a worker that knows them. The worker also
+  runs the six-hourly sweep that deletes unsaved profile photos, so give it the API's storage settings: the same
+  `UPLOAD_DIR` volume with local storage, or the same bucket with S3.
 - Uploads: `STORAGE_PROVIDER=local` (default) keeps images under `UPLOAD_DIR`, served from `/uploads`, which suits one
   server with a persistent disk. For anything else set `STORAGE_PROVIDER=s3` with an S3-compatible bucket (AWS S3,
   Cloudflare R2 with `S3_REGION=auto`, DigitalOcean Spaces, MinIO): `S3_BUCKET`, `S3_PUBLIC_BASE_URL` (the bucket's
   public URL or a CDN), optional `S3_ENDPOINT`/`S3_FORCE_PATH_STYLE`, and keys or the default AWS credentials. The
   bucket must be publicly readable; objects are immutable and cached for a year. `/uploads` keeps serving older local
   files after a switch. Try it locally with `docker compose --profile s3 up -d` (MinIO, see `apps/api/.env.example`).
+  The API and the worker delete replaced and unsaved profile photos, so S3 credentials need `DeleteObject` as well as
+  `PutObject`; a refused delete is logged, and the sweep tries again. A CDN may keep serving a deleted photo until its
+  cached copy expires, and files stored on local disk before a switch to S3 are never deleted from it.
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
   at the API (or proxy `/api` and `/uploads`).
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck, the API test-suite against Postgres + Redis services, and builds.
-  `.github/workflows/windows.yml` runs the one-command setup, lint, typecheck, API tests and builds on Windows.
+- CI (`.github/workflows/ci.yml`) checks that sharp loads, then runs lint, typecheck, the API test-suite against
+  Postgres + Redis services, and builds; its `docker` job builds the API image and processes an image inside it.
+  `.github/workflows/windows.yml` runs the one-command setup, a sharp check, lint, typecheck, API tests and builds on
+  Windows.
 
 ## Known gaps / next steps
 
@@ -744,7 +1083,14 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   opened (refusals are audited, and the actions limited to 60 an hour), and the check takes no lock, so a report filed
   during an admin's suspend or role change doesn't stop it.
 - **Nothing has been checked on a real phone** beyond what the web export shows: see "Checks that need a real phone" in
-  `e2e/README.md`.
+  `e2e/README.md`. Profiles and jobs added more of them: the native square crop and the photo-library permission,
+  cancelling an upload and its timeout, the keyboard on the long edit form, the list editors and each registration
+  step, Android's back button between registration steps and iOS swipe-back being off after step 1, VoiceOver and
+  TalkBack focus after removing or finishing a list row, on the copy banner and its Undo, and on the "Not now" note,
+  links opening the browser, the chip rows keeping the chosen chip in view, VoiceOver and TalkBack on a job's matched
+  skills and its card, a job's add-skills link bringing back a profile editor already open, and the edit screen's
+  scroll to a section (`measureLayout`) on the new architecture.
+- **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
 **Smaller follow-ups.**
 
@@ -770,14 +1116,37 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     run it until they're reinstated.
   - Under automatic approval, an owner's edit republishes a rejected group with no admin, as an edit does for posts.
 - Content and moderation:
-  - Funding listings keep the flaws the business directory avoided: contact details in lists, and edits with no rate
-    limit.
+  - Funding listings keep the flaws the business directory avoided: contact details in lists (jobs no longer send
+    them either), and edits with no rate limit.
   - Deleting a post, job, funding listing or event leaves its open reports in the queue with no content (business
     listings resolve theirs). A report filed while a listing is being deleted can still slip in the same way.
   - `CONTENT_REMOVED` pushes include the admin's note, which chat removals keep in the app.
   - **Admin → Reports** shows only an error when another admin has just handled a report; Chat reports closes the
     dialog and refreshes the list.
   - Illuminize staff reach only escalated chat reports, even in an institution where they are genuine admins.
+- Uploads:
+  - A CDN in front of S3 may keep serving a deleted profile photo until its cached copy expires.
+  - Only a profile photo has to be the member's own upload. Job company logos, business logos, post images and event
+    covers take any http(s) address, so one can point at someone else's upload, or at a server that logs whoever views
+    it.
+  - Only profile photos are ever deleted: other uploads stay in storage after whatever used them changes or goes.
+- Links:
+  - In rich text, an address whose host is written beyond ASCII (an internationalised domain) stays plain text rather
+    than becoming a link.
+  - The mobile app's right-to-left layout of rich text is an approximation: it takes the direction from the first
+    letter, using letter ranges for the main scripts (`textDirection`), where the web has the browser's `dir="auto"`.
+  - Job links (apply link, company website, logo) saved before the stricter rules are stored and shown as they were
+    typed. Profile links saved before them are stored as typed too, though other members see them only as today's rules
+    read them, and not at all if those rules refuse them.
+  - Events, business listings and funding still check their links with the older `httpUrlSchema`, which lets a user
+    name or password through ("https://google.com@evil.example") and stores the address as typed.
+- Registration:
+  - Browser Back (web) goes to the previous step only when the history entry before registration belongs to the same
+    page load, such as the landing page that led to sign-in. When registration holds the load's first entry (its
+    address, or the sign-in page, opened directly or in a new tab, or the page reloaded), Back leaves registration, and
+    the draft with it.
+  - Nothing tests the "Join the network" label at an institution that approves members automatically but has invite
+    auto-approve off: no seeded institution is set up that way.
 - Screens and navigation:
   - The admin Members status tabs can still overflow sideways on narrow phones (member rows reflow; tabs don't wrap).
   - The web app's shared Modal close and ConfirmDialog buttons are under 44px tall.
@@ -785,8 +1154,15 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
-  - UI follow-ups: deeper tenant theming / branding preview in admin, skeleton loaders and purposeful motion, and a
-    sweep of any remaining emoji on secondary empty states (chrome and feed already use the shared SVG icon set).
+  - UI follow-ups: deeper tenant theming / branding preview in admin, and skeleton loaders and purposeful motion.
+  - Emoji still stand in for icons in places. The profile, member, directory, job and notification screens use the
+    shared SVG set, but on both apps emoji remain on most other empty states (messages, groups, mentors, events,
+    funding, businesses, the digest, blocked members), the lock on the Messages, Groups and Mentors "aren't available"
+    screens, the chat list's group and muted marks, the feed's digest banner and the digest's new-members line,
+    business and funding contact buttons, an event's city, the pending-approval screen and the tenant picker; on the
+    phone app's Add image, Add a poll, a business's Add logo and an event's Cover image buttons; and on the web, the
+    admin and platform consoles' empty states, the moderation badges and Pin button, the page-not-found, error and
+    email confirmation pages, and the platform console's nav.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

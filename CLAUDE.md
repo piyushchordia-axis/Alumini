@@ -18,6 +18,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React; `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections;
   `src/data/countries.ts` (generated) includes `maxNationalDigits` and `src/lib/phone.ts` clamps national numbers.
+  `src/lib/profile.ts` holds the profile's sections and registration steps, strength, hidden inputs and "Use details
+  from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
+  `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser.
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -30,7 +33,7 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 | Lint / typecheck everything | `pnpm lint`, `pnpm typecheck` (or `pnpm turbo run lint typecheck`) |
 | API tests | `pnpm test` (Postgres + Redis must run; set `REQUIRE_DB=1` and `REQUIRE_REAL_REDIS=1` so nothing silently skips) |
 | One test file | `cd apps/api; pnpm exec vitest run test/integration/polls.test.ts` |
-| New migration after a schema change | `pnpm --filter @illuminize/api db:generate --name short_name`, then `pnpm db:migrate` |
+| New migration after a schema change | `pnpm --filter @illuminize/api db:generate --name short_name`, then `pnpm db:migrate` (replacing a column: see Gotchas) |
 | Reset demo data (also clears Redis, which resets OTP rate limits) | `pnpm db:reset` |
 | Run a scheduled job now | `pnpm jobs:run digest demo-university --force` (or `celebrations`) |
 | e2e | `pnpm db:reset`, `pnpm demo`, then `pnpm e2e:web` / `pnpm e2e:admin`; mobile: `pnpm e2e:mobile:export`, `pnpm e2e:mobile:serve`, `pnpm e2e:mobile-web` |
@@ -78,6 +81,24 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   configured senders).
 - **Notifications.** Use `notify()`: categories and member preferences, dedupe keys, chunked bulk inserts. Links in
   emails use `WEB_APP_URL`.
+- **Links and skills.** A link a member types uses `hostUrlSchema` (one site's hosts) or `linkUrlSchema` /
+  `linkUrlSchemaUpTo(max)`, which refuse a user name or password and store `URL.href`; never `httpUrlSchema` for a new
+  field. Skills go through `skillListSchema` (`normalizeSkills`) and are compared with `skillKey`.
+- **Profiles.** A form neither checks nor sends the inputs it hides (`hiddenProfileKeys`, `withoutHiddenProfileKeys`),
+  and an edit (profile or job) leaves a key it doesn't send as stored: a new optional text field takes `.optional()`
+  after `optionalTrimmed` (or works like jobs' `optionalText`), because bare `optionalTrimmed` turns a missing key into
+  null. The profile copy (`toPortableProfileDto`, "Use details from …") never carries the name, batch, what they do,
+  the institution's questions, marital status and kids, the phone setting or the photo, and carries the date of birth
+  only when the source profile shows the birthday on its feed.
+- **Rich text.** Long member-written text renders through `RichText` (web `components/common/RichText.tsx`, mobile
+  `components/RichText.tsx`), never `dangerouslySetInnerHTML`; cards use `plainExcerpt`, forms show `RICH_TEXT_HINT`.
+  Posts, comments and chat stay plain text.
+- **Uploads.** Every image goes through `storeUpload` (`processImage` in `src/lib/images.ts`, then the `uploads`
+  ledger). A profile photo changes only through `applyAvatarChange`, inside the saving transaction: it must be an avatar
+  the member (or the editing admin) uploaded here, and the photo it replaces is deleted after commit if unused.
+- **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
+  details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
+  date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.
 - **Feature parity.** Every member-facing feature ships on **web and mobile** in the same change — including visual
   design. Admin and platform consoles are web only.
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
@@ -103,7 +124,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `normalizePhone` rejects over-length nationals. Regenerate countries via
     `node packages/shared/scripts/generate-countries.mjs` after changing length rules.
   - **Composer.** Avatar top-aligned to the textarea; Add image / Poll / Post live in one footer tray inside the card.
-  - **Directory.** Default search + batch; advanced filters behind a toggle / sheet, not a six-column slab.
+  - **Directory and Jobs.** Search plus a filter or two in view (web directory: batch; Jobs on both apps: type and Can
+    refer; the mobile directory shows search alone); the rest behind More filters (web) / Filters (mobile), not a
+    six-column slab.
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.
@@ -117,6 +140,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   one transaction. Values only app code uses keep the generated `ADD VALUE`. A new content type must rebuild
   `content_type` in its own migration, because the `moderation_items` view needs the literal: copy the latest rebuild
   (0023 today, not 0019, which lacks `GROUP`), keeping every value and view arm (README → Known gaps has the steps).
+- `memberships.industry` and `jobs.company_industry` share the `industry` enum (`INDUSTRIES`): a new industry is one
+  `ALTER TYPE "industry" ADD VALUE` for both, plus its label.
+- Replacing a column makes drizzle-kit stop and ask whether it was renamed, which an unattended run can't answer.
+  Generate twice: add the new columns with a hand-written backfill while the old ones still exist, then drop the old
+  ones in a second migration (0029 and 0030 do this for jobs).
+- Drizzle applies a migration only if its journal `when` is newer than the last one applied. When two branches both
+  added migrations, regenerate the later branch's after the other's (keeping their hand-written parts), never just
+  renumber them: databases that already ran the other branch's would skip them silently.
 - BullMQ keeps a finished job's id for a day, and `MemoryJobQueue` only dedupes pending jobs, so a constant `jobId`
   passes the tests and silently stops repeats in production. Chat pushes use one id per time bucket.
 - Drizzle and Postgres copy a failed query's values into the error; the logger's `err` serializer strips them. Log
@@ -124,7 +155,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - A trigger stamps `memberships.approved_at` when a membership becomes APPROVED (and on insert).
 - expo-router: `href: null` on a tab makes the screen unreachable (it redirects). Hide the tab button instead
   (`tabBarButton: () => null`). A route folder with no `Tabs.Screen` silently redirects to the first visible tab, so
-  e2e opens every section. A cold deep link seeds the stack's anchor with the detail's params.
+  e2e opens every section. A cold deep link seeds the stack's anchor with the detail's params. Pushing onto another
+  tab's stack (the feed's profile card opening Edit profile) needs `{ withAnchor: true }`, or that stack holds only the
+  pushed screen and Back and Save leave it behind.
 - Mobile native stack headers (`headerShown: true` / old `detailHeader`) float over the scene on device — search bars
   and titles draw under the status bar and the header. Always use the in-tree bars (`MemberAppBar`, `StackHeader`,
   `ChatHeader`) and keep tab/detail stacks at `headerShown: false`. On web, inactive tab scenes stay mounted: the tabs
@@ -143,6 +176,15 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   the install will fail to resolve the package. Prefer `npx expo install <pkg>` inside `apps/mobile`.
 - Do not declare React components inside another component's render body (e.g. a local `NavLabel`): ESLint
   `react-hooks/static-components` rejects it. Hoist helpers to module scope.
+- sharp decodes and re-encodes every upload, so upload tests use real images made at test time
+  (`test/helpers/images.ts`); a few fake bytes after a PNG header get 415. Its native build is per platform: don't
+  share `node_modules` between Windows and a dev container.
+- Hermes may lack parts of `Intl` (compact numbers, some date formatting): shared code the phone app runs writes such
+  text by hand, as `formatSalary` and `applicationsLine` do.
+- A page holding a form waits only for its queries' first answer (`isLoading && !isFetched`, see `RegisterPage`): a
+  query with no data goes back to loading on every refetch, which swaps the form, and what's typed in it, for a spinner.
+- Redis caches are versioned in `src/redis/keys.ts` (`cacheTenant`, `cacheDirectoryFilters`): bump the version when a
+  cached shape changes, or old entries are served until they expire.
 
 ## Git
 
@@ -154,13 +196,24 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 
 - **Wave 2 is done:** messages, groups, mentorship, referrals and the business directory, on web and mobile. README
   "How it works" describes each.
+- **Richer profiles and job posts are done:** guided registration, profile details and strength, photos and uploads,
+  rich text, and structured jobs with matching skills. README "Profiles and onboarding", "Photos and uploads", "Rich
+  text" and "Jobs" describe them.
 - **Wave 3 is next:** event upgrades (tickets, reminders) and giving campaigns, on the payments layer
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
   - the gaps to close before launch and the smaller follow-ups in README → "Known gaps / next steps";
-  - the device-only checks in `e2e/README.md` → "Checks that need a real phone", none run yet;
-  - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens,
-    sweep any remaining emoji on secondary empty states; admin Members status tabs can still overflow on narrow phones
-    (list rows were reflowed);
+  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration and jobs
+    added more), none run yet;
+  - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
+    stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
+  - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers
+    take any http(s) address), only profile photos are ever deleted, and a CDN may serve a deleted one until it expires;
+  - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
+    emoji still used as icons outside the profile, member, directory, job and notification screens (most empty states,
+    the lock on the Messages, Groups and Mentors "aren't available" screens, the digest banner, contact buttons, the
+    platform console's nav: README → Known gaps lists them); admin Members status tabs can still overflow on narrow
+    phones (list rows were reflowed);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
-    runs on `claude/**` pushes.
+    runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
+    GitHub yet.

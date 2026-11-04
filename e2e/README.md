@@ -44,15 +44,50 @@ pnpm e2e:web                             # screenshots go to e2e/screenshots (or
 
 Covers:
 
-- tenant picker → landing → phone + OTP → registration (with a profile question) → auto-approved feed;
+- tenant picker → landing → phone + OTP → registration in three steps → auto-approved feed: a photo on Basics, Continue
+  refusing a missing name and focusing it, the Work step's heading taking focus, the step bar and the browser's Back
+  going to the step before with nothing lost, Skip for now putting Work back as it was last accepted, the profile
+  question on About you, a server error sending the member back to Work with the headline focused, and the photo
+  arriving with the profile;
+- the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
+  to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react, comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
   announcement and a poll vote; the celebrations card and wishes; the weekly digest (run through the platform job
   endpoint, see `lib.mjs`);
-- post a job and delete it through the confirm dialog; RSVP; directory search and a profile;
+- jobs: seeded cards with pay, experience and "+1 more" skills; the Work mode and experience filters behind More
+  filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend Engineer page offering
+  a member with no skills "Add your skills to see which you match" in place of a count, its link landing on My
+  profile's Work (`#work`) near the top of the screen; posting a job with work mode, seniority, experience, skills
+  (Enter adding one without posting the form), pay previewed as it will show, bullet points, a How to apply address and
+  an Apply link opening in a new tab with noopener, its page offering its poster nothing to match; an edit of the title
+  alone keeping every other field; Mark closed swapping the contacts and How to apply for "Applications closed"; a new
+  job at the same company, typed in lower case with a double space, offered Use details from your last job at Smoke
+  Labs, filling the website; deleting a job through the confirm dialog;
+- rich text: the seeded meetup's bullets, its link opening in a new tab, and its email opening in place with nofollow;
+  the Zylo Labs listing's bullets as one list with no dash left, its link, and a numbered list keeping its start;
+- an RSVP; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
+  More filters leaving Priya out, and Priya's card with her headline, then her profile: headline, skills, her current
+  role before her past one, studies here and elsewhere, and a LinkedIn link with the right target and rel;
 - businesses: search and filters, contact details only on a listing's own page; add, edit, find it in My posts and
   delete it;
+- My profile: the photo picker refusing a text file beside it, a saved photo served as a 512-pixel square JPEG, and
+  initials when a photo can't load; a headline, skills, a GitHub handle turned into its address and a past role, saved
+  together, with an end year before the start refused in its row and a server error on `experiences.0.endYear` shown
+  there; the meter moving to 75 with four skills, a link and a past role saved, asking for neither skills nor a link,
+  and its bio item linking to About you; `#work` landing on Work on a phone with no sideways scrolling; and all of it
+  on the profile other members open, found by the new headline;
+- matching skills at a phone's width, with "typescript, aws" among the skills just saved: the Backend Engineer card
+  showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, its link's name saying
+  "(you have this)" after each; its page keeping the job's order, the same two checked, and "You have 2 of 4 skills";
+  "You have 0 of 4 skills" and no marks on Associate Product Manager; and the member's own job, asking for TypeScript
+  among skills too long for one line, unmarked on its page and on its My posts card, whose chips shorten to fit;
+- joining Demo College as that member (nothing sent): the name from the account, Use details from Demo University
+  keeping a city typed first, and Undo keeping a headline changed after the copy, with focus back on Use details;
+  re-applying after a rejection (answered by the script) prefilling every step, with the reason on each and no Use
+  details offer;
 - the phone layout: every section opens its own page, the More sheet, its active state, sections the institution has
-  switched off, and the guards keeping the open screen when a refetch fails;
+  switched off, and the guards keeping the open screen when a refetch fails (the registration form keeping what's
+  typed, even when the account details fail too);
 - direct messages between two seeded members (Meera and Sneha): a request, accepted live, replies both ways with
   exactly one bubble each, a thread in a background tab not marking anything read, Try again reusing the client key, a
   refusal for sending too fast, a draft surviving a failed refetch, a report (and a second one), a block (the blocked
@@ -63,11 +98,13 @@ Covers:
   accepted from Invitations (with the history before it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
-  Mentor badge in the directory;
+  Mentor badge in the directory and on the new mentor's own profile;
 - referrals: a job offered for referral, the Can refer filter, a request reported, one accepted into a live chat that
   opens with the note, closing a job closing a waiting request, and the bell;
-- a chat notice in the bell opening its thread; notification settings; sign out;
-- an ADMIN_APPROVAL tenant landing on the pending screen, and a forced sign-out leaving nothing cached.
+- a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
+  alone (its icon is silent); sign out;
+- an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
+  pending screen; and a forced sign-out leaving nothing cached.
 
 ## Web (tenant admin + platform console)
 
@@ -77,16 +114,21 @@ pnpm e2e:admin
 
 Covers:
 
-- the tenant admin dashboard; approving and rejecting members; approving a pending job, and a pending business listing
-  whose contact details show only once opened; resolving the spam report by removing content;
+- the tenant admin dashboard; approving and rejecting members; a member's page showing Kiran Joshi's whole profile
+  (headline, skills, past role, studies elsewhere, Open to); approving a pending job after its full preview (the
+  Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
+  nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
+  spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
-- adding a profile question; importing an invitation CSV and joining through its link in a second browser; an
+- the Profile fields page saying degree and field of study are built in, and adding a profile question; importing an
+  invitation CSV and joining through its link in a second browser, with the name filled in and the three steps; an
   announcement that also goes by email;
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
   audit row the view writes, the messages discarded on leaving the page, a report another admin just handled, removing
   the reported message, and the page on a phone;
-- analytics charts and the members CSV;
+- analytics charts and the members CSV, with the profile's own columns after "Last active" and Rahul's seeded headline
+  and skills in them;
 - the platform console: login, onboarding an institution with its first admin, a billing plan and usage, stats and
   user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and a row
   on a phone), opening an institution's admin console without being a member, a school's settings starting with
@@ -109,18 +151,51 @@ add that origin to `CORS_ORIGINS`.
 
 Covers:
 
-- tenant picker → landing → login → OTP → register → feed; a post with a photo, editing it, the celebrations card and
-  a poll vote;
+- tenant picker → landing → login → OTP → registration in three steps → feed, as on the web: each step's button on the
+  screen once, the step bar going back with Work kept, Skip for now putting Work back as it was last accepted, Back
+  from About you, and a server error sending the member back to Work;
+- the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
+  opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
+  and the card gone after a reload;
+- a post with a photo, editing it, the celebrations card and a poll vote;
+- Edit profile: a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
+  role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
+  row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
+  still to add, skills no longer among it, and `?section=about` scrolling About you into view;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; My posts from the More
   hub, its tabs scrolling rather than truncating;
-- jobs, an RSVP, directory search and a member profile;
-- businesses behind More: search, filters and contact details only on a listing's own page; add, edit, My posts and
-  delete through the confirm sheet;
-- notification settings persisting; nested screens opened cold, and a notification tap landing on its target;
+- jobs: seeded cards with place, pay, experience and "+1 more" skills; the Work mode and experience filters behind
+  Filters, and Clear filters; the Backend Engineer page, its title the only heading holding it, with its facts, section
+  headings, About the company, a How to apply link opening in a new tab with noopener, and Apply;
+- matching skills: before the member has any, the Backend Engineer card marking none and its page offering "Add your
+  skills to see which you match" in place of a count, the link bringing back the Edit profile left open and unsaved on
+  the Profile tab, at Work with its draft, rather than stacking a second editor; once "typescript, aws" are saved,
+  TypeScript and AWS first on that card, each with a check, then Node.js and "+1 more" on one line, with "(you have
+  this)" after each in the card's name; its page keeping the job's order, the same two checked, and "You have 2 of 4
+  skills"; and "You have 0 of 4 skills" with no marks on Associate Product Manager;
+- an RSVP, with the description's bullets, link and mail link as on the web;
+- the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
+  name, the Investing filter leaving Priya out, and Priya's full profile with her roles in order and a LinkedIn link
+  with the right target and rel;
+- businesses behind More: search, filters and contact details only on a listing's own page; the description's bullets
+  as one list with the bullet marks hidden from screen readers, its numbered steps read out from 1 with the numbers on
+  the left, and its link; add, edit, My posts and delete through the confirm sheet;
+- notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
+  and a notification tap landing on its target;
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including a report from tapping a
   message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers;
-- a current pupil seeing none of them; sections switched off; the guards; the pending screen; switching institution and
+- the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
+  card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
+  list and a contact email; the job's facts after posting and after an edit of the title alone, its page comparing
+  nothing with its poster's skills; the edit form opening with Executive, last in its row, drawn on the screen; the
+  poster's own card on Jobs unmarked though they have TypeScript, its long skills cut short with an ellipsis to stay on
+  one line; a second job at the same company filling the website and industry from Use details from your last job at
+  Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
+- a current pupil seeing none of them; sections switched off; the guards (the registration form keeping what's typed,
+  even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
+  with the reason on each; joining Demo College with Use details from Demo University and Undo keeping a headline
+  changed after it, then Submit for approval with its note, landing on the pending screen; switching institution and
   signing out from the More hub; a forced sign-out leaving nothing cached.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
@@ -128,7 +203,9 @@ screens), so the script picks the last visible match and dispatches clicks direc
 Android the native navigation doesn't have this quirk.
 
 Not covered by any script: reporting a declined, withdrawn or closed mentorship or referral request's note, and the
-admin's view of a note report (**View request** in Chat reports). The API tests cover them.
+admin's view of a note report (**View request** in Chat reports). The API tests cover them. Nor is the last registration
+step's **Join the network** for an invitation at an institution that approves members automatically but has invitation
+auto-approve off, as no seeded institution is set up that way.
 
 ## Checks that need a real phone
 
@@ -287,3 +364,53 @@ second copy of a screen, or back to the page the button was on.
 - [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
       picker and shows the picked image.
 - [ ] Tab labels on screens with tabs (My posts, Jobs, Mentors, Groups) aren't clipped.
+
+**Profiles and registration**
+
+For the registration checks, sign one phone out (More → Sign out) and join Demo University with a number that isn't in
+the demo data, then sign Rahul back in. For the copy banner, Rahul opens Demo College under More → Switch institution:
+leave without sending, or he'll be waiting for approval there.
+
+- [ ] On "Step 1 of 3 · Basics", choose Add photo: the first time, the phone asks for access to your photos. Allow it
+      and pick a photo: the system editor crops it square, and the round preview shows it once it's uploaded. On the
+      other phone, deny access (or turn it off in Settings first): "Allow photo access to choose an image." shows under
+      the buttons.
+- [ ] Disconnect the computer running the API from the network, so the upload hangs, and pick a photo: Cancel upload
+      stops it, the button goes back to Add photo, and focus stays there. Pick again and wait: after 90 seconds, "The
+      upload is taking too long. Check your connection and try again." shows. Reconnect, and Add photo works again.
+- [ ] On each registration step, tap the last box: it and the step's buttons (Continue, Skip for now, Back, Join the
+      network) stay above the keyboard, with nothing hidden behind it. On Work, choose Add a past role and type in each
+      of its boxes, the years too: Done and Remove stay reachable. Do the same on My profile → Edit profile, down to the
+      links in About you, and in Add a place of study.
+- [ ] Android: on Work and About you, the back button goes to the step before, keeping what was typed; on Basics it
+      leaves registration. iPhone: swiping from the left edge goes back only from Basics; on Work and About you it does
+      nothing, and the step bar and Back move between the steps.
+- [ ] TalkBack or VoiceOver, in Edit profile: Remove on a past role says "Removed" and its name, and focus moves to
+      Add a past role; Done folds a row and moves focus to its Edit button; Done on a row whose end year is before its
+      start says the problem and moves focus to that year.
+- [ ] TalkBack or VoiceOver, on Rahul's registration at Demo College: Use details from Demo University reads out what
+      it filled in and moves focus to Undo. Type a batch, Continue, change the headline on Work, go back to Basics and
+      choose Undo: it reads out what it kept, and focus goes back to Use details from Demo University.
+- [ ] My profile → Or edit → About you opens Edit profile scrolled to the About you heading, and Work to the Work
+      heading. This checks the scroll to a section (`measureLayout`) on the new architecture.
+- [ ] TalkBack or VoiceOver, on Rahul's feed: Not now on "Complete your profile" moves focus to "Hidden for 14 days. My
+      profile always shows what's left to add." The card stays away on the other phone and after restarting the app.
+- [ ] Links open the phone's browser, and coming back finds the app where it was: LinkedIn on Priya's profile
+      (Directory), Apply and the address in How to apply on "Backend Engineer (Node.js)", its website under About the
+      company, and the map link in the Mumbai alumni coffee meetup. The meetup's email address opens the mail app.
+
+**Jobs**
+
+- [ ] On Post a job, the chip rows too wide for the screen (Type, Seniority, Currency and Company size, at least)
+      scroll sideways. Tapping a chip partly off the screen scrolls its row until the chip is whole on the screen, and
+      a row whose choice is already in view stays where you left it. Post a job with Executive seniority and a company
+      size of 5,001+, then Edit it: the form opens with both chips on the screen, though each is last in its row.
+- [ ] TalkBack or VoiceOver, with one phone signed in as Vikram (`+91 91000 00005`), whose profile lists SQL: on Jobs,
+      the card for Priya's "Associate Product Manager" is read in full, title first, with its skills as "SQL (you have
+      this), Product management, A/B testing, 1 more". On its page, the SQL chip is one stop read as "SQL (you have
+      this)", the other skills are read by name alone, and "You have 1 of 4 skills" follows them.
+- [ ] Sign in with a number that isn't in the demo data and join with Skip for now on Work, as in the registration
+      checks above, so the profile lists no skills. On My profile choose Edit profile and type a headline without
+      saving, then open Jobs → "Backend Engineer (Node.js)" and choose Add your skills to see which you match. The
+      Profile tab comes back with that same editor, scrolled to Work and the headline still typed, and Back (and, on
+      the iPhone, the swipe back) goes to My profile, never to a second editor.

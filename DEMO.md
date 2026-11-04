@@ -43,16 +43,19 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
 **As a new alumnus**
 1. On the first screen, pick **Demo University** and sign in with any new number. The landing is brand-first (cover +
    institution name); chrome uses SVG icons, not emoji.
-2. Fill in your profile: batch, profession, company, city, plus the optional details.
+2. Create your profile in three steps: **Basics** (a photo, your name and batch), **Work** (or **Skip for now**) and
+   **About you**, then **Join the network**. "What's new" below walks through it.
 3. Post in the community feed (composer tray with Add image / Poll / Post), react and comment on others' posts.
 4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
 5. Open **Events** and RSVP to the Mumbai coffee meetup, or plan your own gathering.
-6. Search the **Directory** by batch, city or company.
+6. Search the **Directory** by name, company or skill, or filter it by batch and city.
 7. Sign out, pick **Demo College**, register again with a new number, and see the "awaiting approval" screen.
 
 **As an institution admin** (sign in to Demo College with `+91 90000 00002`, then click **Admin**)
-1. **Members**: approve or reject the pending alumni, with a reason they will see.
-2. **Moderation**: approve or reject pending posts, the internship and the Toronto dinner.
+1. **Members**: approve or reject the pending alumni, with a reason they will see. On the **Approved** tab, open a
+   member such as Kiran Joshi to see their whole profile.
+2. **Moderation**: approve or reject pending posts, the internship and the Toronto dinner. **View full content** shows
+   the whole internship, its stipend included.
 3. **Reports**: remove the reported spam post.
 4. **Settings**: switch member approval or post moderation between automatic and manual, turn features on or off,
    and change the institution's colours and logo under **Branding**.
@@ -79,6 +82,68 @@ No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (80
 phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
+
+**Richer profiles and job posts** (run `pnpm db:reset` first: the seeded profiles and job posts load only into fresh
+demo data)
+
+Profiles now hold a headline, past roles, studies, skills, links and what a member is open to, and joining walks through
+them in three steps. Job posts give the pay, experience, skills, the role in sections and the company. The web and phone
+apps match.
+
+- **Join in three steps.** Pick **Demo University** and sign in with a new number. **Create your profile** opens on
+  "Step 1 of 3 · Basics": choose **Add photo**, fill in your name and batch, and press **Continue**. On "Step 2 of 3 ·
+  Work", type a headline, then press **Skip for now**: you move on to "Step 3 of 3 · About you" without what you typed
+  on Work. The step bar at the top goes back to any step you've opened, and the browser's Back to the step before.
+  Press **Join the network** and the feed opens. At Demo College the last button is **Submit for approval**, with "An
+  admin at DCE will review your profile before you can join." under it.
+- **Use details from another institution.** Sign in to **Demo University** as Kiran Joshi (`+91 91000 00011`), who is a
+  member of Demo College only. The first step says "You have a profile at Demo College of Engineering". Give a batch and
+  type a city, then choose **Use details from Demo College of Engineering**: it fills in his headline, company, skills,
+  past role, studies, website and more, keeps the city you typed, and says what it filled in and what it kept. Press
+  **Continue**, change the headline on Work, go back to Basics on the step bar and choose **Undo**: the rest goes, and
+  your headline stays. The batch, the institution's own questions, the **Personal** details (marital status and kids)
+  and the photo are never copied.
+  Rahul or Priya signing in to Demo College see **Use details from Demo University** the same way.
+- **Profile strength.** Sign in as Rahul (`+91 91000 00001`). The feed opens with **Complete your profile** at 80%, and
+  the one thing missing, **Add a profile photo**, opens the Basics part of his profile. **Not now** hides the card for
+  14 days on every device, leaving "Hidden for 14 days. My profile always shows what's left to add." in its place. **My
+  profile** always shows **Profile strength** and what's **Still to add**. The feed's card also goes once a profile
+  reaches 90%.
+- **Edit your profile.** **My profile** shows your profile as other members see it, then its three sections, **Basics**,
+  **Work** and **About you**, saved together with **Save profile**. On the phone app, choose **Edit profile** on My
+  profile, or a section after **Or edit**. Add a headline, skills (press Enter or type a comma after each), **Add a past
+  role**, a GitHub handle such as "@yourname" (it becomes the full address when you leave the box) and an **Open to**
+  choice. Then find yourself in **Directory**: your card shows the headline, and your page the skills, your roles with
+  the current one first, your studies and your links.
+- **Directory by skill.** Search **Directory** for "Distributed systems": Sneha Kulkarni comes up from her skills alone,
+  and her card shows **Investing**, what she's open to. **More filters** (**Filters** on the phone app) now has
+  Industry, Skill, Field of study and Open to. Choose "Open to investing" (**Investing** on the phone app) and search
+  for Priya: nobody matches, as she's open to hiring. Clear the filters and open Priya Nair for a full profile: her
+  headline, skills, her roles in order, her studies here and in London, and a LinkedIn link.
+- **Job posts.** Open **Jobs**. Rahul's **Backend Engineer (Node.js)** card shows "Zylo Labs · Mumbai · Remote",
+  "₹25–40 LPA", "3–6 years" and three of its four skills with "+1 more". Its page has the key facts (the pay note "Plus
+  ESOPs", Mid level, 2 openings), the skills, **Apply**, the role in sections (About the role, Responsibilities,
+  Requirements, Benefits, How to apply) and **About the company**. Work mode, Seniority and "Your experience (years)"
+  wait behind **More filters** (**Filters** on the phone app): type 1 in "Your experience (years)" and the backend job
+  goes, while Priya's **Associate Product Manager** (1–3 years) stays.
+- **Skills you have.** Sign in as Vikram (`+91 91000 00005`) and open Priya's **Associate Product Manager**: SQL, which
+  is on his profile, is a filled chip with a check mark, and the line under the skills says "You have 1 of 4 skills".
+  The job's card on the list shows SQL first, with the same check, and the page of Rahul's backend job says "You have 0
+  of 4 skills". A member whose profile lists no skills (a new one that skipped Work, say) sees "Add your skills to see
+  which you match" instead, which opens the Work section of My profile (**Edit profile** at Work on the phone app).
+  None of this shows to the job's poster, or in an admin's preview.
+- **Post a job.** As Rahul, choose **+ Post a job** (on the phone app, the **+** button on Jobs). Give it a title, type
+  "Zylo Labs" as the company and write About the role. Under **Company**, the form offers **Use details from your last
+  job at Zylo Labs**: it fills in the website, industry, size and about from his backend job and says "Filled in from
+  your last job at Zylo Labs. Check them before you post." Type the pay in full, 1800000 as the Minimum pay and 2500000
+  as the Maximum, and the form previews it: "Shows as: ₹18–25 LPA". Start each line of Responsibilities with "- " for
+  bullet points, add an **Apply link** and choose **Post job**. Then, on its page, **Mark closed**: Apply (and any email
+  or phone) gives way to "Applications closed", and How to apply goes too.
+- **Bullet points and links** in long descriptions (jobs, events, businesses, funding and bios): open the Mumbai coffee
+  meetup in **Events**, or Zylo Labs in **Businesses**. A line starting with "- " is a bullet, "1. " starts a numbered
+  list, and web and email addresses become links. Posts, comments and chat stay plain text.
+- **On the phone app** all of this works the same. While registering, Android's back button goes to the step before,
+  and on an iPhone swiping back is off after the first step, so nothing typed is lost.
 
 **Wave 2: connect one to one** (run `pnpm db:reset` first, so the demo data for these is fresh)
 
@@ -140,15 +205,15 @@ profile and sign out.
      Mentors too.
   4. Sign in to Demo School as Naina Sen (`+91 91000 00026`). Her batch is two years away, so she's still at school:
      she sees no Messages, Groups or Mentors, and Jobs has no Referrals, even though the school switched them all on.
-- **Notification settings** (bell → ⚙️ Settings) now have **Messages** and **Mentorship and referrals**. Messages can be
-  **In app** (the number on Messages alone) or **In app + push**; they never appear under the bell.
+- **Notification settings** (bell → **Settings**) now have **Messages** and **Mentorship and referrals**. Messages can
+  be **In app** (the number on Messages alone) or **In app + push**; they never appear under the bell.
 - **Deleting your account** (Profile) now explains that your messages stay in other people's chats, shown as from a
   "Deleted member", and that groups you own pass to the member who has been in them longest.
 - **On the phone app** everything members do above works the same: Messages is a tab, and you tap a message to report
   it. The admin steps (Chat reports, Audit log, Settings, Reports and Moderation) are on the web only.
 
 **Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)
-- **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed opens with today's birthday (Meera) and Rahul's own
+- **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed shows today's birthday (Meera) and Rahul's own
   third anniversary of joining. Tap **Wish**; Meera sees them under the bell. Only the day and month are ever
   shown. Members can opt out in their profile.
 - **Polls and announcements.** Vote in Priya's London meetup poll. The pinned announcement came from the admin;
@@ -158,7 +223,7 @@ profile and sign out.
 - **This week.** Every Monday morning members get a digest of popular posts, new jobs and upcoming events, in the app
   and by email if they have confirmed one (Profile → Email). To see it now, run `pnpm jobs:run digest demo-university
   --force` in a terminal, then open **This week** from the feed.
-- **Notification settings** (bell → ⚙️ Settings): choose off, in-app, or in-app and push per kind of notification,
+- **Notification settings** (bell → **Settings**): choose off, in-app, or in-app and push per kind of notification,
   and turn off the digest or announcement emails. Every email has an unsubscribe link.
 - **Profile questions.** As an admin, open **Admin → Profile fields** and add a question (for example "Hostel" with
   choices). Choice questions can filter the directory; admin-only questions stay private.
@@ -221,5 +286,7 @@ profile and sign out.
 | Tunnel will not start | Stop it with Ctrl+C and run `pnpm mobile:tunnel` again; the tunnel service is occasionally busy. |
 | No Messages, Groups or Mentors | At Demo School they start off until its admin turns them on (see "Schools and current pupils" above), and a pupil never sees them. At the other institutions, look in **Admin → Settings**: someone may have switched them off. |
 | No seeded chats, groups, mentors or businesses | The demo data is older than Wave 2. Run `pnpm db:reset`. |
+| No headlines or skills on profiles, or no pay on the seeded jobs | The demo data is older than richer profiles and job posts. Run `pnpm db:reset`. |
+| No "Use details from …" when joining | It's offered only to a number that is already an approved member of another institution, on a first application (not when re-applying), and only when it would fill something in. |
 | A profile still asks "Open to mentoring students" | That question is from the demo data before Mentors replaced it. Run `pnpm db:reset`. |
 | "Too many codes requested" or "Too many requests" when signing in | Each number gets 5 codes an hour, and each computer 20 requests for a code. Wait, or run `pnpm db:reset`, which also clears these limits (and resets the demo data). |
