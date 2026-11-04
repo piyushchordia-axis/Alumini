@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPES, JOB_TYPE_LABELS, JOBS_TAB_LABELS, JOBS_TABS, jobsTabFrom, plainExcerpt, referralBoxFrom, type JobDto, type JobSeekerDto, type JobsTab, type JobType, type ReferralBox } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPES, JOB_TYPE_LABELS, JOBS_TAB_LABELS, JOBS_TABS, jobPlaceLabel, jobSalaryText, jobsTabFrom, referralBoxFrom, type JobCardDto, type JobSeekerDto, type JobsTab, type JobType, type ReferralBox } from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
@@ -18,8 +18,10 @@ import { qk } from "@/lib/queryKeys";
 import { jobHref, useReferralsAvailable, useReferralsWayOut } from "@/lib/referrals";
 import { colors, spacing, useTheme } from "@/theme";
 
-function JobCard({ slug, job }: { slug: string; job: JobDto }) {
+function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
   const router = useRouter();
+  const place = jobPlaceLabel(job);
+  const pay = jobSalaryText(job) ?? job.salaryNote;
   return (
     <Card onPress={() => router.push(jobHref(slug, job.id))}>
       {/* The badges have a line of their own, so a long title keeps the width. */}
@@ -35,15 +37,14 @@ function JobCard({ slug, job }: { slug: string; job: JobDto }) {
       </Row>
       <Muted size={13}>
         {job.companyName}
-        {job.location ? ` · ${job.location}` : ""}
-        {job.isRemote ? " · Remote" : ""}
+        {place ? ` · ${place}` : ""}
       </Muted>
       <Text numberOfLines={2} style={{ color: "#475569" }}>
-        {plainExcerpt(job.description, 200)}
+        {job.summary}
       </Text>
       <Muted>
         {job.author.fullName} · {timeAgo(job.createdAt)}
-        {job.salaryRange ? ` · ${job.salaryRange}` : ""}
+        {pay ? ` · ${pay}` : ""}
       </Muted>
     </Card>
   );
@@ -112,7 +113,7 @@ export default function JobsScreen() {
           <>
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
               {/* Off, so the web build's browser doesn't keep what's typed here for session restore. */}
-              <Input accessibilityLabel="Search jobs" placeholder="Search title or company" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
+              <Input accessibilityLabel="Search jobs" placeholder="Search title, company or skill" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
             </View>
             <FlatList
               data={jobs.items}

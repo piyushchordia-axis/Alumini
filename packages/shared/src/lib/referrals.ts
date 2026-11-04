@@ -1,5 +1,6 @@
 import { REFERRAL_MAX_REQUESTS_PER_JOB, type ReferralBox, type ReferralStatus } from "../constants";
-import type { JobDto, ReferralAskRefusal, ReferralDto } from "../types/dto";
+import type { JobCardDto, ReferralAskRefusal, ReferralDto } from "../types/dto";
+import { jobIsOpen } from "./jobs";
 
 /** The Jobs section's tabs, kept in the URL as `?tab=` on both apps. Openings is the default and needs none. */
 export const JOBS_TABS = ["openings", "seekers", "referrals"] as const;
@@ -119,16 +120,16 @@ export const referralsWayOutText = (institution: string, chatEligible: boolean) 
 export const jobReferralsWayOutText = (institution: string, chatEligible: boolean) =>
   `${referralsOffReason(institution, chatEligible)} You can't accept requests now, but you can still decline or report them here.`;
 
-/** Whether a job takes new referral requests now, as the API decides: published, open, before its closing date, and offered. */
-export function takesReferralRequests(job: Pick<JobDto, "canRefer" | "moderationStatus" | "isClosed" | "expiresAt">, now: number): boolean {
-  return job.canRefer && job.moderationStatus === "APPROVED" && !job.isClosed && !(job.expiresAt && Date.parse(job.expiresAt) <= now);
+/** Whether a job takes new referral requests now, as the API decides: open (`jobIsOpen`), and offered. */
+export function takesReferralRequests(job: Pick<JobCardDto, "canRefer" | "moderationStatus" | "isClosed" | "expiresAt">, now: number): boolean {
+  return job.canRefer && jobIsOpen(job, now);
 }
 
 /** On someone else's job that takes requests, to a member who hasn't asked yet: what asking does. */
 export const referralAskText = (posterName: string) => `${posterName} can refer people for this job. Ask with a short note: if they accept, it opens a private chat between you.`;
 
 /** On the poster's own job, above its requests, while they can use referrals: whether members can still ask, and if not, why. */
-export function jobReferralsIntro(job: Pick<JobDto, "canRefer" | "moderationStatus" | "isClosed" | "expiresAt">, now: number): string {
+export function jobReferralsIntro(job: Pick<JobCardDto, "canRefer" | "moderationStatus" | "isClosed" | "expiresAt">, now: number): string {
   if (!job.canRefer) return "You no longer offer referrals for this job, so members can't ask any more.";
   if (job.isClosed) return "This job is closed, so members can't ask for a referral any more.";
   if (job.moderationStatus !== "APPROVED") return "While this job is in review, members can't ask for a referral. Requests already waiting stay here.";

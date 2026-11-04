@@ -13,11 +13,13 @@ import {
   CHAT_PARTICIPANT_STATES,
   CHAT_REPORT_ACTIONS,
   CHAT_REPORT_TARGET_KINDS,
+  COMPANY_SIZES,
   CONTENT_TYPES,
   EVENT_KINDS,
   FUNDING_KINDS,
   FUNDING_STAGES,
   INVITATION_STATUSES,
+  JOB_SENIORITIES,
   JOB_TYPES,
   MARITAL_STATUSES,
   MEMBERSHIP_ROLES,
@@ -42,8 +44,10 @@ import {
   REPORT_REASONS,
   REPORT_STATUSES,
   RSVP_STATUSES,
+  SALARY_PERIODS,
   TENANT_STATUSES,
   TENANT_TYPES,
+  WORK_MODES,
 } from "@illuminize/shared";
 
 export const tenantTypeEnum = pgEnum("tenant_type", TENANT_TYPES);
@@ -55,6 +59,10 @@ export const professionTypeEnum = pgEnum("profession_type", PROFESSION_TYPES);
 export const maritalStatusEnum = pgEnum("marital_status", MARITAL_STATUSES);
 export const moderationStatusEnum = pgEnum("moderation_status", MODERATION_STATUSES);
 export const jobTypeEnum = pgEnum("job_type", JOB_TYPES);
+export const workModeEnum = pgEnum("work_mode", WORK_MODES);
+export const jobSeniorityEnum = pgEnum("job_seniority", JOB_SENIORITIES);
+export const salaryPeriodEnum = pgEnum("salary_period", SALARY_PERIODS);
+export const companySizeEnum = pgEnum("company_size", COMPANY_SIZES);
 export const fundingKindEnum = pgEnum("funding_kind", FUNDING_KINDS);
 export const fundingStageEnum = pgEnum("funding_stage", FUNDING_STAGES);
 export const businessCategoryEnum = pgEnum("business_category", BUSINESS_CATEGORIES);

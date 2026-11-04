@@ -1,3 +1,4 @@
+import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, EmptyState, ErrorBox, Loading, PageHeader } from "@/components/ui";
@@ -48,7 +49,7 @@ export function DigestPage() {
                     <Link to={`${base}/jobs/${j.id}`} className="font-medium text-slate-900 hover:underline">
                       {j.title}
                     </Link>
-                    <div className="text-xs text-slate-500">{[j.companyName, j.isRemote ? "Remote" : j.location].filter(Boolean).join(" · ")}</div>
+                    <div className="text-xs text-slate-500">{[j.companyName, jobPlaceLabel(j)].filter(Boolean).join(" · ")}</div>
                   </li>
                 ))}
               </ul>

@@ -1,3 +1,4 @@
+import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
@@ -58,7 +59,7 @@ export default function DigestScreen() {
         <Card>
           <Text style={{ fontWeight: "700", color: colors.text }}>New jobs</Text>
           {d.jobs.map((j) => (
-            <Item key={j.id} title={j.title} meta={[j.companyName, j.isRemote ? "Remote" : j.location].filter(Boolean).join(" · ")} onPress={() => router.push(`/t/${slug}/jobs/${j.id}`)} />
+            <Item key={j.id} title={j.title} meta={[j.companyName, jobPlaceLabel(j)].filter(Boolean).join(" · ")} onPress={() => router.push(`/t/${slug}/jobs/${j.id}`)} />
           ))}
         </Card>
       )}

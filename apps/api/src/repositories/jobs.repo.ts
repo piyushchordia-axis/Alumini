@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, ilike, isNull, ne, not, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, gte, ilike, isNull, lte, ne, not, or, sql, type SQL } from "drizzle-orm";
 import type { JobListQuery } from "@illuminize/shared";
 import type { DbClient, Tx } from "../db/client";
 import { jobSeekers, jobs, memberships } from "../db/schema";
@@ -33,10 +33,16 @@ export async function listJobs(
   }
   if (q.q) {
     const p = `%${escapeLike(q.q)}%`;
-    conds.push(or(ilike(jobs.title, p), ilike(jobs.companyName, p))!);
+    // Any one skill containing the text, so "node" finds "Node.js", and a query never spans two skills.
+    conds.push(or(ilike(jobs.title, p), ilike(jobs.companyName, p), sql`EXISTS (SELECT 1 FROM unnest(${jobs.skills}) AS s(skill) WHERE s.skill ILIKE ${p})`)!);
   }
   if (q.jobType) conds.push(eq(jobs.jobType, q.jobType));
-  if (q.remote !== undefined) conds.push(eq(jobs.isRemote, q.remote));
+  if (q.workMode) conds.push(eq(jobs.workMode, q.workMode));
+  if (q.seniority) conds.push(eq(jobs.seniority, q.seniority));
+  if (q.experience !== undefined) {
+    // Fits that many years: neither end of the job's range rules it out, and an open end rules nothing out.
+    conds.push(or(isNull(jobs.experienceMin), lte(jobs.experienceMin, q.experience))!, or(isNull(jobs.experienceMax), gte(jobs.experienceMax, q.experience))!);
+  }
   if (q.location) conds.push(ilike(jobs.location, `%${escapeLike(q.location)}%`));
   if (q.canRefer !== undefined) {
     // What the cards say, which is the stored flag only while it's shown, and never for a poster who is a current pupil.

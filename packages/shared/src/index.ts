@@ -7,6 +7,7 @@ export * from "./lib/phone";
 export * from "./lib/skills";
 export * from "./lib/richText";
 export * from "./lib/salary";
+export * from "./lib/jobs";
 export * from "./schemas/common";
 export * from "./schemas/auth";
 export * from "./schemas/tenant";

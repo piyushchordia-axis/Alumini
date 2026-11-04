@@ -197,6 +197,9 @@ try {
     // A job whose poster offers referrals says so on its card.
     const backend = page.getByRole("button", { name: /^Backend Engineer \(Node\.js\)/ }).locator("visible=true").first();
     await backend.getByText("Can refer", { exact: true }).waitFor();
+    // Where it's done and what it pays, written from its work mode and its pay range.
+    await backend.getByText("Zylo Labs · Mumbai · Remote", { exact: true }).waitFor();
+    await backend.getByText(/ · ₹25–40 LPA$/).waitFor();
     // Each tab, and on Referrals each list, is in the URL, as a referral notification links to them.
     await tab("Looking for work", false).click();
     await tab("Looking for work", true).waitFor();
@@ -1166,13 +1169,24 @@ try {
     const analyst = `Mobile Referral Analyst ${unique}`;
 
     // The poster offers referrals on two new jobs. What ticking the box means is said beside it, before anything is posted.
-    const postJob = async (title) => {
+    // The analyst job is remote and gives an email, which go once it closes.
+    const contactEmail = "smoke-mobile-jobs@example.com";
+    const postJob = async (title, { remote = false } = {}) => {
       await poster.goto(`${app}/jobs`);
       await shown(poster.getByRole("button", { name: "Post a job" })).click();
       await poster.waitForURL(/\/jobs\/new$/);
       await shown(poster.getByLabel("Job title *", { exact: true })).fill(title);
       await shown(poster.getByLabel("Company *", { exact: true })).fill("Smoke Labs");
       await shown(poster.getByLabel("Description *", { exact: true })).fill("Help us keep the mobile smoke tests green.");
+      // Work mode is one choice of three, on-site to start with, and the chosen one says so on the web build too.
+      const mode = (name) => shown(poster.getByRole("group", { name: "Work mode", exact: true }).getByRole("button", { name, exact: true }));
+      if ((await mode("On-site").getAttribute("aria-selected")) !== "true") throw new Error("a new job doesn't start out on-site");
+      if (remote) {
+        await mode("Remote").click();
+        if ((await mode("Remote").getAttribute("aria-selected")) !== "true" || (await mode("On-site").getAttribute("aria-selected")) !== "false") throw new Error("the Remote work mode doesn't show as chosen");
+        await shown(poster.getByLabel("Contact email", { exact: true })).fill(contactEmail);
+        await shown(poster.getByLabel("Pay note", { exact: true })).fill("₹18–25 LPA plus ESOPs");
+      }
       await shown(poster.getByText("Members can ask you for a referral with a short note. If you accept, it opens a private chat between you.", { exact: true })).waitFor();
       const offer = shown(poster.getByRole("checkbox", { name: "I can refer people for this job", exact: true }));
       if ((await offer.getAttribute("aria-checked")) !== "false") throw new Error("a new job starts out offering referrals");
@@ -1182,9 +1196,14 @@ try {
       await poster.waitForURL(/\/jobs\/[0-9a-f-]{36}$/);
       await shown(poster.getByRole("heading", { name: title })).waitFor();
       await shown(poster.getByText("Job published", { exact: true })).waitFor();
+      if (remote) {
+        await shown(poster.getByText("Smoke Labs · Remote", { exact: true })).waitFor();
+        await shown(poster.getByText("Pay note: ₹18–25 LPA plus ESOPs", { exact: true })).waitFor();
+        await shown(poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true })).waitFor();
+      }
       return poster.url();
     };
-    const analystPage = await postJob(analyst);
+    const analystPage = await postJob(analyst, { remote: true });
     const engineerPage = await postJob(engineer);
     // The poster's own page waits for requests, which have to arrive here live.
     await shown(poster.getByText("Can refer", { exact: true })).waitFor();
@@ -1352,6 +1371,9 @@ try {
     await confirmClose.waitFor({ state: "hidden" });
     await shown(poster.getByText("Job closed", { exact: true })).waitFor();
     await shown(poster.getByText("Closed", { exact: true })).waitFor();
+    // Closed, it takes no more applications: its contacts go from the page, its poster's too, and the page says so.
+    await shown(poster.getByText("Applications closed", { exact: true })).waitFor();
+    if (await poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true }).locator("visible=true").count()) throw new Error("a closed job still shows its contact email");
     await closing.getByText("Closed", { exact: true }).waitFor(live);
     if (await closing.getByRole("button", { name: "Withdraw request" }).count()) throw new Error("a request closed with its job can still be withdrawn");
     await sent.getByText("Accepted", { exact: true }).waitFor();

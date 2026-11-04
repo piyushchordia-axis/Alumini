@@ -1,4 +1,4 @@
-import { EMAIL_VERIFICATION_TTL_SECONDS, type MessageChannel } from "@illuminize/shared";
+import { EMAIL_VERIFICATION_TTL_SECONDS, jobPlaceLabel, type MessageChannel } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import { findEmailVerification } from "../../repositories/emailVerifications.repo";
 import { findInvitationById } from "../../repositories/invitations.repo";
@@ -205,7 +205,7 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
           color: tenant.primaryColor,
           appLink: `${app}/digest`,
           posts: d.posts.map((x) => ({ excerpt: x.body.replace(/\s+/g, " ").trim().slice(0, 160), authorName: x.authorName, link: `${app}/feed/${x.id}`, reactions: x.reactionCount, comments: x.commentCount })),
-          jobs: d.jobs.map((x) => ({ title: x.title, meta: [x.companyName, x.isRemote ? "Remote" : x.location].filter(Boolean).join(" · "), link: `${app}/jobs/${x.id}` })),
+          jobs: d.jobs.map((x) => ({ title: x.title, meta: [x.companyName, jobPlaceLabel(x)].filter(Boolean).join(" · "), link: `${app}/jobs/${x.id}` })),
           events: d.events.map((x) => ({ title: x.title, meta: `${when(x.startAt, x.timezone)} · ${x.city}`, link: `${app}/events/${x.id}` })),
           newMembers: digest.content.newMembers,
           unsubscribePage: links.page,

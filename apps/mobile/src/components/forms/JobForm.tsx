@@ -1,9 +1,23 @@
-import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, RICH_TEXT_HINT, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto, type JobType } from "@illuminize/shared";
+import {
+  CAN_REFER_HELP,
+  CAN_REFER_LABEL,
+  JOB_TYPES,
+  JOB_TYPE_LABELS,
+  RICH_TEXT_HINT,
+  WORK_MODES,
+  WORK_MODE_LABELS,
+  jobCreateSchema,
+  waitingReferralsCloseText,
+  type JobCreateInput,
+  type JobDto,
+  type JobType,
+  type WorkMode,
+} from "@illuminize/shared";
 import { useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { DateTimeField } from "@/components/DateTimeField";
-import { Button, ChipSelect, Choice, ErrorText, Input, Row } from "@/components/ui";
-import { colors, useTheme } from "@/theme";
+import { Button, ChipSelect, Choice, ErrorText, Input } from "@/components/ui";
+import { colors } from "@/theme";
 import { useFormErrors } from "./useFormErrors";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -27,19 +41,18 @@ export function JobForm({
   offerReferrals?: boolean;
   waitingReferrals?: number;
 }) {
-  const theme = useTheme();
   const [canRefer, setCanRefer] = useState(initial?.canRefer ?? false);
   const closesWaiting = offerReferrals && !!initial?.canRefer && waitingReferrals > 0 && !canRefer;
   const [title, setTitle] = useState(initial?.title ?? "");
   const [companyName, setCompanyName] = useState(initial?.companyName ?? "");
   const [location, setLocation] = useState(initial?.location ?? "");
-  const [isRemote, setIsRemote] = useState(initial?.isRemote ?? false);
+  const [workMode, setWorkMode] = useState<WorkMode | "">(initial?.workMode ?? "ON_SITE");
   const [jobType, setJobType] = useState<JobType | "">(initial?.jobType ?? "FULL_TIME");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [applyUrl, setApplyUrl] = useState(initial?.applyUrl ?? "");
   const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
   const [contactPhone, setContactPhone] = useState(initial?.contactPhone ?? "");
-  const [salaryRange, setSalaryRange] = useState(initial?.salaryRange ?? "");
+  const [salaryNote, setSalaryNote] = useState(initial?.salaryNote ?? "");
   const [closes, setCloses] = useState<string | null>(initial?.expiresAt ? localDate(new Date(initial.expiresAt)) : null);
   const { errors, serverError, busy, fromZod, run } = useFormErrors();
   const nul = (s: string) => (s.trim() ? s.trim() : null);
@@ -50,13 +63,13 @@ export function JobForm({
         title,
         companyName,
         location: nul(location),
-        isRemote,
+        workMode,
         jobType,
         description,
         applyUrl: nul(applyUrl),
         contactEmail: nul(contactEmail),
         contactPhone: nul(contactPhone),
-        salaryRange: nul(salaryRange),
+        salaryNote: nul(salaryNote),
         expiresAt: closes ? new Date(`${closes}T23:59:59`).toISOString() : null,
         // Left out unless it was offered, so an edit never changes what the poster couldn't see, and on an edit unless they
         // changed it: a copy of the job read while referrals were off says false, which saving mustn't store.
@@ -72,15 +85,14 @@ export function JobForm({
       <Input label="Company *" value={companyName} onChangeText={setCompanyName} error={errors.companyName} />
       <ChipSelect label="Type *" options={JOB_TYPES.map((t) => ({ value: t, label: JOB_TYPE_LABELS[t] }))} value={jobType} onChange={setJobType} />
       <Input label="Location" value={location} onChangeText={setLocation} placeholder="City, country" error={errors.location} />
-      <Row style={{ justifyContent: "space-between" }}>
-        <Text style={{ color: colors.text }}>Remote friendly</Text>
-        <Switch value={isRemote} onValueChange={setIsRemote} trackColor={{ true: theme.primary }} accessibilityLabel="Remote friendly" />
-      </Row>
+      <View role="group" aria-label="Work mode">
+        <ChipSelect tall label="Work mode" options={WORK_MODES.map((m) => ({ value: m, label: WORK_MODE_LABELS[m] }))} value={workMode} onChange={setWorkMode} />
+      </View>
       <Input label="Description *" value={description} onChangeText={setDescription} multiline placeholder="Role, requirements, how to apply" error={errors.description} hint={RICH_TEXT_HINT} />
       <Input label="Apply link" value={applyUrl} onChangeText={setApplyUrl} autoCapitalize="none" keyboardType="url" placeholder="https://" error={errors.applyUrl} />
       <Input label="Contact email" value={contactEmail} onChangeText={setContactEmail} autoCapitalize="none" keyboardType="email-address" error={errors.contactEmail} />
       <Input label="Contact phone" value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" error={errors.contactPhone} />
-      <Input label="Salary range" value={salaryRange} onChangeText={setSalaryRange} placeholder="e.g. ₹18–25 LPA" error={errors.salaryRange} />
+      <Input label="Pay note" value={salaryNote} onChangeText={setSalaryNote} placeholder="e.g. ₹18–25 LPA plus ESOPs" error={errors.salaryNote} />
       <DateTimeField label="Applications close" mode="date" value={closes} onChange={setCloses} minimumDate={new Date()} clearable error={errors.expiresAt} hint="Optional. The job leaves the board after this day." />
       {offerReferrals && (
         <View style={{ gap: 6 }}>

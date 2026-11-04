@@ -305,7 +305,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
       for (let k = 0; k < 4; k++) {
         const author = pick(r, generated);
         const createdAt = at(shiftDay(firstDay, 14 + k * 40 + Math.floor(r() * 10)), 11);
-        await db.insert(jobs).values({ tenantId, authorMembershipId: author.id, title: `${pick(r, ROLES)}`, companyName: author.company ?? "Stealth startup", location: author.city, isRemote: r() < 0.3, jobType: "FULL_TIME", description: "Referral available for alumni. Message me for details.", isClosed: k < 2, moderationStatus: "APPROVED", moderatedAt: createdAt, createdAt, updatedAt: createdAt });
+        await db.insert(jobs).values({ tenantId, authorMembershipId: author.id, title: `${pick(r, ROLES)}`, companyName: author.company ?? "Stealth startup", location: author.city, workMode: r() < 0.3 ? "REMOTE" : "ON_SITE", jobType: "FULL_TIME", description: "Referral available for alumni. Message me for details.", isClosed: k < 2, moderationStatus: "APPROVED", moderatedAt: createdAt, createdAt, updatedAt: createdAt });
       }
       const host = pick(r, generated);
       const eventDay = shiftDay(today, -12);

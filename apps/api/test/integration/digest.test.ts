@@ -52,7 +52,7 @@ describe.skipIf(!dbAvailable)("weekly digest", () => {
     const [quiet] = await ctx.db.insert(posts).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, body: "Quiet post", moderationStatus: "APPROVED", reactionCount: 1 }).returning();
     const [loud] = await ctx.db.insert(posts).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, body: "Reunion photos <script>alert(1)</script> are up!", moderationStatus: "APPROVED", reactionCount: 3, commentCount: 4 }).returning();
     await ctx.db.insert(posts).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, body: "Old news", moderationStatus: "APPROVED", reactionCount: 50, createdAt: new Date(now.getTime() - 9 * 86_400_000) });
-    await ctx.db.insert(jobs).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Backend engineer", companyName: "Zylo", jobType: "FULL_TIME", description: "Build things", moderationStatus: "APPROVED", isRemote: true });
+    await ctx.db.insert(jobs).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Backend engineer", companyName: "Zylo", jobType: "FULL_TIME", description: "Build things", moderationStatus: "APPROVED", workMode: "REMOTE" });
     await ctx.db.insert(events).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Pune meetup", description: "Chai", kind: "CASUAL_MEETUP", city: "Pune", startAt: new Date(now.getTime() + 3 * 86_400_000), timezone: "Asia/Kolkata", moderationStatus: "APPROVED" });
     await ctx.db.insert(events).values({ tenantId: tenant.id, authorMembershipId: author.membership.id, title: "Too far ahead", description: "-", kind: "CASUAL_MEETUP", city: "Pune", startAt: new Date(now.getTime() + 30 * 86_400_000), timezone: "Asia/Kolkata", moderationStatus: "APPROVED" });
     await confirmEmail(reader.user.id, "bala@example.com");
@@ -89,7 +89,7 @@ describe.skipIf(!dbAvailable)("weekly digest", () => {
     // Members can read it in the app; content removed since is left out.
     await ctx.db.update(posts).set({ moderationStatus: "REMOVED" }).where(eq(posts.id, loud!.id));
     const latest = await request(ctx.app).get(`${base}/digest/latest`).set(reader.headers);
-    expect(latest.body.data).toMatchObject({ weekStart: week, newMembers: 2, jobs: [{ title: "Backend engineer", isRemote: true }], events: [{ title: "Pune meetup", city: "Pune" }] });
+    expect(latest.body.data).toMatchObject({ weekStart: week, newMembers: 2, jobs: [{ title: "Backend engineer", location: null, workMode: "REMOTE" }], events: [{ title: "Pune meetup", city: "Pune" }] });
     expect(latest.body.data.posts.map((p: { id: string }) => p.id)).toEqual([quiet!.id]);
   });
 

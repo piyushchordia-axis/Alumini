@@ -1,4 +1,4 @@
-import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, RICH_TEXT_HINT, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_HELP, CAN_REFER_LABEL, JOB_TYPES, JOB_TYPE_LABELS, RICH_TEXT_HINT, WORK_MODES, WORK_MODE_LABELS, jobCreateSchema, waitingReferralsCloseText, type JobCreateInput, type JobDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useMemo, useState } from "react";
@@ -54,13 +54,13 @@ export function JobForm({
       title: initial?.title ?? "",
       companyName: initial?.companyName ?? "",
       location: initial?.location ?? null,
-      isRemote: initial?.isRemote ?? false,
+      workMode: initial?.workMode ?? "ON_SITE",
       jobType: initial?.jobType ?? "FULL_TIME",
       description: initial?.description ?? "",
       applyUrl: initial?.applyUrl ?? null,
       contactEmail: initial?.contactEmail ?? null,
       contactPhone: initial?.contactPhone ?? null,
-      salaryRange: initial?.salaryRange ?? null,
+      salaryNote: initial?.salaryNote ?? null,
       expiresAt: toLocalDate(initial?.expiresAt),
       canRefer: initial?.canRefer ?? false,
     },
@@ -107,9 +107,15 @@ export function JobForm({
         <FormField label="Location" error={e.location?.message}>
           <Input {...register("location", nullable)} placeholder="City, country" />
         </FormField>
-        <div className="flex items-end pb-2">
-          <Checkbox {...register("isRemote")} label="Remote friendly" />
-        </div>
+        <FormField label="Work mode" error={e.workMode?.message}>
+          <Select {...register("workMode")}>
+            {WORK_MODES.map((m) => (
+              <option key={m} value={m}>
+                {WORK_MODE_LABELS[m]}
+              </option>
+            ))}
+          </Select>
+        </FormField>
         <div className="sm:col-span-2">
           <FormField label="Description" required error={e.description?.message} hint={RICH_TEXT_HINT}>
             <Textarea {...register("description")} rows={6} invalid={!!e.description} placeholder="Role, requirements, how to apply" />
@@ -124,8 +130,8 @@ export function JobForm({
         <FormField label="Contact phone" error={e.contactPhone?.message}>
           <Input {...register("contactPhone", nullable)} />
         </FormField>
-        <FormField label="Salary range" error={e.salaryRange?.message}>
-          <Input {...register("salaryRange", nullable)} placeholder="e.g. ₹18–25 LPA" />
+        <FormField label="Pay note" error={e.salaryNote?.message}>
+          <Input {...register("salaryNote", nullable)} placeholder="e.g. ₹18–25 LPA plus ESOPs" />
         </FormField>
         <FormField label="Applications close" hint="Optional. The job is hidden from the board after this day." error={e.expiresAt?.message}>
           <Input type="date" min={toLocalDate(new Date().toISOString()) ?? undefined} {...register("expiresAt", nullable)} />

@@ -11,12 +11,15 @@ import type {
   ChatParticipantState,
   ChatReportAction,
   ChatReportTargetKind,
+  CompanySize,
   ContentType,
   EventKind,
   BusinessCategory,
   FundingKind,
   FundingStage,
+  Industry,
   InvitationStatus,
+  JobSeniority,
   JobType,
   MaritalStatus,
   MembershipRole,
@@ -41,9 +44,12 @@ import type {
   ReportReason,
   ReportStatus,
   RsvpStatus,
+  SalaryCurrency,
+  SalaryPeriod,
   TenantFeatures,
   TenantStatus,
   TenantType,
+  WorkMode,
 } from "../constants";
 import type { ErrorCode } from "../errorCodes";
 import type { ResolvedNotificationPrefs } from "../lib/notifications";
@@ -721,18 +727,32 @@ export interface ModerationFields {
   moderatedAt: string | null;
 }
 
-export interface JobDto extends ModerationFields {
+/**
+ * A job as lists show it. No contact details or apply link, so one page of a list isn't a contact scrape, and none of the
+ * sections, which only its own page shows.
+ */
+export interface JobCardDto extends ModerationFields {
   id: string;
   title: string;
   companyName: string;
+  companyLogoUrl: string | null;
   location: string | null;
-  isRemote: boolean;
+  workMode: WorkMode;
   jobType: JobType;
-  description: string;
-  applyUrl: string | null;
-  contactEmail: string | null;
-  contactPhone: string | null;
-  salaryRange: string | null;
+  seniority: JobSeniority | null;
+  /** Years of experience asked for; either end may be open (see `experienceLabel`). */
+  experienceMin: number | null;
+  experienceMax: number | null;
+  skills: string[];
+  /** Pay in minor units of `salaryCurrency`, per `salaryPeriod` (see `formatSalary`). Either end may be open. */
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryCurrency: SalaryCurrency;
+  salaryPeriod: SalaryPeriod;
+  /** Shown as "Pay note". */
+  salaryNote: string | null;
+  /** About the role as one plain line of at most 200 characters, made by the API (`plainExcerpt`). */
+  summary: string;
   isClosed: boolean;
   expiresAt: string | null;
   author: MemberCardDto;
@@ -744,6 +764,29 @@ export interface JobDto extends ModerationFields {
   canRefer: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A job in full, as its own page, the admin preview and its poster's edit form see it. */
+export interface JobDto extends JobCardDto {
+  /** About the role. */
+  description: string;
+  responsibilities: string | null;
+  requirements: string | null;
+  benefits: string | null;
+  /**
+   * How to apply, and the three below: null for anyone but its poster or an admin once the job stops taking applications
+   * (`jobIsOpen`), so a closed job's contacts stop getting messages.
+   */
+  howToApply: string | null;
+  applyUrl: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  openings: number | null;
+  educationRequirement: string | null;
+  companyWebsite: string | null;
+  companyIndustry: Industry | null;
+  companySize: CompanySize | null;
+  aboutCompany: string | null;
 }
 
 /** The viewer's own latest request for a referral on a job, whatever became of it. */
@@ -965,7 +1008,8 @@ export interface DigestDto {
   weekStart: string;
   createdAt: string;
   posts: Array<{ id: string; excerpt: string; authorName: string; reactionCount: number; commentCount: number }>;
-  jobs: Array<{ id: string; title: string; companyName: string; location: string | null; isRemote: boolean }>;
+  /** Each one's place reads as `jobPlaceLabel` writes it. */
+  jobs: Array<{ id: string; title: string; companyName: string; location: string | null; workMode: WorkMode }>;
   events: Array<{ id: string; title: string; startAt: string; timezone: string; city: string }>;
   /** Members who joined that week. */
   newMembers: number;

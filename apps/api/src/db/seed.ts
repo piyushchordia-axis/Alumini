@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultFeaturesFor, type MentorArea, type MentorAvailability } from "@illuminize/shared";
+import { defaultFeaturesFor, toMinor, type MentorArea, type MentorAvailability } from "@illuminize/shared";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { loadConfig, loadDotenvFiles } from "../config/env";
 import { createLogger } from "../lib/logger";
@@ -269,10 +269,63 @@ export async function seedContent(db: Db, tenantIds: Record<string, string>, m: 
     await db.execute(sql`update posts set comment_count = (select count(*) from post_comments c where c.post_id = posts.id and c.moderation_status = 'APPROVED'), reaction_count = (select count(*) from post_reactions r where r.post_id = posts.id) where tenant_id = ${uni}`);
 
     await db.insert(jobs).values([
-      { tenantId: uni, authorMembershipId: rahul, title: "Backend Engineer (Node.js)", companyName: "Zylo Labs", location: "Mumbai", isRemote: true, jobType: "FULL_TIME", description: "Own our payments ledger service. 3+ years with Node/TypeScript and Postgres. Remote-friendly within India.", applyUrl: "https://example.com/zylo/backend", salaryRange: "₹25–40 LPA", ...approved },
-      { tenantId: uni, authorMembershipId: priya, title: "Associate Product Manager", companyName: "Google", location: "London", isRemote: false, jobType: "FULL_TIME", description: "Referral available for DemoU alumni. Consumer product, 1–3 years experience.", contactEmail: "priya@example.com", ...approved },
-      { tenantId: uni, authorMembershipId: meera, title: "Summer Intern – Strategy", companyName: "Deloitte", location: "Dubai", isRemote: false, jobType: "INTERNSHIP", description: "8-week internship for 2024/2025 batches. Visa sponsorship supported.", ...approved },
-      { tenantId: uni, authorMembershipId: arjun, title: "Export Operations Lead", companyName: "Singh Textiles", location: "Surat", isRemote: false, jobType: "FULL_TIME", description: "Closed — position filled.", isClosed: true, ...approved },
+      // Every field filled in, so the job's page shows each part of it.
+      {
+        tenantId: uni,
+        authorMembershipId: rahul,
+        title: "Backend Engineer (Node.js)",
+        companyName: "Zylo Labs",
+        location: "Mumbai",
+        workMode: "REMOTE",
+        jobType: "FULL_TIME",
+        seniority: "MID",
+        experienceMin: 3,
+        experienceMax: 6,
+        skills: ["Node.js", "TypeScript", "PostgreSQL", "AWS"],
+        openings: 2,
+        description: "Own our payments ledger service, the system every rupee on Zylo Labs moves through. You'll join a team of six engineers:\n\n- shipping to production several times a day\n- working closely with finance and risk\n- remote-friendly within India",
+        responsibilities: "- Design and run the ledger's APIs and its nightly reconciliation\n- Keep payouts correct and on time as volume grows\n- Review code and mentor two junior engineers\n- Share the on-call rota, one week in six",
+        requirements: "- 3+ years building backend services with Node.js and TypeScript\n- Solid PostgreSQL: transactions, indexes and reading query plans\n- You've run a service in production and fixed it when it broke\n- Payments or fintech experience is a plus, not a must",
+        benefits: "- ESOPs from day one\n- Health cover for you and your family\n- ₹50,000 a year for courses, books and conferences\n- A week in Mumbai each quarter, travel paid",
+        howToApply: "Apply at https://example.com/zylo/backend with your CV and a link to code you're proud of.\n\n- A 30-minute call with the hiring manager\n- A take-home exercise of about three hours\n- A final round with the team\n\nWe reply to everyone within a week.",
+        applyUrl: "https://example.com/zylo/backend",
+        salaryMinMinor: toMinor(2_500_000, "INR"),
+        salaryMaxMinor: toMinor(4_000_000, "INR"),
+        salaryCurrency: "INR",
+        salaryPeriod: "YEAR",
+        salaryNote: "Plus ESOPs",
+        companyWebsite: "https://example.com/zylo",
+        companyIndustry: "SOFTWARE_INTERNET",
+        companySize: "SIZE_11_50",
+        aboutCompany: "Zylo Labs builds lending software for small marketplaces. Founded by DemoU alumni in 2021, we're a team of 40 in Mumbai and across India.",
+        ...approved,
+      },
+      {
+        tenantId: uni,
+        authorMembershipId: priya,
+        title: "Associate Product Manager",
+        companyName: "Google",
+        location: "London",
+        workMode: "HYBRID",
+        jobType: "FULL_TIME",
+        seniority: "ENTRY",
+        experienceMin: 1,
+        experienceMax: 3,
+        skills: ["Product management", "SQL", "A/B testing", "User research"],
+        description: "Referral available for DemoU alumni. Consumer product, 1–3 years experience. Three days a week in the office.",
+        responsibilities: "- Write specs with engineering and design\n- Run experiments and read their results\n- Talk to users every week",
+        requirements: "- 1–3 years in product, consulting or engineering\n- Comfortable with SQL and basic statistics\n- The right to work in the UK",
+        salaryMinMinor: toMinor(55_000, "GBP"),
+        salaryMaxMinor: toMinor(70_000, "GBP"),
+        salaryCurrency: "GBP",
+        salaryPeriod: "YEAR",
+        companyIndustry: "SOFTWARE_INTERNET",
+        companySize: "SIZE_5001_PLUS",
+        contactEmail: "priya@example.com",
+        ...approved,
+      },
+      { tenantId: uni, authorMembershipId: meera, title: "Summer Intern – Strategy", companyName: "Deloitte", location: "Dubai", jobType: "INTERNSHIP", description: "8-week internship for 2024/2025 batches. Visa sponsorship supported.", ...approved },
+      { tenantId: uni, authorMembershipId: arjun, title: "Export Operations Lead", companyName: "Singh Textiles", location: "Surat", jobType: "FULL_TIME", description: "Closed — position filled.", isClosed: true, ...approved },
     ]);
     await db.insert(jobSeekers).values({ tenantId: uni, membershipId: vikram, note: "Graduating from IIM-A in 2026, looking for product/strategy roles in Bengaluru or Mumbai.", preferredRoles: "Product Manager, Strategy Associate", preferredLocations: "Bengaluru, Mumbai", isActive: true });
 
@@ -324,8 +377,31 @@ export async function seedContent(db: Db, tenantIds: Record<string, string>, m: 
     await db.insert(contentReports).values({ tenantId: col, reporterMembershipId: neha, contentType: "POST", contentId: spam!.id, reason: "SPAM", details: "Looks like a scam link." });
 
     await db.insert(jobs).values([
-      { tenantId: col, authorMembershipId: neha, title: "Solutions Architect", companyName: "TCS", location: "Hyderabad", isRemote: false, jobType: "FULL_TIME", description: "Architect role in the BFSI unit. 8+ years experience. DCE alumni referrals welcome.", ...approved },
-      { tenantId: col, authorMembershipId: kiran, title: "Robotics Intern", companyName: "Joshi Robotics", location: "Pune", isRemote: false, jobType: "INTERNSHIP", description: "6-month internship on autonomous warehouse robots. ROS2 and C++ preferred.", moderationStatus: "PENDING" },
+      { tenantId: col, authorMembershipId: neha, title: "Solutions Architect", companyName: "TCS", location: "Hyderabad", jobType: "FULL_TIME", description: "Architect role in the BFSI unit. 8+ years experience. DCE alumni referrals welcome.", ...approved },
+      // Waiting for review, so the admin's preview has a structured job to show.
+      {
+        tenantId: col,
+        authorMembershipId: kiran,
+        title: "Robotics Intern",
+        companyName: "Joshi Robotics",
+        location: "Pune",
+        jobType: "INTERNSHIP",
+        seniority: "ENTRY",
+        experienceMin: 0,
+        skills: ["ROS2", "C++", "Python"],
+        educationRequirement: "Final-year B.E. or B.Tech in mechanical, electronics or computer engineering",
+        openings: 3,
+        description: "6-month internship on autonomous warehouse robots. ROS2 and C++ preferred.",
+        requirements: "- Built something that moves: a robot, a drone or a rover\n- Comfortable on Linux and with Git\n- Available full time from January",
+        salaryMinMinor: toMinor(25_000, "INR"),
+        salaryMaxMinor: toMinor(35_000, "INR"),
+        salaryCurrency: "INR",
+        salaryPeriod: "MONTH",
+        companyIndustry: "MANUFACTURING_ENGINEERING",
+        companySize: "SIZE_11_50",
+        aboutCompany: "Joshi Robotics builds warehouse automation for Indian 3PLs, with two pilots live in Pune.",
+        moderationStatus: "PENDING",
+      },
     ]);
     await db.insert(fundingListings).values({ tenantId: col, authorMembershipId: kiran, kind: "SEEKING", title: "Joshi Robotics", stage: "PRE_SEED", amountMinMinor: 20_000_000, amountMaxMinor: 50_000_000, currency: "INR", pitch: "Warehouse automation for Indian 3PLs. Two pilots live in Pune. Raising ₹2–5Cr pre-seed.", sectors: ["robotics", "logistics"], moderationStatus: "PENDING" });
     await db.insert(events).values([
@@ -347,7 +423,7 @@ export async function seedContent(db: Db, tenantIds: Record<string, string>, m: 
       { tenantId: sch, authorMembershipId: shreya, body: "Designed the new alumni logo — would love feedback from the 2009 batch especially!", ...approved },
       { tenantId: sch, authorMembershipId: nikhil, body: "Singapore DIS alumni: there are at least six of us here now. Dinner soon?", ...approved },
     ]);
-    await db.insert(jobs).values({ tenantId: sch, authorMembershipId: aditya, title: "Product Analyst", companyName: "Flipkart", location: "Bengaluru", isRemote: false, jobType: "FULL_TIME", description: "Referral for DIS alumni with 1–3 years of analytics experience.", ...approved });
+    await db.insert(jobs).values({ tenantId: sch, authorMembershipId: aditya, title: "Product Analyst", companyName: "Flipkart", location: "Bengaluru", jobType: "FULL_TIME", description: "Referral for DIS alumni with 1–3 years of analytics experience.", ...approved });
     await db.insert(fundingListings).values({ tenantId: sch, authorMembershipId: nikhil, kind: "OFFERING", title: "Seed cheques for DIS founders", stage: "SEED", currency: "USD", amountMinMinor: 5_000_000, amountMaxMinor: 25_000_000, pitch: "Investing personally in alumni-founded companies, USD 50k–250k, sector agnostic.", sectors: [], ...approved });
     await db.insert(events).values([
       { tenantId: sch, authorMembershipId: admin, title: "Founders' Day assembly", description: "Join the morning assembly and the alumni tea afterwards.", kind: "ORGANISED_EVENT", city: "Bengaluru", venueName: "Demo International School", startAt: inDays(21, 3), endAt: inDays(21, 6), timezone: "Asia/Kolkata", ...approved },

@@ -1,10 +1,12 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, plainExcerpt, type JobDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, jobPlaceLabel, jobSalaryText, type JobCardDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 
-export function JobCard({ slug, job }: { slug: string; job: JobDto }) {
+export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
+  const place = jobPlaceLabel(job);
+  const pay = jobSalaryText(job) ?? job.salaryNote;
   return (
     <ContentCard to={`/t/${slug}/app/jobs/${job.id}`} status={job.moderationStatus} className="p-4">
       <div className="flex items-start justify-between gap-3">
@@ -12,8 +14,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobDto }) {
           <h3 className="truncate font-semibold text-slate-900">{job.title}</h3>
           <p className="text-sm text-slate-600">
             {job.companyName}
-            {job.location ? ` · ${job.location}` : ""}
-            {job.isRemote ? " · Remote" : ""}
+            {place ? ` · ${place}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -24,10 +25,10 @@ export function JobCard({ slug, job }: { slug: string; job: JobDto }) {
         </div>
       </div>
       <ModerationCardNote status={job.moderationStatus} note={job.moderationNote} />
-      <p className="mt-2 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{plainExcerpt(job.description, 200)}</p>
+      <p className="mt-2 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{job.summary}</p>
       <p className="mt-2 text-xs text-slate-400">
         Posted by {job.author.fullName} (batch of {job.author.batchYear}) · {timeAgo(job.createdAt)}
-        {job.salaryRange ? ` · ${job.salaryRange}` : ""}
+        {pay ? ` · ${pay}` : ""}
       </p>
     </ContentCard>
   );

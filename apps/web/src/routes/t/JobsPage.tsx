@@ -39,7 +39,7 @@ export function JobsPage() {
   const [jobType, setJobType] = useState<JobType | "">("");
   const [remote, setRemote] = useState(false);
   const [canRefer, setCanRefer] = useState(false);
-  const filters = { q: q || undefined, jobType: jobType || undefined, remote: remote || undefined, canRefer: (available && canRefer) || undefined };
+  const filters = { q: q || undefined, jobType: jobType || undefined, workMode: remote ? ("REMOTE" as const) : undefined, canRefer: (available && canRefer) || undefined };
   const jobs = useInfiniteList(qk.jobs(slug, filters), (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), tab === "openings");
   const seekers = useInfiniteList(qk.seekers(slug), (cursor) => api.jobs.seekers.list(slug, { cursor, limit: 20 }), tab === "seekers");
 
@@ -56,7 +56,7 @@ export function JobsPage() {
         {tab === "openings" ? (
           <>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <Input aria-label="Search jobs" placeholder="Search title or company" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
+              <Input aria-label="Search jobs" placeholder="Search title, company or skill" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
               <Select aria-label="Job type" value={jobType} onChange={(e) => setJobType(e.target.value as JobType | "")} className="w-44">
                 <option value="">All types</option>
                 {JOB_TYPES.map((t) => (

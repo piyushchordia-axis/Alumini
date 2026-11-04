@@ -165,14 +165,38 @@ try {
   await step("create a job and view it", async () => {
     await page.click('nav >> text=Jobs');
     await page.waitForSelector("text=Backend Engineer (Node.js)");
+    // Remote only asks for remote jobs, and each card it leaves says so where it says where the job is done.
+    const cardPlaces = () => page.locator('a[href*="/app/jobs/"]:not([href$="/new"])').allInnerTexts();
+    await page.locator("a", { hasText: "Summer Intern – Strategy" }).waitFor();
+    await page.locator("a", { hasText: "Zylo Labs · Mumbai · Remote" }).waitFor();
+    await page.getByLabel("Remote only").check();
+    await page.locator("a", { hasText: "Summer Intern – Strategy" }).waitFor({ state: "detached" });
+    await page.locator("a", { hasText: "Backend Engineer (Node.js)" }).waitFor();
+    const remoteCards = await cardPlaces();
+    if (!remoteCards.length || remoteCards.some((text) => !text.includes(" · Remote"))) throw new Error(`Remote only lists a job that isn't remote: ${remoteCards.join(" | ")}`);
+    await page.getByLabel("Remote only").uncheck();
+    await page.locator("a", { hasText: "Summer Intern – Strategy" }).waitFor();
+
     await page.click("text=+ Post a job");
     await page.fill('input[name="title"]', `Smoke Test Engineer ${unique}`);
     await page.fill('input[name="companyName"]', "Smoke Labs");
+    await page.getByLabel("Work mode").selectOption("REMOTE");
     await page.fill('textarea[name="description"]', "Keep the smoke tests green. Remote within India.");
+    await page.getByLabel("Contact email").fill("smoke-jobs@example.com");
+    await page.getByLabel("Pay note").fill("₹18–25 LPA plus ESOPs");
     await page.click('button:has-text("Post job")');
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+$/);
     await page.waitForSelector("h1:has-text('Smoke Test Engineer')");
+    await page.getByText("Smoke Labs · Remote", { exact: true }).waitFor();
+    await page.getByText("Pay note: ₹18–25 LPA plus ESOPs", { exact: true }).waitFor();
+    const email = page.locator('a[href="mailto:smoke-jobs@example.com"]');
+    await email.waitFor();
     await shot("06-job-detail");
+    // Closed, it takes no more applications: its contacts go from the page, its poster's too, and the page says so.
+    await page.getByRole("button", { name: "Mark closed" }).click();
+    await page.getByText("Applications closed", { exact: true }).waitFor();
+    await email.waitFor({ state: "detached" });
+    await shot("06b-job-closed");
   });
 
   await step("delete your own job through the confirm dialog", async () => {

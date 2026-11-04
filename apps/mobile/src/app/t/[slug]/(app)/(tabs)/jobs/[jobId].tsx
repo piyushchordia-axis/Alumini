@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_DELETED_TEXT, JOB_TYPE_LABELS, waitingReferralsCloseText } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_DELETED_TEXT, JOB_TYPE_LABELS, applicationsClosed, applicationsLine, jobFacts, jobPlaceLabel, waitingReferralsCloseText } from "@illuminize/shared";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -35,6 +35,7 @@ function JobDetail({ jobId }: { jobId: string }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [confirming, setConfirming] = useState<"close" | "delete" | null>(null);
+  const [now] = useState(() => Date.now());
   const [status, setStatus] = useStatus();
   // Such as "Job published", from the form that has gone.
   useGroupNotice(`job:${jobId}`, setStatus);
@@ -70,6 +71,14 @@ function JobDetail({ jobId }: { jobId: string }) {
   const j = job.data;
   const waiting = j.pendingReferralCount ?? 0;
   const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;
+  const place = jobPlaceLabel(j);
+  const pay = jobFacts(j)
+    .filter((f) => f.key === "salary" || f.key === "salaryNote")
+    .map((f) => `${f.label}: ${f.value}`)
+    .join(" · ");
+  // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
+  const ended = applicationsClosed(j, now);
+  const applications = applicationsLine(j, now);
   return (
     <Screen title="Job">
       <Card>
@@ -78,8 +87,7 @@ function JobDetail({ jobId }: { jobId: string }) {
         </Text>
         <Muted size={14}>
           {j.companyName}
-          {j.location ? ` · ${j.location}` : ""}
-          {j.isRemote ? " · Remote" : ""}
+          {place ? ` · ${place}` : ""}
         </Muted>
         <Row>
           <Badge label={JOB_TYPE_LABELS[j.jobType]} tone="info" />
@@ -89,12 +97,18 @@ function JobDetail({ jobId }: { jobId: string }) {
           <ModerationBadge status={j.moderationStatus} />
         </Row>
         <ModerationNote status={j.moderationStatus} note={j.moderationNote} />
-        {j.salaryRange && <Muted size={13}>💰 {j.salaryRange}</Muted>}
-        {j.expiresAt && <Muted>Applications close {formatDate(j.expiresAt)}</Muted>}
+        {!!pay && <Muted size={13}>{pay}</Muted>}
+        {!ended && !!applications && <Muted>{applications}</Muted>}
         <RichText text={j.description} />
-        {j.applyUrl && !j.isClosed && <Button title="Apply ↗" onPress={() => void Linking.openURL(j.applyUrl!)} />}
-        {j.contactEmail && <Button title={`✉️ ${j.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${j.contactEmail}`)} />}
-        {j.contactPhone && <Button title={`📞 ${j.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${j.contactPhone}`)} />}
+        {ended ? (
+          <Text style={{ fontWeight: "600", color: colors.text }}>{applications}</Text>
+        ) : (
+          <>
+            {j.applyUrl && <Button title="Apply ↗" onPress={() => void Linking.openURL(j.applyUrl!)} />}
+            {j.contactEmail && <Button title={`Email ${j.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${j.contactEmail}`)} />}
+            {j.contactPhone && <Button title={`Call ${j.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${j.contactPhone}`)} />}
+          </>
+        )}
         <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
           <MemberRow slug={slug} member={j.author} meta={`Posted ${formatDate(j.createdAt)}`} />
           {!j.isMine && <ReportButton slug={slug} contentType="JOB" contentId={j.id} />}
