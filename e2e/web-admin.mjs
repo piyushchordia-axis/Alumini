@@ -15,6 +15,13 @@ const step = async (name, fn) => {
     results.push(`✓ ${name}`);
   } catch (err) {
     results.push(`✗ ${name}: ${String(err).split("\n")[0]}`);
+    // What every open page showed (a step may drive several), best effort: nothing here may hide the step's own error.
+    const file = `FAILED-${name.replace(/\W+/g, "-").replace(/^-|-$/g, "").slice(0, 80)}`;
+    for (const [i, p] of browser.contexts().flatMap((c) => c.pages()).entries()) {
+      const each = p === page ? `${file}.png` : `${file}-page${i + 1}.png`;
+      await p.screenshot({ path: `${SHOTS}/${each}`, fullPage: true, timeout: 10_000 }).catch(() => {});
+      results.push(`  ${p === page ? "main page" : `page ${i + 1}`} at ${p.url()} (${each})`);
+    }
     throw err;
   }
 };
@@ -41,14 +48,17 @@ async function onlyOnce(p, text) {
   if (n !== 1) throw new Error(`"${text}" shows ${n} times on the page`);
 }
 
-/** Registration's last two steps with nothing more filled in: Continue, Skip for now, then `label`. */
+/** Registration's last two steps with nothing more filled in: Continue, Skip for now, then `label`, with one Back on each. */
 async function finishRegistration(p, label) {
   await onlyOnce(p, "Continue");
+  await onlyOnce(p, "Back");
   await p.getByRole("button", { name: "Continue", exact: true }).click();
   await p.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
   await onlyOnce(p, "Skip for now");
+  await onlyOnce(p, "Back");
   await p.getByRole("button", { name: "Skip for now", exact: true }).click();
   await p.getByRole("heading", { name: "Step 3 of 3 · About you", exact: true }).waitFor();
+  await onlyOnce(p, "Back");
   await p.getByRole("button", { name: label, exact: true }).click();
 }
 

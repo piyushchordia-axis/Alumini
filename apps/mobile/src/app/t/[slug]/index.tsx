@@ -1,16 +1,23 @@
 import { isApiClientError } from "@illuminize/shared/client";
 import { Redirect, useGlobalSearchParams, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconBusinesses, IconDirectory, IconEvents, IconFeed, IconFunding, IconJobs } from "@/components/icons";
+import { SignedInAs } from "@/components/SignedInAs";
 import { Avatar, Button, Spinner } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
 import { homeHref } from "@/lib/sections";
+import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
+import { useTenantStore } from "@/stores/tenantStore";
 import { colors, elevation, spacing, useTheme } from "@/theme";
 
-/** Tenant landing: branding + sign-in, or a redirect into the app for signed-in users. */
+/**
+ * Tenant landing: branding and sign-in; Join for someone signed in who isn't a member here; a redirect into the app for
+ * a member.
+ */
 export default function TenantLandingScreen() {
   // Global, because the layout's error screen unmounts the stack, and Try again brings it back on this screen with no params of its own.
   const { slug } = useGlobalSearchParams<{ slug: string }>();
@@ -19,13 +26,25 @@ export default function TenantLandingScreen() {
   const tenant = useTenant(slug);
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
+  const phone = useAuthStore((s) => s.user?.phone ?? null);
+  const signOut = useSignOut();
   const membership = useMembershipQuery(authed ? slug : undefined);
+  const last = useTenantStore((s) => s.lastTenantSlug);
+  const setLast = useTenantStore((s) => s.setLastTenantSlug);
+  const error = membership.error;
+  // Signed in but not a member here: they stay, to join or to sign in with another number. Sending them straight into a
+  // fresh registration form made that form's Back bring them right back to it.
+  const notMember = authed && isApiClientError(error) && (error.status === 404 || error.code === "NOT_A_MEMBER");
+  // Nor is it the institution to start at, as the app's own guard decides once a membership is refused: the picker would
+  // send them straight back here, Choose a different institution included.
+  useEffect(() => {
+    if (notMember && last === slug) setLast(null);
+  }, [notMember, last, slug, setLast]);
 
   if (!tenant.data || !hydrated) return <Spinner />;
   if (authed) {
     if (membership.isLoading) return <Spinner label="Checking your membership…" />;
     if (membership.data) return <Redirect href={membership.data.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
-    if (membership.error && isApiClientError(membership.error) && membership.error.status === 404) return <Redirect href={`/t/${slug}/register`} />;
   }
   const t = tenant.data;
   const f = t.settings.features;
@@ -53,7 +72,14 @@ export default function TenantLandingScreen() {
       </View>
       <View style={{ marginHorizontal: spacing.lg, marginTop: -56, backgroundColor: "#fff", borderRadius: 20, padding: spacing.xl, gap: spacing.md, ...elevation[2] }}>
         {t.welcomeMessage ? <Text style={{ color: "#475569", lineHeight: 20 }}>{t.welcomeMessage}</Text> : null}
-        <Button title="Sign in / Join with mobile number" onPress={() => router.push(`/t/${slug}/login`)} />
+        {notMember ? (
+          <>
+            <Button title={`Join ${t.shortName ?? t.name}`} onPress={() => router.push(`/t/${slug}/register`)} />
+            <SignedInAs phone={phone} onUseDifferentNumber={() => void signOut(`/t/${slug}/login`)} centered />
+          </>
+        ) : (
+          <Button title="Sign in / Join with mobile number" onPress={() => router.push(`/t/${slug}/login`)} />
+        )}
         <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>
           {t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "New members are verified by the alumni office." : "New members get instant access."}
         </Text>

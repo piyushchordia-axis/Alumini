@@ -1,25 +1,45 @@
 import { countryName } from "@illuminize/shared";
+import { isApiClientError } from "@illuminize/shared/client";
 import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
+import { SignedInAs } from "@/components/auth/SignedInAs";
 import { IconBusinesses, IconDirectory, IconEvents, IconFeed, IconFunding, IconJobs } from "@/components/icons";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { ErrorBox, LinkButton, Loading } from "@/components/ui";
+import { useMembershipQuery } from "@/hooks/useMembership";
+import { useSignOut } from "@/hooks/useSignOut";
 import { useTenant } from "@/hooks/useTenant";
 import { useTenantSlug } from "@/hooks/useTenantSlug";
 import { applyTenantTheme } from "@/lib/theme";
-import { useIsAuthenticated } from "@/stores/authStore";
+import { useAuthStore, useIsAuthenticated } from "@/stores/authStore";
+import { useUiStore } from "@/stores/uiStore";
 
 export function LandingPage() {
   const slug = useTenantSlug();
   const tenant = useTenant(slug);
   const authed = useIsAuthenticated();
+  const membership = useMembershipQuery(slug);
+  const phone = useAuthStore((s) => s.user?.phone ?? null);
+  const signOut = useSignOut();
+  const last = useUiStore((s) => s.lastTenantSlug);
+  const setLast = useUiStore((s) => s.setLastTenantSlug);
+  // Signed in but not a member here: they stay, to join or to sign in with another number. Sending them straight into a
+  // fresh registration form made that form's Back bring them right back to it. Anyone else goes into the app, which
+  // deals with a membership waiting, refused, or one that couldn't be checked.
+  const error = membership.error;
+  const notMember = authed && !membership.data && isApiClientError(error) && (error.status === 404 || error.code === "NOT_A_MEMBER");
   useEffect(() => {
     if (tenant.data) applyTenantTheme(tenant.data);
   }, [tenant.data]);
+  // Nor is it the institution to start at, as the app's own guard decides once a membership is refused: the picker
+  // (Choose a different institution, below) would send them back into the app here, and on into a fresh form.
+  useEffect(() => {
+    if (notMember && last === slug) setLast(null);
+  }, [notMember, last, slug, setLast]);
 
-  if (tenant.isLoading) return <Loading />;
+  if (tenant.isLoading || (authed && membership.isLoading)) return <Loading />;
   if (tenant.error || !tenant.data) return <ErrorBox error={tenant.error ?? "Not found"} className="m-6" />;
-  if (authed) return <Navigate to={`/t/${slug}/app`} replace />;
+  if (authed && !notMember) return <Navigate to={`/t/${slug}/app`} replace />;
   const t = tenant.data;
   const place = [t.city, countryName(t.country)].filter(Boolean).join(", ");
   const features = [
@@ -36,9 +56,18 @@ export function LandingPage() {
       <div className="space-y-5">
         {t.welcomeMessage && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">{t.welcomeMessage}</p>}
         <div className="space-y-2">
-          <LinkButton to={`/t/${slug}/login`} className="w-full">
-            Sign in / Join with your mobile number
-          </LinkButton>
+          {authed ? (
+            <>
+              <LinkButton to={`/t/${slug}/register`} className="w-full">
+                Join {t.shortName ?? t.name}
+              </LinkButton>
+              <SignedInAs phone={phone} onUseDifferentNumber={() => void signOut(`/t/${slug}/login`)} className="justify-center" />
+            </>
+          ) : (
+            <LinkButton to={`/t/${slug}/login`} className="w-full">
+              Sign in / Join with your mobile number
+            </LinkButton>
+          )}
           <p className="text-center text-xs text-slate-500">
             {t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "New members are verified by the alumni office before access." : "New members get instant access."}
           </p>

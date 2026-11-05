@@ -5,11 +5,12 @@ import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { IconSpark } from "@/components/icons";
 import { AuthShell } from "@/components/layout/AuthShell";
-import { RegistrationSteps } from "@/components/profile/RegistrationSteps";
+import { RegistrationSteps, historyIndex } from "@/components/profile/RegistrationSteps";
 import { ErrorBox, Loading } from "@/components/ui";
 import { useMe } from "@/hooks/useMe";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
+import { useSignOut } from "@/hooks/useSignOut";
 import { useTenant } from "@/hooks/useTenant";
 import { useTenantSlug } from "@/hooks/useTenantSlug";
 import { api } from "@/lib/api";
@@ -39,8 +40,10 @@ export function RegisterPage() {
   const me = useMe();
   const storedName = useAuthStore((s) => s.user?.displayName ?? null);
   const displayName = me.data?.user.displayName ?? storedName;
+  const phone = useAuthStore((s) => s.user?.phone ?? null);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const signOut = useSignOut();
   useEffect(() => {
     if (tenant.data) applyTenantTheme(tenant.data);
   }, [tenant.data]);
@@ -100,14 +103,19 @@ export function RegisterPage() {
               </p>
             ) : undefined
           }
+          account={phone ? { phone, onUseDifferentNumber: () => signOut(`/t/${slug}/login`) } : undefined}
+          // Back where they came from (the landing page, as a rule), or to the landing page when this page opened first.
+          onLeave={() => ((historyIndex() ?? 0) > 0 ? navigate(-1) : navigate(`/t/${slug}`))}
           onSubmit={async (values) => {
             const m = await api.membership.register(slug, values);
-            qc.setQueryData(qk.membership(slug), m);
             await qc.invalidateQueries({ queryKey: qk.me });
             // A suspension held from a deleted account comes back SUSPENDED: no toast, the pending page says so (as on mobile).
             if (m.status === "APPROVED") toast.success(`Welcome to ${t.name}!`);
             else if (m.status === "PENDING") toast.success("Submitted for approval");
-            navigate(m.status === "APPROVED" ? `/t/${slug}/app` : `/t/${slug}/pending`, { replace: true });
+            // The membership moves them on, through this page's own redirect above (to the app, or the waiting page), and
+            // nothing else may: a second visit to the app, landing while its redirect to the first section was still being
+            // drawn, left them on an empty page.
+            qc.setQueryData(qk.membership(slug), m);
           }}
         />
       )}

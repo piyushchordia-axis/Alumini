@@ -214,6 +214,9 @@ function draftBody(d: ProfileDraft, skills: string[], savedAvatar: string | null
   };
 }
 
+/** Whether `now` holds anything other than `then`, the inputs' values as they started. */
+const changedFrom = (now: object, then: object) => now !== then && JSON.stringify(now) !== JSON.stringify(then);
+
 /** `errors` without `keys`, and without anything under a key ending in "." ("experiences." for every row's). */
 function without(errors: Record<string, string>, ...keys: string[]): Record<string, string> {
   const drop = (k: string) => keys.some((key) => (key.endsWith(".") ? k.startsWith(key) : k === key));
@@ -252,7 +255,8 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
   // The form as it opened, which registration's "Use details from …" compares with to tell what the member has typed.
   const [start] = useState<ProfileDraft>(() => toDraft(initial));
   const [draft, setDraft] = useState<ProfileDraft>(start);
-  const [answers, setAnswers] = useState<FieldAnswers>(() => answersToValues(initial?.fields));
+  const [startAnswers] = useState<FieldAnswers>(() => answersToValues(initial?.fields));
+  const [answers, setAnswers] = useState<FieldAnswers>(startAnswers);
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -441,6 +445,8 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     mode,
     start,
     draft,
+    /** Anything typed, picked or uploaded that the form didn't start with, which leaving would lose. */
+    touched: changedFrom(draft, start) || changedFrom(answers, startAnswers),
     set,
     setValues,
     setAvatar,

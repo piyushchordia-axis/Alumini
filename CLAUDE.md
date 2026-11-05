@@ -235,6 +235,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   text by hand, as `formatSalary` and `applicationsLine` do.
 - A page holding a form waits only for its queries' first answer (`isLoading && !isFetched`, see `RegisterPage`): a
   query with no data goes back to loading on every refetch, which swaps the form, and what's typed in it, for a spinner.
+- Navigate once. React Router draws each navigation as a transition, so two in quick succession can be drawn as the last
+  alone: registration navigating to `/app` itself while its own `<Navigate>` (on the membership put in the cache) did
+  the same left `AppHomeRedirect`'s `<Navigate>`, whose effect had already run, on `/app` with nothing to show. When a
+  page redirects on a query's data, let that redirect move it on.
 - Redis caches are versioned in `src/redis/keys.ts` (`cacheTenant`, `cacheDirectoryFilters`): bump the version when a
   cached shape changes, or old entries are served until they expire.
 

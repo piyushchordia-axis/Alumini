@@ -14,6 +14,13 @@ const step = async (name, fn) => {
     results.push(`✓ ${name}`);
   } catch (err) {
     results.push(`✗ ${name}: ${String(err).split("\n")[0]}`);
+    // What every open page showed (a step may drive several), best effort: nothing here may hide the step's own error.
+    const file = `FAILED-${name.replace(/\W+/g, "-").replace(/^-|-$/g, "").slice(0, 80)}`;
+    for (const [i, p] of browser.contexts().flatMap((c) => c.pages()).entries()) {
+      const each = p === page ? `${file}.png` : `${file}-page${i + 1}.png`;
+      await p.screenshot({ path: `${SHOTS}/${each}`, fullPage: true, timeout: 10_000 }).catch(() => {});
+      results.push(`  ${p === page ? "main page" : `page ${i + 1}`} at ${p.url()} (${each})`);
+    }
     throw err;
   }
 };
@@ -65,16 +72,20 @@ async function onlyOnce(p, text) {
 
 /**
  * Registration's last two steps with nothing more filled in: Continue, Skip for now, then `label` ("Join the network" or
- * "Submit for approval"). `hint` is text the last step must show first.
+ * "Submit for approval"), each step showing its buttons once, Back included. `hint` is text the last step must show
+ * first.
  */
 async function finishRegistration(p, label, { hint } = {}) {
   await onlyOnce(p, "Continue");
+  await onlyOnce(p, "Back");
   await p.getByRole("button", { name: "Continue", exact: true }).click();
   await p.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
   await onlyOnce(p, "Continue");
   await onlyOnce(p, "Skip for now");
+  await onlyOnce(p, "Back");
   await p.getByRole("button", { name: "Skip for now", exact: true }).click();
   await p.getByRole("heading", { name: "Step 3 of 3 · About you", exact: true }).waitFor();
+  await onlyOnce(p, "Back");
   if (hint) await p.getByText(hint).waitFor();
   await p.getByRole("button", { name: label, exact: true }).click();
 }
@@ -106,6 +117,20 @@ try {
     await heading("Step 1 of 3 · Basics").waitFor();
     await shot("03-register");
 
+    // Basics names the number the code went to, with a way to use another, and has Back, as every step does. With nothing
+    // typed, Back goes where they came from: the landing page, which offers Join rather than sending a signed-in
+    // non-member straight back into a fresh form.
+    await page.getByText(`Signed in as +91 ${PHONE_A.slice(0, 5)} ${PHONE_A.slice(5)}`, { exact: true }).waitFor();
+    await onlyOnce(page, "Back");
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.waitForURL(/\/t\/demo-university$/);
+    await page.getByRole("button", { name: "Use a different number", exact: true }).waitFor();
+    if (await page.getByText("Sign in / Join", { exact: false }).count()) throw new Error("the landing page offers a signed-in member to sign in");
+    await shot("02b-landing-signed-in");
+    await page.getByRole("link", { name: "Join DemoU", exact: true }).click();
+    await page.waitForURL(/\/register$/);
+    await heading("Step 1 of 3 · Basics").waitFor();
+
     // Step 1: the photo and everything required. Continue checks this step before moving on.
     await page.setInputFiles('input[aria-label="Profile photo"]', { name: "me.png", mimeType: "image/png", buffer: PNG });
     await page.getByRole("group", { name: "Profile photo" }).getByRole("button", { name: "Change photo", exact: true }).waitFor();
@@ -125,6 +150,7 @@ try {
     if ((await focused()) !== "Step 2 of 3 · Work") throw new Error("the Work step's heading didn't take focus");
     await onlyOnce(page, "Continue");
     await onlyOnce(page, "Skip for now");
+    await onlyOnce(page, "Back");
     await page.fill('input[name="headline"]', "Not this one");
     await page.getByRole("button", { name: "Step 1: Basics", exact: true }).click();
     await heading("Step 1 of 3 · Basics").waitFor();
@@ -133,16 +159,38 @@ try {
     if ((await page.inputValue('input[name="headline"]')) !== "Not this one") throw new Error("going back a step lost what was typed on the Work step");
     await page.getByRole("button", { name: "Skip for now", exact: true }).click();
     await heading("Step 3 of 3 · About you").waitFor();
+    await onlyOnce(page, "Back");
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await heading("Step 2 of 3 · Work").waitFor();
     if ((await page.inputValue('input[name="headline"]')) !== "") throw new Error("Skip for now kept what was typed on the Work step");
     await page.fill('input[name="headline"]', "Founder of Smoke Labs");
     await page.fill('input[name="companyName"]', "Smoke Labs");
     await shot("03b-register-work");
+    // Back on Work goes to Basics, and both steps keep what's in them.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await heading("Step 1 of 3 · Basics").waitFor();
+    if ((await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("Back on Work lost the name");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await heading("Step 2 of 3 · Work").waitFor();
+    if ((await page.inputValue('input[name="companyName"]')) !== "Smoke Labs") throw new Error("Back on Work lost what was typed there");
     // The browser's Back (a phone's back gesture) goes to the step before, keeping everything, rather than leaving.
     await page.evaluate(() => history.back());
     await heading("Step 1 of 3 · Basics").waitFor();
     if (!page.url().endsWith("/register") || (await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("the browser's Back left the registration");
+    // On Basics, with something typed, it asks first, and Cancel stays with everything kept.
+    await page.evaluate(() => history.back());
+    const leaving = page.getByRole("dialog", { name: "Leave registration?" });
+    await leaving.getByText("What you've entered here won't be kept.", { exact: true }).waitFor();
+    await shot("03b2-register-leave");
+    await leaving.getByRole("button", { name: "Cancel", exact: true }).click();
+    await leaving.waitFor({ state: "detached" });
+    if (!page.url().endsWith("/register") || (await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("Cancel on Leave registration? left the registration, or lost the name");
+    // So does Back there.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await leaving.getByText("What you've entered here won't be kept.", { exact: true }).waitFor();
+    await leaving.getByRole("button", { name: "Cancel", exact: true }).click();
+    await leaving.waitFor({ state: "detached" });
+    if (!page.url().endsWith("/register") || (await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("Cancel on Back's Leave registration? left the registration, or lost the name");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await heading("Step 2 of 3 · Work").waitFor();
     if ((await page.inputValue('input[name="headline"]')) !== "Founder of Smoke Labs") throw new Error("the browser's Back lost the Work step");
@@ -920,12 +968,37 @@ try {
   });
 
   await step("joining a second institution offers the details given the first, keeps what's typed, and can be undone", async () => {
-    // Smoke Tester is a member of Demo University only. Nothing is sent here, so they don't join Demo College.
-    await page.goto(BASE + "/t/demo-college/register");
+    // Smoke Tester is a member of Demo University only. Nothing is sent here, so they don't join Demo College. Its landing
+    // page doesn't send them into the form: it offers Join, and another number.
+    // Remembered as the institution to start at, as after being removed from it: the landing page forgets it, so Choose a
+    // different institution opens the list rather than coming back here through a fresh form.
+    const remembered = () => page.evaluate(() => JSON.parse(localStorage.getItem("illuminize.ui")).state.lastTenantSlug);
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem("illuminize.ui"));
+      localStorage.setItem("illuminize.ui", JSON.stringify({ ...stored, state: { ...stored.state, lastTenantSlug: "demo-college" } }));
+    });
+    await page.goto(BASE + "/t/demo-college");
+    const signedInAs = page.getByText(`Signed in as +91 ${PHONE_A.slice(0, 5)} ${PHONE_A.slice(5)}`, { exact: true });
+    await signedInAs.waitFor();
+    for (let i = 0; i < 20 && (await remembered()) !== null; i++) await page.waitForTimeout(100);
+    if ((await remembered()) !== null) throw new Error("the landing page of an institution they aren't a member of stayed remembered");
+    await page.getByRole("link", { name: "Choose a different institution", exact: true }).click();
+    await page.waitForURL(`${BASE}/`);
+    await page.locator('a[href="/t/demo-college"]').click();
+    await signedInAs.waitFor();
+    await page.getByRole("link", { name: "Join DCE", exact: true }).click();
+    await page.waitForURL(/\/t\/demo-college\/register$/);
     await page.getByRole("heading", { name: "Step 1 of 3 · Basics", exact: true }).waitFor();
     // With no invitation, the name they gave before starts them off.
     if ((await page.inputValue('input[name="fullName"]')) !== "Smoke Tester") throw new Error("the name wasn't filled in from the account");
     await page.fill('input[name="city"]', "Pune");
+    // With something typed, Use a different number asks first, as signing out loses it; Cancel keeps them signed in, here.
+    await page.getByRole("button", { name: "Use a different number", exact: true }).click();
+    const signOut = page.getByRole("dialog", { name: "Use a different number?" });
+    await signOut.getByText("You'll be signed out, and what you've entered here won't be kept.", { exact: true }).waitFor();
+    await signOut.getByRole("button", { name: "Cancel", exact: true }).click();
+    await signOut.waitFor({ state: "detached" });
+    if ((await page.inputValue('input[name="city"]')) !== "Pune") throw new Error("Cancel on Use a different number lost the city");
     await page.getByRole("button", { name: "Use details from Demo University", exact: true }).click();
     const undo = page.getByRole("button", { name: "Undo", exact: true });
     await undo.waitFor();
@@ -955,6 +1028,14 @@ try {
     if ((await page.inputValue('input[name="headline"]')) !== "Head of smoke at Smoke Labs") throw new Error("Undo threw away the headline typed after the copy");
     if ((await page.inputValue('input[name="companyName"]')) !== "") throw new Error("Undo left the copied company");
     if (await page.getByRole("button", { name: "Remove Playwright", exact: true }).count()) throw new Error("Undo left the copied skills");
+    // Back to Basics, then Back there, with all this typed, asks first; Leave goes back to the landing page.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("heading", { name: "Step 1 of 3 · Basics", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    const leaving = page.getByRole("dialog", { name: "Leave registration?" });
+    await leaving.getByRole("button", { name: "Leave", exact: true }).click();
+    await page.waitForURL(/\/t\/demo-college$/);
+    await page.getByRole("link", { name: "Join DCE", exact: true }).waitFor();
     await page.goto(BASE + "/t/demo-university/app/feed");
     await page.waitForSelector("text=Welcome to the official Demo University alumni network");
   });

@@ -314,13 +314,33 @@ Work and About you.
 Each step leaves out what the member isn't asked (see "Who is asked what" above).
 
 - **Continue** checks the step it leaves. **Skip for now** on Work puts back the values it last accepted. The last step
-  has **Back** and **Join the network** or **Submit for approval**, by the server's rule (an institution that approves
-  members automatically, or an invitation it lets straight in), with "An admin at … will review your profile before you
-  can join." under it when approval is needed. The step bar opens any step already visited.
+  has **Join the network** or **Submit for approval**, by the server's rule (an institution that approves members
+  automatically, or an invitation it lets straight in), with "An admin at … will review your profile before you can
+  join." under it when approval is needed. The step bar opens any step already visited.
+- **Back** is on every step (left of the step's buttons on a wide web page, last on a phone). On Work and About you it
+  goes to the step before, keeping the draft. On Basics it leaves for the page they came from, normally the
+  institution's landing page, asking "Leave registration?" first if anything has been typed
+  (`REGISTRATION_LEAVE_CONFIRM`).
+- **Basics names the verified number**: "Signed in as +91 98765 43210" (`formatPhone`), with **Use a different number**
+  beside it, which signs out and opens sign-in, asking first if anything has been typed (`REGISTRATION_NUMBER_CONFIRM`).
+- **The landing page doesn't bounce.** Someone signed in who isn't a member of the institution (a 404 or
+  `NOT_A_MEMBER`) sees its landing page with **Join …** (to registration) and the same "Signed in as" line, instead of
+  being sent straight into a fresh form, which Back on Basics would only bring them back to. A member still goes into
+  the app, and a member removed while in the app still lands on registration. The landing page also stops remembering
+  the institution as the one to start at, as the app's guard does when a membership is refused, so Choose a different
+  institution opens the list instead of coming back to it.
 - **One POST at the end** (`POST /t/:slug/memberships`), so admins hear only of complete applications. A server error
-  opens the earliest step holding a field it names (`profileStepOf`) and marks the field.
-- Each step starts at the top with its heading focused. Browser Back (web) and Android's back button go to the step
-  before; iOS swipe-back is off after step 1; a double tap moves one step.
+  opens the earliest step holding a field it names (`profileStepOf`) and marks the field. On the web app the membership
+  it returns, put in the cache, moves them on through the page's own redirect, and nothing else navigates: a second
+  navigation to the app could land while the app's redirect to its first section was still being drawn, and leave an
+  empty page.
+- Each step starts at the top with its heading focused. Browser Back (web), Android's back button and iOS's swipe back
+  go to the step before, as Back does, and on Basics they leave, asking first as Back does (web: `useBlocker`; mobile:
+  expo-router's `usePreventRemove`, whose cancelled swipe arrives as a POP). While the profile is being sent they do
+  nothing, so a refusal finds the draft still there; the page the profile then moves them on to, signing out and a
+  forced sign-out aren't held. Android's back button with nothing under registration (opened first, or after a
+  redirect replaced everything) never reaches `usePreventRemove`, as the navigator hands it straight to Android, so
+  registration's own `BackHandler` answers it there, the same way. A double tap moves one step.
 - **Re-applying** after a rejection prefills every step and shows the reason above each. On a first registration the
   name comes from the invitation, or else from the account.
 - **The draft stays in memory only**, as it holds personal details, and survives a background refetch failing.
@@ -1169,8 +1189,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 - **Nothing has been checked on a real phone** beyond what the web export shows: see "Checks that need a real phone" in
   `e2e/README.md`. Profiles and jobs added more of them: the native square crop and the photo-library permission,
   cancelling an upload and its timeout, the keyboard on the long edit form, the list editors and each registration
-  step, Android's back button between registration steps and iOS swipe-back being off after step 1, VoiceOver and
-  TalkBack focus after removing or finishing a list row, on the copy banner and its Undo, and on the "Not now" note,
+  step, Android's back button and iOS's swipe back going to the registration step before (and asking on Basics),
+  VoiceOver and TalkBack focus after removing or finishing a list row, on the copy banner and its Undo, and on the "Not
+  now" note,
   links opening the browser, the chip rows keeping the chosen chip in view, VoiceOver and TalkBack on a job's matched
   skills and its card, a job's add-skills link bringing back a profile editor already open, and the edit screen's
   scroll to a section (`measureLayout`) on the new architecture. Photo preparation added HEIC from an iPhone and HEIF
@@ -1231,10 +1252,16 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Events, business listings and funding still check their links with the older `httpUrlSchema`, which lets a user
     name or password through ("https://google.com@evil.example") and stores the address as typed.
 - Registration:
-  - Browser Back (web) goes to the previous step only when the history entry before registration belongs to the same
-    page load, such as the landing page that led to sign-in. When registration holds the load's first entry (its
-    address, or the sign-in page, opened directly or in a new tab, or the page reloaded), Back leaves registration, and
-    the draft with it.
+  - Browser Back (web) goes to the previous step, or asks before leaving Basics with something typed, only when the
+    history entry before registration belongs to the same page load, such as the landing page that led to sign-in.
+    When registration holds the load's first entry (its address, or the sign-in page, opened directly or in a new tab,
+    or the page reloaded), the browser's Back leaves registration without asking, and the draft with it. The labelled
+    Back always works.
+  - On the phone app, iOS's swipe back and Android's back button (between steps, while sending, and with registration
+    the only screen) are checked by hand only (`e2e/README.md`), and the browser's own Back on its web build isn't
+    tested; e2e sees the hold only through the `beforeunload` it adds on the web build.
+  - A member removed while in the app (the membership answering 404) is still sent straight to registration, so Back on
+    Basics there returns to the app page before it, which sends them to registration again.
   - Nothing tests the "Join the network" label at an institution that approves members automatically but has invite
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or

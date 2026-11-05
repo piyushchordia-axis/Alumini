@@ -2,6 +2,8 @@ import {
   PORTABLE_PROFILE_KEYS,
   PROFILE_SECTIONS,
   PROFILE_SECTION_TITLES,
+  REGISTRATION_LEAVE_CONFIRM,
+  REGISTRATION_NUMBER_CONFIRM,
   REGISTRATION_STEP_HINTS,
   fillFromPortableProfile,
   hiddenProfileKeys,
@@ -22,12 +24,14 @@ import {
   type ProfileStep,
   type TenantPublicDto,
 } from "@illuminize/shared";
-import { Stack } from "expo-router";
+import { usePreventRemove, useRouter } from "expo-router";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { AccessibilityInfo, BackHandler, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from "react-native";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconCheck, IconSwitch } from "@/components/icons";
 import { ProfileAboutSection, ProfileBasicsSection, ProfileWorkSection } from "@/components/profile/ProfileSections";
 import { toDraft, useProfileDraft, type DraftValues, type ProfileDraft } from "@/components/profile/useProfileDraft";
+import { SignedInAs } from "@/components/SignedInAs";
 import type { SkillsInputHandle } from "@/components/SkillsInput";
 import { Button, ErrorText, focusOn, headingRole, type Focusable } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
@@ -83,16 +87,25 @@ export interface RegistrationStepsProps {
   copy?: PortableProfileDto | null;
   /** The screen's scroll view: each step starts at the top. */
   scrollRef: RefObject<ScrollViewInstance | null>;
+  /** The number they signed in with, shown on the first step with "Use a different number", which signs out. */
+  account?: { phone: string; onUseDifferentNumber: () => void | Promise<void> };
+  /** Back on the first step: back where they came from. */
+  onLeave: () => void;
 }
+
+/** Leaving the screen by going back: Android's back button, iOS's swipe (cancelled by the stack and reported as POP). */
+const BACK_ACTIONS = new Set(["GO_BACK", "POP"]);
 
 /**
  * Registration in three steps, each one section of the profile, as on the web app: Basics (the photo and everything
  * required), Work, and About you. Continue checks the step it leaves; Skip for now puts Work back as it was when it was
- * last accepted; the last step sends everything at once, and a problem found then opens the step holding it. Android's
- * back button goes to the step before, and iOS's swipe back is off after the first step. The draft lives only in memory,
- * above the steps, so moving between them (or a refetch behind the screen) loses nothing.
+ * last accepted; the last step sends everything at once, and a problem found then opens the step holding it. Back,
+ * Android's back button and iOS's swipe back go to the step before; on the first step they leave, asking first if
+ * anything has been typed. The draft lives only in memory, above the steps, so moving between them (or a refetch behind
+ * the screen) loses nothing.
  */
-export function RegistrationSteps({ tenant, initial, customFields, submitLabel, onSubmit, needsApproval, reapplying = false, notice, intro, copy, scrollRef }: RegistrationStepsProps) {
+export function RegistrationSteps({ tenant, initial, customFields, submitLabel, onSubmit, needsApproval, reapplying = false, notice, intro, copy, scrollRef, account, onLeave }: RegistrationStepsProps) {
+  const router = useRouter();
   const skillsRef = useRef<SkillsInputHandle>(null);
   const headingRef = useRef<Focusable>(null);
   const [step, setStep] = useState<ProfileStep>(1);
@@ -109,6 +122,14 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
    * details from …" (or its Undo) filled it in. Never what was typed and left unchecked, which would be sent as it is.
    */
   const acceptedWork = useRef<DraftValues | null>(null);
+  // Set once they're on their way out (leaving, signing out, or moved on once the profile is in), so what takes them
+  // isn't held.
+  const [leaving, setLeaving] = useState(false);
+  // What the confirm sheet asks: to leave (Back on Basics, or the system's back there), or to use a different number.
+  const [asking, setAsking] = useState<"leave" | "number" | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  // The system's back on Basics, held while they're asked, to let through if they choose Leave.
+  const heldBack = useRef<(() => void) | null>(null);
 
   const open = (target: ProfileStep, focusHeading: boolean) => {
     setStep(target);
@@ -170,9 +191,71 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
     open(3, true);
   };
 
+  // Going back (Android's back button, iOS's swipe, which the stack cancels and reports) goes to the step before rather
+  // than leaving the screen and everything typed with it, and does nothing while the profile is being sent (goTo waits
+  // that out), as on the web app; on Basics with something typed it asks first. Anything else that takes the screen away
+  // is let through: the screen the profile moves them on to once it's in, or a forced sign-out. So the hold stays on
+  // while the profile is sent, and a refusal finds it still there.
+  const guarded = !leaving && (step > 1 || f.touched);
+  const disablePrevention = usePreventRemove(guarded, ({ data, repeat }) => {
+    if (!BACK_ACTIONS.has(data.action.type)) {
+      setLeaving(true);
+      return repeat();
+    }
+    if (step > 1) return goTo((step - 1) as ProfileStep);
+    heldBack.current = repeat;
+    setAsking("leave");
+  });
+
+  /** Lets the screen go: whatever is about to take it away must not be held. */
+  const letGo = () => {
+    setLeaving(true);
+    disablePrevention();
+  };
+
+  /** Back on the first step: where they came from, asking first if anything has been typed. */
+  const leave = () => {
+    if (f.touched) return setAsking("leave");
+    letGo();
+    onLeave();
+  };
+
+  /** Signs out, for signing in with another number, asking first if anything has been typed. */
+  const switchNumber = async (confirmed: boolean) => {
+    if (!account) return;
+    if (f.touched && !confirmed) return setAsking("number");
+    setSigningOut(true);
+    letGo();
+    await account.onUseDifferentNumber();
+  };
+
+  const confirmAsked = () => {
+    if (asking === "number") return void switchNumber(true);
+    const back = heldBack.current;
+    heldBack.current = null;
+    setAsking(null);
+    if (back) {
+      setLeaving(true);
+      back();
+    } else {
+      letGo();
+      onLeave();
+    }
+  };
+
+  const cancelAsked = () => {
+    heldBack.current = null;
+    setAsking(null);
+  };
+
+  // Android's back button with nothing under this screen (opened first, or by a redirect that replaced everything): the
+  // navigator hands it straight back to Android without a word to usePreventRemove, and the app would close or go to the
+  // background, everything typed with it. Here it does what it does anywhere else. Added after the navigator's own
+  // listener, so it's asked first; with something to go back to it passes, to come through usePreventRemove.
   const onHardwareBack = useEffectEvent(() => {
-    if (step === 1) return false;
-    goTo((step - 1) as ProfileStep);
+    if (!guarded || router.canGoBack()) return false;
+    if (step > 1) goTo((step - 1) as ProfileStep);
+    else leave();
     return true;
   });
   useEffect(() => {
@@ -211,10 +294,9 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
   };
 
   const section = profileSectionOfStep(step);
+  const asked = asking === "number" ? REGISTRATION_NUMBER_CONFIRM : REGISTRATION_LEAVE_CONFIRM;
   return (
     <View style={[styles.stack, settled ? null : styles.settling]}>
-      {/* iOS's swipe back would leave the screen and everything typed: after the first step, the step bar and Back go back. */}
-      <Stack.Screen options={{ gestureEnabled: step === 1 }} />
       {notice}
       <StepBar step={step} furthest={furthest} locked={f.photoBusy || f.busy} onPick={goTo} />
       <View style={{ gap: 2 }}>
@@ -222,6 +304,7 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
           <Text style={styles.heading}>{registrationStepHeading(step)}</Text>
         </View>
         <Text style={styles.hint}>{REGISTRATION_STEP_HINTS[section]}</Text>
+        {step === 1 && account && <SignedInAs phone={account.phone} onUseDifferentNumber={() => void switchNumber(false)} />}
       </View>
       {step === 1 && intro}
       {step === 1 && offerCopy && copy && <CopyBanner copy={copy} message={copied?.message ?? null} note={undoNote} onUse={applyCopy} onUndo={undoCopy} />}
@@ -233,9 +316,10 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
         {f.photoBusy && <Text style={styles.note}>Wait for the photo to finish uploading.</Text>}
         <Button title={step === 3 ? submitLabel : "Continue"} onPress={() => (step === 3 ? void f.submit() : goTo((step + 1) as ProfileStep))} loading={step === 3 && f.busy} disabled={f.photoBusy} />
         {step === 2 && <Button title="Skip for now" variant="ghost" onPress={skipWork} />}
-        {step === 3 && <Button title="Back" variant="outline" onPress={() => goTo(2)} disabled={f.busy} />}
+        <Button title="Back" variant="outline" onPress={() => (step === 1 ? leave() : goTo((step - 1) as ProfileStep))} disabled={f.busy} />
         {step === 3 && needsApproval && <Text style={styles.note}>An admin at {tenant.shortName ?? tenant.name} will review your profile before you can join.</Text>}
       </View>
+      <ConfirmSheet open={asking !== null} title={asked.title} body={asked.body} confirmLabel={asked.confirm} destructive busy={signingOut} onConfirm={confirmAsked} onCancel={cancelAsked} />
     </View>
   );
 }

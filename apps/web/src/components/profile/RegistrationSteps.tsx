@@ -2,6 +2,8 @@ import {
   PORTABLE_PROFILE_KEYS,
   PROFILE_SECTIONS,
   PROFILE_SECTION_TITLES,
+  REGISTRATION_LEAVE_CONFIRM,
+  REGISTRATION_NUMBER_CONFIRM,
   REGISTRATION_STEP_HINTS,
   fillFromPortableProfile,
   hiddenProfileKeys,
@@ -21,6 +23,8 @@ import clsx from "clsx";
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import type { Path } from "react-hook-form";
 import { useBlocker } from "react-router-dom";
+import { SignedInAs } from "@/components/auth/SignedInAs";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconCheck, IconSwitch } from "@/components/icons";
 import { PROFILE_SECTION_BODIES, PhotoWait } from "@/components/profile/ProfileForm";
 import { toProfileFormValues, useProfileForm, type ProfileFormOptions, type ProfileFormValues } from "@/components/profile/useProfileForm";
@@ -46,7 +50,7 @@ const onlyWork = (values: Values): Values => Object.fromEntries(Object.entries(v
 const isRepeatClick = (e: MouseEvent) => e.detail > 1;
 
 /** Where the browser's history is, as the router counts it (its own `idx` in each entry's state). */
-const historyIndex = (): number | undefined => {
+export const historyIndex = (): number | undefined => {
   const idx = (window.history.state as { idx?: unknown } | null)?.idx;
   return typeof idx === "number" ? idx : undefined;
 };
@@ -66,16 +70,22 @@ export interface RegistrationStepsProps extends Omit<ProfileFormOptions, "mode">
   intro?: ReactNode;
   /** Their profile at another institution, offered on the first step as "Use details from …". */
   copy?: PortableProfileDto | null;
+  /** The number they signed in with, shown on the first step with "Use a different number", which signs out. */
+  account?: { phone: string; onUseDifferentNumber: () => void | Promise<void> };
+  /** Back on the first step: back where they came from. */
+  onLeave: () => void;
 }
+
+type Asking = "leave" | "back" | "number";
 
 /**
  * Registration in three steps, each one section of the profile: Basics (the photo and everything required), Work, and
  * About you. Continue checks the step it leaves; Skip for now puts Work back as it was when it was last accepted; the
- * last step sends everything at once, and an error the server finds opens the step holding it. The browser's Back goes to
- * the step before. The draft lives only in memory, above the steps, so moving between them (or a refetch behind the
- * page) loses nothing.
+ * last step sends everything at once, and an error the server finds opens the step holding it. Back, and the browser's
+ * Back, go to the step before; on the first step they leave, asking first if anything has been typed. The draft lives
+ * only in memory, above the steps, so moving between them (or a refetch behind the page) loses nothing.
  */
-export function RegistrationSteps({ submitLabel, needsApproval, reapplying = false, notice, intro, copy, ...options }: RegistrationStepsProps) {
+export function RegistrationSteps({ submitLabel, needsApproval, reapplying = false, notice, intro, copy, account, onLeave, ...options }: RegistrationStepsProps) {
   const customFields = options.customFields ?? [];
   const formRef = useRef<HTMLFormElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -92,6 +102,13 @@ export function RegistrationSteps({ submitLabel, needsApproval, reapplying = fal
    */
   const acceptedWork = useRef<Values | null>(null);
   const moving = useRef(false);
+  // What the confirm dialog is asking: leave (Back on Basics), the browser's Back on Basics, or a different number.
+  const [asking, setAsking] = useState<Asking | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  // Set once they've chosen to go, so the way out isn't held.
+  const leaving = useRef(false);
+  // Set while the browser's Back on Basics is held for the confirm dialog, which the router's answer mustn't undo.
+  const holdingBack = useRef(false);
   const photoWaitId = useId();
   const copyMessageId = useId();
   const undoNoteId = useId();
@@ -125,18 +142,60 @@ export function RegistrationSteps({ submitLabel, needsApproval, reapplying = fal
 
   // The browser's Back (a phone's back gesture) goes to the step before, as Back does, rather than leaving the page and
   // everything typed with it: the router asks this about each navigation, and a Back from a later step is answered here
-  // (not while the profile is being sent) and held, the page staying where it is. On the first step it leaves. Only a
-  // Back one page within this visit is held: the router numbers each page load's history afresh, and holding a Back to a
-  // page from another load would jump by the wrong count, or reload.
+  // (not while the profile is being sent) and held, the page staying where it is. On the first step it leaves, but with
+  // something typed it's held while they're asked. Only a Back one page within this visit is held: the router numbers
+  // each page load's history afresh, and holding a Back to a page from another load would jump by the wrong count, or
+  // reload. Leaving on purpose (Back on Basics, a different number) isn't held; nor is sending, which replaces the page.
   const [entryIndex] = useState(() => historyIndex());
   const blocker = useBlocker(({ historyAction }) => {
-    if (historyAction !== "POP" || step === 1 || entryIndex === undefined || historyIndex() !== entryIndex - 1) return false;
+    if (leaving.current || historyAction !== "POP" || entryIndex === undefined || historyIndex() !== entryIndex - 1) return false;
+    if (step === 1) {
+      if (!f.dirty) return false;
+      holdingBack.current = true;
+      setAsking("back");
+      return true;
+    }
+    holdingBack.current = false;
     if (!form.formState.isSubmitting) show((step - 1) as ProfileStep, true);
     return true;
   });
   useEffect(() => {
-    if (blocker.state === "blocked") blocker.reset();
+    if (blocker.state === "blocked" && !holdingBack.current) blocker.reset();
   }, [blocker]);
+
+  /** Back on the first step: where they came from, asking first if anything has been typed. */
+  const leave = () => {
+    if (f.dirty) return setAsking("leave");
+    leaving.current = true;
+    onLeave();
+  };
+
+  /** Signs out, for signing in with another number, asking first if anything has been typed. */
+  const switchNumber = async (confirmed: boolean) => {
+    if (!account) return;
+    if (f.dirty && !confirmed) return setAsking("number");
+    leaving.current = true;
+    setSigningOut(true);
+    await account.onUseDifferentNumber();
+  };
+
+  const confirmAsked = () => {
+    if (asking === "number") return void switchNumber(true);
+    setAsking(null);
+    leaving.current = true;
+    if (asking === "back") {
+      holdingBack.current = false;
+      blocker.proceed?.();
+    } else onLeave();
+  };
+
+  const cancelAsked = () => {
+    if (asking === "back") {
+      holdingBack.current = false;
+      blocker.reset?.();
+    }
+    setAsking(null);
+  };
 
   /** Moves to `target`, checking the step being left first when moving on. Never while the photo uploads. */
   const goTo = async (target: ProfileStep) => {
@@ -201,55 +260,70 @@ export function RegistrationSteps({ submitLabel, needsApproval, reapplying = fal
   const Body = PROFILE_SECTION_BODIES[section];
   const busy = form.formState.isSubmitting;
 
+  const asked = asking === "number" ? REGISTRATION_NUMBER_CONFIRM : REGISTRATION_LEAVE_CONFIRM;
+
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
-      {notice}
-      <StepList step={step} furthest={furthest} locked={f.photoBusy || busy} onPick={(n) => void goTo(n)} />
-      <div>
-        <h2 ref={headingRef} tabIndex={-1} className="font-display text-lg font-semibold text-slate-900 focus:outline-none">
-          {registrationStepHeading(step)}
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">{REGISTRATION_STEP_HINTS[section]}</p>
-      </div>
-      {step === 1 && intro}
-      {step === 1 && offerCopy && copy && (
-        <CopyBanner copy={copy} message={copied?.message ?? null} messageId={copyMessageId} note={undoNote} noteId={undoNoteId} onUse={applyCopy} onUndo={undoCopy} />
-      )}
-      <Body form={f} />
-      {f.serverError ? (
-        <div role="alert">
-          <ErrorBox error={f.serverError} />
+    <>
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
+        {notice}
+        <StepList step={step} furthest={furthest} locked={f.photoBusy || busy} onPick={(n) => void goTo(n)} />
+        <div>
+          <h2 ref={headingRef} tabIndex={-1} className="font-display text-lg font-semibold text-slate-900 focus:outline-none">
+            {registrationStepHeading(step)}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">{REGISTRATION_STEP_HINTS[section]}</p>
+          {step === 1 && account && <SignedInAs phone={account.phone} onUseDifferentNumber={() => void switchNumber(false)} className="mt-1" />}
         </div>
-      ) : null}
-      <div className="space-y-3 border-t border-slate-100 pt-5">
-        {f.photoBusy && <PhotoWait id={photoWaitId} className="text-center text-sm text-slate-500 sm:text-right" />}
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-          {step === 2 && (
-            <Button type="button" variant="ghost" className="min-h-11" onClick={(e) => !isRepeatClick(e) && skipWork()}>
-              Skip for now
-            </Button>
-          )}
-          {step === 3 && (
-            <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={(e) => !isRepeatClick(e) && show(2, true)}>
+        {step === 1 && intro}
+        {step === 1 && offerCopy && copy && (
+          <CopyBanner copy={copy} message={copied?.message ?? null} messageId={copyMessageId} note={undoNote} noteId={undoNoteId} onUse={applyCopy} onUndo={undoCopy} />
+        )}
+        <Body form={f} />
+        {f.serverError ? (
+          <div role="alert">
+            <ErrorBox error={f.serverError} />
+          </div>
+        ) : null}
+        <div className="space-y-3 border-t border-slate-100 pt-5">
+          {f.photoBusy && <PhotoWait id={photoWaitId} className="text-center text-sm text-slate-500 sm:text-right" />}
+          {/* Back first, at the left, and last on a narrow screen, where the primary button comes first. */}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="outline" className="min-h-11 sm:mr-auto" disabled={busy} onClick={(e) => !isRepeatClick(e) && (step === 1 ? leave() : void goTo((step - 1) as ProfileStep))}>
               Back
             </Button>
+            {step === 2 && (
+              <Button type="button" variant="ghost" className="min-h-11" onClick={(e) => !isRepeatClick(e) && skipWork()}>
+                Skip for now
+              </Button>
+            )}
+            <Button
+              type="submit"
+              className="min-h-11 sm:min-w-40"
+              loading={step === 3 && busy}
+              disabled={f.photoBusy}
+              aria-describedby={f.photoBusy ? photoWaitId : undefined}
+              onClick={(e) => isRepeatClick(e) && e.preventDefault()}
+            >
+              {step === 3 ? submitLabel : "Continue"}
+            </Button>
+          </div>
+          {step === 3 && needsApproval && (
+            <p className="text-center text-xs text-slate-500 sm:text-right">An admin at {f.tenant.shortName ?? f.tenant.name} will review your profile before you can join.</p>
           )}
-          <Button
-            type="submit"
-            className="min-h-11 sm:min-w-40"
-            loading={step === 3 && busy}
-            disabled={f.photoBusy}
-            aria-describedby={f.photoBusy ? photoWaitId : undefined}
-            onClick={(e) => isRepeatClick(e) && e.preventDefault()}
-          >
-            {step === 3 ? submitLabel : "Continue"}
-          </Button>
         </div>
-        {step === 3 && needsApproval && (
-          <p className="text-center text-xs text-slate-500 sm:text-right">An admin at {f.tenant.shortName ?? f.tenant.name} will review your profile before you can join.</p>
-        )}
-      </div>
-    </form>
+      </form>
+      {/* Outside the form: its buttons would otherwise submit it. */}
+      <ConfirmDialog
+        open={asking === "back" ? blocker.state === "blocked" : asking !== null}
+        title={asked.title}
+        body={asked.body}
+        confirmLabel={asked.confirm}
+        destructive
+        busy={signingOut}
+        onConfirm={confirmAsked}
+        onCancel={cancelAsked}
+      />
+    </>
   );
 }
 

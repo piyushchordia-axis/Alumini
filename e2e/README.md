@@ -17,7 +17,10 @@ approves the pending fixtures and removes the reported chat message; the member 
 members), and a second run would find those states gone.
 
 The scripts read `API_URL` (default `http://localhost:4000`), `WEB_URL` (default `http://localhost:5173`),
-`MOBILE_WEB_URL` (default `http://localhost:8081`) and `SHOTS` (where screenshots go, default `e2e/screenshots`).
+`MOBILE_WEB_URL` (default `http://localhost:8081`) and `SHOTS` (where screenshots go, default `e2e/screenshots`). A step
+that fails leaves a full-page `FAILED-<step name>.png` of the script's main page there, and
+`FAILED-<step name>-page<n>.png` of each other page still open (a step that signs in a second member drives two), and
+the results give each page's address.
 
 ### The sign-in budget
 
@@ -48,11 +51,14 @@ pnpm e2e:web                             # screenshots go to e2e/screenshots (or
 
 Covers:
 
-- tenant picker → landing → phone + OTP → registration in three steps → auto-approved feed: a photo on Basics, Continue
-  refusing a missing name and focusing it, the Work step's heading taking focus, the step bar and the browser's Back
-  going to the step before with nothing lost, Skip for now putting Work back as it was last accepted, the profile
-  question on About you, a server error sending the member back to Work with the headline focused, and the photo
-  arriving with the profile;
+- tenant picker → landing → phone + OTP → registration in three steps → auto-approved feed: "Signed in as" with the
+  number on Basics, and one Back on every step; Back on an untouched Basics leaving for the landing page, which offers
+  Join DemoU (not the sign-in button) instead of sending them back into the form; a photo on Basics, Continue refusing a
+  missing name and focusing it, the Work step's heading taking focus, the step bar, Back and the browser's Back going to
+  the step before with nothing lost, the browser's Back and Back on a Basics with something typed asking "Leave
+  registration?" and Cancel staying, Skip for now putting Work back as it was last accepted, the profile question on
+  About you, a server error sending the member back to Work with the headline focused, and the photo arriving with the
+  profile;
 - the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
@@ -90,8 +96,11 @@ Covers:
   "(you have this)" after each; its page keeping the job's order, the same two checked, and "You have 2 of 4 skills";
   "You have 0 of 4 skills" and no marks on Associate Product Manager; and the member's own job, asking for TypeScript
   among skills too long for one line, unmarked on its page and on its My posts card, whose chips shorten to fit;
-- joining Demo College as that member (nothing sent): the name from the account, Use details from Demo University
-  keeping a city typed first, and Undo keeping a headline changed after the copy, with focus back on Use details;
+- joining Demo College as that member (nothing sent): its landing page offering Join DCE and "Signed in as" rather than
+  sending them into the form, and forgetting Demo College as the institution to start at, so Choose a different
+  institution opens the list; the name from the account, Use a different number with a city typed asking first and
+  Cancel staying, Use details from Demo University keeping that city, Undo keeping a headline changed after the copy,
+  with focus back on Use details, and Back on Basics asking "Leave registration?", whose Leave goes to the landing page;
   re-applying after a rejection (answered by the script) prefilling every step, with the reason on each and no Use
   details offer;
 - the phone layout: every section opens its own page, the More sheet, its active state, sections the institution has
@@ -167,8 +176,13 @@ add that origin to `CORS_ORIGINS`.
 Covers:
 
 - tenant picker → landing → login → OTP → registration in three steps → feed, as on the web: each step's button on the
-  screen once, the step bar going back with Work kept, Skip for now putting Work back as it was last accepted, Back
-  from About you, and a server error sending the member back to Work;
+  screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so nothing holds
+  the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the form; with a
+  name typed, the page held, Use a different number asking first and Cancel staying signed in, and Back asking "Leave
+  registration?", Cancel staying with the name and Leave going to the landing screen; the step bar going back with
+  Work kept, Skip for now putting Work back as it was last accepted, Back from About you and from Work, a server error
+  sending the member back to Work with the page still held, and Join the network leaving the screen (it isn't held)
+  with nothing holding the feed;
 - the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
@@ -214,9 +228,11 @@ Covers:
   Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
 - a current pupil seeing none of them; sections switched off; the guards (the registration form keeping what's typed,
   even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
-  with the reason on each; joining Demo College with Use details from Demo University and Undo keeping a headline
-  changed after it, then Submit for approval with its note, landing on the pending screen; switching institution and
-  signing out from the More hub; a forced sign-out leaving nothing cached;
+  with the reason on each; joining Demo College from its landing screen's Join DCE (it doesn't send a signed-in
+  non-member into the form, and forgets Demo College as the institution to start at, so Choose a different institution
+  opens the list), with Use details from Demo University and Undo keeping a headline changed after it, then Submit for
+  approval with its note, landing on the pending screen; switching institution and signing out from the More hub; a
+  forced sign-out leaving nothing cached;
 - the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", and My profile's link; the
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
   review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
@@ -445,9 +461,22 @@ leave without sending, or he'll be waiting for approval there.
       above the keyboard and nothing hidden under it. Closing the keyboard puts the form back, with no gap left at the
       bottom. These screens now make room for the keyboard on Android too, as the chats do, since an edge-to-edge window
       no longer shrinks for it.
-- [ ] Android: on Work and About you, the back button goes to the step before, keeping what was typed; on Basics it
-      leaves registration. iPhone: swiping from the left edge goes back only from Basics; on Work and About you it does
-      nothing, and the step bar and Back move between the steps.
+- [ ] Android's back button and the iPhone's swipe from the left edge: on Work and About you they go to the step before,
+      keeping what was typed (on the iPhone the screen springs back into place, with no flicker of the screen under
+      it). On an untouched Basics they leave for the institution's landing screen, which shows Join and "Use a different
+      number", not a fresh form. On Basics with a name typed, "Leave registration?" asks first: Cancel (and Android's
+      back button on the sheet) stays with the name kept, and Leave goes to the landing screen. While Join the network
+      is spinning (turn on airplane mode first, so it fails), they do nothing; the failure leaves them on About you with
+      everything kept, and back works again. When the profile is sent, Join the network goes straight to the feed.
+- [ ] Android, with registration the only screen: force-quit the app, open a link to `/t/<slug>/register` (or, as a
+      member, be removed by an admin while the app is closed, then open it), fill in Basics, Continue, and press the
+      back button: it goes to Basics, not out of the app. Back on Basics with a name typed asks "Leave registration?",
+      and Leave opens the landing screen.
+- [ ] Signed in at an institution they aren't a member of, whose landing screen is the one the app opened (as after
+      being removed): Choose a different institution opens the list of institutions, not the same landing screen again.
+- [ ] TalkBack or VoiceOver, on Basics: Back is read as a button on every step, and "Signed in as" and the number are
+      read before "Use a different number", a button. With a name typed, Use a different number opens the sheet, read as
+      an alert named "Use a different number?", and Cancel (or Android's back button) closes it, still signed in.
 - [ ] TalkBack or VoiceOver, in Edit profile: Remove on a past role says "Removed" and its name, and focus moves to
       Add a past role; Done folds a row and moves focus to its Edit button; Done on a row whose end year is before its
       start says the problem and moves focus to that year.

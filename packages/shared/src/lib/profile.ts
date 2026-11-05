@@ -26,6 +26,20 @@ export const REGISTRATION_STEP_HINTS: Record<ProfileSection, string> = {
   about: "Your story, studies, links and what you're open to. All of it is optional.",
 };
 
+/** What leaving registration from Basics asks first when anything has been typed, word for word on web and mobile. */
+export const REGISTRATION_LEAVE_CONFIRM = {
+  title: "Leave registration?",
+  body: "What you've entered here won't be kept.",
+  confirm: "Leave",
+} as const;
+
+/** What "Use a different number" asks first on Basics when anything has been typed. */
+export const REGISTRATION_NUMBER_CONFIRM = {
+  title: "Use a different number?",
+  body: "You'll be signed out, and what you've entered here won't be kept.",
+  confirm: "Sign out",
+} as const;
+
 /** The section a registration step holds: step 1 is "basics". */
 export const profileSectionOfStep = (step: ProfileStep): ProfileSection => PROFILE_SECTIONS[step - 1] ?? "basics";
 

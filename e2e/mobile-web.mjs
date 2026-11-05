@@ -20,6 +20,13 @@ const step = async (name, fn) => {
     results.push(`✓ ${name}`);
   } catch (err) {
     results.push(`✗ ${name}: ${String(err).split("\n")[0]}`);
+    // What every open page showed (a step may drive several), best effort: nothing here may hide the step's own error.
+    const file = `FAILED-${name.replace(/\W+/g, "-").replace(/^-|-$/g, "").slice(0, 80)}`;
+    for (const [i, p] of browser.contexts().flatMap((c) => c.pages()).entries()) {
+      const each = p === page ? `${file}.png` : `${file}-page${i + 1}.png`;
+      await p.screenshot({ path: `${SHOTS}/${each}`, fullPage: true, timeout: 10_000 }).catch(() => {});
+      results.push(`  ${p === page ? "main page" : `page ${i + 1}`} at ${p.url()} (${each})`);
+    }
     throw err;
   }
 };
@@ -33,6 +40,16 @@ const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_C
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 page.setDefaultTimeout(20000);
 page.on("dialog", (d) => d.accept());
+/**
+ * Whether the page holds going back: registration's hold on Back (expo-router's usePreventRemove) asks before the page
+ * unloads too, on the web, so a beforeunload event shows whether it's on.
+ */
+const holdsBack = () =>
+  page.evaluate(() => {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: false });
 const tap = (text) => page.getByText(text, { exact: true }).last().click();
 // Items on the tab bar are links with role=tab. The screens' own Tabs have that role too, but no href.
@@ -55,25 +72,31 @@ const signIn = async (number) => {
 // Registration is three steps. A click waits out the moment a step that has just opened ignores taps (so a double tap
 // moves one step), and each button's label must be on the page once.
 const stepHeading = (n, name) => page.getByRole("heading", { name: `Step ${n} of 3 · ${name}`, exact: true });
+const expectOnce = async (name) => {
+  const shown = await page.getByText(name, { exact: true }).locator("visible=true").count();
+  if (shown !== 1) throw new Error(`"${name}" shows ${shown} times on the register screen`);
+};
 const pressStepButton = async (name) => {
   const button = page.getByRole("button", { name, exact: true });
   await button.waitFor();
-  const shown = await page.getByText(name, { exact: true }).locator("visible=true").count();
-  if (shown !== 1) throw new Error(`"${name}" shows ${shown} times on the register screen`);
+  await expectOnce(name);
   await button.click();
 };
 /**
  * From step 1 with its inputs filled: Continue, "Skip for now" on Work (after `onWork`, to look at it), then `label` on
- * About you, which says when an admin looks first.
+ * About you, which says when an admin looks first. Each step has one Back.
  */
 const finishRegistration = async (label, { onWork } = {}) => {
   await stepHeading(1, "Basics").waitFor();
+  await expectOnce("Back");
   await pressStepButton("Continue");
   await stepHeading(2, "Work").waitFor();
-  if ((await page.getByText("Continue", { exact: true }).locator("visible=true").count()) !== 1) throw new Error('"Continue" isn\'t on the Work step once');
+  await expectOnce("Continue");
+  await expectOnce("Back");
   await onWork?.();
   await pressStepButton("Skip for now");
   await stepHeading(3, "About you").waitFor();
+  await expectOnce("Back");
   if (label === "Submit for approval") await page.getByText(/^An admin at .+ will review your profile before you can join\.$/).waitFor();
   await pressStepButton(label);
 };
@@ -116,9 +139,51 @@ try {
     await signIn(PHONE);
     await page.getByText("Create your profile").waitFor();
     await shot("m03-register");
+    // Basics names the number the code went to, with a way to use another, and has Back, as every step does. With
+    // nothing typed, Back goes where they came from: the landing screen, which offers Join rather than sending a
+    // signed-in non-member straight back into a fresh form.
+    // The landing screen under this one says it too, now.
+    await page.getByText(`Signed in as +91 ${PHONE.slice(0, 5)} ${PHONE.slice(5)}`, { exact: true }).locator("visible=true").waitFor();
+    if (await holdsBack()) throw new Error("an untouched Basics holds going back");
+    await pressStepButton("Back");
+    await page.waitForURL("**/t/demo-university");
+    await page.getByText("Use a different number", { exact: true }).locator("visible=true").waitFor();
+    if (await page.getByText("Sign in / Join with mobile number").locator("visible=true").count()) throw new Error("the landing screen offers a signed-in member to sign in");
+    await shot("m02b-landing-signed-in");
     const inputs = page.locator("input:visible");
-    await inputs.nth(0).fill("Mobile Smoke");
-    await inputs.nth(1).fill("2014");
+    const fillBasics = async () => {
+      await tap("Join DemoU");
+      await stepHeading(1, "Basics").waitFor();
+      await inputs.nth(0).fill("Mobile Smoke");
+      await inputs.nth(1).fill("2014");
+      if (!(await holdsBack())) throw new Error("Basics with a name typed doesn't hold going back");
+    };
+    await fillBasics();
+    // With something typed, Use a different number asks first, as signing out loses it; Cancel keeps them signed in.
+    await page.getByText("Use a different number", { exact: true }).locator("visible=true").click();
+    const signOutNote = page.getByText("You'll be signed out, and what you've entered here won't be kept.", { exact: true });
+    await signOutNote.waitFor();
+    await shot("m03a-register-other-number");
+    await tap("Cancel");
+    await signOutNote.waitFor({ state: "detached" });
+    if ((await inputs.nth(0).inputValue()) !== "Mobile Smoke") throw new Error("Cancel on Use a different number lost the name");
+    // So does Back: Cancel stays with the name, and Leave goes to the landing screen, from where Join starts afresh.
+    const leaveNote = page.getByText("What you've entered here won't be kept.", { exact: true });
+    await pressStepButton("Back");
+    await leaveNote.waitFor();
+    await shot("m03a2-register-leave");
+    await tap("Cancel");
+    await leaveNote.waitFor({ state: "detached" });
+    if ((await inputs.nth(0).inputValue()) !== "Mobile Smoke") throw new Error("Cancel on Leave registration? lost the name");
+    await pressStepButton("Back");
+    await leaveNote.waitFor();
+    await tap("Leave");
+    await page.waitForURL("**/t/demo-university");
+    await page.getByText("Join DemoU", { exact: true }).locator("visible=true").waitFor();
+    // The registration screen goes, and its hold with it.
+    await page.getByText("Create your profile").waitFor({ state: "detached" });
+    if (await holdsBack()) throw new Error("the landing screen holds going back: Leave left registration's hold behind");
+    await fillBasics();
     await pressStepButton("Continue");
     // Skip for now puts Work back as it was last accepted (here, as it started): never what was typed and left
     // unchecked, even after going back a step and returning, which keeps it.
@@ -137,6 +202,16 @@ try {
     await pressStepButton("Back");
     await stepHeading(2, "Work").waitFor();
     if ((await headlineBox.inputValue()) !== "") throw new Error("Skip for now kept what was typed on the Work step");
+    // Back on Work goes to Basics, and both steps keep what's in them.
+    await headlineBox.fill("Kept by Back");
+    await pressStepButton("Back");
+    await stepHeading(1, "Basics").waitFor();
+    if ((await inputs.nth(0).inputValue()) !== "Mobile Smoke") throw new Error("Back on Work lost the name");
+    await pressStepButton("Continue");
+    await stepHeading(2, "Work").waitFor();
+    if ((await headlineBox.inputValue()) !== "Kept by Back") throw new Error("Back on Work lost what was typed there");
+    // Left blank, as the profile card below expects.
+    await headlineBox.fill("");
     // A problem the server finds opens the step holding it, with the problem on its input.
     const register = "**/api/v1/t/demo-university/memberships";
     const refusal = { error: { code: "VALIDATION_ERROR", message: "Invalid input", details: [{ path: "headline", message: "The server can't take this headline" }] } };
@@ -150,11 +225,24 @@ try {
     await pressStepButton("Join the network");
     await stepHeading(2, "Work").waitFor();
     await page.getByText("The server can't take this headline", { exact: true }).waitFor();
+    // Going back is still held after a refusal: nothing typed may be lost to it.
+    if (!(await holdsBack())) throw new Error("a refused profile left going back unheld");
     await page.unroute(register);
     await pressStepButton("Continue");
     await stepHeading(3, "About you").waitFor();
     await pressStepButton("Join the network");
-    await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).waitFor();
+    // Sending lets the screen go: Back's hold on it, kept while the profile is sent, mustn't keep the member there, nor
+    // outlive it.
+    const welcome = page.getByText("Welcome to the official Demo University alumni network", { exact: false });
+    await welcome.waitFor();
+    await page.waitForURL("**/t/demo-university/feed");
+    await page
+      .getByText("Create your profile")
+      .waitFor({ state: "detached", timeout: 5000 })
+      .catch(() => {
+        throw new Error("the registration screen stayed after Join the network");
+      });
+    if (await holdsBack()) throw new Error("the feed holds going back: registration's hold outlived it");
     for (let i = 0; i < 50 && liveSockets.length === 0; i++) await page.waitForTimeout(100);
     if (liveSockets.length === 0) throw new Error("the app did not open a live-updates connection after signing in");
     await shot("m04-feed");
@@ -218,14 +306,15 @@ try {
 
   await step("a chosen reaction is a brand tint with a filled icon, and choosing it again takes it back", async () => {
     // Saving the edit closes its screen; until it has, the feed underneath is hidden and its card can't be found.
-    await page.getByText(`Edited on mobile ${unique}`, { exact: true }).locator("visible=true").first().waitFor();
-    // The innermost box holding both the post's text and its reactions is its card.
-    const card = page
-      .locator("div")
-      .filter({ has: page.getByText(`Edited on mobile ${unique}`, { exact: true }) })
-      .filter({ has: page.locator('[aria-label="Like"]') })
-      .locator("visible=true")
-      .last();
+    const text = page.getByText(`Edited on mobile ${unique}`, { exact: true }).locator("visible=true").first();
+    await text.waitFor();
+    // The post's card is the nearest box around its text that holds a Like. While the feed settles after the edit, that
+    // box can briefly be the whole list, so wait until it holds exactly one Like.
+    const card = text.locator('xpath=ancestor::div[.//*[@aria-label="Like"]][1]');
+    for (let tries = 0; (await card.locator('[aria-label="Like"]').count()) !== 1; tries++) {
+      if (tries >= 50) throw new Error("couldn't find the edited post's own card with its Like");
+      await page.waitForTimeout(200);
+    }
     await card.locator('[aria-label="Like"][aria-pressed="false"]').click();
     const chosen = card.locator('[aria-label="Like"][aria-pressed="true"]');
     await chosen.waitFor();
@@ -2221,8 +2310,25 @@ try {
   });
 
   await step("ADMIN_APPROVAL tenant lands on the pending screen", async () => {
-    // deep link straight into the college (served with SPA fallback); signed in but not a member → register
+    // Deep link straight into the college (served with SPA fallback). Signed in but not a member: its landing screen offers
+    // Join and another number, rather than sending them straight into the form.
+    // Remembered as the institution to start at, as after being removed from it: the landing screen forgets it, so Choose
+    // a different institution opens the list rather than this screen again.
+    await page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem("illuminize.tenant"));
+      localStorage.setItem("illuminize.tenant", JSON.stringify({ ...stored, state: { ...stored.state, lastTenantSlug: "demo-college" } }));
+    });
     await page.goto(BASE + "/t/demo-college");
+    const signedInAs = page.getByText(`Signed in as +91 ${PHONE.slice(0, 5)} ${PHONE.slice(5)}`, { exact: true }).locator("visible=true");
+    await signedInAs.waitFor();
+    for (let i = 0; i < 20 && (await remembered()) !== null; i++) await page.waitForTimeout(100);
+    if ((await remembered()) !== null) throw new Error("the landing screen of an institution they aren't a member of stayed remembered");
+    await shot("m08-landing-join");
+    await tap("Choose a different institution");
+    await page.getByPlaceholder(/Search by name or city/).waitFor();
+    await tap("Demo College of Engineering");
+    await signedInAs.waitFor();
+    await tap("Join DCE");
     await page.getByText("Create your profile").waitFor();
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Pending Mobile");

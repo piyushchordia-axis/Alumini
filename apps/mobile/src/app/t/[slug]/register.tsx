@@ -13,6 +13,7 @@ import { useTenant } from "@/hooks/useTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { homeHref } from "@/lib/sections";
+import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
 import { radius, spacing } from "@/theme";
@@ -33,6 +34,8 @@ export default function RegisterScreen() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const storedName = useAuthStore((s) => s.user?.displayName ?? null);
+  const phone = useAuthStore((s) => s.user?.phone ?? null);
+  const signOut = useSignOut();
   const setLast = useTenantStore((s) => s.setLastTenantSlug);
   // Nothing here refetches behind the form: with no membership cached, a refetch shows the spinner and loses what they've typed.
   const membership = useMembershipQuery(slug, { refetchOnWindowFocus: false, refetchOnReconnect: false });
@@ -101,6 +104,9 @@ export default function RegisterScreen() {
           reapplying={reapplying}
           copy={copy.data ?? null}
           scrollRef={scroller}
+          account={phone ? { phone, onUseDifferentNumber: () => signOut(`/t/${slug}/login`) } : undefined}
+          // Back where they came from (the landing screen, as a rule), or to the landing screen when this one opened first.
+          onLeave={() => (router.canGoBack() ? router.back() : router.replace(`/t/${slug}`))}
           notice={
             reapplying ? (
               <View role="note" style={[styles.box, styles.notice]}>
