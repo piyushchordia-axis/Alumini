@@ -1,3 +1,4 @@
+import { tenantKeyPredicate } from "@illuminize/shared";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -6,5 +7,5 @@ import type { QueryClient } from "@tanstack/react-query";
  * approval/suspension, role or profile changes. Only queries on screen refetch straight away.
  */
 export function invalidateTenant(qc: QueryClient, slug: string) {
-  return qc.invalidateQueries({ predicate: (q) => q.queryKey[1] === slug });
+  return qc.invalidateQueries({ predicate: tenantKeyPredicate(slug) });
 }

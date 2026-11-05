@@ -1,5 +1,6 @@
 import {
   MAX_INVITE_IMPORT_ROWS,
+  channelName,
   csvLine,
   formatPhone,
   parseCsv,
@@ -21,7 +22,6 @@ import { formatDateTime, timeAgo } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-const CHANNEL_LABELS: Record<MessageChannel, string> = { WHATSAPP: "WhatsApp", SMS: "SMS", EMAIL: "email" };
 const PHONE_HEADERS = ["phone", "mobile", "phone_number", "mobile_number", "whatsapp"];
 const NAME_HEADERS = ["name", "full_name", "fullname"];
 const BATCH_HEADERS = ["batch", "batch_year", "year", "graduation_year"];
@@ -88,7 +88,7 @@ function statusBadge(inv: InvitationDto) {
 function deliveryText(inv: InvitationDto) {
   const d = inv.delivery;
   if (!d) return inv.sendCount ? "" : "—";
-  const via = d.channel ? ` by ${CHANNEL_LABELS[d.channel]}` : "";
+  const via = d.channel ? ` by ${channelName(d.channel)}` : "";
   switch (d.status) {
     case "QUEUED":
     case "SENDING":
@@ -202,7 +202,7 @@ function ImportCard({ fields, channels, onDone }: { fields: ProfileFieldDto[]; c
             checked={send && channels.length > 0}
             disabled={channels.length === 0}
             onChange={(e) => setSend(e.target.checked)}
-            label={channels.length ? `Send the invitations now (by ${channels.map((c) => CHANNEL_LABELS[c]).join(", then ")})` : "Sending isn't included in your plan; you'll share the links yourself"}
+            label={channels.length ? `Send the invitations now (by ${channels.map(channelName).join(", then ")})` : "Sending isn't included in your plan; you'll share the links yourself"}
           />
           <div className="flex gap-2">
             <Button onClick={() => run.mutate()} loading={run.isPending}>
@@ -291,7 +291,7 @@ export function AdminInvitationsPage() {
           </div>
           <p className="text-sm text-slate-600">
             {channels.length ? (
-              <>Your plan sends invitations by {channels.map((c) => CHANNEL_LABELS[c]).join(", then ")}. Each invitation can be resent once a day.</>
+              <>Your plan sends invitations by {channels.map(channelName).join(", then ")}. Each invitation can be resent once a day.</>
             ) : (
               <>Your plan doesn&apos;t include WhatsApp, SMS or email messages: copy an invitation&apos;s link or share it on WhatsApp from your own phone.</>
             )}

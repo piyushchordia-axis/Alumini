@@ -386,6 +386,13 @@ export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 /** Outbound message channels, in no particular order (each message type sets its own preference). */
 export const MESSAGE_CHANNELS = ["WHATSAPP", "SMS", "EMAIL"] as const;
 export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+/** A channel on its own, as a label or a checkbox names it. */
+export const MESSAGE_CHANNEL_LABELS: Record<MessageChannel, string> = { WHATSAPP: "WhatsApp", SMS: "SMS", EMAIL: "Email" };
+
+/** A channel inside a sentence ("by WhatsApp, then email"), where email takes a small letter. */
+export function channelName(channel: MessageChannel): string {
+  return channel === "EMAIL" ? "email" : MESSAGE_CHANNEL_LABELS[channel];
+}
 
 /**
  * DELIVERED and READ are reported by provider webhooks (WhatsApp/MSG91 status callbacks). CANCELLED: dropped before
@@ -567,6 +574,17 @@ export const MODERATION_STATUS_LABELS: Record<ModerationStatus, string> = {
   REJECTED: "Rejected",
   REMOVED: "Removed",
 };
+
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  OPEN: "Open",
+  RESOLVED: "Resolved",
+  DISMISSED: "Dismissed",
+};
+
+/** The badge tones both apps have, for a status badge: waiting, fine, refused, or set aside. */
+export type StatusTone = "warning" | "success" | "danger" | "neutral";
+export const MEMBER_STATUS_TONE: Record<MembershipStatus, StatusTone> = { PENDING: "warning", APPROVED: "success", REJECTED: "danger", SUSPENDED: "neutral" };
+export const MODERATION_STATUS_TONE: Record<ModerationStatus, StatusTone> = { PENDING: "warning", APPROVED: "success", REJECTED: "danger", REMOVED: "neutral" };
 
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   POST: "Post",

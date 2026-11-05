@@ -17,12 +17,13 @@ import type {
   TenantSettingsUpdate,
 } from "../..";
 import type { ContentType, ModerationStatus } from "../../constants";
+import type { ContentAction } from "../../lib/admin";
 import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDetailDto, AdminMemberDto, AdminReportDto, MentorProfileDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
 
-export type ModerationAction = "approve" | "reject" | "remove" | "restore";
+export type ModerationAction = ContentAction;
 
 export interface ModerationResultDto {
   contentType: ContentType;

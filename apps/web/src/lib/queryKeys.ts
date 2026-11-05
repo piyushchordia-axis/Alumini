@@ -1,3 +1,5 @@
+import { adminKeys } from "@illuminize/shared";
+
 export const qk = {
   tenants: ["tenants"] as const,
   tenant: (slug: string) => ["tenant", slug] as const,
@@ -31,20 +33,8 @@ export const qk = {
   celebrations: (slug: string) => ["celebrations", slug] as const,
   digest: (slug: string) => ["digest", slug] as const,
   myReports: (slug: string) => ["reports", slug, "mine"] as const,
-  admin: {
-    dashboard: (slug: string) => ["admin", slug, "dashboard"] as const,
-    analytics: (slug: string, weeks: number) => ["admin", slug, "analytics", weeks] as const,
-    members: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "members", filters ?? {}] as const,
-    member: (slug: string, id: string) => ["admin", slug, "member", id] as const,
-    moderation: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "moderation", filters ?? {}] as const,
-    reports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "reports", filters ?? {}] as const,
-    chatReports: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "chat-reports", filters ?? {}] as const,
-    settings: (slug: string) => ["admin", slug, "settings"] as const,
-    profileFields: (slug: string) => ["admin", slug, "profile-fields"] as const,
-    invitations: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "invitations", filters ?? {}] as const,
-    invitationSummary: (slug: string) => ["admin", slug, "invitations", "summary"] as const,
-    audit: (slug: string, filters?: Record<string, unknown>) => ["admin", slug, "audit", filters ?? {}] as const,
-  },
+  /** The admin console's keys, kept in the shared package for both apps. */
+  admin: adminKeys,
   platform: {
     tenants: (filters?: Record<string, unknown>) => ["platform", "tenants", filters ?? {}] as const,
     tenant: (id: string) => ["platform", "tenant", id] as const,

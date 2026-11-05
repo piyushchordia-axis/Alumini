@@ -1,5 +1,5 @@
-import { CHAT_REPORT_TARGET_KIND_LABELS, DELETED_MEMBER_NAME, REPORT_REASON_LABELS, REPORT_STATUSES, type AdminChatReportDto, type AdminChatReportMessageDto, type AdminChatReportViewDto, type ReportStatus } from "@illuminize/shared";
-import { errorMessage, isApiClientError } from "@illuminize/shared/client";
+import { CHAT_REPORT_TARGET_KIND_LABELS, DELETED_MEMBER_NAME, REPORT_REASON_LABELS, REPORT_STATUSES, REPORT_STATUS_LABELS, type AdminChatReportDto, type AdminChatReportMessageDto, type AdminChatReportViewDto, type ReportStatus } from "@illuminize/shared";
+import { errorMessage, isOutOfDate, unlessOutOfDate } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
@@ -15,9 +15,6 @@ import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
 const nameOf = (member: AdminChatReportDto["reporter"]) => member?.fullName ?? DELETED_MEMBER_NAME;
-
-/** Another admin got there first, or it's no longer this admin's to handle. Closing a report tells nobody else live, so only this answer shows the row is out of date. */
-const isOutOfDate = (e: unknown) => isApiClientError(e) && (e.status === 403 || e.status === 404 || e.status === 409);
 
 function senderLabel(m: AdminChatReportMessageDto): string {
   return m.kind === "SYSTEM" ? "System message" : nameOf(m.sender);
@@ -92,14 +89,6 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
     onError: failed,
   });
   const dismiss = useMutation({ mutationFn: (note?: string) => api.admin.chatReports.dismiss(slug, report.id, note || null), onSuccess: refresh("Report dismissed"), onError: failed });
-  /** For a dialog, which closes once this settles and stays open with its note if it throws: only a failure worth trying again should keep it. */
-  const dialogAction = async (act: () => Promise<unknown>) => {
-    try {
-      await act();
-    } catch (e) {
-      if (!isOutOfDate(e)) throw e;
-    }
-  };
   const isMessage = report.targetKind === "MESSAGE";
   return (
     <li className="px-4 py-3">
@@ -158,9 +147,9 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
           <span className="text-xs text-slate-500">Each view is recorded in the audit log.</span>
         </div>
       )}
-      <ReasonModal open={modal === "remove"} title="Remove this message?" label="Everyone in the thread sees that it was removed. The sender is notified and sees your note in the app. All open reports on it are resolved." tone="danger" confirmLabel="Remove" onClose={() => setModal(null)} onConfirm={(note) => dialogAction(() => resolve.mutateAsync({ action: "REMOVE_MESSAGE", note }))} />
-      <ReasonModal open={modal === "none"} title={isMessage ? "Resolve without removing" : "Resolve this report"} label="Add a note for the record." confirmLabel="Resolve" onClose={() => setModal(null)} onConfirm={(note) => dialogAction(() => resolve.mutateAsync({ action: "NONE", note }))} />
-      <ReasonModal open={modal === "dismiss"} title="Dismiss this report" confirmLabel="Dismiss" onClose={() => setModal(null)} onConfirm={(note) => dialogAction(() => dismiss.mutateAsync(note))} />
+      <ReasonModal open={modal === "remove"} title="Remove this message?" label="Everyone in the thread sees that it was removed. The sender is notified and sees your note in the app. All open reports on it are resolved." tone="danger" confirmLabel="Remove" onClose={() => setModal(null)} onConfirm={(note) => unlessOutOfDate(() => resolve.mutateAsync({ action: "REMOVE_MESSAGE", note }))} />
+      <ReasonModal open={modal === "none"} title={isMessage ? "Resolve without removing" : "Resolve this report"} label="Add a note for the record." confirmLabel="Resolve" onClose={() => setModal(null)} onConfirm={(note) => unlessOutOfDate(() => resolve.mutateAsync({ action: "NONE", note }))} />
+      <ReasonModal open={modal === "dismiss"} title="Dismiss this report" confirmLabel="Dismiss" onClose={() => setModal(null)} onConfirm={(note) => unlessOutOfDate(() => dismiss.mutateAsync(note))} />
     </li>
   );
 }
@@ -183,7 +172,7 @@ export function AdminChatReportsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Chat reports" subtitle="Private messages members reported. You see a message only if you choose to, and never a whole conversation." />
-      <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={REPORT_STATUSES.map((s) => ({ value: s, label: s.charAt(0) + s.slice(1).toLowerCase() }))} className="w-fit max-w-full" />
+      <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={REPORT_STATUSES.map((s) => ({ value: s, label: REPORT_STATUS_LABELS[s] }))} className="w-fit max-w-full" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={`No ${status.toLowerCase()} chat reports`} />}

@@ -1,3 +1,4 @@
+import { channelName } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { BrandingForm } from "@/components/admin/BrandingForm";
@@ -26,7 +27,7 @@ export function AdminSettingsPage() {
       <Card className="p-4 text-sm text-slate-700">
         <span className="font-medium text-slate-900">Your plan includes: </span>
         in-app notifications and push
-        {q.data.outboundChannels.length > 0 && `, plus ${q.data.outboundChannels.map((c) => ({ WHATSAPP: "WhatsApp", SMS: "SMS", EMAIL: "email" })[c]).join(", ")} for invites and announcements`}
+        {q.data.outboundChannels.length > 0 && `, plus ${q.data.outboundChannels.map(channelName).join(", ")} for invites and announcements`}
         .{" "}
         <span className="text-slate-500">{q.data.outboundChannels.length === 0 ? "Ask the Illuminize team to add WhatsApp, SMS or email messaging." : "Messages are billed per delivery."}</span>
       </Card>

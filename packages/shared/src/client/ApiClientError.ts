@@ -45,6 +45,32 @@ export function fatalQueryError<E>(query: { data: unknown; error: E | null }): E
   return query.data != null && isTransientError(query.error) ? null : query.error;
 }
 
+/**
+ * The answer to an admin acting on something that changed under them: another admin got there first (409), it's gone
+ * (404), or it's no longer theirs to handle (403). Trying again can't help, so the screen should refresh instead. Closing
+ * a report tells no other admin live, so this answer may be the only sign that a row is out of date.
+ *
+ * The guard names the statuses it proves, so a false answer leaves an ApiClientError typed as one: a 400's fieldErrors
+ * stay readable in the other branch.
+ */
+export function isOutOfDate(err: unknown): err is ApiClientError & { readonly status: 403 | 404 | 409 } {
+  return isApiClientError(err) && (err.status === 403 || err.status === 404 || err.status === 409);
+}
+
+/**
+ * Runs `act` for a dialog or sheet that stays open, with what was typed in it, while its action throws. An out-of-date
+ * answer isn't worth another try, so it calls `onOutOfDate` and resolves, which closes the dialog. Anything else rethrows.
+ */
+export async function unlessOutOfDate<T>(act: () => Promise<T>, onOutOfDate?: (err: ApiClientError) => void): Promise<T | undefined> {
+  try {
+    return await act();
+  } catch (err) {
+    if (!isOutOfDate(err)) throw err;
+    onOutOfDate?.(err);
+    return undefined;
+  }
+}
+
 /** Query `meta` for data a route guard acts on: the institution and the member's own membership. */
 export const GUARD_QUERY_META = { guard: true };
 

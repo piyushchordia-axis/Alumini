@@ -1,14 +1,8 @@
-import type { ApprovalMode, ContentType, MembershipRole, ModerationStatus } from "@illuminize/shared";
+import { MODERATION_TRANSITIONS, moderationActionsFor, type ApprovalMode, type ContentAction, type ContentType, type MembershipRole, type ModerationStatus } from "@illuminize/shared";
 import { AppError } from "../lib/errors";
 
-export type ContentAction = "approve" | "reject" | "remove" | "restore";
-
-const TRANSITIONS: Record<ModerationStatus, Partial<Record<ContentAction, ModerationStatus>>> = {
-  PENDING: { approve: "APPROVED", reject: "REJECTED" },
-  REJECTED: { approve: "APPROVED" },
-  APPROVED: { remove: "REMOVED" },
-  REMOVED: { restore: "APPROVED" },
-};
+// The table lives in the shared package, so the apps' buttons offer exactly what this allows.
+export type { ContentAction };
 
 export interface ContentAuthor {
   role: MembershipRole;
@@ -22,11 +16,11 @@ export function initialModerationStatus(mode: ApprovalMode, author: ContentAutho
 }
 
 export function canTransitionContent(from: ModerationStatus, action: ContentAction): boolean {
-  return TRANSITIONS[from]?.[action] !== undefined;
+  return MODERATION_TRANSITIONS[from]?.[action] !== undefined;
 }
 
 export function transitionContent(from: ModerationStatus, action: ContentAction): ModerationStatus {
-  const to = TRANSITIONS[from]?.[action];
+  const to = MODERATION_TRANSITIONS[from]?.[action];
   if (!to) throw AppError.invalidTransition(`Cannot ${action} content that is ${from}`);
   return to;
 }
@@ -45,6 +39,4 @@ export function canViewContent(status: ModerationStatus, viewer: { isAuthor: boo
   return viewer.isAuthor;
 }
 
-export function availableModerationActions(status: ModerationStatus): ContentAction[] {
-  return Object.keys(TRANSITIONS[status] ?? {}) as ContentAction[];
-}
+export const availableModerationActions = moderationActionsFor;

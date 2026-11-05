@@ -1,4 +1,4 @@
-import { CONTENT_TYPE_LABELS, REPORT_REASON_LABELS, REPORT_STATUSES, type AdminReportDto, type ReportStatus } from "@illuminize/shared";
+import { CONTENT_TYPE_LABELS, REPORT_REASON_LABELS, REPORT_STATUSES, REPORT_STATUS_LABELS, type AdminReportDto, type ReportStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -91,7 +91,7 @@ export function AdminReportsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Reports" subtitle="Content flagged by members" />
-      <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={REPORT_STATUSES.map((s) => ({ value: s, label: s.charAt(0) + s.slice(1).toLowerCase() }))} className="w-fit" />
+      <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={REPORT_STATUSES.map((s) => ({ value: s, label: REPORT_STATUS_LABELS[s] }))} className="w-fit" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={`No ${status.toLowerCase()} reports`} />}

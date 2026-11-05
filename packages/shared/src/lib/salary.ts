@@ -24,7 +24,7 @@ export function toMajor(minor: number, currency: string): number {
 }
 
 /** Digits in groups of three, or as India groups them past the thousands: 1,20,000. Written by hand, as Hermes may lack Intl. */
-function groupDigits(digits: string, indian: boolean): string {
+export function groupDigits(digits: string, indian: boolean): string {
   if (digits.length <= 3) return digits;
   const size = indian ? 2 : 3;
   const groups = [digits.slice(-3)];

@@ -1,4 +1,4 @@
-import type { AdminMemberDto } from "@illuminize/shared";
+import { fieldErrorsFrom, type AdminMemberDto } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -27,8 +27,7 @@ export function AdminFieldAnswers({ member }: { member: AdminMemberDto }) {
       toast.success("Answers saved");
     },
     onError: (e) => {
-      const fe = (e as { fieldErrors?: Record<string, string> }).fieldErrors ?? {};
-      const mine = Object.fromEntries(Object.entries(fe).filter(([k]) => k.startsWith("fields.")).map(([k, v]) => [k.slice(7), v]));
+      const mine = fieldErrorsFrom(e, "fields.");
       if (Object.keys(mine).length) setErrors(mine);
       else toast.error(errorMessage(e));
     },

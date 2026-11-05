@@ -7,6 +7,7 @@ import { IconAnnounce, IconPoll } from "@/components/icons";
 import { Avatar, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
 export function PostComposer() {
@@ -16,7 +17,7 @@ export function PostComposer() {
   const [poll, setPoll] = useState<{ options: string[]; allowsMultiple: boolean; closesInDays: string } | null>(null);
   const isAdmin = membership.role === "TENANT_ADMIN";
   const [announce, setAnnounce] = useState<{ pin: boolean; channels: MessageChannel[] } | null>(null);
-  const audience = useQuery({ queryKey: ["admin", tenant.slug, "announcement-audience"], queryFn: () => api.admin.announcements.audience(tenant.slug), enabled: !!announce });
+  const audience = useQuery({ queryKey: qk.admin.announcementAudience(tenant.slug), queryFn: () => api.admin.announcements.audience(tenant.slug), enabled: !!announce });
   const qc = useQueryClient();
   const pollInput = (): PollCreateInput | undefined =>
     poll

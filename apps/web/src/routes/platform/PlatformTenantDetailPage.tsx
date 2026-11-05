@@ -3,6 +3,7 @@ import {
   BILLING_MODELS,
   BILLING_MODEL_LABELS,
   MESSAGE_CHANNELS,
+  MESSAGE_CHANNEL_LABELS,
   formatPhone,
   type BillingModel,
   type BillingPlanCreateInput,
@@ -219,10 +220,10 @@ function ChannelsField({
           const on = channels.includes(c);
           return (
             <div key={c} className="space-y-1">
-              <Checkbox label={CHANNEL_LABELS[c]} checked={on} onChange={(e) => onChange(e.target.checked ? [...channels, c] : channels.filter((x) => x !== c), rates)} />
+              <Checkbox label={MESSAGE_CHANNEL_LABELS[c]} checked={on} onChange={(e) => onChange(e.target.checked ? [...channels, c] : channels.filter((x) => x !== c), rates)} />
               {on && (
                 <Input
-                  aria-label={`${CHANNEL_LABELS[c]} rate per message (${currency})`}
+                  aria-label={`${MESSAGE_CHANNEL_LABELS[c]} rate per message (${currency})`}
                   type="number"
                   min={0}
                   step="0.001"
@@ -239,7 +240,6 @@ function ChannelsField({
   );
 }
 
-const CHANNEL_LABELS: Record<MessageChannel, string> = { WHATSAPP: "WhatsApp", SMS: "SMS", EMAIL: "Email" };
 const ratesToInputs = (r: Partial<Record<MessageChannel, number>>): Record<MessageChannel, string> => ({
   WHATSAPP: r.WHATSAPP != null ? String(r.WHATSAPP / 100) : "",
   SMS: r.SMS != null ? String(r.SMS / 100) : "",
@@ -250,7 +250,7 @@ const inputsToRates = (channels: MessageChannel[], r: Record<MessageChannel, str
   Object.fromEntries(channels.filter((c) => r[c].trim() !== "").map((c) => [c, Math.round(Number(r[c]) * 100 * 1000) / 1000]));
 const channelSummary = (p: BillingPlanDto) =>
   p.includedChannels.length
-    ? p.includedChannels.map((c) => `${CHANNEL_LABELS[c]}${p.messageRatesMinor[c] != null ? ` ${formatMoneyMinor(p.messageRatesMinor[c]!, p.currency, 3)}/msg` : ""}`).join(", ")
+    ? p.includedChannels.map((c) => `${MESSAGE_CHANNEL_LABELS[c]}${p.messageRatesMinor[c] != null ? ` ${formatMoneyMinor(p.messageRatesMinor[c]!, p.currency, 3)}/msg` : ""}`).join(", ")
     : "in-app and push only";
 
 function currentMonthIn(timeZone: string): { start: string; end: string; today: string } {
@@ -468,7 +468,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               {MESSAGE_CHANNELS.map((c) => (
-                <Stat key={c} label={`${CHANNEL_LABELS[c]} messages`} value={usage.data!.messages[c]} hint="Delivered in the period" />
+                <Stat key={c} label={`${MESSAGE_CHANNEL_LABELS[c]} messages`} value={usage.data!.messages[c]} hint="Delivered in the period" />
               ))}
             </div>
             <p className="mt-2 text-xs text-slate-500">Days are calendar days in {usage.data.timeZone}. The estimate is prorated when the period is not exactly one billing cycle.</p>

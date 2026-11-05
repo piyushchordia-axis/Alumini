@@ -5,6 +5,8 @@ import {
   CONTENT_TYPE_LABELS,
   MODERATION_STATUSES,
   MODERATION_STATUS_LABELS,
+  canPin,
+  moderationActionsFor,
   type ChatGroupContentDto,
   type ContentDto,
   type ContentType,
@@ -127,7 +129,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   const qc = useQueryClient();
   const [modal, setModal] = useState<"reject" | "remove" | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const full = useQuery({ queryKey: ["admin", slug, "content", item.contentType, item.id], queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
+  const full = useQuery({ queryKey: qk.admin.content(slug, item.contentType, item.id), queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
   const refresh = () => {
     void invalidateTenant(qc, slug);
   };
@@ -167,6 +169,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   });
   const isPinned = item.isPinned;
   const s = item.moderationStatus;
+  const can = moderationActionsFor(s);
   const link = contentLink(slug, item);
   return (
     <li className="px-4 py-3">
@@ -212,27 +215,27 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(s === "PENDING" || s === "REJECTED") && (
+          {can.includes("approve") && (
             <Button size="sm" onClick={approve} loading={act.isPending}>
               Approve
             </Button>
           )}
-          {s === "PENDING" && (
+          {can.includes("reject") && (
             <Button size="sm" variant="outline" onClick={() => setModal("reject")}>
               Reject
             </Button>
           )}
-          {s === "APPROVED" && (
+          {can.includes("remove") && (
             <Button size="sm" variant="danger" onClick={() => setModal("remove")}>
               Remove
             </Button>
           )}
-          {s === "REMOVED" && (
+          {can.includes("restore") && (
             <Button size="sm" variant="outline" onClick={() => act.mutate({ action: "restore" })} loading={act.isPending}>
               Restore
             </Button>
           )}
-          {s === "APPROVED" && item.contentType === "POST" && (
+          {canPin(item.contentType, s) && (
             <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => pin.mutate(!isPinned)} loading={pin.isPending}>
               <IconPin size={14} />
               {isPinned ? "Unpin" : "Pin"}

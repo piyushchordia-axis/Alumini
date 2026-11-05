@@ -1,4 +1,4 @@
-import { MEMBERSHIP_STATUSES, formatPhone, type AdminMemberDto, type MembershipStatus } from "@illuminize/shared";
+import { MEMBERSHIP_STATUSES, formatPhone, memberActionsFor, type AdminMemberDto, type MembershipStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -33,24 +33,25 @@ export function useMemberActions(slug: string) {
 export function MemberActionButtons({ member, actions, compact }: { member: AdminMemberDto; actions: ReturnType<typeof useMemberActions>; compact?: boolean }) {
   const [modal, setModal] = useState<"reject" | "suspend" | null>(null);
   const size = compact ? "sm" : "md";
+  const can = memberActionsFor(member.status);
   return (
     <div className="flex flex-wrap gap-2">
-      {(member.status === "PENDING" || member.status === "REJECTED") && (
+      {can.includes("approve") && (
         <Button size={size} onClick={() => actions.approve.mutate(member.id)} loading={actions.approve.isPending && actions.approve.variables === member.id}>
           Approve
         </Button>
       )}
-      {member.status === "PENDING" && (
+      {can.includes("reject") && (
         <Button size={size} variant="outline" onClick={() => setModal("reject")}>
           Reject
         </Button>
       )}
-      {member.status === "APPROVED" && (
+      {can.includes("suspend") && (
         <Button size={size} variant="outline" onClick={() => setModal("suspend")}>
           Suspend
         </Button>
       )}
-      {member.status === "SUSPENDED" && (
+      {can.includes("reinstate") && (
         <Button size={size} onClick={() => actions.reinstate.mutate(member.id)} loading={actions.reinstate.isPending && actions.reinstate.variables === member.id}>
           Reinstate
         </Button>

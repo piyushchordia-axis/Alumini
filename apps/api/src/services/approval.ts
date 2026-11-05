@@ -1,23 +1,15 @@
-import type { ApprovalMode, MembershipStatus } from "@illuminize/shared";
+import { MEMBERSHIP_TRANSITIONS, memberActionsFor, type ApprovalMode, type MembershipAction, type MembershipStatus } from "@illuminize/shared";
 import { AppError } from "../lib/errors";
 
-export type MembershipAction = "approve" | "reject" | "suspend" | "reinstate" | "reapply";
-
-type Target = MembershipStatus | "INITIAL";
-
-const TRANSITIONS: Record<MembershipStatus, Partial<Record<MembershipAction, Target>>> = {
-  PENDING: { approve: "APPROVED", reject: "REJECTED" },
-  APPROVED: { suspend: "SUSPENDED" },
-  REJECTED: { approve: "APPROVED", reapply: "INITIAL" },
-  SUSPENDED: { reinstate: "APPROVED" },
-};
+// The table lives in the shared package, so the apps' buttons offer exactly what this allows.
+export type { MembershipAction };
 
 export function initialMembershipStatus(mode: ApprovalMode): MembershipStatus {
   return mode === "AUTO_APPROVE" ? "APPROVED" : "PENDING";
 }
 
 export function canTransitionMembership(from: MembershipStatus, action: MembershipAction): boolean {
-  return TRANSITIONS[from]?.[action] !== undefined;
+  return MEMBERSHIP_TRANSITIONS[from]?.[action] !== undefined;
 }
 
 /**
@@ -25,7 +17,7 @@ export function canTransitionMembership(from: MembershipStatus, action: Membersh
  * restarts the membership according to the tenant's current approval mode.
  */
 export function transitionMembership(from: MembershipStatus, action: MembershipAction, mode?: ApprovalMode): MembershipStatus {
-  const target = TRANSITIONS[from]?.[action];
+  const target = MEMBERSHIP_TRANSITIONS[from]?.[action];
   if (!target) {
     throw AppError.invalidTransition(`Cannot ${action} a membership that is ${from}`);
   }
@@ -37,6 +29,4 @@ export function transitionMembership(from: MembershipStatus, action: MembershipA
 }
 
 /** Actions an admin may take on a membership in the given status (for UI affordances). */
-export function availableAdminActions(status: MembershipStatus): MembershipAction[] {
-  return (Object.keys(TRANSITIONS[status] ?? {}) as MembershipAction[]).filter((a) => a !== "reapply");
-}
+export const availableAdminActions = memberActionsFor;

@@ -100,7 +100,8 @@ export const YOU_HAVE_THIS_TEXT = "(you have this)";
 /** In place of skillMatchText when the viewer's profile lists no skills, linking to its Work section. */
 export const ADD_SKILLS_TO_MATCH_TEXT = "Add your skills to see which you match";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Short English month names, January first, for dates written by hand. */
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 /** "12 Dec" in `timeZone`, with the year when it isn't `now`'s. Written by hand, as Hermes may lack Intl date formatting. */
 function shortDate(at: number, now: number, timeZone: string): string {
