@@ -163,15 +163,24 @@ export async function scriptFeatures(page, slug) {
   };
 }
 
-/** Serves one notification, so a script can tap a row without a second member to cause one. Read already, so tapping sends nothing. */
-export async function scriptNotification(page, slug, { type, data, title }) {
+/**
+ * Serves one notification, so a script can tap a row without a second member to cause one. Read already, so tapping sends
+ * nothing. `subject` is what the API adds to an admin's new-member notice (where the request stands now), and
+ * `update(fields)` changes the row from the next request on, as when another admin has dealt with it.
+ */
+export async function scriptNotification(page, slug, { type, data, title, body = null, subject }) {
   const url = new RegExp(`/api/v1/t/${slug}/notifications(\\?|$)`);
+  let row = { id: "00000000-0000-4000-8000-000000000001", type, title, body, data, readAt: "2026-01-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", ...(subject ? { subject } : {}) };
   await page.route(url, (route) => {
     if (route.request().method() !== "GET") return route.fallback();
-    const row = { id: "00000000-0000-4000-8000-000000000001", type, title, body: null, data, readAt: "2026-01-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z" };
     return fulfillJson(route, 200, { data: [row], nextCursor: null });
   });
-  return { stop: () => page.unroute(url) };
+  return {
+    update: (fields) => {
+      row = { ...row, ...fields };
+    },
+    stop: () => page.unroute(url),
+  };
 }
 
 /**

@@ -2405,7 +2405,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Members", "Moderation", "Reports", "Chat reports", "Invitations", "Profile fields", "Settings", "Audit log"];
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations", "Profile fields", "Settings", "Audit log"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2451,11 +2451,13 @@ try {
     if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
-    // Until a section is in the phone app, the home lists it as on the web console, and its tile opens nothing.
+    // Until a section is in the phone app, the home lists it as on the web console. Members is, so its tile and row link.
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
     const listed = (await page.getByRole("list").filter({ hasText: "Audit log" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
-    if (await page.getByRole("link", { name: /^Pending members/ }).count()) throw new Error("the Pending members tile links to a section the phone app doesn't have yet");
+    await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
+    await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
+    if (await page.getByRole("link", { name: /^Content to review/ }).count()) throw new Error("the Content to review tile links to a section the phone app doesn't have yet");
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
     await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
@@ -2478,7 +2480,7 @@ try {
   });
 
   await step("an admin notice tapped in the list opens the console, and Back returns to the list", async () => {
-    // Every admin notice opens the console's home until its own section is in the phone app.
+    // An admin notice other than a request to join opens the console's home until its own section is in the phone app.
     const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "CHAT_REPORT_FILED", data: { chatReportId: "00000000-0000-4000-8000-0000000000c1" }, title: "A message was reported" });
     try {
       await page.goto(SAMAJ + "/profile/notifications");
@@ -2520,6 +2522,289 @@ try {
       await barTab("More").waitFor();
     } finally {
       await membership.stop();
+      await page.unroute(url);
+    }
+  });
+
+  // The members list and the new-member notice, as the Samaj admin again (opened afresh, so the role is his own again).
+  const shown = (locator) => locator.locator("visible=true").last();
+  const memberButton = (name) => shown(page.getByRole("button", { name, exact: true }));
+  const memberTab = (label) => shown(page.getByRole("tab", { name: new RegExp(`^${label}`) }));
+  const statusSays = (text) => shown(page.getByRole("status").filter({ hasText: text }));
+  const answer = (route, status, body) => route.fulfill({ status, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(body) });
+  // The API telling the app's live connection that the admin's notices changed, as when another admin handles a request
+  // to join: marking them read from outside the app, with its own session, sends notification:unread to all its screens.
+  // Sent until `changed()` sees the list refetched, as the connection may still be joining its rooms.
+  const whenNoticesChange = async (changed) => {
+    for (let i = 0; i < 5; i++) {
+      const token = await page.evaluate(() => localStorage.getItem("illuminize.access"));
+      const res = await fetch(`${API}/api/v1/t/shri-gujarati-samaj/notifications/read-all`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      if (res.status !== 204) throw new Error(`marking the notices read answered ${res.status}`);
+      try {
+        return await changed();
+      } catch {
+        // Not refetched yet: say it again.
+      }
+    }
+    throw new Error("the notices weren't refetched when the API said they had changed");
+  };
+  let parthId = null;
+
+  await step("the members list shows who waits, each with actions named for them, and Approve all asks first", async () => {
+    await page.goto(SAMAJ + "/admin");
+    const listed = page.waitForResponse((r) => /\/admin\/members\?/.test(r.url()) && r.url().includes("status=PENDING") && r.request().method() === "GET");
+    await shown(page.getByRole("link", { name: "Pending members, 2", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/members?status=PENDING");
+    parthId = (await (await listed).json()).data.find((m) => m.fullName === "Parth Joshi")?.id;
+    if (!parthId) throw new Error("Parth Joshi isn't among the members waiting");
+    const pending = memberTab("Pending");
+    await pending.waitFor();
+    if ((await pending.getAttribute("aria-selected")) !== "true") throw new Error("the members list didn't open on Pending");
+    if (!/^Pending\s*2$/.test((await pending.innerText()).trim())) throw new Error(`the Pending tab reads "${await pending.innerText()}", not its count of 2`);
+    await shown(page.getByText(/^Batch of 2018 · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
+    for (const name of ["Approve Parth Joshi", "Reject Parth Joshi", "Approve Diya Raval", "Reject Diya Raval"]) {
+      const box = await memberButton(name).boundingBox();
+      if (!box || box.height < 44) throw new Error(`"${name}" is ${box?.height}px tall, under 44px`);
+    }
+    await fitsPhone("the members list", shown(page.getByText("Diya Raval", { exact: true })));
+    await shot("m14-admin-members");
+
+    const sent = [];
+    const onRequest = (r) => r.method() === "POST" && r.url().includes("/admin/members/") && sent.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await shown(page.getByText("2 waiting", { exact: true })).waitFor();
+      await memberButton("Approve all pending members").click();
+      const sheet = shown(page.getByRole("alertdialog", { name: "Approve all 2 pending members?", exact: true }));
+      await sheet.getByText("Each is told they're in and can sign in straight away. Reject anyone you don't recognise first.", { exact: true }).waitFor();
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await shown(page.getByText("2 waiting", { exact: true })).waitFor();
+      if (sent.length) throw new Error(`Cancel still sent ${sent.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+  });
+
+  await step("a request to join is approved from its notice, which then says where it stands", async () => {
+    // As the API sends an admin's copy: who it is about, and where the request stands now.
+    const subject = { kind: "membership", membershipId: parthId, fullName: "Parth Joshi", status: "PENDING" };
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "NEW_MEMBER_PENDING", data: { membershipId: parthId }, title: "New member awaiting approval", body: "Parth Joshi (batch of 2018) has requested to join.", subject });
+    try {
+      await page.goto(SAMAJ + "/profile/notifications");
+      const approve = memberButton("Approve Parth Joshi");
+      const reject = memberButton("Reject Parth Joshi");
+      for (const [name, button] of [["Approve", approve], ["Reject", reject]]) {
+        await button.waitFor();
+        const box = await button.boundingBox();
+        if (!box || box.height < 44) throw new Error(`the notice's ${name} is ${box?.height}px tall, under 44px`);
+      }
+      // Beside the notice's text, never inside the button that opens it.
+      if (await page.locator('[role="button"] [role="button"]').locator("visible=true").count()) throw new Error("a notice's action sits inside its row's button");
+
+      await reject.click();
+      const reasonSheet = shown(page.getByRole("dialog", { name: "Reject Parth Joshi?", exact: true }));
+      await reasonSheet.getByPlaceholder("Reason (shown to the member)").waitFor();
+      await reasonSheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await reasonSheet.waitFor({ state: "hidden" });
+
+      // Decided elsewhere while Reject is open (another admin rejected him): the list refetches, and the sheet closes
+      // saying where he stands, rather than vanish with what was typed. Waiting again, as if he had applied again, it
+      // doesn't open again by itself.
+      await reject.click();
+      await reasonSheet.getByPlaceholder("Reason (shown to the member)").fill("Typed as another admin decided");
+      notice.update({ subject: { ...subject, status: "REJECTED" } });
+      await whenNoticesChange(() => reasonSheet.waitFor({ state: "hidden", timeout: 3000 }));
+      await statusSays("Parth Joshi's request has already been rejected.").waitFor();
+      await shown(page.getByText("Rejected", { exact: true })).waitFor();
+      notice.update({ subject });
+      await whenNoticesChange(() => approve.waitFor({ timeout: 3000 }));
+      if (await page.getByRole("dialog", { name: "Reject Parth Joshi?" }).locator("visible=true").count()) throw new Error("the reason sheet opened again by itself once the request waited again");
+
+      // Approve asks first, then sends the status the notice showed.
+      await approve.click();
+      const confirm = shown(page.getByRole("alertdialog", { name: "Approve Parth Joshi?", exact: true }));
+      await confirm.getByText("They're told they're in and can sign in straight away.", { exact: true }).waitFor();
+      await shot("m14b-notice-approve");
+      const posted = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith(`/admin/members/${parthId}/approve`));
+      await confirm.getByRole("button", { name: "Approve", exact: true }).click();
+      const body = (await posted).postData();
+      if (JSON.parse(body ?? "{}").expectedStatus !== "PENDING") throw new Error(`the notice's Approve sent ${body}`);
+      await statusSays("Parth Joshi approved").waitFor();
+      await confirm.waitFor({ state: "hidden" });
+
+      // The same notice still showing him waiting, as on another admin's phone: the API refuses to approve him twice.
+      await approve.click();
+      await confirm.getByRole("button", { name: "Approve", exact: true }).click();
+      await statusSays("Parth Joshi has already been approved.").waitFor();
+      await confirm.waitFor({ state: "hidden" });
+
+      // Once dealt with, the notice shows where the request stands, with nothing left to press; or that it's gone.
+      notice.update({ subject: { ...subject, status: "APPROVED" } });
+      await page.goto(SAMAJ + "/profile/notifications");
+      await shown(page.getByText("Approved", { exact: true })).waitFor();
+      if (await page.getByRole("button", { name: /Parth Joshi$/ }).locator("visible=true").count()) throw new Error("an approved request's notice still offers Approve or Reject");
+      notice.update({ subject: { ...subject, fullName: null, status: null } });
+      await page.goto(SAMAJ + "/profile/notifications");
+      await shown(page.getByText("No longer waiting", { exact: true })).waitFor();
+
+      // Its text still opens the members waiting, where Diya is now alone, and Back returns to the notices.
+      await shown(page.getByText("New member awaiting approval", { exact: true })).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/admin/members?status=PENDING");
+      await memberButton("Reject Diya Raval").waitFor();
+      if (await page.getByText("Parth Joshi", { exact: true }).locator("visible=true").count()) throw new Error("Pending still lists Parth Joshi once approved");
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
+    } finally {
+      await notice.stop();
+    }
+  });
+
+  await step("Reject in the members list asks for a reason, and a refusal says where the member stands", async () => {
+    await page.goto(SAMAJ + "/admin/members?status=PENDING");
+    await memberButton("Reject Diya Raval").click();
+    const sheet = shown(page.getByRole("dialog", { name: "Reject Diya Raval?", exact: true }));
+    const reason = sheet.getByPlaceholder("Reason (shown to the member)");
+    const confirm = sheet.getByRole("button", { name: "Reject", exact: true });
+    // The API wants 3 characters at least.
+    await reason.fill("ab");
+    if ((await confirm.getAttribute("aria-disabled")) !== "true") throw new Error("the sheet's Reject isn't held with 2 characters");
+    await reason.fill("Not a Samaj member yet");
+    if ((await confirm.getAttribute("aria-disabled")) === "true") throw new Error("the sheet's Reject is still held with a reason");
+    await shot("m14c-reason-sheet");
+
+    // A failure that says nothing about her (the server busy) keeps the sheet open with what was typed, to try again. One
+    // that says she has moved on (another admin rejected her first) closes it, says so, and refreshes the list.
+    const rejectUrl = "**/admin/members/*/reject";
+    const refusals = [
+      [503, { error: { code: "INTERNAL", message: "The server is busy. Try again in a minute." } }],
+      [409, { error: { code: "INVALID_TRANSITION", message: "This member has already been rejected", details: { status: "REJECTED" } } }],
+    ];
+    await page.route(rejectUrl, (route) => {
+      const next = route.request().method() === "POST" ? refusals.shift() : undefined;
+      return next ? answer(route, ...next) : route.fallback();
+    });
+    try {
+      await confirm.click();
+      await sheet.getByText("The server is busy. Try again in a minute.", { exact: true }).waitFor();
+      if ((await reason.inputValue()) !== "Not a Samaj member yet") throw new Error(`after a failure the sheet holds "${await reason.inputValue()}", not the reason typed`);
+      const refetched = page.waitForRequest((r) => r.method() === "GET" && /\/admin\/members\?/.test(r.url()) && r.url().includes("status=PENDING"));
+      await confirm.click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays("Diya Raval's request has already been rejected.").waitFor();
+      await refetched;
+      if (refusals.length) throw new Error("the sheet didn't send both tries");
+    } finally {
+      await page.unroute(rejectUrl);
+    }
+
+    // She still waits in fact, so she is rejected for real.
+    await memberButton("Reject Diya Raval").click();
+    await reason.fill("Not a Samaj member yet");
+    await confirm.click();
+    await statusSays("Diya Raval's request rejected").waitFor();
+    await sheet.waitFor({ state: "hidden" });
+    await shown(page.getByText("No pending members", { exact: true })).waitFor();
+
+    // Under Rejected with the reason she was given, and an Approve that sends the status her row shows. Answered by the
+    // script as if another admin had approved her meanwhile: the line says so rather than a bare error.
+    await memberTab("Rejected").click();
+    await page.waitForURL(/status=REJECTED/);
+    await shown(page.getByText("Reason: Not a Samaj member yet", { exact: true })).waitFor();
+    const url = "**/admin/members/*/approve";
+    let sent = null;
+    await page.route(url, (route) => {
+      sent = route.request().postData();
+      return answer(route, 409, { error: { code: "INVALID_TRANSITION", message: "This member has already been approved", details: { status: "APPROVED" } } });
+    });
+    try {
+      const refetched = page.waitForRequest((r) => r.method() === "GET" && /\/admin\/members\?/.test(r.url()) && r.url().includes("status=REJECTED"));
+      await memberButton("Approve Diya Raval").click();
+      await statusSays("Diya Raval has already been approved.").waitFor();
+      if (JSON.parse(sent ?? "{}").expectedStatus !== "REJECTED") throw new Error(`the list's Approve sent ${sent}`);
+      // Refused as out of date, the list asks again for where everyone stands.
+      await refetched;
+    } finally {
+      await page.unroute(url);
+    }
+  });
+
+  await step("searching the members list, the admin's own row says You and offers nothing", async () => {
+    // Approved's first answer held back: until it comes, nothing of Rejected's stands in for it, as Diya's row there has
+    // an Approve that would act on her as rejected.
+    const listUrl = /\/admin\/members\?/;
+    let release = () => {};
+    const held = new Promise((resolve) => (release = resolve));
+    let holding = false;
+    await page.route(listUrl, async (route) => {
+      if (route.request().method() !== "GET" || !route.request().url().includes("status=APPROVED")) return route.fallback();
+      holding = true;
+      await held;
+      return route.fallback();
+    });
+    try {
+      await memberTab("Approved").click();
+      await page.waitForURL(/status=APPROVED/);
+      for (let i = 0; i < 100 && !holding; i++) await page.waitForTimeout(50);
+      if (!holding) throw new Error("the Approved tab didn't ask for its rows");
+      await shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByRole("progressbar", { name: "Loading", exact: true }).waitFor();
+      if (await page.getByText("Diya Raval", { exact: true }).locator("visible=true").count()) throw new Error("the Approved tab shows Rejected's rows while its own load");
+      if (await page.getByRole("button", { name: /Diya Raval$/ }).locator("visible=true").count()) throw new Error("the Approved tab offers Rejected's buttons while its own rows load");
+    } finally {
+      release();
+    }
+    await memberButton("Suspend Parth Joshi").waitFor();
+    await page.unroute(listUrl);
+    const search = shown(page.getByLabel("Search members", { exact: true }));
+    await search.fill("Nisha");
+    await page.waitForURL(/q=Nisha/);
+    await memberButton("Suspend Nisha Modi").waitFor();
+    // Once the search's answer is in, it's the only row.
+    await page.waitForFunction(() => [...document.querySelectorAll('[role="button"][aria-label^="Suspend "]')].filter((b) => b.getBoundingClientRect().height > 0).length === 1);
+    await search.fill("Jignesh");
+    await page.waitForURL(/q=Jignesh/);
+    await shown(page.getByText("Jignesh Patel", { exact: true })).waitFor();
+    await shown(page.getByText("You", { exact: true })).waitFor();
+    if (await page.getByRole("button", { name: /Jignesh Patel$/ }).locator("visible=true").count()) throw new Error("the admin's own row offers actions on himself");
+    await memberButton("Clear search").click();
+    await memberButton("Suspend Parth Joshi").waitFor();
+  });
+
+  await step("the members list scrolls on to page 2, showing a row repeated across the pages once", async () => {
+    // Page 1 as the API has it, said to be 1 of 2; page 2 starts with page 1's first row again, as when someone newer
+    // pushes it over between the two requests.
+    const url = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/members\?/;
+    let first = null;
+    const asked = [];
+    await page.route(url, async (route) => {
+      const q = new URL(route.request().url()).searchParams;
+      if (route.request().method() !== "GET" || q.get("status") !== "APPROVED" || q.get("q")) return route.fallback();
+      const n = Number(q.get("page") ?? "1");
+      asked.push(n);
+      if (n === 1) {
+        const real = await (await route.fetch()).json();
+        first = real.data;
+        return answer(route, 200, { ...real, total: 27 });
+      }
+      return answer(route, 200, { data: [first[0], { ...first[1], id: "00000000-0000-4000-8000-0000000000d2", fullName: "Zara Pagetwo" }], page: n, pageSize: 25, total: 27 });
+    });
+    try {
+      await page.goto(SAMAJ + "/admin/members?status=APPROVED");
+      await shown(page.getByText(/^Showing \d+ of 27$/)).waitFor();
+      const footer = shown(page.getByText(`Showing ${first.length + 1} of 27`, { exact: true }));
+      for (let i = 0; i < 40 && !(await footer.count()); i++) {
+        await page.mouse.move(195, 600);
+        await page.mouse.wheel(0, 800);
+        await page.waitForTimeout(150);
+      }
+      await footer.waitFor();
+      await shown(page.getByText("Zara Pagetwo", { exact: true })).waitFor();
+      const times = await page.getByText(first[0].fullName, { exact: true }).locator("visible=true").count();
+      if (times !== 1) throw new Error(`${first[0].fullName}, on both pages, shows ${times} times`);
+      // 27 rows at 25 a page make two pages: nothing past page 2 is asked for.
+      if (!asked.includes(2) || asked.some((n) => n > 2)) throw new Error(`the list asked for pages ${asked.join(", ")}`);
+      await shot("m14d-members-page-2");
+    } finally {
       await page.unroute(url);
     }
   });

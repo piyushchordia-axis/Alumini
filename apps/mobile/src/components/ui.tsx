@@ -73,10 +73,14 @@ export function LoadError({ error, onRetry, onBack, backLabel = "Choose another 
   );
 }
 
-/** `icon` draws before the title, given the title's colour (an SVG from components/icons). `ref` reaches the pressable, to move focus to it. */
+/**
+ * `icon` draws before the title, given the title's colour (an SVG from components/icons). `ref` reaches the pressable, to
+ * move focus to it. `size="compact"` is the admin console's denser button, still a 44-point target, for a row's actions.
+ */
 export function Button({
   title,
   variant = "primary",
+  size = "regular",
   loading,
   disabled,
   icon,
@@ -86,11 +90,13 @@ export function Button({
 }: PressableProps & {
   title: string;
   variant?: "primary" | "outline" | "ghost" | "danger";
+  size?: "regular" | "compact";
   loading?: boolean;
   icon?: (color: string) => ReactNode;
   style?: ViewStyle;
   ref?: Ref<ComponentRef<typeof View>>;
 }) {
+  const compact = size === "compact";
   const theme = useTheme();
   const bg = variant === "primary" ? theme.primary : variant === "danger" ? colors.danger : "transparent";
   const fg = variant === "primary" ? theme.onPrimary : variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.primaryInk;
@@ -102,7 +108,7 @@ export function Button({
       accessibilityLabel={title}
       aria-disabled={!!(disabled || loading)}
       aria-busy={!!loading}
-      style={({ pressed }) => [styles.button, icon ? styles.buttonWithIcon : null, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
+      style={({ pressed }) => [styles.button, compact ? styles.buttonCompact : null, icon ? styles.buttonWithIcon : null, { backgroundColor: bg, borderColor: variant === "outline" ? colors.border : bg, opacity: pressed || disabled || loading ? 0.7 : 1 }, style]}
       {...rest}
     >
       {loading ? (
@@ -110,7 +116,7 @@ export function Button({
       ) : (
         <>
           {icon?.(fg)}
-          <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
+          <Text style={[styles.buttonText, compact ? styles.buttonTextCompact : null, { color: fg }]}>{title}</Text>
         </>
       )}
     </Pressable>
@@ -522,6 +528,8 @@ const styles = StyleSheet.create({
   padded: { padding: spacing.lg, gap: spacing.md },
   button: { height: 46, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.lg, borderWidth: 1 },
   buttonText: { fontWeight: "600", fontSize: 15 },
+  buttonCompact: { height: 44, paddingHorizontal: spacing.md },
+  buttonTextCompact: { fontSize: 14 },
   buttonWithIcon: { flexDirection: "row", gap: spacing.sm },
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
   input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },

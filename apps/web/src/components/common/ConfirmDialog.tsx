@@ -1,3 +1,4 @@
+import { errorMessage } from "@illuminize/shared/client";
 import { Button, Modal } from "@/components/ui";
 
 /**
@@ -11,6 +12,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive = false,
   busy = false,
+  error,
   onConfirm,
   onCancel,
 }: {
@@ -20,6 +22,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   destructive?: boolean;
   busy?: boolean;
+  /** Why the action failed, shown in the dialog, which stays open so it can be tried again. */
+  error?: unknown;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -43,6 +47,11 @@ export function ConfirmDialog({
       }
     >
       {body ? <p className="text-sm text-slate-600">{body}</p> : null}
+      {error ? (
+        <p className="mt-3 text-sm text-red-600" role="alert">
+          {errorMessage(error)}
+        </p>
+      ) : null}
     </Modal>
   );
 }

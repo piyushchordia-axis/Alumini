@@ -132,7 +132,12 @@ pnpm e2e:admin
 
 Covers:
 
-- the tenant admin dashboard; approving and rejecting members; a member's page showing Kiran Joshi's whole profile
+- the tenant admin dashboard; approving and rejecting members, each toast naming the member; Approve all asking first
+  (opened and cancelled, sending nothing); approving Pooja Bhatt from her new-member notice (answered by the script: its
+  Approve and Reject 44px tall beside the link to her page, never inside it; an open Reject closing with a toast that
+  says where she stands once the API's live notice of a change refetches the list showing her decided elsewhere, and
+  not opening again by itself when she waits again; Approve sending the status the notice showed, and the notice then
+  showing Approved); a member's page showing Kiran Joshi's whole profile
   (headline, skills, past role, studies elsewhere, Open to); approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
   nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
@@ -238,7 +243,21 @@ Covers:
   review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
   still on the web console; Back to More and to My profile; an admin notice tapped in Notifications opening the console,
   with Back returning to the list; and, with the role taken away (answered by the script), the console leaving for the
-  feed with one set of tabs, More dropping its row, and the console opened cold doing the same.
+  feed with one set of tabs, More dropping its row, and the console opened cold doing the same;
+- the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi and Diya
+  Raval with their details line and 44px actions named for them, no sideways scrolling, and Approve all asking first
+  (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
+  its Reject opening the reason sheet first, an open reason sheet closing and saying where he stands once the API's
+  live notice of a change refetches the list showing him decided elsewhere (and not opening again by itself when he
+  waits again), Approve sending the status the notice showed, the same notice then refused as "already approved",
+  showing Approved or "No longer waiting" once dealt with, and its text opening the members waiting with Back
+  returning; Diya rejected through the reason sheet, its Reject held under 3 characters, a server failure (answered by
+  the script) keeping the sheet open with the error and the reason typed, and a refusal saying she was already
+  rejected closing it, saying so and refreshing the list; then listed under Rejected with her reason, where a refusal
+  (answered by the script) says she has already been approved, the Approve sent the status her row showed, and the list
+  refreshes; the Approved tab, its answer held back by the script, showing a spinner and none of Rejected's rows or
+  buttons until its own arrive; searching for Nisha, and for Jignesh, whose own row says "You" with no actions; and a
+  second page (answered by the script) loading on scroll, a row repeated across the pages shown once.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -526,8 +545,20 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] Pulling the console's home down refreshes it.
 - [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
       number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the
-      console's home, and Back (and the iPhone's swipe back) goes to the Samaj feed, with one tab bar, never a blank
-      screen; on Android a second Back leaves the app rather than showing the Samaj feed again (the phone remembers the
-      Samaj, so the start screen redirects there as the push opens: one Samaj, not two). Do it again with the app open
-      on another tab: Back returns there. Then once more with the console's home already open: tapping the push keeps
-      it one screen deep, so a single Back leaves the console.
+      members waiting, the new member among them, with the console's home under it. Back (and the iPhone's swipe back)
+      goes to the console's home, then to the Samaj feed, with one tab bar, never a blank screen; on Android one more
+      Back leaves the app rather than showing the Samaj feed again (the phone remembers the Samaj, so the start screen
+      redirects there as the push opens: one Samaj, not two). Do it again with the app open on another tab: Back returns
+      there, by way of the console's home. Then once more with the console's home already open: the push opens the
+      members waiting above it, and a single Back returns to the console's home.
+- [ ] In Notifications, that member's notice has Approve and Reject under its text, and TalkBack or VoiceOver reads
+      them with the member's name ("Approve …", "Reject …"). Approve asks first; Cancel. Tapping the notice's text opens
+      the members waiting.
+- [ ] On the members list, choose Reject on that member: with the keyboard up, the reason box and the sheet's Reject
+      and Cancel stay above it on both phones, and Reject stays disabled until the reason has 3 characters. On Android
+      the back button closes the sheet (the keyboard first, if it's up), and opening Reject again still shows what was
+      typed. Reject with a reason: the line above the list says so, and TalkBack or VoiceOver reads it out without
+      moving focus.
+- [ ] TalkBack or VoiceOver on the members list: the status tabs are read as tabs with their counts, and each row's
+      buttons with the member's name ("Approve Parth Joshi", "Reject Parth Joshi"), so one row's can't be mistaken for
+      the next's. The admin's own row (search Jignesh under Approved) says "You" and has no buttons.

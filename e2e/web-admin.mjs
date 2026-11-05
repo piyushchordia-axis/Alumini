@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { expectSvgNoEmoji } from "./lib.mjs";
+import { expectSvgNoEmoji, scriptNotification } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -84,7 +84,7 @@ try {
     const row = page.locator("li", { hasText: "Divya Menon" }).first();
     await row.waitFor();
     await row.locator('button:has-text("Approve")').click();
-    await page.waitForSelector("text=Member approved");
+    await page.getByText("Divya Menon approved", { exact: true }).waitFor();
     await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
     await page.waitForSelector("li:has-text('Divya Menon')");
     await shot("a02-members");
@@ -111,7 +111,97 @@ try {
     await row.locator('button:has-text("Reject")').click();
     await page.fill("textarea", "Could not verify batch, please add your roll number");
     await page.click('button:has-text("Reject"):not(:has-text("Rejected"))  >> nth=-1');
-    await page.waitForSelector("text=Request rejected");
+    await page.getByText("Amit Verma's request rejected", { exact: true }).waitFor();
+  });
+
+  await step("Approve all asks first, and Cancel leaves the request waiting", async () => {
+    // Pooja Bhatt is the last one waiting, so the question is about one member. The next step approves her from her notice.
+    const sent = [];
+    const onRequest = (r) => r.method() === "POST" && r.url().includes("/admin/members/") && sent.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
+      await page.locator("li", { hasText: "Pooja Bhatt" }).first().waitFor();
+      await page.getByRole("button", { name: "Approve all pending", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "Approve the 1 pending member?", exact: true });
+      await dialog.getByText("They're told they're in and can sign in straight away. Reject them first if you don't recognise them.", { exact: true }).waitFor();
+      await dialog.getByRole("button", { name: "Approve", exact: true }).waitFor();
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      await page.locator("li", { hasText: "Pooja Bhatt" }).first().waitFor();
+      if (sent.length) throw new Error(`Cancel still sent ${sent.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+  });
+
+  await step("an admin approves a request to join from its notice, its buttons beside the link to the member", async () => {
+    await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
+    const href = await page.locator("li", { hasText: "Pooja Bhatt" }).first().getByRole("link", { name: "Pooja Bhatt", exact: true }).getAttribute("href");
+    const id = href.split("/").pop();
+    // As the API sends an admin's copy: who it is about, and where the request stands now.
+    const subject = { kind: "membership", membershipId: id, fullName: "Pooja Bhatt", status: "PENDING" };
+    const notice = await scriptNotification(page, "demo-college", { type: "NEW_MEMBER_PENDING", data: { membershipId: id }, title: "New member awaiting approval", body: "Pooja Bhatt (batch of 2021) has requested to join.", subject });
+    try {
+      await page.goto(`${BASE}/t/demo-college/app/notifications`);
+      const row = page.locator("main li", { hasText: "New member awaiting approval" });
+      const link = row.getByRole("link", { name: /^New member awaiting approval/ });
+      if ((await link.getAttribute("href")) !== href) throw new Error(`the notice links to ${await link.getAttribute("href")}, not Pooja's page ${href}`);
+      const approve = row.getByRole("button", { name: "Approve Pooja Bhatt", exact: true });
+      const reject = row.getByRole("button", { name: "Reject Pooja Bhatt", exact: true });
+      for (const [name, button] of [["Approve", approve], ["Reject", reject]]) {
+        const box = await button.boundingBox();
+        if (!box || box.height < 44) throw new Error(`the notice's ${name} is ${box?.height}px tall, under 44px`);
+      }
+      if (await link.locator("button").count()) throw new Error("a button sits inside the notice's link");
+      await shot("a02c-notice-actions");
+
+      // Decided elsewhere while Reject is open (another admin rejected her): the list refetches, and the dialog closes
+      // saying where she stands, rather than vanish with what was typed. Waiting again, as if she had applied again, it
+      // doesn't open again by itself. The API says the notices changed when they're marked read from outside this page,
+      // with its own session; said until the list has refetched, as the live connection may still be joining its rooms.
+      const whenNoticesChange = async (changed) => {
+        for (let i = 0; i < 5; i++) {
+          const status = await page.evaluate(async () => {
+            const token = JSON.parse(localStorage.getItem("illuminize.auth") ?? "{}").state?.accessToken;
+            return (await fetch("/api/v1/t/demo-college/notifications/read-all", { method: "POST", headers: { Authorization: `Bearer ${token}` } })).status;
+          });
+          if (status !== 204) throw new Error(`marking the notices read answered ${status}`);
+          try {
+            return await changed();
+          } catch {
+            // Not refetched yet: say it again.
+          }
+        }
+        throw new Error("the notices weren't refetched when the API said they had changed");
+      };
+      await reject.click();
+      const dialog = page.getByRole("dialog", { name: "Reject Pooja Bhatt?", exact: true });
+      await dialog.getByRole("textbox").fill("Typed as another admin decided");
+      notice.update({ subject: { ...subject, status: "REJECTED" } });
+      await whenNoticesChange(() => dialog.waitFor({ state: "hidden", timeout: 3000 }));
+      await page.getByText("Pooja Bhatt's request has already been rejected.", { exact: true }).waitFor();
+      await row.getByText("Rejected", { exact: true }).waitFor();
+      notice.update({ subject });
+      await whenNoticesChange(() => approve.waitFor({ timeout: 3000 }));
+      if (await page.getByRole("dialog").count()) throw new Error("Reject opened again by itself once the request waited again");
+
+      // It sends the status the notice showed, so a notice left open can't overturn another admin's decision.
+      const posted = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith(`/admin/members/${id}/approve`));
+      await approve.click();
+      const body = (await posted).postData();
+      if (JSON.parse(body ?? "{}").expectedStatus !== "PENDING") throw new Error(`the notice's Approve sent ${body}`);
+      await page.getByText("Pooja Bhatt approved", { exact: true }).waitFor();
+      // Opened again once dealt with, it shows where the request stands, with nothing left to press.
+      notice.update({ subject: { ...subject, status: "APPROVED" } });
+      await page.reload();
+      await row.getByText("Approved", { exact: true }).waitFor();
+      if (await row.getByRole("button", { name: /Pooja Bhatt$/ }).count()) throw new Error("an approved request's notice still offers Approve or Reject");
+    } finally {
+      await notice.stop();
+    }
+    await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
+    await page.locator("li", { hasText: "Pooja Bhatt" }).first().waitFor();
   });
 
   await step("approve a pending job from the moderation queue", async () => {

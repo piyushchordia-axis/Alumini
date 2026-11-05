@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
@@ -178,6 +178,30 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(res.body.data.approved).toBe(3);
     const dashboard = await api().get(`/api/v1/t/${tenant.slug}/admin/dashboard`).set(admin.headers);
     expect(dashboard.body.data).toMatchObject({ pendingMembers: 0, approvedMembers: 4 });
+  });
+
+  it("pages the members list in one fixed order, so members created in the same instant each show once", async () => {
+    const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const user = await createUser(ctx);
+      ids.push((await createMembership(ctx, tenant.id, user.id, { status: "PENDING" })).id);
+    }
+    // One createdAt for all, as rows inserted by one statement have, so only the tiebreak orders them.
+    await ctx.db.update(memberships).set({ createdAt: new Date("2026-01-01T00:00:00.000Z") }).where(inArray(memberships.id, ids));
+
+    const seen: string[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const res = await api().get(`/api/v1/t/${tenant.slug}/admin/members?status=PENDING&page=${page}&pageSize=2`).set(admin.headers);
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(7);
+      seen.push(...res.body.data.map((m: { id: string }) => m.id));
+    }
+    // Every member once across the pages, newest first and then by id, the same however Postgres reads the rows.
+    expect(seen).toHaveLength(7);
+    expect(new Set(seen).size).toBe(7);
+    expect(seen).toEqual([...ids].sort().reverse());
   });
 
   it("enforces role and tenant boundaries", async () => {

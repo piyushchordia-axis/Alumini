@@ -1,7 +1,8 @@
-import { jobsQuery, mentorsQuery, notificationTarget, type NotificationDto } from "@illuminize/shared";
+import { jobsQuery, memberRequestOf, mentorsQuery, notificationTarget, type NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
+import { MemberRequestActions } from "@/components/admin/MemberActions";
 import { IconBell, IconSettings } from "@/components/icons";
 import { Button, EmptyState, LoadMore, Loading, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -42,7 +43,8 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
       return `${base}/feed`;
     case "admin":
       if (!isAdmin) return null;
-      return t.section === "members" ? `/t/${slug}/admin/members?status=PENDING` : `/t/${slug}/admin/${t.section}`;
+      if (t.section === "members") return t.membershipId ? `/t/${slug}/admin/members/${t.membershipId}` : `/t/${slug}/admin/members?status=PENDING`;
+      return `/t/${slug}/admin/${t.section}`;
   }
 }
 
@@ -87,17 +89,27 @@ export function NotificationsPage() {
               {n.body && <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>}
             </>
           );
-          const cls = clsx("block px-4 py-3 transition hover:bg-slate-50", !n.readAt && "bg-primary/5");
+          // A request to join that may still wait: its text links to the member, and Approve and Reject sit beside it,
+          // never inside the link.
+          const request = isTenantAdmin ? memberRequestOf(n) : null;
+          const cls = clsx("block px-4 py-3 transition hover:bg-slate-50", !n.readAt && !request && "bg-primary/5");
+          const markRead = () => !n.readAt && readOne.mutate(n.id);
+          const text = to ? (
+            <Link to={to} className={cls} onClick={markRead}>
+              {body}
+            </Link>
+          ) : (
+            <button className={clsx(cls, "w-full text-left")} onClick={markRead}>
+              {body}
+            </button>
+          );
           return (
-            <li key={n.id}>
-              {to ? (
-                <Link to={to} className={cls} onClick={() => !n.readAt && readOne.mutate(n.id)}>
-                  {body}
-                </Link>
-              ) : (
-                <button className={clsx(cls, "w-full text-left")} onClick={() => !n.readAt && readOne.mutate(n.id)}>
-                  {body}
-                </button>
+            <li key={n.id} className={clsx(request && !n.readAt && "bg-primary/5")}>
+              {text}
+              {request && (
+                <div className="px-4 pb-3">
+                  <MemberRequestActions slug={slug} subject={request} />
+                </div>
               )}
             </li>
           );

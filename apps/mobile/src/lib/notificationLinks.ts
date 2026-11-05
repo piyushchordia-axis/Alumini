@@ -32,7 +32,9 @@ export function notificationHref(slug: string, type: string, data: unknown, { is
     case "celebrations":
       return `${base}/feed`;
     case "admin":
-      // The console's home, which shows what's waiting, until the notice's own section is in the phone app.
-      return isAdmin ? `${base}/admin` : null;
+      if (!isAdmin) return null;
+      // A request to join opens the members waiting; the others the console's home, which shows what's waiting, until
+      // their own section is in the phone app.
+      return t.section === "members" ? `${base}/admin/members?status=PENDING` : `${base}/admin`;
   }
 }

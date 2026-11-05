@@ -184,9 +184,14 @@ before showing the demo.
 - The **admin console** is in the web app and the phone app. On the web, the header links to it at every width, and the
   link, the sidebar and the More sheet show an amber count of what's waiting (pending members, content to review, open
   reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
-  profile, and admin notices open it too: a stack of its own above the tabs, opening on the dashboard. Its pages are
-  coming to the phone one at a time (see Known gaps). The app opens only for an institution's members, so Illuminize
-  staff who aren't one use its console on the web.
+  profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
+  the members waiting, the others on the dashboard. Its pages are coming to the phone one at a time (see Known gaps);
+  the members list is there, with the same status tabs and counts, search, Approve all and row actions as the web's,
+  scrolling on through the pages. On both apps an admin's notice of a request to join carries Approve and Reject while
+  the request waits (the phone asks before approving), and otherwise says where it stands; a refetch that shows it
+  decided elsewhere closes an open Reject and says so. The notice and the list send the status they showed, so a screen
+  left open can't overturn another admin's decision: the API refuses (409) and the apps say where the member stands now.
+  The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the app theme.
 - A trigger (migration 0005) stamps `memberships.approved_at` when a membership becomes approved.
@@ -940,8 +945,9 @@ expires (the shared client in `packages/shared/src/realtime` refreshes and recon
 - Events only go from server to client; every write is a REST call. Each one about an institution carries its
   `tenantSlug`.
   - `notification:new` (with the new unread count), `notification:unread` (another device read some, or another admin
-    approved or rejected a request to join, which marks every current admin's notice of it read) and
-    `notification:bulk` (an announcement reached many members at once).
+    approved or rejected a request to join, which marks every current admin's unread notice of it read and tells only
+    those admins; both apps refetch the list, so an unread notice shows where the request stands, while one already read
+    learns it from the API's 409 when acted on) and `notification:bulk` (an announcement reached many members at once).
   - `chat:message` (a new message, to everyone who may see it and to the sender's other devices), `chat:read` (the
     member read a thread on another device; only ever to their own devices, as there are no read receipts),
     `chat:removed` (an admin removed a message), `chat:changed` (a thread changed: refetch it; it carries no content,
@@ -1267,10 +1273,11 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
-  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: members,
-    member detail, moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the
-    audit log. Until each lands, its tile on the console's home (members, moderation and both kinds of report have one)
-    opens nothing, and its admin notices open the console's home.
+  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: member detail,
+    moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log.
+    Until each lands, its tile on the console's home (moderation and both kinds of report have one) opens nothing, and
+    its admin notices open the console's home. A new-member notice opens the members waiting, not the member, until
+    member detail lands.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

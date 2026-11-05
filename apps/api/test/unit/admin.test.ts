@@ -6,6 +6,10 @@ import {
   CHAT_PUSH_KINDS,
   CONTENT_TYPES,
   MEMBERSHIP_STATUSES,
+  MEMBERSHIP_STATUS_LABELS,
+  MEMBER_ACTION_COPY,
+  MEMBER_SEARCH_HINT,
+  MEMBER_STATUS_TAB_LABELS,
   MEMBER_STATUS_TONE,
   MESSAGE_CHANNELS,
   MESSAGE_CHANNEL_LABELS,
@@ -20,6 +24,8 @@ import {
   adminKeys,
   adminWaitingCount,
   approvalSummary,
+  approveAllCopy,
+  approveAllDoneText,
   canPin,
   channelName,
   dashboardTiles,
@@ -28,9 +34,19 @@ import {
   formatCalendarDate,
   formatCount,
   isAdminNotification,
+  memberActionDoneText,
+  memberActionErrorText,
+  memberActionLabel,
   memberActionsFor,
+  memberEmptyTitle,
+  memberListMeta,
+  memberStatusNowText,
+  memberTabCounts,
   moderationActionsFor,
+  onlySearchChanged,
   pagedNext,
+  parseMemberStatus,
+  statusTabs,
   tenantKeyPredicate,
   type AdminSection,
   type AdminSectionPath,
@@ -403,6 +419,31 @@ describe("dedupeById", () => {
   });
 });
 
+describe("onlySearchChanged", () => {
+  const members = (filters: Record<string, unknown>) => adminKeys.members("demo", filters);
+
+  it("keeps the rows on screen while the search is refined, cleared or started", () => {
+    expect(onlySearchChanged(members({ status: "APPROVED", q: "Ni" }), members({ status: "APPROVED", q: "Nisha" }))).toBe(true);
+    expect(onlySearchChanged(members({ status: "APPROVED", q: "Nisha" }), members({ status: "APPROVED", q: undefined }))).toBe(true);
+    expect(onlySearchChanged(members({ status: "APPROVED" }), members({ status: "APPROVED", q: "Nisha" }))).toBe(true);
+    expect(onlySearchChanged(adminKeys.audit("demo", { action: "member.", search: "a" }), adminKeys.audit("demo", { action: "member.", search: "ab" }), "search")).toBe(true);
+  });
+
+  it("never shows another tab's rows, whose buttons act on a different status", () => {
+    expect(onlySearchChanged(members({ status: "PENDING", q: undefined }), members({ status: "APPROVED", q: undefined }))).toBe(false);
+    expect(onlySearchChanged(members({ status: "PENDING", q: "Pa" }), members({ status: "REJECTED", q: "Pa" }))).toBe(false);
+    expect(onlySearchChanged(members({ status: "PENDING" }), members({}))).toBe(false);
+  });
+
+  it("starts over for another list, another institution, or no list before", () => {
+    expect(onlySearchChanged(undefined, members({ status: "PENDING" }))).toBe(false);
+    expect(onlySearchChanged(adminKeys.members("other", { status: "PENDING" }), members({ status: "PENDING" }))).toBe(false);
+    expect(onlySearchChanged(adminKeys.invitations("demo", { status: "PENDING" }), members({ status: "PENDING" }))).toBe(false);
+    expect(onlySearchChanged(adminKeys.dashboard("demo"), members({ status: "PENDING" }))).toBe(false);
+    expect(onlySearchChanged([], [])).toBe(false);
+  });
+});
+
 describe("formatCount", () => {
   it("groups thousands in threes", () => {
     expect(formatCount(0)).toBe("0");
@@ -529,5 +570,187 @@ describe("unlessOutOfDate", () => {
     const offline = new ApiClientError(0, "NETWORK_ERROR", "offline");
     await expect(unlessOutOfDate(() => Promise.reject(offline), onOutOfDate)).rejects.toBe(offline);
     expect(onOutOfDate).not.toHaveBeenCalled();
+  });
+});
+
+describe("MEMBER_ACTION_COPY", () => {
+  const offered = [...new Set(MEMBERSHIP_STATUSES.flatMap(memberActionsFor))];
+
+  it("has words for every action an admin is offered, and asks a reason only for Reject and Suspend", () => {
+    expect(Object.keys(MEMBER_ACTION_COPY).sort()).toEqual([...offered].sort());
+    for (const action of offered) expect(!!MEMBER_ACTION_COPY[action].reason, action).toBe(action === "reject" || action === "suspend");
+    expect(offered.map((a) => [a, MEMBER_ACTION_COPY[a].label, MEMBER_ACTION_COPY[a].variant])).toEqual([
+      ["approve", "Approve", "primary"],
+      ["reject", "Reject", "outline"],
+      ["suspend", "Suspend", "outline"],
+      ["reinstate", "Reinstate", "primary"],
+    ]);
+  });
+
+  it("words the reason sheet as the web's dialogs did, with the member's name", () => {
+    const reject = MEMBER_ACTION_COPY.reject.reason;
+    const suspend = MEMBER_ACTION_COPY.suspend.reason;
+    expect(reject).toMatchObject({ body: "The member will see this reason and can re-apply.", confirm: "Reject" });
+    expect(reject?.title("Diya Raval")).toBe("Reject Diya Raval?");
+    expect(reject?.title(null)).toBe("Reject this request?");
+    expect(suspend).toMatchObject({ body: "They lose access until reinstated.", confirm: "Suspend" });
+    expect(suspend?.title("Parth Joshi")).toBe("Suspend Parth Joshi?");
+  });
+});
+
+describe("memberActionDoneText and memberActionLabel", () => {
+  it("say what happened to whom", () => {
+    expect(memberActionDoneText("approve", "Parth Joshi")).toBe("Parth Joshi approved");
+    expect(memberActionDoneText("reject", "Diya Raval")).toBe("Diya Raval's request rejected");
+    expect(memberActionDoneText("suspend", "Nisha Modi")).toBe("Nisha Modi suspended");
+    expect(memberActionDoneText("reinstate", "Nisha Modi")).toBe("Nisha Modi reinstated");
+  });
+
+  it("fall back to the old words when there is no name", () => {
+    expect(memberActionDoneText("approve", null)).toBe("Member approved");
+    expect(memberActionDoneText("reject", null)).toBe("Request rejected");
+    expect(memberActionDoneText("suspend", null)).toBe("Member suspended");
+    expect(memberActionDoneText("reinstate", null)).toBe("Member reinstated");
+  });
+
+  it("name a row's button with its member, starting with the word it shows", () => {
+    expect(memberActionLabel("approve", "Parth Joshi")).toBe("Approve Parth Joshi");
+    expect(memberActionLabel("suspend", "Nisha Modi")).toBe("Suspend Nisha Modi");
+    expect(memberActionLabel("reject", null)).toBe("Reject");
+  });
+});
+
+describe("approveAllCopy and approveAllDoneText", () => {
+  it("ask before approving everyone waiting, counting them", () => {
+    expect(approveAllCopy(2)).toEqual({
+      title: "Approve all 2 pending members?",
+      body: "Each is told they're in and can sign in straight away. Reject anyone you don't recognise first.",
+      confirm: "Approve all",
+    });
+    expect(approveAllCopy(1200).title).toBe("Approve all 1,200 pending members?");
+    expect(approveAllCopy(1)).toMatchObject({ title: "Approve the 1 pending member?", confirm: "Approve" });
+  });
+
+  it("report the server's count, which can be smaller than the screen's", () => {
+    expect(approveAllDoneText(2)).toBe("Approved 2 members");
+    expect(approveAllDoneText(1)).toBe("Approved 1 member");
+    expect(approveAllDoneText(1500)).toBe("Approved 1,500 members");
+    expect(approveAllDoneText(0)).toBe("Nobody was waiting any more");
+  });
+});
+
+describe("memberActionErrorText", () => {
+  // As the API answers when another admin, or a stale notice's PENDING, got there first: see assertAdminTransition.
+  const refused = (status: unknown) => new ApiClientError(409, "INVALID_TRANSITION", "This member has already been approved", { status });
+
+  it("says where the member stands now, from the status in a 409's details", () => {
+    expect(memberActionErrorText(refused("APPROVED"), "Parth Joshi")).toBe("Parth Joshi has already been approved.");
+    expect(memberActionErrorText(refused("REJECTED"), "Diya Raval")).toBe("Diya Raval's request has already been rejected.");
+    expect(memberActionErrorText(refused("SUSPENDED"), "Nisha Modi")).toBe("Nisha Modi is suspended.");
+    expect(memberActionErrorText(refused("PENDING"), "Diya Raval")).toBe("Diya Raval's request is waiting for approval again.");
+    expect(memberActionErrorText(refused("APPROVED"), null)).toBe("This member has already been approved.");
+    expect(memberActionErrorText(refused("REJECTED"), null)).toBe("This request has already been rejected.");
+  });
+
+  it("still explains a 409 without a status it knows", () => {
+    const others = [refused("GONE"), refused(undefined), new ApiClientError(409, "INVALID_TRANSITION", "Cannot approve a membership that is APPROVED"), new ApiClientError(409, "CONFLICT", "x", "APPROVED")];
+    for (const err of others) expect(memberActionErrorText(err, "Parth Joshi")).toBe("Someone else has already dealt with this member.");
+  });
+
+  it("says a member who has gone has gone", () => {
+    const gone = new ApiClientError(404, "NOT_FOUND", "Member not found");
+    expect(memberActionErrorText(gone, "Parth Joshi")).toBe("Parth Joshi isn't here any more: they may have deleted their account.");
+    expect(memberActionErrorText(gone, null)).toBe("This member isn't here any more: they may have deleted their account.");
+  });
+
+  it("passes on the API's own words for anything else", () => {
+    expect(memberActionErrorText(new ApiClientError(403, "NEEDS_ANOTHER_ADMIN", "This needs another admin or Illuminize staff"), "Parth Joshi")).toBe("This needs another admin or Illuminize staff");
+    expect(memberActionErrorText(new ApiClientError(403, "FORBIDDEN", "You cannot change your own membership"), "Jignesh")).toBe("You cannot change your own membership");
+    expect(memberActionErrorText(new ApiClientError(0, "NETWORK_ERROR", "Could not reach the server. Check your connection."), "Parth Joshi")).toBe("Could not reach the server. Check your connection.");
+    expect(memberActionErrorText(new Error(""), "Parth Joshi")).toBe("Something went wrong");
+    expect(memberActionErrorText(null, "Parth Joshi")).toBe("Something went wrong");
+    expect(memberActionErrorText("offline", "Parth Joshi")).toBe("Something went wrong");
+  });
+});
+
+describe("memberStatusNowText", () => {
+  it("says where a member stands now, as a refusal would, for a notice that moved on under an open question", () => {
+    expect(memberStatusNowText("REJECTED", "Parth Joshi")).toBe("Parth Joshi's request has already been rejected.");
+    expect(memberStatusNowText("APPROVED", "Pooja Bhatt")).toBe("Pooja Bhatt has already been approved.");
+    expect(memberStatusNowText(null, null)).toBe("This member isn't here any more: they may have deleted their account.");
+  });
+
+  it("is the 409's and the 404's words, so the two ways of finding out read the same", () => {
+    for (const status of MEMBERSHIP_STATUSES) {
+      const refused = new ApiClientError(409, "INVALID_TRANSITION", "x", { status });
+      expect(memberStatusNowText(status, "Diya Raval"), status).toBe(memberActionErrorText(refused, "Diya Raval"));
+    }
+    expect(memberStatusNowText(null, "Diya Raval")).toBe(memberActionErrorText(new ApiClientError(404, "NOT_FOUND", "Member not found"), "Diya Raval"));
+  });
+});
+
+describe("statusTabs and memberTabCounts", () => {
+  const dashboard = { pendingMembers: 2, approvedMembers: 8, rejectedMembers: 1, suspendedMembers: 0 };
+
+  it("label the members tabs as the web did, shorter than the badge's", () => {
+    for (const s of MEMBERSHIP_STATUSES) expect(MEMBER_STATUS_TAB_LABELS[s]).toBe(s.charAt(0) + s.slice(1).toLowerCase());
+    expect(MEMBERSHIP_STATUS_LABELS.PENDING).toBe("Pending approval");
+  });
+
+  it("give each status a tab in order, with its count from the dashboard", () => {
+    expect(statusTabs(MEMBERSHIP_STATUSES, MEMBER_STATUS_TAB_LABELS, memberTabCounts(dashboard))).toEqual([
+      { value: "PENDING", label: "Pending", count: 2 },
+      { value: "APPROVED", label: "Approved", count: 8 },
+      { value: "REJECTED", label: "Rejected", count: 1 },
+      { value: "SUSPENDED", label: "Suspended", count: 0 },
+    ]);
+  });
+
+  it("show no count, rather than 0, until the counts have loaded", () => {
+    expect(memberTabCounts(undefined)).toBeUndefined();
+    for (const tab of statusTabs(MEMBERSHIP_STATUSES, MEMBER_STATUS_TAB_LABELS, memberTabCounts(undefined))) expect(tab, tab.value).not.toHaveProperty("count");
+    expect(statusTabs(REPORT_STATUSES, REPORT_STATUS_LABELS, { OPEN: 3 })).toEqual([
+      { value: "OPEN", label: "Open", count: 3 },
+      { value: "RESOLVED", label: "Resolved" },
+      { value: "DISMISSED", label: "Dismissed" },
+    ]);
+  });
+});
+
+describe("parseMemberStatus", () => {
+  it("reads a status from the address", () => {
+    for (const s of MEMBERSHIP_STATUSES) expect(parseMemberStatus(s)).toBe(s);
+    expect(parseMemberStatus(["REJECTED", "APPROVED"])).toBe("REJECTED");
+  });
+
+  it("opens Pending for anything else, rather than send the API a status it refuses", () => {
+    for (const raw of [undefined, null, "", "foo", "pending", "approved", "constructor", 3, [], ["nope"], { status: "APPROVED" }]) {
+      expect(parseMemberStatus(raw), JSON.stringify(raw)).toBe("PENDING");
+    }
+  });
+});
+
+describe("memberListMeta", () => {
+  const formatDate = (iso: string) => `on ${iso.slice(0, 10)}`;
+  const member = { batchYear: 2018, phone: "+919100000037", companyName: "Infosys", city: "Pune", createdAt: "2026-11-03T10:00:00.000Z" };
+
+  it("joins the batch, phone, work and request date", () => {
+    expect(memberListMeta(member, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Infosys, Pune · requested on 2026-11-03");
+  });
+
+  it("leaves out what the member didn't give", () => {
+    expect(memberListMeta({ ...member, companyName: null }, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Pune · requested on 2026-11-03");
+    expect(memberListMeta({ ...member, city: null }, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Infosys · requested on 2026-11-03");
+    expect(memberListMeta({ ...member, companyName: null, city: null, phone: "" }, formatDate)).toBe("Batch of 2018 · requested on 2026-11-03");
+  });
+});
+
+describe("memberEmptyTitle", () => {
+  it("names the tab, and the search when there is one", () => {
+    expect(memberEmptyTitle("PENDING")).toBe("No pending members");
+    expect(memberEmptyTitle("SUSPENDED", "")).toBe("No suspended members");
+    expect(memberEmptyTitle("APPROVED", "  ")).toBe("No approved members");
+    expect(memberEmptyTitle("APPROVED", " Nisha ")).toBe("No approved members match “Nisha”");
+    expect(MEMBER_SEARCH_HINT).toBe("Search looks at names, companies and phone numbers.");
   });
 });

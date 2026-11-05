@@ -12,9 +12,9 @@ import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { AdminFieldAnswers } from "@/components/admin/AdminFieldAnswers";
+import { MemberActionButtons, useMemberActions } from "@/components/admin/MemberActions";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/stores/uiStore";
-import { MemberActionButtons, useMemberActions } from "./AdminMembersPage";
 
 export function AdminMemberDetailPage() {
   const { tenant, me } = useAdminTenant();

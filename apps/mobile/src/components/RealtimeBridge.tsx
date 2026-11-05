@@ -30,7 +30,11 @@ export function RealtimeBridge() {
       realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
       // The same for a referral request: its lists, and the pages of jobs, which say where the viewer's own request stands.
       realtime.on("referral:changed", (e) => void refreshReferrals(qc, e.tenantSlug)),
-      realtime.on("notification:unread", (e) => qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count })),
+      realtime.on("notification:unread", (e) => {
+        qc.setQueryData(qk.unread(e.tenantSlug), { count: e.count });
+        // Read elsewhere, such as another admin handling a request to join: the list shows where that request stands now.
+        void qc.invalidateQueries({ queryKey: qk.notifications(e.tenantSlug), predicate: (q) => q.queryKey.length === 2 });
+      }),
       // One notification sent to many members (an announcement): refetch rather than patch.
       realtime.on("notification:bulk", (e) => {
         void qc.invalidateQueries({ queryKey: ["notifications", e.tenantSlug] });

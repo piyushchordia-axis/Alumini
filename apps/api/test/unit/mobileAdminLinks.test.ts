@@ -16,12 +16,13 @@ const ADMIN_PAYLOADS: Record<string, Record<string, string>> = {
 };
 
 describe("notificationHref in the phone app", () => {
-  it("opens the admin console's home from every admin notice, for an admin", () => {
+  it("opens the members waiting from a request to join, and the console's home from every other admin notice, for an admin", () => {
     const adminTypes = NOTIFICATION_TYPES.filter(isAdminNotification);
     expect(adminTypes).toEqual(Object.keys(ADMIN_PAYLOADS));
     for (const type of adminTypes) {
-      expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe("/t/demo/admin");
-      expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe("/t/demo/admin");
+      const href = type === "NEW_MEMBER_PENDING" ? "/t/demo/admin/members?status=PENDING" : "/t/demo/admin";
+      expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe(href);
+      expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe(href);
     }
   });
 
@@ -50,6 +51,8 @@ describe("the phone console's links", () => {
       expect(adminSectionHref("demo", key), key).toBe(`/t/demo/admin/${path}`);
     }
     expect(adminSectionHref("demo", "dashboard", { status: "PENDING", q: "a b&c" })).toBe("/t/demo/admin?status=PENDING&q=a%20b%26c");
+    // The console home's Pending members tile, now that Members is in the phone app.
+    expect(adminSectionHref("demo", "members", { status: "PENDING" })).toBe("/t/demo/admin/members?status=PENDING");
   });
 });
 

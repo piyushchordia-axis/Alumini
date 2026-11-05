@@ -1,7 +1,8 @@
-import type { ContentType, MembershipStatus, ModerationStatus, NotificationType } from "../constants";
-import type { DashboardDto, TenantPublicSettings } from "../types/dto";
+import { MEMBERSHIP_STATUSES, type ContentType, type MembershipStatus, type ModerationStatus, type NotificationType } from "../constants";
+import type { AdminMemberDto, DashboardDto, TenantPublicSettings } from "../types/dto";
 import { MONTHS } from "./jobs";
 import { NOTIFICATION_CATEGORY } from "./notifications";
+import { formatPhone } from "./phone";
 import { groupDigits } from "./salary";
 import { isValidCalendarDate } from "./time";
 
@@ -88,7 +89,7 @@ export type AdminSectionKey = AdminSection["key"];
  * The sections the phone app's console has so far (its Dashboard is the console's home). It lists the others as on the
  * web console, and README → Known gaps names them, until every page is in the phone app.
  */
-export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard"];
+export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members"];
 
 /** A figure on the console's home, which both apps draw as a tile. */
 export interface DashboardTile {
@@ -165,6 +166,136 @@ export function memberActionsFor(status: MembershipStatus): MemberAdminAction[] 
   return (Object.keys(MEMBERSHIP_TRANSITIONS[status] ?? {}) as MembershipAction[]).filter((a): a is MemberAdminAction => a !== "reapply");
 }
 
+/** One admin action's words on both apps. Names may be null: a notice's applicant can have deleted their account. */
+export interface MemberActionCopy {
+  label: string;
+  /** Approve and Reinstate act at once and lead; Reject and Suspend ask for a reason first. */
+  variant: "primary" | "outline";
+  /** The reason sheet or dialog, for an action the member is told the reason for. */
+  reason?: { title: (name: string | null) => string; body: string; confirm: string };
+  /** What happened, for a toast or status line: "Parth Joshi approved". */
+  done: (name: string | null) => string;
+}
+
+export const MEMBER_ACTION_COPY: Readonly<Record<MemberAdminAction, MemberActionCopy>> = {
+  approve: { label: "Approve", variant: "primary", done: (name) => (name ? `${name} approved` : "Member approved") },
+  reject: {
+    label: "Reject",
+    variant: "outline",
+    reason: { title: (name) => `Reject ${name ?? "this request"}?`, body: "The member will see this reason and can re-apply.", confirm: "Reject" },
+    done: (name) => (name ? `${name}'s request rejected` : "Request rejected"),
+  },
+  suspend: {
+    label: "Suspend",
+    variant: "outline",
+    reason: { title: (name) => `Suspend ${name ?? "this member"}?`, body: "They lose access until reinstated.", confirm: "Suspend" },
+    done: (name) => (name ? `${name} suspended` : "Member suspended"),
+  },
+  reinstate: { label: "Reinstate", variant: "primary", done: (name) => (name ? `${name} reinstated` : "Member reinstated") },
+};
+
+/** A row's button named with its member, so a screen reader can tell one row's Approve from the next: "Approve Parth Joshi". */
+export function memberActionLabel(action: MemberAdminAction, name: string | null): string {
+  return name ? `${MEMBER_ACTION_COPY[action].label} ${name}` : MEMBER_ACTION_COPY[action].label;
+}
+
+export function memberActionDoneText(action: MemberAdminAction, name: string | null): string {
+  return MEMBER_ACTION_COPY[action].done(name);
+}
+
+/** The confirmation before approving everyone waiting, `n` of them as far as the screen knows. */
+export function approveAllCopy(n: number): { title: string; body: string; confirm: string } {
+  return n === 1
+    ? { title: "Approve the 1 pending member?", body: "They're told they're in and can sign in straight away. Reject them first if you don't recognise them.", confirm: "Approve" }
+    : { title: `Approve all ${formatCount(n)} pending members?`, body: "Each is told they're in and can sign in straight away. Reject anyone you don't recognise first.", confirm: "Approve all" };
+}
+
+/** What Approve all did, by the server's count, which another admin acting first can make smaller than the screen's. */
+export function approveAllDoneText(approved: number): string {
+  if (approved === 0) return "Nobody was waiting any more";
+  return `Approved ${formatCount(approved)} ${approved === 1 ? "member" : "members"}`;
+}
+
+/** Where a member's request stands, as a 409 reports it: worded for the admin whose screen showed it otherwise. */
+const STATUS_NOW: Readonly<Record<MembershipStatus, (name: string | null) => string>> = {
+  APPROVED: (name) => `${name ?? "This member"} has already been approved.`,
+  REJECTED: (name) => (name ? `${name}'s request has already been rejected.` : "This request has already been rejected."),
+  SUSPENDED: (name) => `${name ?? "This member"} is suspended.`,
+  // A rejected applicant who applied again: the admin acted on the rejection.
+  PENDING: (name) => (name ? `${name}'s request is waiting for approval again.` : "This request is waiting for approval again."),
+};
+
+/**
+ * Where a member stands now, for an admin whose screen showed them otherwise: from a 409's details, or a notice's refetch
+ * that moved on under an open question. A null status is a member who has gone.
+ */
+export function memberStatusNowText(status: MembershipStatus | null, name: string | null): string {
+  return status ? STATUS_NOW[status](name) : `${name ?? "This member"} isn't here any more: they may have deleted their account.`;
+}
+
+/**
+ * Why an action on a member failed, in words for a toast or status line. A 409 says where the member stands now, from
+ * the status the API puts in its details (another admin, or a stale notice, got there first). It reads the error's fields
+ * rather than importing ApiClientError, because lib/ doesn't depend on the client.
+ */
+export function memberActionErrorText(err: unknown, name: string | null): string {
+  const e = err !== null && typeof err === "object" ? (err as { status?: unknown; message?: unknown; details?: unknown }) : {};
+  if (e.status === 409) {
+    const status = e.details !== null && typeof e.details === "object" && "status" in e.details ? e.details.status : undefined;
+    const now = MEMBERSHIP_STATUSES.find((s) => s === status);
+    return now ? memberStatusNowText(now, name) : "Someone else has already dealt with this member.";
+  }
+  if (e.status === 404) return memberStatusNowText(null, name);
+  return typeof e.message === "string" && e.message ? e.message : "Something went wrong";
+}
+
+/** The members list's tab names: shorter than MEMBERSHIP_STATUS_LABELS' "Pending approval", which a badge uses. */
+export const MEMBER_STATUS_TAB_LABELS: Readonly<Record<MembershipStatus, string>> = { PENDING: "Pending", APPROVED: "Approved", REJECTED: "Rejected", SUSPENDED: "Suspended" };
+
+export interface StatusTab<S extends string> {
+  value: S;
+  label: string;
+  count?: number;
+}
+
+/** A status list's tabs, in the order of `statuses`, each with its count once the counts have loaded. */
+export function statusTabs<S extends string>(statuses: readonly S[], labels: Readonly<Record<S, string>>, counts?: Partial<Readonly<Record<S, number>>>): StatusTab<S>[] {
+  return statuses.map((value) => {
+    const count = counts?.[value];
+    return count === undefined ? { value, label: labels[value] } : { value, label: labels[value], count };
+  });
+}
+
+/** The members list's tab counts, from the console's dashboard, or undefined until it has loaded. */
+export function memberTabCounts(d: Pick<DashboardDto, "pendingMembers" | "approvedMembers" | "rejectedMembers" | "suspendedMembers"> | undefined): Record<MembershipStatus, number> | undefined {
+  return d ? { PENDING: d.pendingMembers, APPROVED: d.approvedMembers, REJECTED: d.rejectedMembers, SUSPENDED: d.suspendedMembers } : undefined;
+}
+
+/**
+ * The members list's status from its address (?status=). Anything that isn't a status, from an old link or a typo, opens
+ * the Pending tab rather than reaching the API as a 400. An app's router may give a repeated parameter as a list.
+ */
+export function parseMemberStatus(raw: unknown): MembershipStatus {
+  const value: unknown = Array.isArray(raw) ? raw[0] : raw;
+  return MEMBERSHIP_STATUSES.find((s) => s === value) ?? "PENDING";
+}
+
+/** A member row's second line: "Batch of 2018 · +91 91000 00037 · Infosys, Pune · requested 3 Nov 2026". */
+export function memberListMeta(m: Pick<AdminMemberDto, "batchYear" | "phone" | "companyName" | "city" | "createdAt">, formatDate: (iso: string) => string): string {
+  const work = [m.companyName, m.city].filter(Boolean).join(", ");
+  return [`Batch of ${m.batchYear}`, formatPhone(m.phone), work, `requested ${formatDate(m.createdAt)}`].filter(Boolean).join(" · ");
+}
+
+/** The members list's empty state: "No pending members", or with a search, "No approved members match “Nisha”". */
+export function memberEmptyTitle(status: MembershipStatus, q?: string | null): string {
+  const which = MEMBER_STATUS_TAB_LABELS[status].toLowerCase();
+  const search = q?.trim();
+  return search ? `No ${which} members match “${search}”` : `No ${which} members`;
+}
+
+/** Under an empty search's title, what the members search looks at. */
+export const MEMBER_SEARCH_HINT = "Search looks at names, companies and phone numbers.";
+
 export type ContentAction = "approve" | "reject" | "remove" | "restore";
 
 /** The moderation state machine: the API's transitions and both apps' buttons. */
@@ -221,6 +352,27 @@ export function dedupeById<T extends { id: string }>(rows: readonly T[]): T[] {
     seen.add(row.id);
     return true;
   });
+}
+
+/**
+ * Whether a list may go on showing the rows of `previousKey` while those of `key` load: only when the two keys differ in
+ * nothing but the search (`searchField` of the filters, the key's last part). Rows carry actions for the tab they were
+ * listed under, so a tab's rows must never stand in for another's, even for a moment, with live Approve buttons.
+ */
+export function onlySearchChanged(previousKey: readonly unknown[] | undefined, key: readonly unknown[], searchField = "q"): boolean {
+  if (!previousKey || previousKey.length !== key.length || key.length === 0) return false;
+  const last = key.length - 1;
+  if (previousKey.some((part, i) => i < last && part !== key[i])) return false;
+  const before = previousKey[last];
+  const now = key[last];
+  if (!isFilters(before) || !isFilters(now)) return false;
+  const fields = new Set([...Object.keys(before), ...Object.keys(now)]);
+  fields.delete(searchField);
+  return [...fields].every((field) => before[field] === now[field]);
+}
+
+function isFilters(value: unknown): value is Readonly<Record<string, unknown>> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /** A whole count with its thousands grouped: "12,345". Written by hand, as Hermes may lack Intl number formatting. */

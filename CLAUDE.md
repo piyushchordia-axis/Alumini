@@ -266,9 +266,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers
     take any http(s) address), only profile photos are ever deleted, and a CDN may serve a deleted one until it expires;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-  - admin pages not yet in the phone app, which show there as on the web console for now: members, member detail,
-    moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log
-    (README → Known gaps lists them too);
+  - admin pages not yet in the phone app, which show there as on the web console for now: member detail, moderation,
+    reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log (README → Known
+    gaps lists them too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

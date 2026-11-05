@@ -191,7 +191,8 @@ export async function listMembersForAdmin(
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
       .where(where)
-      .orderBy(desc(memberships.createdAt))
+      // The id breaks ties, so rows created in one statement (as the seed's are) keep their place from page to page.
+      .orderBy(desc(memberships.createdAt), desc(memberships.id))
       .limit(f.pageSize)
       .offset((f.page - 1) * f.pageSize),
     db
