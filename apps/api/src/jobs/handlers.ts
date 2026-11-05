@@ -7,6 +7,7 @@ import { engagementTick, runCelebrations } from "../services/celebrations.servic
 import { runDigest, sendDigestBatch } from "../services/digest.service";
 import { pushConversation, pushEvent, pushGroupInvite } from "../services/chat/push";
 import { sweepUnusedAvatars } from "../services/uploads.service";
+import { sweepEscalatedChatReports } from "../services/chat/staffAlerts.service";
 import type { JobHandlers } from "./JobQueue";
 
 /** The one registry of job handlers; every name in JobPayloads must have one (the type enforces it). */
@@ -30,5 +31,8 @@ export const jobHandlers: JobHandlers = {
   "chat.pushGroupInvite": pushGroupInvite,
   "uploads.sweepAvatars": async (ctx) => {
     await sweepUnusedAvatars(ctx);
+  },
+  "chatReports.alertStaff": async (ctx) => {
+    await sweepEscalatedChatReports(ctx);
   },
 };

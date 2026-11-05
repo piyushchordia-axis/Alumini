@@ -21,7 +21,7 @@ import { toJobReferralLinkDto, toReferralDto } from "../../dto/referrals.dto";
 import { AppError } from "../../lib/errors";
 import { runInTransaction } from "../../lib/transaction";
 import { blocksBetween, limitLockWait, lockPair } from "../../repositories/chat.repo";
-import { insertChatReport } from "../../repositories/chatReports.repo";
+import { insertChatReport, lockReportSubject } from "../../repositories/chatReports.repo";
 import { findJobWithAuthor, lockJob, type JobRow, type JobWithAuthor } from "../../repositories/jobs.repo";
 import { findMembershipById, listMembershipsForUser, lockMembership } from "../../repositories/memberships.repo";
 import {
@@ -48,6 +48,7 @@ import type { MembershipRow, TenantContext, TenantRow } from "../../types/reques
 import { recordAuditStrict } from "../audit.service";
 import { blockedByYou, contactUnavailable, freshChatTenant, isReachable, type ChatTenant } from "../chat/common";
 import { openDirectFromOrigin } from "../chat/open";
+import { alertStaffIfEscalated } from "../chat/staffAlerts.service";
 import { assertCanView, canView, type ContentActor } from "../content.common";
 import { notify, notifyTenantAdmins } from "../notifications/notification.service";
 import { publishReferralChanged } from "./events";
@@ -389,6 +390,9 @@ export async function reportReferralRequest(ctx: AppContext, tenantCtx: TenantCo
   const me = actor.membership.id;
   return runInTransaction(ctx, async (tx) => {
     await limitLockWait(tx);
+    // Its requester never changes, so it's read unlocked: the report subject's lock has to come before the pair's.
+    const subject = (await findReferral(tx, tenantId, id))?.requesterMembershipId;
+    if (subject) await lockReportSubject(tx, tenantId, subject, "file");
     const { row, side } = await lockForAction(tx, tenantId, me, id);
     if (side !== "POSTER") throw AppError.badRequest("You can't report your own request");
     if (row.acceptedAt) throw AppError.invalidTransition("This request was accepted. Report its messages in your chat instead.");
@@ -408,7 +412,8 @@ export async function reportReferralRequest(ctx: AppContext, tenantCtx: TenantCo
     });
     if (!report) throw AppError.conflict("You have already reported this request");
     await recordAuditStrict(tx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } });
-    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A referral request was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, row.requesterMembershipId] }, tx);
+    const forStaff = await alertStaffIfEscalated(ctx, tx, report.id);
+    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A referral request was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, row.requesterMembershipId], excludeStaff: !forStaff }, tx);
     // The sender's copy changes only if it was waiting, and then they hear of it just as of a decline.
     if (isWaiting) await notifyDeclined(ctx, tx, tenantId, updated, actor.membership.fullName);
     await publishReferralChanged(ctx, tx, tenantCtx.tenant.slug, isWaiting ? [me, row.requesterMembershipId] : [me]);

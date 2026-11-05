@@ -1,0 +1,2 @@
+ALTER TABLE "chat_reports" ADD COLUMN "staff_alerted_at" timestamp (3) with time zone;--> statement-breakpoint
+CREATE INDEX "chat_reports_staff_unalerted_idx" ON "chat_reports" USING btree ("created_at") WHERE "chat_reports"."status" = 'OPEN' and "chat_reports"."staff_alerted_at" is null;

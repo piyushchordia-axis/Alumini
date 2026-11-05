@@ -140,11 +140,14 @@ export async function clearDegreesAt(db: DbClient, tenantId: string): Promise<nu
   return rows.length;
 }
 
-export async function listTenantAdmins(db: DbClient, tenantId: string): Promise<MembershipRow[]> {
-  return db
-    .select()
+/** With excludeStaff, leaves out Illuminize staff who hold the admin role here. */
+export async function listTenantAdmins(db: DbClient, tenantId: string, opts: { excludeStaff?: boolean } = {}): Promise<MembershipRow[]> {
+  const rows = await db
+    .select({ membership: memberships })
     .from(memberships)
-    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.role, "TENANT_ADMIN"), eq(memberships.status, "APPROVED")));
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.role, "TENANT_ADMIN"), eq(memberships.status, "APPROVED"), opts.excludeStaff ? eq(users.isPlatformAdmin, false) : undefined));
+  return rows.map((r) => r.membership);
 }
 
 export async function approveAllPending(

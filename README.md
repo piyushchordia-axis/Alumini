@@ -465,9 +465,9 @@ OTP delivery is pluggable (`OTP_PROVIDER`):
 ### Background jobs
 
 Work that can wait (push notifications and Expo receipts, outbound messages, invitations, announcements, celebrations,
-the weekly digest, chat pushes and the sweep of unsaved profile photos) runs on BullMQ queues in Redis: `jobs`,
-`messages` and `chat`. Code inside a request
-queues a job; it never calls slow providers itself.
+the weekly digest, chat pushes, staff alerts for escalated chat reports and the sweep of unsaved profile photos) runs on
+BullMQ queues in Redis: `jobs`, `messages` and `chat`. Code inside a request queues a job; it never calls slow providers
+itself.
 
 - **Where workers run.** `WORKER_MODE=inline` (the default outside production, so `pnpm demo` needs nothing extra)
   runs them inside the API process. In production the default is `separate`: run `pnpm worker` locally, or
@@ -482,7 +482,7 @@ queues a job; it never calls slow providers itself.
 
 ### Outbound messages (WhatsApp, SMS, email)
 
-Invitations, announcements, the weekly digest and email confirmations go out through `queueMessage()`
+Invitations, announcements, the weekly digest, email confirmations and staff alerts go out through `queueMessage()`
 (`apps/api/src/services/messages`), and Wave 3's reminders and receipts will too. Each
 message is stored in `outbound_messages` and sent by a background job, which tries the message type's channels in
 order (for example WhatsApp, then SMS, then email), retries temporary provider errors with backoff, and records every
@@ -802,11 +802,25 @@ because admins can read everything in that view. Instead:
   now. Staff see escalated reports in the platform console's **Chat reports** (no text) and open them through the
   institution's own admin pages, where each view is audited with why they were allowed in. Staff reach only escalated
   reports.
+- **Staff alerts.** When a report becomes theirs, each member of staff it doesn't name gets a `STAFF_CHAT_REPORT` email
+  (or WhatsApp or SMS, where a template is configured for it and they have no confirmed email): at once if it's filed
+  about an admin or with no other admin to handle it, and within five minutes if a later change of admins escalates it
+  (the `chatReports.alertStaff` job). `chat_reports.staff_alerted_at` records it, so a report alerts once while it
+  stays theirs. The alert gives the institution, the reason, what was reported and why it's for staff, and a link to the
+  console; it names nobody and quotes nothing. It's checked again when sent: a report closed by then sends nothing, and
+  one its admins can handle again sends nothing and is claimed afresh if it becomes staff's later. A report that names
+  every member of staff waits until one joins whom it doesn't. It's queued without an institution, so no institution is
+  billed for it. Staff who hold the admin role in an institution get its `CHAT_REPORT_FILED` notice only for a report
+  that's theirs from the start, the one kind they can open.
+- **Changes to who is an admin** are audited in the same transaction as the change: staff assigning or removing an
+  institution's admins or changing someone's staff flag, and admins approving, rejecting, suspending or reinstating a
+  member or changing a role. Assigning never lifts a suspension ("This member is suspended. Reinstate them first.").
 - **No retaliation.** While an open chat report names a tenant admin as the reported member, that admin can't suspend
   anyone, change roles, reinstate a suspended admin, edit member profiles or remove a mentor. Every target gets the same
   answer, "This needs another admin or Illuminize staff", so it doesn't point at the reporter. Refusals are audited, and
   those actions together are limited to 60 an hour per admin, so they can't be repeated to watch for the report closing.
-  Staff aren't restricted.
+  Staff aren't restricted. Filing and the check share a lock on the reported member, so a report filed while an admin's
+  change is under way either stops it or is filed once the change has committed.
 
 ### Account deletion and suspension
 
@@ -1073,17 +1087,16 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 - **Deleting and rejoining clears blocks and a suspension.** Someone blocked or suspended can delete their account and
   sign in again with the same phone. Fixing it means keeping a hashed phone after deletion, which waits for the
   privacy policy.
-- **Staff get no alert** for escalated chat reports: they appear in the platform console only.
+- **The platform console shows no count of escalated chat reports** yet: staff are alerted by email (see "Chat reports
+  and admin access"), but its nav has no badge.
 - **Staff can change who is an admin and then read a report that change escalated.** Each staff action records why it
   was allowed, so it can be checked afterwards.
 - **A blocked member's abuse is invisible to admins,** because withheld messages can't be reported.
-- **Reporting a sole admin's message** stops them suspending anyone or changing roles until staff close the report, and
-  staff aren't alerted.
+- **Reporting a sole admin's message** stops them suspending anyone or changing roles until staff close the report.
 - **A reported admin keeps some reach over the reporter:** they can still moderate the reporter's posts and see the
   reporter's other reports.
-- **The retaliation rule leaks a little and has a gap.** Its refusal tells an admin, roughly, when a report about them
-  opened (refusals are audited, and the actions limited to 60 an hour), and the check takes no lock, so a report filed
-  during an admin's suspend or role change doesn't stop it.
+- **The retaliation rule leaks a little.** Its refusal tells an admin, roughly, when a report about them opened
+  (refusals are audited, and the actions limited to 60 an hour).
 - **Nothing has been checked on a real phone** beyond what the web export shows: see "Checks that need a real phone" in
   `e2e/README.md`. Profiles and jobs added more of them: the native square crop and the photo-library permission,
   cancelling an upload and its timeout, the keyboard on the long edit form, the list editors and each registration

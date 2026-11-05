@@ -57,6 +57,24 @@ export async function updateUser(db: DbClient, id: string, values: Partial<typeo
   return row;
 }
 
+/**
+ * Illuminize staff whom a chat report doesn't name: none of their memberships is its reporter or its reported member, as
+ * reportNamesUser has it. users.id is spelled out: in a single-table select Drizzle leaves the table off an interpolated
+ * column, and a bare id here would mean the membership's.
+ */
+export async function listStaffNotNamedBy(db: DbClient, reportId: string): Promise<UserRow[]> {
+  return db
+    .select()
+    .from(users)
+    .where(
+      and(
+        eq(users.isPlatformAdmin, true),
+        sql`not exists (select 1 from chat_reports r join memberships m on m.id in (r.reporter_membership_id, r.reported_membership_id) where r.id = ${reportId} and m.user_id = users.id)`,
+      ),
+    )
+    .orderBy(users.createdAt);
+}
+
 export async function deleteUser(db: DbClient, id: string): Promise<void> {
   await db.delete(users).where(eq(users.id, id));
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { defaultFeaturesFor, type AdminChatReportViewDto, type AuditDto, type ChatConversationDto, type ChatMessageDto } from "@illuminize/shared";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app";
@@ -10,7 +10,10 @@ import { chatReportContext } from "../../src/repositories/chatReports.repo";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
 import { capturingLogger } from "../helpers/capturingLogger";
 import { acceptedThread, bareMember, chatApi, type Session } from "../helpers/chat";
+import { refusingAuditWhere as refuseAuditWhere, untilSomeoneSleeps, untilSomeoneWaitsFor, withTrigger } from "../helpers/db";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
+import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
+import { askForReferral, postReferralJob, referralsApi } from "../helpers/referrals";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -89,14 +92,7 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
     const text = JSON.stringify(value);
     for (const word of words) expect(text).not.toContain(word);
   };
-  async function refusingAuditWhere(check: string, fn: () => Promise<void>) {
-    await ctx.db.execute(sql.raw(`alter table audit_log add constraint test_refuse_audit check (${check}) not valid`));
-    try {
-      await fn();
-    } finally {
-      await ctx.db.execute(sql.raw("alter table audit_log drop constraint test_refuse_audit"));
-    }
-  }
+  const refusingAuditWhere = (check: string, fn: () => Promise<void>) => refuseAuditWhere(ctx, check, fn);
   const refusingAudit = (action: string, fn: () => Promise<void>) => refusingAuditWhere(`action <> '${action}'`, fn);
   /** Someone with the staff flag and a membership here, which is the case a staff-only session can't show. */
   async function staffMember(tenantId: string, membership: MemberOptions = {}) {
@@ -1043,6 +1039,77 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
       const { body } = await chatApi(ctx, tenant.slug, admin).send(id, SECRET);
       expect((await chatApi(ctx, tenant.slug, member).report(body.data.id)).status).toBe(201);
       refused(await as.setRole(bystander.id, "MEMBER"));
+    });
+
+    // A trigger holds one side mid-transaction, and the other starts only once it's there, so these don't depend on timing.
+    describe("and a report filed while they act", () => {
+      /** An admin, a member they could suspend, and something of theirs to report in each of the three ways. */
+      async function beforeTheReport() {
+        const { tenant } = await createTenant(ctx);
+        const reporter = await memberSession(ctx, tenant.id, { fullName: "Reporter Rao" });
+        const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", fullName: "Reported Roy" });
+        await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+        const target = await bareMember(ctx, tenant.id);
+        const conversationId = await acceptedThread(ctx, tenant.slug, reporter, admin);
+        const sent = await chatApi(ctx, tenant.slug, admin).send(conversationId, SECRET);
+        await offerToMentor(ctx, tenant.slug, reporter);
+        const asked = await askMentor(ctx, tenant.slug, admin, reporter.membership.id);
+        const job = await postReferralJob(ctx, tenant.slug, reporter);
+        const referral = await askForReferral(ctx, tenant.slug, admin, job.id);
+        const report = {
+          message: () => chatApi(ctx, tenant.slug, reporter).report(sent.body.data.id),
+          mentorship: () => mentorshipApi(ctx, tenant.slug, reporter).report(asked.id),
+          referral: () => referralsApi(ctx, tenant.slug, reporter).report(referral.id),
+        };
+        return { tenant, target, as: adminOf(tenant.slug, admin), report };
+      }
+      const memberRow = async (id: string) => (await ctx.db.select().from(memberships).where(eq(memberships.id, id)))[0]!;
+      const reportsIn = (tenantId: string) => ctx.db.select().from(chatReports).where(eq(chatReports.tenantId, tenantId));
+
+      it.each(["message", "mentorship", "referral"] as const)("is stopped by a %s report filed first, which the check waits for rather than missing", async (kind) => {
+        const s = await beforeTheReport();
+        await withTrigger(ctx, "before insert on chat_reports", "perform pg_sleep(0.5); return new;", async () => {
+          // Supertest sends a request only once something calls then().
+          const filing = s.report[kind]().then((res) => res);
+          await untilSomeoneSleeps(ctx);
+          refused(await s.as.suspend(s.target.id));
+          expect((await filing).status).toBeLessThan(300);
+        });
+        expect((await memberRow(s.target.id)).status).toBe("APPROVED");
+        expect(await auditRows(s.tenant.id, "membership.suspend")).toEqual([]);
+        expect(await auditRows(s.tenant.id, "membership.action_refused")).toHaveLength(1);
+        expect(await reportsIn(s.tenant.id)).toEqual([expect.objectContaining({ status: "OPEN" })]);
+      });
+
+      it("files a report sent during the change once the change commits, and both stand", async () => {
+        const s = await beforeTheReport();
+        await withTrigger(ctx, "before update on memberships", "perform pg_sleep(1); return new;", async () => {
+          const suspending = s.as.suspend(s.target.id).then((res) => res);
+          await untilSomeoneSleeps(ctx);
+          const filing = s.report.message().then((res) => res);
+          // The report waits for the change to commit instead of slipping in beside it.
+          await untilSomeoneWaitsFor(ctx, "advisory");
+          expect(await reportsIn(s.tenant.id)).toEqual([]);
+          const [suspended, filed] = await Promise.all([suspending, filing]);
+          expect(suspended.status).toBe(200);
+          expect(filed.status).toBe(201);
+        });
+        expect((await memberRow(s.target.id)).status).toBe("SUSPENDED");
+        expect(await reportsIn(s.tenant.id)).toEqual([expect.objectContaining({ status: "OPEN" })]);
+        refused(await s.as.setRole(s.target.id, "TENANT_ADMIN"));
+      });
+
+      it("takes reports about the same admin side by side", async () => {
+        const s = await beforeTheReport();
+        await withTrigger(ctx, "before insert on chat_reports", "perform pg_sleep(1); return new;", async () => {
+          const filing = Promise.all([s.report.message(), s.report.mentorship(), s.report.referral()]);
+          // Two filers inside their inserts at once, each holding the subject lock: they share it. (Only two, because the
+          // mentorship and referral requests are between the same pair, whose lock they take one after the other.)
+          await untilSomeoneSleeps(ctx, 2);
+          expect((await filing).map((res) => res.status)).toEqual([201, 200, 200]);
+        });
+        expect(await reportsIn(s.tenant.id)).toHaveLength(3);
+      });
     });
   });
 

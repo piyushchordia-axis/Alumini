@@ -67,10 +67,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   live in `FEATURE_PREREQUISITES`, school defaults in `SCHOOL_OFF_FEATURES`. Anything that sends reads settings fresh,
   not from the five-minute tenant cache. Private contact also checks `isCurrentPupil` (`requireChatEligible`).
 - **Chat.** `appendMessage(ctx, tx, …)` takes `tx`: only the outermost caller opens a transaction, and nothing inside
-  uses `ctx.db` (nested ones can freeze the pool). Lock in this order: the member (per-member limits), the pair
-  (`lockPair`, which blocks take too), mentorship or referral rows, the conversation, a participant. Every emit and push
-  goes to `chatRecipients()` (or `chatRecipientOf` for a badge). Chat writes go over REST only; the socket stays server
-  to client. Message bodies and request notes never go into pushes, notifications, audit metadata, job payloads or logs.
+  uses `ctx.db` (nested ones can freeze the pool). Lock in this order: the report subject (`lockReportSubject`, shared
+  to file a chat report, exclusive in `assertNoOpenReportAboutActor`; `adminTransition` takes the actor's before the
+  target membership row), the member (per-member limits), the pair (`lockPair`, which blocks take too), mentorship or
+  referral rows, the conversation, a participant. Every emit and push goes to `chatRecipients()` (or `chatRecipientOf`
+  for a badge). Chat writes go over REST only; the socket stays server to client. Message bodies and request notes never
+  go into pushes, notifications, audit metadata, job payloads or logs.
 - **Invisible blocks.** A request or invitation that meets a block gets the normal answer and is stored suppressed
   (`withheld`, `suppressed`, `invite_suppressed`); nobody is told. Tests deep-equal the blocked and unblocked views.
 - **Ways out.** A gated connection (mentorship, referrals) keeps its ways out (own lists, withdraw, end, report, stop)
@@ -80,7 +82,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   institution's time zone and claiming a row in `tenant_job_runs`.
 - **Outbound messages.** Use `queueMessage(s)` with a template in `services/messages/templates.ts` (priority,
   optional `load` step, secret keys). Invitations and announcements may use only `tenantOutboundChannels` (plan ∩
-  configured senders).
+  configured senders). Messages to Illuminize staff (`STAFF_CHAT_REPORT`) are queued with `tenantId: null`, so no
+  institution is billed for them.
 - **Notifications.** Use `notify()`: categories and member preferences, dedupe keys, chunked bulk inserts. Links in
   emails use `WEB_APP_URL`.
 - **Links and skills.** A link a member types uses `hostUrlSchema` (one site's hosts) or `linkUrlSchema` /

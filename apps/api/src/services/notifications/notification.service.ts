@@ -68,10 +68,11 @@ export async function notify(ctx: AppContext, input: NotifyInput, db: DbClient =
 
 export async function notifyTenantAdmins(
   ctx: AppContext,
-  input: Omit<NotifyInput, "recipientMembershipIds"> & { excludeMembershipId?: string; excludeMembershipIds?: Array<string | null> },
+  /** excludeStaff leaves out Illuminize staff holding the admin role, for what only the institution's own admins handle. */
+  input: Omit<NotifyInput, "recipientMembershipIds"> & { excludeMembershipId?: string; excludeMembershipIds?: Array<string | null>; excludeStaff?: boolean },
   db: DbClient = ctx.db,
 ): Promise<void> {
-  const admins = await listTenantAdmins(db, input.tenantId);
+  const admins = await listTenantAdmins(db, input.tenantId, { excludeStaff: input.excludeStaff });
   const excluded = new Set([input.excludeMembershipId, ...(input.excludeMembershipIds ?? [])]);
   const recipientMembershipIds = admins.map((a) => a.id).filter((id) => !excluded.has(id));
   await notify(ctx, { ...input, recipientMembershipIds }, db);

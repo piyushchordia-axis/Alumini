@@ -2,7 +2,7 @@ import { MENTORSHIP_MAX_OPEN_PER_MENTEE, notificationTarget, type AdminChatRepor
 import { and, eq, inArray, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { auditLog, chatConversations, chatMessages, chatReports, memberships, mentorProfiles, mentorships, notifications, tenantSettings, users } from "../../src/db/schema";
+import { auditLog, chatConversations, chatMessages, chatReports, memberships, mentorProfiles, mentorships, notifications, outboundMessages, tenantSettings, users } from "../../src/db/schema";
 import { seedConnections, seedCore, seedMembers } from "../../src/db/seed";
 import { seedDemoHistory } from "../../src/db/seedDemoHistory";
 import { keys } from "../../src/redis/keys";
@@ -866,16 +866,19 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       expect(await ctx.db.select().from(chatReports)).toHaveLength(1);
     });
 
-    it("escalates a report about a tenant admin's request, which that admin hears nothing of", async () => {
+    it("escalates a report about a tenant admin's request, which that admin hears nothing of, and alerts staff", async () => {
       const { tenant, mentor, m } = await setup();
+      const staff = await loginAs(ctx, "+919999999999");
       const adminMentee = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
       await offerToMentor(ctx, tenant.slug, mentor);
       const asked = await askMentor(ctx, tenant.slug, adminMentee, mentor.membership.id);
       await m(mentor).report(asked.id);
       expect(await noticesTo(adminMentee, "CHAT_REPORT_FILED")).toEqual([]);
-      const staff = auth((await loginAs(ctx, "+919999999999")).accessToken);
-      const escalated = await request(ctx.app).get("/api/v1/platform/chat-reports").set(staff);
+      const escalated = await request(ctx.app).get("/api/v1/platform/chat-reports").set(auth(staff.accessToken));
       expect(escalated.body.total).toBe(1);
+      // The sole admin can't be told, so staff are, there and then.
+      const alerted = await ctx.db.select().from(outboundMessages).where(eq(outboundMessages.type, "STAFF_CHAT_REPORT"));
+      expect(alerted).toEqual([expect.objectContaining({ tenantId: null, recipientUserId: staff.user.id, payload: { chatReportId: escalated.body.data[0].id, tenantId: tenant.id } })]);
     });
 
     it("counts against chat-report, 30 an hour", async () => {

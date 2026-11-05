@@ -4,13 +4,14 @@ import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { memberships, uploads } from "../../src/db/schema";
+import { auditLog, memberships, notifications, uploads } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { updateMembership } from "../../src/repositories/memberships.repo";
 import { updateMyProfile } from "../../src/services/membership.service";
 import { S3Storage } from "../../src/services/storage";
 import { loadTenantContext } from "../../src/services/tenant.service";
 import { UNSAVED_AVATAR_GRACE_MS, applyAvatarChange, removeAvatarsIfUnused, sweepUnusedAvatars } from "../../src/services/uploads.service";
+import { refusingAudit } from "../helpers/db";
 import { PROFILE, auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { testPng } from "../helpers/images";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -143,6 +144,26 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     const reinstate = await api().post(`${base}/admin/members/${id}/reinstate`).set(admin.headers);
     expect(reinstate.body.data.status).toBe("APPROVED");
     expect((await api().get(`${base}/posts`).set(auth(session.accessToken))).status).toBe(200);
+  });
+
+  it("changes a member's status or role only together with its audit row", async () => {
+    const { tenant } = await createTenant(ctx);
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    const member = await memberSession(ctx, tenant.id);
+    const base = `/api/v1/t/${tenant.slug}/admin/members/${member.membership.id}`;
+    await refusingAudit(ctx, "membership.suspend", async () => {
+      expect((await api().post(`${base}/suspend`).set(admin.headers).send({ reason: "Spam" })).status).toBe(500);
+    });
+    await refusingAudit(ctx, "membership.role_change", async () => {
+      expect((await api().patch(`${base}/role`).set(admin.headers).send({ role: "TENANT_ADMIN" })).status).toBe(500);
+    });
+    const [row] = await ctx.db.select().from(memberships).where(eq(memberships.id, member.membership.id));
+    expect(row).toMatchObject({ status: "APPROVED", role: "MEMBER", statusReason: null });
+    expect(await ctx.db.select().from(notifications).where(eq(notifications.recipientMembershipId, member.membership.id))).toEqual([]);
+
+    expect((await api().post(`${base}/suspend`).set(admin.headers).send({ reason: "Spam" })).status).toBe(200);
+    const [audit] = await ctx.db.select().from(auditLog).where(eq(auditLog.action, "membership.suspend"));
+    expect(audit).toMatchObject({ targetId: member.membership.id, actorMembershipId: admin.membership.id, metadata: { from: "APPROVED", to: "SUSPENDED", reason: "Spam" } });
   });
 
   it("bulk-approves pending members", async () => {

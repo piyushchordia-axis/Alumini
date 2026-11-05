@@ -159,6 +159,61 @@ export async function closeOpenReportsOnMessage(db: DbClient, tenantId: string, 
     .returning({ id: chatReports.id, reporterMembershipId: chatReports.reporterMembershipId });
 }
 
+/**
+ * Holds a member, as the subject of chat reports, until the transaction ends. Filing a report about them takes it shared
+ * ("file"), so filers don't wait on each other; the check that holds back a reported admin takes it exclusive ("check")
+ * before it looks for an open report. A report filed during an admin's change then either commits first, and the check
+ * sees it, or waits until the change has committed. There's no row to lock for this: a lock on the member's row would hold
+ * up every insert that points at it. It comes before any other lock (see CLAUDE.md, Chat).
+ */
+export async function lockReportSubject(tx: Tx, tenantId: string, membershipId: string, mode: "file" | "check"): Promise<void> {
+  const key = sql`hashtextextended(${`chat-report-subject:${tenantId}:${membershipId}`}, 0)`;
+  await tx.execute(mode === "file" ? sql`select pg_advisory_xact_lock_shared(${key})` : sql`select pg_advisory_xact_lock(${key})`);
+}
+
+export interface ClaimedReport {
+  id: string;
+  tenantId: string;
+  /** The staff_alerted_at this claim set, which tells one escalation's alerts from a later one's. */
+  claimedAt: Date;
+}
+
+/** Some member of Illuminize staff whom the report doesn't name, so an alert about it has somebody to go to. */
+const staffToAlert: SQL = sql`exists (select 1 from users u where u.is_platform_admin and not exists (select 1 from memberships m where m.user_id = u.id and m.id in (chat_reports.reporter_membership_id, chat_reports.reported_membership_id)))`;
+
+/**
+ * Marks open escalated reports that staff haven't been told about as told, oldest first, and returns them, so each is
+ * alerted once while it stays theirs. Leaves a report no member of staff may be told about (every one is named in it) for
+ * when there is one. One statement, which skips rows another transaction holds (another sweep, or an admin closing the
+ * report): the next sweep finds them if they're still open.
+ */
+export async function claimEscalatedReports(db: DbClient, opts: { reportId?: string; limit: number }): Promise<ClaimedReport[]> {
+  const unalerted = db
+    .select({ id: chatReports.id })
+    .from(chatReports)
+    .where(and(eq(chatReports.status, "OPEN"), isNull(chatReports.staffAlertedAt), reportIsEscalated, staffToAlert, opts.reportId ? eq(chatReports.id, opts.reportId) : undefined))
+    .orderBy(asc(chatReports.createdAt))
+    .limit(opts.limit)
+    .for("update", { skipLocked: true });
+  const rows = await db
+    .update(chatReports)
+    .set({ staffAlertedAt: sql`now()` })
+    .where(inArray(chatReports.id, unalerted))
+    .returning({ id: chatReports.id, tenantId: chatReports.tenantId, claimedAt: chatReports.staffAlertedAt });
+  return rows.map((r) => ({ ...r, claimedAt: r.claimedAt! }));
+}
+
+/**
+ * Marks an open report as not yet told to staff, when its alerts went to nobody: none was left to send them to, or it
+ * stopped being theirs before they went out. The next sweep claims it again once it's theirs.
+ */
+export async function releaseStaffAlert(db: DbClient, tenantId: string, id: string): Promise<void> {
+  await db
+    .update(chatReports)
+    .set({ staffAlertedAt: null })
+    .where(and(eq(chatReports.tenantId, tenantId), eq(chatReports.id, id), eq(chatReports.status, "OPEN")));
+}
+
 /** Whether this member is the subject of a report nobody has closed yet. */
 export async function hasOpenReportAbout(db: DbClient, tenantId: string, membershipId: string): Promise<boolean> {
   const [row] = await db

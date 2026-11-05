@@ -25,7 +25,17 @@ import { runInTransaction } from "../lib/transaction";
 import { buildPage, type Page } from "../lib/pagination";
 import { normalizePhone } from "../lib/phone";
 import { findPlanEffectiveOn } from "../repositories/billing.repo";
-import { clearDegreesAt, findMembership, findMembershipWithUser, insertMembership, listMembershipsForUser, listTenantAdmins, updateMembership } from "../repositories/memberships.repo";
+import {
+  clearDegreesAt,
+  findMembership,
+  findMembershipById,
+  findMembershipWithUser,
+  insertMembership,
+  listMembershipsForUser,
+  listTenantAdmins,
+  lockMembership,
+  updateMembership,
+} from "../repositories/memberships.repo";
 import { keys } from "../redis/keys";
 import {
   findSettings,
@@ -110,41 +120,57 @@ function fallbackAdminBatchYear(tenant: Pick<TenantRow, "timezone">, settings: {
   return Math.max(settings.minBatchYear, Math.min(settings.maxBatchYear, lastYear));
 }
 
+/**
+ * Makes someone an admin here, a new member or an existing one. Never lifts a suspension: that's a reinstatement, which the
+ * institution's admins record with a reason, and the member's row is held from this check to the change so one can't land
+ * in between. Runs in the caller's transaction, which audits it.
+ */
 async function ensureAdminMembership(
   db: DbClient,
   tenant: TenantRow,
   input: AssignAdminInput,
   actorUserId: string,
   fallbackBatchYear: number,
-): Promise<{ membership: MembershipRow; created: boolean }> {
+): Promise<{ membership: MembershipRow; created: boolean; from: MembershipRow["status"] | null }> {
   const { e164, region } = normalizePhone(input.phone);
   const user = await findOrCreateUserByPhone(db, e164, region);
+  const found = await findMembership(db, tenant.id, user.id);
+  if (found) await lockMembership(db, tenant.id, found.id);
+  const existing = found && (await findMembershipById(db, tenant.id, found.id));
+  if (existing?.status === "SUSPENDED") throw AppError.conflict("This member is suspended. Reinstate them first.");
+  const result = existing
+    ? {
+        membership: (await updateMembership(db, tenant.id, existing.id, {
+          role: "TENANT_ADMIN",
+          status: "APPROVED",
+          statusReason: null,
+          statusChangedAt: existing.status === "APPROVED" ? existing.statusChangedAt : new Date(),
+          statusChangedByUserId: existing.status === "APPROVED" ? existing.statusChangedByUserId : actorUserId,
+        }))!,
+        created: false,
+        from: existing.status,
+      }
+    : {
+        membership: await insertMembership(db, {
+          tenantId: tenant.id,
+          userId: user.id,
+          role: "TENANT_ADMIN",
+          status: "APPROVED",
+          statusChangedAt: new Date(),
+          statusChangedByUserId: actorUserId,
+          fullName: input.fullName,
+          batchYear: input.batchYear ?? fallbackBatchYear,
+          professionType: "OTHER",
+          city: tenant.city,
+          country: tenant.country,
+        }),
+        created: true,
+        from: null,
+      };
+  // The user's row after the membership's, as registering and editing a profile take them: the other way round, assigning
+  // someone as they register could deadlock.
   if (!user.displayName) await updateUser(db, user.id, { displayName: input.fullName });
-  const existing = await findMembership(db, tenant.id, user.id);
-  if (existing) {
-    const membership = (await updateMembership(db, tenant.id, existing.id, {
-      role: "TENANT_ADMIN",
-      status: "APPROVED",
-      statusReason: null,
-      statusChangedAt: existing.status === "APPROVED" ? existing.statusChangedAt : new Date(),
-      statusChangedByUserId: existing.status === "APPROVED" ? existing.statusChangedByUserId : actorUserId,
-    }))!;
-    return { membership, created: false };
-  }
-  const membership = await insertMembership(db, {
-    tenantId: tenant.id,
-    userId: user.id,
-    role: "TENANT_ADMIN",
-    status: "APPROVED",
-    statusChangedAt: new Date(),
-    statusChangedByUserId: actorUserId,
-    fullName: input.fullName,
-    batchYear: input.batchYear ?? fallbackBatchYear,
-    professionType: "OTHER",
-    city: tenant.city,
-    country: tenant.country,
-  });
-  return { membership, created: true };
+  return result;
 }
 
 export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor, input: PlatformTenantCreateInput): Promise<PlatformTenantDto> {
@@ -249,17 +275,21 @@ export async function listPlatformTenantAdmins(ctx: AppContext, tenantId: string
   return adminsOf(ctx.db, tenantId);
 }
 
+/** Who is an admin decides who reaches an escalated chat report, so each change to it is audited in its own transaction. */
 export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, tenantId: string, input: AssignAdminInput): Promise<AdminMemberDto> {
   const { tenant, settings } = await loadTenant(ctx, tenantId);
-  const { membership, created } = await ensureAdminMembership(ctx.db, tenant, input, actor.userId, fallbackAdminBatchYear(tenant, settings));
-  await recordAudit(ctx, {
-    tenantId,
-    actorUserId: actor.userId,
-    action: "platform.tenant.admin.assign",
-    targetType: "membership",
-    targetId: membership.id,
-    metadata: { created },
-    ip: actor.ip,
+  const membership = await runInTransaction(ctx, async (tx) => {
+    const { membership, created, from } = await ensureAdminMembership(tx, tenant, input, actor.userId, fallbackAdminBatchYear(tenant, settings));
+    await recordAuditStrict(tx, {
+      tenantId,
+      actorUserId: actor.userId,
+      action: "platform.tenant.admin.assign",
+      targetType: "membership",
+      targetId: membership.id,
+      metadata: { created, from },
+      ip: actor.ip,
+    });
+    return membership;
   });
   const { user } = (await findMembershipWithUser(ctx.db, tenantId, membership.id))!;
   return toAdminMemberDto(membership, user);
@@ -267,17 +297,19 @@ export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, t
 
 export async function removeTenantAdmin(ctx: AppContext, actor: PlatformActor, tenantId: string, membershipId: string): Promise<void> {
   await loadTenant(ctx, tenantId);
-  const found = await findMembershipWithUser(ctx.db, tenantId, membershipId);
-  if (!found) throw AppError.notFound("Member not found");
-  if (found.membership.role !== "TENANT_ADMIN") return;
-  await updateMembership(ctx.db, tenantId, membershipId, { role: "MEMBER" });
-  await recordAudit(ctx, {
-    tenantId,
-    actorUserId: actor.userId,
-    action: "platform.tenant.admin.remove",
-    targetType: "membership",
-    targetId: membershipId,
-    ip: actor.ip,
+  await runInTransaction(ctx, async (tx) => {
+    const found = await findMembershipWithUser(tx, tenantId, membershipId);
+    if (!found) throw AppError.notFound("Member not found");
+    if (found.membership.role !== "TENANT_ADMIN") return;
+    await updateMembership(tx, tenantId, membershipId, { role: "MEMBER" });
+    await recordAuditStrict(tx, {
+      tenantId,
+      actorUserId: actor.userId,
+      action: "platform.tenant.admin.remove",
+      targetType: "membership",
+      targetId: membershipId,
+      ip: actor.ip,
+    });
   });
 }
 
@@ -288,17 +320,20 @@ export async function listPlatformUsers(ctx: AppContext, query: PlatformUsersQue
   return buildPage(data, query.page, query.pageSize, total);
 }
 
+/** Staff reach escalated chat reports, and staff holding an admin role don't count as one, so this is audited as the roster is. */
 export async function setPlatformAdmin(ctx: AppContext, actor: PlatformActor, userId: string, enabled: boolean): Promise<PlatformUserDto> {
   if (userId === actor.userId) throw AppError.forbidden("You cannot change your own platform admin flag");
-  const user = await findUserById(ctx.db, userId);
-  if (!user) throw AppError.notFound("User not found");
-  const updated = (await updateUser(ctx.db, userId, { isPlatformAdmin: enabled }))!;
-  await recordAudit(ctx, {
-    actorUserId: actor.userId,
-    action: enabled ? "platform.admin.grant" : "platform.admin.revoke",
-    targetType: "user",
-    targetId: userId,
-    ip: actor.ip,
+  const updated = await runInTransaction(ctx, async (tx) => {
+    if (!(await findUserById(tx, userId))) throw AppError.notFound("User not found");
+    const row = (await updateUser(tx, userId, { isPlatformAdmin: enabled }))!;
+    await recordAuditStrict(tx, {
+      actorUserId: actor.userId,
+      action: enabled ? "platform.admin.grant" : "platform.admin.revoke",
+      targetType: "user",
+      targetId: userId,
+      ip: actor.ip,
+    });
+    return row;
   });
   return toPlatformUserDto(updated, await listMembershipsForUser(ctx.db, userId));
 }

@@ -1,8 +1,9 @@
-import { EMAIL_VERIFICATION_TTL_SECONDS, jobPlaceLabel, type MessageChannel } from "@illuminize/shared";
+import { CHAT_REPORT_TARGET_KIND_LABELS, EMAIL_VERIFICATION_TTL_SECONDS, REPORT_REASON_LABELS, jobPlaceLabel, type MessageChannel } from "@illuminize/shared";
 import type { AppContext } from "../../context";
+import { findChatReport, releaseStaffAlert } from "../../repositories/chatReports.repo";
 import { findEmailVerification } from "../../repositories/emailVerifications.repo";
 import { findInvitationById } from "../../repositories/invitations.repo";
-import { findMembershipByIdUnscoped } from "../../repositories/memberships.repo";
+import { findMembershipById, findMembershipByIdUnscoped } from "../../repositories/memberships.repo";
 import { findNotificationPrefs } from "../../repositories/notifications.repo";
 import { findPostById } from "../../repositories/posts.repo";
 import { digestDetails, findDigest } from "../../repositories/digest.repo";
@@ -28,6 +29,8 @@ export interface MessagePayloads {
   DIGEST: { tenantId: string; weekStart: string; membershipId: string };
   /** An invitation to join an institution (from an admin's import). */
   INVITE: { invitationId: string; tenantName: string; color: string; recipientName: string | null; link: string; token: string };
+  /** Tells a member of Illuminize staff that a chat report has become theirs. Ids only: the load step reads the rest. */
+  STAFF_CHAT_REPORT: { chatReportId: string; tenantId: string };
 }
 export type MessageType = keyof MessagePayloads;
 
@@ -48,6 +51,8 @@ export interface LoadedPayloads {
     unsubscribePage: string;
     unsubscribeHeaders: Record<string, string>;
   };
+  /** Labels and fixed sentences only: never a name, the reporter's details or anything anyone wrote. */
+  STAFF_CHAT_REPORT: { tenantName: string; reason: string; kind: string; basis: string; link: string | null };
 }
 export type RenderPayload<T extends MessageType> = T extends keyof LoadedPayloads ? LoadedPayloads[T] : MessagePayloads[T];
 
@@ -98,6 +103,12 @@ export interface MessageTemplate<T extends MessageType> {
 }
 
 const VERIFY_HOURS = Math.round(EMAIL_VERIFICATION_TTL_SECONDS / 3600);
+
+/** Whether this membership belongs to a member of Illuminize staff. */
+async function isStaffMembership(ctx: AppContext, tenantId: string, membershipId: string | null): Promise<boolean> {
+  const membership = membershipId ? await findMembershipById(ctx.db, tenantId, membershipId) : undefined;
+  return !!membership && !!(await findUserById(ctx.db, membership.userId))?.isPlatformAdmin;
+}
 
 export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
   PLATFORM_TEST: {
@@ -278,6 +289,59 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
         footerHtml: `You received this because ${escapeHtml(p.tenantName)} invited you. If you don't want to join, you can ignore this email.`,
       });
       return { subject: `You're invited to join ${p.tenantName} on Illuminize`, text, html };
+    },
+  },
+
+  STAFF_CHAT_REPORT: {
+    channels: ["EMAIL", "WHATSAPP", "SMS"],
+    priority: 2,
+    // Re-checked at send time: the recipient still staff, and the report still open, still escalated and not naming them.
+    load: async (ctx, p, message) => {
+      const user = message.recipientUserId ? await findUserById(ctx.db, message.recipientUserId) : undefined;
+      if (!user?.isPlatformAdmin) return { cancel: "no longer Illuminize staff" };
+      const found = await findChatReport(ctx.db, p.tenantId, p.chatReportId, user.id);
+      if (!found || found.report.status !== "OPEN") return { cancel: "report closed" };
+      if (found.named) return { cancel: "the report names the recipient" };
+      if (!found.escalated) {
+        // Its admins can handle it again. Should it become staff's later, the sweep claims it and alerts them then.
+        await releaseStaffAlert(ctx.db, p.tenantId, p.chatReportId);
+        return { cancel: "report no longer for staff" };
+      }
+      const tenant = await findTenantById(ctx.db, p.tenantId);
+      if (!tenant) return { cancel: "institution gone" };
+      // A reported admin who is also staff isn't held back (assertNoOpenReportAboutActor), so the alert doesn't say so.
+      const heldBack = found.reportedIsAdmin && !(await isStaffMembership(ctx, p.tenantId, found.report.reportedMembershipId));
+      return {
+        to: { email: user.email, phone: user.phoneE164 },
+        payload: {
+          tenantName: tenant.name,
+          reason: REPORT_REASON_LABELS[found.report.reason],
+          kind: CHAT_REPORT_TARGET_KIND_LABELS[found.report.targetKind],
+          basis: heldBack
+            ? "It's about one of the institution's admins, who can't suspend anyone or change roles until it's closed."
+            : found.reportedIsAdmin
+              ? "It's about one of the institution's admins."
+              : "No other admin there can handle it.",
+          link: ctx.config.webAppUrl ? `${ctx.config.webAppUrl}/platform/chat-reports` : null,
+        },
+      };
+    },
+    // Template body: "A chat report at {{1}} needs Illuminize staff ({{2}}). Open Chat reports in the platform console."
+    whatsapp: (p, configured) =>
+      configured ? { name: configured.name, language: configured.language, components: [{ type: "body", parameters: [{ type: "text", text: p.tenantName }, { type: "text", text: p.reason }] }] } : null,
+    sms: (p) => ({ institution: p.tenantName, reason: p.reason, link: p.link ?? "" }),
+    email: (p) => {
+      const intro = `A chat report at ${p.tenantName} needs Illuminize staff.`;
+      const facts = `Reason: ${p.reason}. Reported: ${p.kind}.`;
+      const open = p.link ? `Open Chat reports in the platform console: ${p.link}` : "Open Chat reports in the platform console.";
+      const privacy = "This email names nobody and quotes nothing. Each view of the messages is recorded in the institution's audit log.";
+      const html = emailLayout({
+        title: "A chat report needs staff",
+        preheader: `${p.tenantName}: ${p.reason}`,
+        bodyHtml: [textToHtml([intro, facts, p.basis].join("\n\n")), p.link ? emailButton(p.link, "Open Chat reports") : textToHtml(open), textToHtml(privacy)].join(""),
+        footerHtml: "You get these as Illuminize staff.",
+      });
+      return { subject: `A chat report at ${p.tenantName} needs staff`, text: [intro, facts, p.basis, open, privacy].join("\n\n"), html };
     },
   },
 };

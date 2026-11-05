@@ -232,6 +232,8 @@ export const chatReports = pgTable(
     resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, { onDelete: "set null" }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true, precision: 3 }),
     resolutionNote: text("resolution_note"),
+    /** When Illuminize staff were sent an alert about it. Escalation itself stays worked out on each read. */
+    staffAlertedAt: timestamp("staff_alerted_at", { withTimezone: true, precision: 3 }),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   (t) => [
@@ -240,5 +242,7 @@ export const chatReports = pgTable(
     index("chat_reports_conversation_idx").on(t.conversationId),
     index("chat_reports_reporter_idx").on(t.reporterMembershipId),
     index("chat_reports_reported_idx").on(t.reportedMembershipId),
+    // What the staff alert sweep looks through: open reports staff haven't been told about.
+    index("chat_reports_staff_unalerted_idx").on(t.createdAt).where(sql`${t.status} = 'OPEN' and ${t.staffAlertedAt} is null`),
   ],
 );

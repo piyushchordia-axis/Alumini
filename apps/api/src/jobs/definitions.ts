@@ -45,6 +45,8 @@ export interface JobPayloads {
   "chat.pushGroupInvite": { tenantId: string; conversationId: string; inviteeMembershipIds: string[] };
   /** Delete profile photos that were uploaded but never saved to a profile (see sweepUnusedAvatars). */
   "uploads.sweepAvatars": Record<string, never>;
+  /** Alert Illuminize staff to chat reports that have become theirs since they were filed (see sweepEscalatedChatReports). */
+  "chatReports.alertStaff": Record<string, never>;
 }
 
 export type JobName = keyof JobPayloads;
@@ -78,4 +80,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "chat.pushEvent": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "chat.pushGroupInvite": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "uploads.sweepAvatars": { queue: "jobs", attempts: 1 },
+  "chatReports.alertStaff": { queue: "jobs", attempts: 1 },
 };

@@ -22,7 +22,7 @@ import { toMentorCardDto, toMentorDto, toMentorProfileDto, toMentorshipDto } fro
 import { AppError } from "../../lib/errors";
 import { runInTransaction } from "../../lib/transaction";
 import { blocksBetween, limitLockWait, lockPair } from "../../repositories/chat.repo";
-import { insertChatReport } from "../../repositories/chatReports.repo";
+import { insertChatReport, lockReportSubject } from "../../repositories/chatReports.repo";
 import { findMembershipById, listMembershipsForUser, lockMembership } from "../../repositories/memberships.repo";
 import {
   closeMentorshipsLeftBehind,
@@ -54,6 +54,7 @@ import type { MembershipRow, TenantContext } from "../../types/request";
 import { recordAuditStrict } from "../audit.service";
 import { blockedByYou, contactUnavailable, freshChatTenant, isReachable, type ChatTenant } from "../chat/common";
 import { closeOriginConversation, openDirectFromOrigin } from "../chat/open";
+import { alertStaffIfEscalated } from "../chat/staffAlerts.service";
 import type { ContentActor } from "../content.common";
 import { assertNoOpenReportAboutActor, recordingRefusal, type Actor as MemberAdminActor } from "../membership.service";
 import { notify, notifyTenantAdmins } from "../notifications/notification.service";
@@ -374,6 +375,9 @@ export async function reportMentorshipRequest(ctx: AppContext, tenantCtx: Tenant
   const me = actor.membership.id;
   const result = await runInTransaction(ctx, async (tx) => {
     await limitLockWait(tx);
+    // Its mentee never changes, so it's read unlocked: the report subject's lock has to come before the pair's.
+    const subject = (await findMentorship(tx, tenantId, id))?.menteeMembershipId;
+    if (subject) await lockReportSubject(tx, tenantId, subject, "file");
     const { row, side } = await lockForAction(tx, tenantId, me, id);
     if (side !== "MENTOR") throw AppError.badRequest("You can't report your own request");
     if (row.acceptedAt) throw AppError.invalidTransition("This request became a mentorship. Report its messages in your chat instead.");
@@ -393,7 +397,8 @@ export async function reportMentorshipRequest(ctx: AppContext, tenantCtx: Tenant
     });
     if (!report) throw AppError.conflict("You have already reported this request");
     await recordAuditStrict(tx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } });
-    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A mentorship request was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, row.menteeMembershipId] }, tx);
+    const forStaff = await alertStaffIfEscalated(ctx, tx, report.id);
+    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A mentorship request was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, row.menteeMembershipId], excludeStaff: !forStaff }, tx);
     // The mentee's copy changes only if it was waiting, and then they hear of it just as of a decline.
     if (waiting) await notifyDeclined(ctx, tx, tenantId, [updated], declinedBy(actor.membership.fullName));
     await publishMentorshipChanged(ctx, tx, tenantCtx.tenant.slug, waiting ? [me, row.menteeMembershipId] : [me]);

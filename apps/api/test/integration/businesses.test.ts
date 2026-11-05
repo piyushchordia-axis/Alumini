@@ -1,4 +1,4 @@
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { and, count, eq, ne } from "drizzle-orm";
 import { BUSINESS_CATEGORIES, defaultFeaturesFor, MAX_BUSINESS_LISTINGS } from "@illuminize/shared";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -9,6 +9,7 @@ import { toBusinessCardDto, toBusinessDto } from "../../src/dto/content.dto";
 import { runInTransaction } from "../../src/lib/transaction";
 import { keys } from "../../src/redis/keys";
 import { escapeLike } from "../../src/repositories/content.common";
+import { withTrigger as withTestTrigger } from "../helpers/db";
 import { auth, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -39,18 +40,7 @@ describe.skipIf(!dbAvailable)("business directory", () => {
   const api = () => request(ctx.app);
   const names = (res: { body: { data: Array<{ name: string }> } }) => res.body.data.map((b) => b.name).sort();
 
-  /** Runs `fn` with a trigger in place, for what can't be arranged through the API: a slow write, or one that fails. */
-  async function withTrigger<T>(when: string, body: string, fn: () => Promise<T>): Promise<T> {
-    await ctx.db.execute(sql.raw(`create or replace function test_trigger() returns trigger as $$ begin ${body} end $$ language plpgsql`));
-    await ctx.db.execute(sql.raw(`create trigger test_trigger ${when} for each row execute function test_trigger()`));
-    try {
-      return await fn();
-    } finally {
-      const table = when.split(" on ")[1]!;
-      await ctx.db.execute(sql.raw(`drop trigger test_trigger on ${table}`));
-      await ctx.db.execute(sql.raw("drop function test_trigger()"));
-    }
-  }
+  const withTrigger = <T>(when: string, body: string, fn: () => Promise<T>) => withTestTrigger(ctx, when, body, fn);
 
   async function setup(opts: Parameters<typeof createTenant>[1] = {}) {
     const { tenant } = await createTenant(ctx, opts);

@@ -4,14 +4,15 @@ import type { DbClient } from "../../db/client";
 import { toChatReportDto } from "../../dto/chat.dto";
 import { AppError } from "../../lib/errors";
 import { runInTransaction } from "../../lib/transaction";
-import { findBlockedByMember, findMessageInTenant, findParticipant, reportContextIds, type ConversationRow } from "../../repositories/chat.repo";
+import { findBlockedByMember, findMessageInTenant, findParticipant, limitLockWait, reportContextIds, type ConversationRow } from "../../repositories/chat.repo";
 import { findGroupById } from "../../repositories/chatGroups.repo";
-import { insertChatReport } from "../../repositories/chatReports.repo";
+import { insertChatReport, lockReportSubject } from "../../repositories/chatReports.repo";
 import type { TenantContext } from "../../types/request";
 import { recordAuditStrict } from "../audit.service";
 import { notifyTenantAdmins } from "../notifications/notification.service";
 import type { ChatActor } from "./chat.service";
 import { isGroupLive } from "./common";
+import { alertStaffIfEscalated } from "./staffAlerts.service";
 
 const notFound = () => AppError.notFound("Message not found");
 
@@ -24,11 +25,13 @@ async function redactedSenderIds(db: DbClient, conversation: Pick<ConversationRo
  * Files a report on a message the member can see. A withheld message answers like one that doesn't exist, for everyone but
  * its sender, who gets the refusal for their own message, so filing can't reveal that anything was withheld. Freezes what an
  * admin may be shown. Admins hear that a report exists and nothing it says, and the reporter stays out of the audit log.
+ * Staff are alerted at once if the report is theirs from the start.
  */
 export async function reportMessage(ctx: AppContext, tenantCtx: TenantContext, actor: ChatActor, messageId: string, input: ChatReportCreateInput): Promise<ChatReportDto> {
   const tenantId = tenantCtx.tenant.id;
   const me = actor.membership.id;
   const row = await runInTransaction(ctx, async (tx) => {
+    await limitLockWait(tx);
     const found = await findMessageInTenant(tx, tenantId, messageId);
     if (!found) throw notFound();
     const { message, conversation } = found;
@@ -46,6 +49,8 @@ export async function reportMessage(ctx: AppContext, tenantCtx: TenantContext, a
     if (message.kind === "SYSTEM") throw AppError.badRequest("This message can't be reported");
     if (message.removedAt) throw AppError.conflict("This message has already been removed");
 
+    // Everything above is a plain read, so this is still the transaction's first lock.
+    if (message.senderMembershipId) await lockReportSubject(tx, tenantId, message.senderMembershipId, "file");
     const report = await insertChatReport(tx, {
       tenantId,
       targetKind: "MESSAGE",
@@ -60,7 +65,9 @@ export async function reportMessage(ctx: AppContext, tenantCtx: TenantContext, a
     if (!report) throw AppError.conflict("You have already reported this message");
 
     await recordAuditStrict(tx, { tenantId, action: "chat_report.file", targetType: "chat_report", targetId: report.id, metadata: { reason: report.reason, targetKind: report.targetKind } });
-    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A chat message was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, message.senderMembershipId] }, tx);
+    // Staff holding the admin role here hear of it only if it's theirs, the one kind of report they can open.
+    const forStaff = await alertStaffIfEscalated(ctx, tx, report.id);
+    await notifyTenantAdmins(ctx, { tenantId, type: "CHAT_REPORT_FILED", title: "A chat message was reported", data: { chatReportId: report.id }, excludeMembershipIds: [me, message.senderMembershipId], excludeStaff: !forStaff }, tx);
     return report;
   });
   return toChatReportDto(row);

@@ -23,4 +23,6 @@ export const scheduledJobs: ScheduledJob[] = [
   { id: "engagement-tick", job: "engagement.tick", data: {}, repeat: { every: 15 * 60_000 } },
   // Photos picked in a form that was never saved; nothing else deletes them.
   { id: "avatar-sweep", job: "uploads.sweepAvatars", data: {}, repeat: { every: 6 * 60 * 60_000 } },
+  // Reports that escalate after filing, when an institution's admins change. One escalated at filing is alerted then.
+  { id: "chat-reports-staff-alert", job: "chatReports.alertStaff", data: {}, repeat: { every: 5 * 60_000 } },
 ];

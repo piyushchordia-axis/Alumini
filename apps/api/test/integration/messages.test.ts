@@ -1,4 +1,3 @@
-import type { MessageChannel } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -6,25 +5,12 @@ import { outboundMessages } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { findMessage } from "../../src/repositories/messages.repo";
 import { queueMessage, sweepMessages } from "../../src/services/messages/message.service";
-import { MessageSendError, type ChannelSender, type RenderedMessage } from "../../src/services/messages/types";
+import { MessageSendError } from "../../src/services/messages/types";
 import { auth, loginAs } from "../helpers/factories";
+import { CapturingSender } from "../helpers/messages";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
-
-/** Records what it "sends"; queue errors to make the next sends fail. */
-class CapturingSender<C extends MessageChannel> implements ChannelSender<C> {
-  readonly provider = "capture";
-  readonly sent: RenderedMessage[] = [];
-  readonly failures: MessageSendError[] = [];
-  constructor(readonly channel: C) {}
-  async send(m: Extract<RenderedMessage, { channel: C }>) {
-    const failure = this.failures.shift();
-    if (failure) throw failure;
-    this.sent.push(m);
-    return { providerMessageId: `${this.channel}-${this.sent.length}` };
-  }
-}
 
 describe.skipIf(!dbAvailable)("outbound messages", () => {
   let ctx: TestContext;

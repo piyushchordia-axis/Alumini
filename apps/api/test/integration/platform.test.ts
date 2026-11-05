@@ -1,8 +1,9 @@
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { memberActivityDays, memberships } from "../../src/db/schema";
-import { PROFILE, auth, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
+import { auditLog, memberActivityDays, memberships, users } from "../../src/db/schema";
+import { refusingAudit, untilSomeoneSleeps, untilSomeoneWaitsFor, withTrigger } from "../helpers/db";
+import { PROFILE, auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -94,6 +95,72 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
     expect((await api().get(`/api/v1/platform/tenants/${tenant.id}/admins`).set(H)).body.data).toHaveLength(1);
     const [row] = await ctx.db.select().from(memberships).where(eq(memberships.id, fresh.body.data.id));
     expect(row?.role).toBe("MEMBER");
+    const audits = await ctx.db.select().from(auditLog).where(eq(auditLog.tenantId, tenant.id));
+    expect(audits.filter((a) => a.action === "platform.tenant.admin.assign").map((a) => [a.targetId, a.metadata])).toEqual([
+      [promote.body.data.id, { created: false, from: "PENDING" }],
+      [fresh.body.data.id, { created: true, from: null }],
+    ]);
+    expect(audits.filter((a) => a.action === "platform.tenant.admin.remove").map((a) => a.targetId)).toEqual([fresh.body.data.id]);
+  });
+
+  it("won't make a suspended member an admin, which would lift the suspension: they're reinstated first", async () => {
+    const { tenant } = await createTenant(ctx);
+    const user = await createUser(ctx, { phone: "+919822222222" });
+    const suspended = await createMembership(ctx, tenant.id, user.id, { status: "SUSPENDED" });
+    await ctx.db.update(memberships).set({ statusReason: "Spam" }).where(eq(memberships.id, suspended.id));
+    const res = await api().post(`/api/v1/platform/tenants/${tenant.id}/admins`).set(H).send({ phone: user.phoneE164, fullName: "Promoted" });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatchObject({ code: "CONFLICT", message: "This member is suspended. Reinstate them first." });
+    const [row] = await ctx.db.select().from(memberships).where(eq(memberships.id, suspended.id));
+    expect(row).toMatchObject({ status: "SUSPENDED", role: "MEMBER", statusReason: "Spam" });
+    expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "platform.tenant.admin.assign"))).toEqual([]);
+  });
+
+  it("assigns someone as they register without a deadlock: whichever comes second gets a clean answer", async () => {
+    const { tenant } = await createTenant(ctx);
+    const phone = "+919855555555";
+    // Signed in but not registered yet, so they have no display name, which assigning them sets.
+    const session = await loginAs(ctx, phone);
+    await withTrigger(ctx, "after insert on memberships", "perform pg_sleep(1); return new;", async () => {
+      const registering = api().post(`/api/v1/t/${tenant.slug}/memberships`).set(auth(session.accessToken)).send(PROFILE).then((res) => res);
+      await untilSomeoneSleeps(ctx);
+      const assigning = api().post(`/api/v1/platform/tenants/${tenant.id}/admins`).set(H).send({ phone, fullName: "Promoted" }).then((res) => res);
+      // Staff's insert waits for the registration's, which goes on to update the user's row: staff mustn't hold it by then.
+      await untilSomeoneWaitsFor(ctx, "transactionid");
+      const [registered, assigned] = await Promise.all([registering, assigning]);
+      expect(registered.status).toBe(201);
+      expect(assigned.status).toBe(409);
+    });
+    expect(await ctx.db.select().from(memberships).where(eq(memberships.tenantId, tenant.id))).toEqual([expect.objectContaining({ role: "MEMBER", fullName: PROFILE.fullName })]);
+    expect(await ctx.db.select().from(auditLog).where(eq(auditLog.action, "platform.tenant.admin.assign"))).toEqual([]);
+  });
+
+  it("changes nobody's admin role or staff flag unless the change is audited with it", async () => {
+    const { tenant } = await createTenant(ctx);
+    const member = await memberSession(ctx, tenant.id, { phone: "+919844444444" });
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    const admins = `/api/v1/platform/tenants/${tenant.id}/admins`;
+    await refusingAudit(ctx, "platform.tenant.admin.assign", async () => {
+      expect((await api().post(admins).set(H).send({ phone: member.user.phoneE164, fullName: "Promoted" })).status).toBe(500);
+      expect((await api().post(admins).set(H).send({ phone: "+919833333333", fullName: "Brand New" })).status).toBe(500);
+    });
+    await refusingAudit(ctx, "platform.tenant.admin.remove", async () => {
+      expect((await api().delete(`${admins}/${admin.membership.id}`).set(H)).status).toBe(500);
+    });
+    await refusingAudit(ctx, "platform.admin.grant", async () => {
+      expect((await api().post(`/api/v1/platform/users/${member.user.id}/platform-admin`).set(H).send({ enabled: true })).status).toBe(500);
+    });
+    const rows = await ctx.db.select().from(memberships).where(eq(memberships.tenantId, tenant.id));
+    expect(rows.map((r) => [r.id, r.role]).sort()).toEqual(
+      [
+        [member.membership.id, "MEMBER"],
+        [admin.membership.id, "TENANT_ADMIN"],
+      ].sort(),
+    );
+    // The new user went with the refused assignment, and the flag stayed off.
+    expect(await ctx.db.select().from(users).where(eq(users.phoneE164, "+919833333333"))).toEqual([]);
+    expect((await ctx.db.select().from(users).where(eq(users.id, member.user.id)))[0]!.isPlatformAdmin).toBe(false);
+    expect((await ctx.db.select().from(auditLog)).filter((a) => a.action.startsWith("platform."))).toEqual([]);
   });
 
   it("records billing plans, computes usage and freezes snapshots", async () => {
