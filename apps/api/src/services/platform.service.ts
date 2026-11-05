@@ -340,12 +340,15 @@ export async function setPlatformAdmin(ctx: AppContext, actor: PlatformActor, us
   if (userId === actor.userId) throw AppError.forbidden("You cannot change your own platform admin flag");
   const updated = await runInTransaction(ctx, async (tx) => {
     if (!(await findUserById(tx, userId))) throw AppError.notFound("User not found");
+    // The institutions whose admins this changes, since staff don't count as one there; chat reports read it (rosterChangedBy).
+    const adminOf = (await listMembershipsForUser(tx, userId)).filter(({ membership }) => membership.role === "TENANT_ADMIN").map(({ membership }) => membership.tenantId);
     const row = (await updateUser(tx, userId, { isPlatformAdmin: enabled }))!;
     await recordAuditStrict(tx, {
       actorUserId: actor.userId,
       action: enabled ? "platform.admin.grant" : "platform.admin.revoke",
       targetType: "user",
       targetId: userId,
+      metadata: { adminOf },
       ip: actor.ip,
     });
     return row;

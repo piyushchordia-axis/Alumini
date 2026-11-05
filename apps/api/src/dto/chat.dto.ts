@@ -1,6 +1,6 @@
 import type { AdminChatReportDto, AdminChatReportViewDto, ChatBlockDto, ChatLastMessageDto, ChatMemberDto, ChatMessageDto, ChatReportDto, PlatformChatReportDto } from "@illuminize/shared";
 import type { ChatBlockRow, ChatMessageRow, ChatSender, MessageWithSender } from "../repositories/chat.repo";
-import type { ChatReportQueueRow, ChatReportRow, FoundChatReport } from "../repositories/chatReports.repo";
+import type { ChatReportQueueRow, ChatReportRow, EscalatedChatReportRow, FoundChatReport } from "../repositories/chatReports.repo";
 
 export const toChatMemberDto = (m: ChatSender): ChatMemberDto => ({ id: m.id, fullName: m.fullName, avatarUrl: m.avatarUrl });
 
@@ -70,8 +70,8 @@ export function toAdminChatReportDto({ report, reporter, reported }: ChatReportQ
   };
 }
 
-export function toPlatformChatReportDto(row: ChatReportQueueRow & { tenant: { slug: string; name: string } }): PlatformChatReportDto {
-  return { ...toAdminChatReportDto(row), tenant: row.tenant };
+export function toPlatformChatReportDto(row: EscalatedChatReportRow): PlatformChatReportDto {
+  return { ...toAdminChatReportDto(row), tenant: row.tenant, basis: row.reportedIsAdmin ? "REPORTED_ADMIN" : "NO_ELIGIBLE_ADMIN", needsOtherStaff: row.needsOtherStaff, noStaffCanTake: row.noStaffCanTake };
 }
 
 /**

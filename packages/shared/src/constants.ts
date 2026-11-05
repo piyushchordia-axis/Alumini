@@ -201,6 +201,9 @@ export const CHAT_REPORT_TARGET_KINDS = ["MESSAGE", "MENTORSHIP_NOTE", "REFERRAL
 export type ChatReportTargetKind = (typeof CHAT_REPORT_TARGET_KINDS)[number];
 export const CHAT_REPORT_ACTIONS = ["NONE", "REMOVE_MESSAGE"] as const;
 export type ChatReportAction = (typeof CHAT_REPORT_ACTIONS)[number];
+/** Why a chat report is Illuminize staff's: it's about an admin, or no other admin can handle it. */
+export const CHAT_REPORT_ESCALATION_BASES = ["REPORTED_ADMIN", "NO_ELIGIBLE_ADMIN"] as const;
+export type ChatReportEscalationBasis = (typeof CHAT_REPORT_ESCALATION_BASES)[number];
 export const CHAT_MESSAGE_MAX_LENGTH = 4000;
 /** How long a requester waits before asking again, counted from their last request or from the thread closing. */
 export const CHAT_REREQUEST_AFTER_DAYS = 30;
@@ -564,6 +567,14 @@ export const CHAT_REPORT_TARGET_KIND_LABELS: Record<ChatReportTargetKind, string
   MENTORSHIP_NOTE: "Mentorship request",
   REFERRAL_NOTE: "Referral request",
 };
+
+export const CHAT_REPORT_ESCALATION_LABELS: Record<ChatReportEscalationBasis, string> = {
+  REPORTED_ADMIN: "About an admin",
+  NO_ELIGIBLE_ADMIN: "No other admin",
+};
+
+/** The NEEDS_OTHER_STAFF answer, which the platform console also shows on such a report. */
+export const NEEDS_OTHER_STAFF_TEXT = "You changed this institution's admins after this report was filed, so another member of Illuminize staff needs to handle it.";
 
 export const MEMBERSHIP_STATUS_LABELS: Record<MembershipStatus, string> = {
   PENDING: "Pending approval",

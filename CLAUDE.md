@@ -64,7 +64,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Admin and abuse-prone actions.** Admin actions call `recordAudit`, which swallows errors, so never inside a
   transaction: there use `recordAuditStrict(tx, …)`, which fails the change with it. Abuse-prone routes add `rateLimit`;
   a service that counts something else (invitees, a group's sends) calls `consumeRateLimit`. Tests enable both with
-  `RATE_LIMIT_IN_TESTS=1`.
+  `RATE_LIMIT_IN_TESTS=1`. A change to who is an admin audits strictly in its own transaction, and a new kind of one
+  adds its action to `rosterChangedBy` (`chatReports.repo.ts`), which keeps staff who made it off the chat reports it
+  escalated (`NEEDS_OTHER_STAFF`).
 - **Feature switches.** Stored maps may lack keys: read them only through `resolveFeatures(type, stored)` (ESLint catches
   `settings.features.x`, not an alias), write with `applyFeatureChange`, and send clients the resolved map. Prerequisites
   live in `FEATURE_PREREQUISITES`, school defaults in `SCHOOL_OFF_FEATURES`. Anything that sends reads settings fresh,

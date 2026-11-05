@@ -828,10 +828,23 @@ because admins can read everything in that view. Instead:
   answers 404 like one that doesn't exist. Filing records no actor in the audit log.
 - **Escalation.** A report goes to Illuminize staff when the reported member is a tenant admin, or when no other eligible
   admin exists (staff holding the admin role don't count). It's worked out when read, so it follows who is an admin
-  now. Staff see escalated reports in the platform console's **Chat reports** (no text) and open them through the
-  institution's own admin pages, where each view is audited with why they were allowed in. Staff reach only escalated
-  reports.
-- **Staff alerts.** When a report becomes theirs, each member of staff it doesn't name gets a `STAFF_CHAT_REPORT` email
+  now. Staff see escalated reports in the platform console's **Chat reports** (no text), whose nav item counts the
+  open ones, with why each is theirs ("About an admin" or "No other admin"), and open them through the institution's
+  own admin pages, where each view is audited with why they were allowed in. Staff reach only escalated reports.
+- **Another member of staff.** A member of staff who changed an institution's admins after a report there was filed
+  (assigning or removing an admin, changing a role, approving, suspending or reinstating an admin, or the staff flag of
+  one of its admins), which may be what made it staff's, can't view, resolve or dismiss it: they get
+  `NEEDS_OTHER_STAFF`, "You changed this institution's admins after this report was filed, so another member of
+  Illuminize staff needs to handle it." Changes that can't make a report staff's don't count: any to its reporter, and
+  taking the admin role from the member it's about (suspending, removing or demoting them), so staff can suspend a
+  reported admin and still close the report. Removing a message leaves open the other reports on it that they must
+  leave to someone else. The console shows them the note on the report in place of its link, and on an open one says
+  when no other member of staff may take it either (make someone a platform admin). It's read from the audit rows those
+  changes write in their own transaction, and a change up to a minute before the report counts too, because both are
+  stamped when their transaction began; a later one counts however late, closed reports included, since escalation is
+  worked out when read. Alerts go only to staff who may take it, and a report no member of staff may take waits,
+  unclaimed, for one who may.
+- **Staff alerts.** When a report becomes theirs, each member of staff who may take it gets a `STAFF_CHAT_REPORT` email
   (or WhatsApp or SMS, where a template is configured for it and they have no confirmed email): at once if it's filed
   about an admin or with no other admin to handle it, and within five minutes if a later change of admins escalates it
   (the `chatReports.alertStaff` job). `chat_reports.staff_alerted_at` records it, so a report alerts once while it
@@ -1147,10 +1160,6 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   outbound message records, and in the `platform.tenant.create` audit row of an institution whose first admin they
   were (its `initialAdmin`).
 - **The pupil rule trusts what members enter.** A pupil who gives a false batch year or date of birth gets through.
-- **The platform console shows no count of escalated chat reports** yet: staff are alerted by email (see "Chat reports
-  and admin access"), but its nav has no badge.
-- **Staff can change who is an admin and then read a report that change escalated.** Each staff action records why it
-  was allowed, so it can be checked afterwards.
 - **A blocked member's abuse is invisible to admins,** because withheld messages can't be reported.
 - **Reporting a sole admin's message** stops them suspending anyone or changing roles until staff close the report.
 - **A reported admin keeps some reach over the reporter:** they can still moderate the reporter's posts and see the

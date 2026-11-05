@@ -143,9 +143,11 @@ Covers:
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
   status tabs, a member's page and the Branding tab;
 - the platform console: login, onboarding an institution with its first admin, a billing plan and usage, stats and
-  user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and a row
-  on a phone), opening an institution's admin console without being a member, a school's settings starting with
-  Messaging, Groups and Mentorship off and saying why, and the admin console stacking on a phone.
+  user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and rows
+  on a phone: the nav item's open count, why each is staff's, "About an admin" or "No other admin", and reports another
+  member of staff must handle, or that no member of staff may take yet, or that are closed, each with its note and no
+  link), opening an institution's admin console without being a member, a school's settings starting with Messaging,
+  Groups and Mentorship off and saying why, and the admin console stacking on a phone.
 
 ## Mobile (Expo app exported for the web)
 

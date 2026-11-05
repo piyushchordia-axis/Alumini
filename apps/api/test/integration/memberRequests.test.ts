@@ -332,7 +332,7 @@ describe.skipIf(!dbAvailable)("requests to join, as admins see and handle them",
       expect(a.status).toBe(200);
       expect(b.status).toBe(200);
       expect(await statusOf(p.id)).toBe("APPROVED");
-      expect((await auditRows("membership.approve", p.id)).map((r) => r.metadata)).toEqual([{ from: "REJECTED", to: "APPROVED", reason: null }]);
+      expect((await auditRows("membership.approve", p.id)).map((r) => r.metadata)).toEqual([{ from: "REJECTED", to: "APPROVED", reason: null, role: "MEMBER" }]);
     });
   });
 

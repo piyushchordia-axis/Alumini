@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { defaultFeaturesFor, type AdminChatReportViewDto, type AuditDto, type ChatConversationDto, type ChatMessageDto } from "@illuminize/shared";
+import { defaultFeaturesFor, NEEDS_OTHER_STAFF_TEXT, type AdminChatReportViewDto, type AuditDto, type ChatConversationDto, type ChatMessageDto } from "@illuminize/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -509,6 +509,30 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
       expect((await platformList(a.neutral)).status).toBe(403);
     });
 
+    it("count what's open in the list's total, which a page of one row reads, and say why each is theirs as things stand", async () => {
+      const openCount = async () => {
+        const res = await platformList(staff, { status: "OPEN", page: 1, pageSize: 1 });
+        expect(res.body.data.length).toBeLessThanOrEqual(1);
+        return res.body.total as number;
+      };
+      const basisOf = async (id: string) => ((await platformList(staff, { pageSize: 100 })).body.data as Array<{ id: string; basis: string }>).find((r) => r.id === id)?.basis;
+      const before = await openCount();
+      const aboutAdmin = await scenario({ reported: { role: "TENANT_ADMIN" } });
+      const noOther = await scenario({ noNeutralAdmin: true });
+      const both = await scenario({ reported: { role: "TENANT_ADMIN" }, noNeutralAdmin: true });
+      await scenario();
+      expect(await openCount()).toBe(before + 3);
+      expect(await basisOf(aboutAdmin.reportId)).toBe("REPORTED_ADMIN");
+      expect(await basisOf(noOther.reportId)).toBe("NO_ELIGIBLE_ADMIN");
+      // About an admin, and with no other: the admin it's about is the reason given.
+      expect(await basisOf(both.reportId)).toBe("REPORTED_ADMIN");
+      // No longer an admin, but with nobody else to handle it, it stays staff's for the other reason.
+      await ctx.db.update(memberships).set({ role: "MEMBER" }).where(eq(memberships.id, both.reported.membership.id));
+      expect(await basisOf(both.reportId)).toBe("NO_ELIGIBLE_ADMIN");
+      expect((await noOther.as(staff).dismiss(noOther.reportId)).status).toBe(200);
+      expect(await openCount()).toBe(before + 2);
+    });
+
     it("are excluded like anyone else when they hold a membership the report names", async () => {
       const { tenant } = await createTenant(ctx);
       const session = await staffMember(tenant.id, { fullName: "Staff Reported" });
@@ -528,6 +552,178 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
       expect((await platformList(session, { pageSize: 100 })).body.data.map((r: { id: string }) => r.id)).not.toContain(reportId);
       // Other staff do reach it.
       expect((await adminOf(tenant.slug, staff).view(reportId)).status).toBe(200);
+    });
+  });
+
+  describe("a member of staff who changed the institution's admins after a report was filed", () => {
+    type Scenario = Awaited<ReturnType<typeof scenario>>;
+    /** A second member of staff, with no membership anywhere. */
+    async function otherStaff() {
+      const user = await createUser(ctx, { isPlatformAdmin: true });
+      return { headers: auth((await loginAs(ctx, user.phoneE164)).accessToken) };
+    }
+    const platformRow = async (who: Headers, id: string, status = "OPEN") => ((await platformList(who, { status, pageSize: 100 })).body.data as Array<{ id: string; needsOtherStaff: boolean }>).find((r) => r.id === id);
+    const removeAdmin = (s: Scenario, membershipId: string) => api().delete(`/api/v1/platform/tenants/${s.tenant.id}/admins/${membershipId}`).set(staff.headers);
+    const assignAdmin = async (s: Scenario, phone?: string) => api().post(`/api/v1/platform/tenants/${s.tenant.id}/admins`).set(staff.headers).send({ phone: phone ?? (await createUser(ctx)).phoneE164, fullName: "Added Admin" });
+    const setStaffFlag = (userId: string, enabled: boolean) => api().post(`/api/v1/platform/users/${userId}/platform-admin`).set(staff.headers).send({ enabled });
+    /** An admin the apps never leave waiting, which only data from elsewhere could hold. */
+    const waitingAdmin = (s: Scenario) => bareMember(ctx, s.tenant.id, { role: "TENANT_ADMIN", status: "PENDING" });
+
+    it.each([
+      ["remove its only other admin", {}, (s) => removeAdmin(s, s.neutral.membership.id)],
+      ["take that admin's role in its console", {}, (s) => s.as(staff).setRole(s.neutral.membership.id, "MEMBER")],
+      ["suspend that admin", {}, (s) => s.as(staff).suspend(s.neutral.membership.id)],
+      ["give that admin the staff flag, so they don't count as one", {}, (s) => setStaffFlag(s.neutral.user.id, true)],
+      ["add an admin while it's about one", { role: "TENANT_ADMIN" }, (s) => assignAdmin(s)],
+      ["make the member it's about an admin", {}, (s) => assignAdmin(s, s.reported.user.phoneE164)],
+      ["give the member it's about the admin role in its console", {}, (s) => s.as(staff).setRole(s.reported.membership.id, "TENANT_ADMIN")],
+      [
+        "reinstate the admin it's about, whom another admin suspended",
+        { role: "TENANT_ADMIN" },
+        async (s) => {
+          expect((await s.as(s.neutral).suspend(s.reported.membership.id)).status).toBe(200);
+          return s.as(staff).reinstate(s.reported.membership.id);
+        },
+      ],
+      ["approve an admin left waiting", { role: "TENANT_ADMIN" }, async (s) => s.as(staff).approve((await waitingAdmin(s)).id)],
+      [
+        "approve everyone waiting, an admin among them",
+        { role: "TENANT_ADMIN" },
+        async (s) => {
+          await waitingAdmin(s);
+          return api().post(`/api/v1/t/${s.tenant.slug}/admin/members/approve-all-pending`).set(staff.headers).send();
+        },
+      ],
+      ["take the staff flag from one of its admins while it's about another", { role: "TENANT_ADMIN" }, async (s) => setStaffFlag((await staffMember(s.tenant.id, { role: "TENANT_ADMIN" })).user.id, false)],
+    ] as Array<[string, MemberOptions, (s: Scenario) => Promise<{ status: number }>]>)("can't view, resolve or dismiss it when they %s, and another member of staff can", async (_, reported, change) => {
+      const s = await scenario({ reported });
+      expect((await change(s)).status).toBeLessThan(300);
+      const as = s.as(staff);
+      for (const res of [await as.view(s.reportId), await as.resolve(s.reportId, { action: "REMOVE_MESSAGE" }), await as.dismiss(s.reportId)]) {
+        expect(res.status).toBe(403);
+        expect(res.body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF", message: NEEDS_OTHER_STAFF_TEXT });
+      }
+      expectNoWords((await as.view(s.reportId)).body, SECRET, DETAILS);
+      expect(await auditRows(s.tenant.id, "chat_report.view")).toEqual([]);
+      expect(await reportRow(s.reportId)).toMatchObject({ status: "OPEN", resolvedByUserId: null });
+      expect((await messageRow(s.messageId)).removedAt).toBeNull();
+      // Still listed for them, with the note in place of a way in.
+      expect(await platformRow(staff, s.reportId)).toMatchObject({ needsOtherStaff: true });
+
+      const other = await otherStaff();
+      expect(await platformRow(other, s.reportId)).toMatchObject({ needsOtherStaff: false });
+      expect((await s.as(other).view(s.reportId)).status).toBe(200);
+      expect((await s.as(other).dismiss(s.reportId)).status).toBe(200);
+      // Closed, it still isn't theirs to read, which the console's closed tab shows too.
+      expect((await as.view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+      expect(await platformRow(staff, s.reportId, "DISMISSED")).toMatchObject({ needsOtherStaff: true });
+    });
+
+    it.each([
+      ["suspend the admin it's about", (s) => s.as(staff).suspend(s.reported.membership.id)],
+      ["take that admin's role in its console", (s) => s.as(staff).setRole(s.reported.membership.id, "MEMBER")],
+      ["remove that admin", (s) => removeAdmin(s, s.reported.membership.id)],
+      ["suspend its reporter, an admin", (s) => s.as(staff).suspend(s.reporter.membership.id)],
+      ["give its reporter, an admin, the staff flag", (s) => setStaffFlag(s.reporter.user.id, true)],
+    ] as Array<[string, (s: Scenario) => Promise<{ status: number }>]>)("can still close it when they %s, which can't have made it theirs", async (_, change) => {
+      // About its only other admin, so it's staff's for both reasons and stays theirs whatever happens to either party.
+      const s = await scenario({ reporter: { role: "TENANT_ADMIN" }, reported: { role: "TENANT_ADMIN" }, noNeutralAdmin: true });
+      expect((await s.as(staff).view(s.reportId)).status).toBe(200);
+      expect((await change(s)).status).toBeLessThan(300);
+      expect(await platformRow(staff, s.reportId)).toMatchObject({ needsOtherStaff: false });
+      expect((await s.as(staff).resolve(s.reportId, { action: "REMOVE_MESSAGE" })).status).toBe(200);
+      expect((await reportRow(s.reportId)).status).toBe("RESOLVED");
+    });
+
+    it("leaves open, for another member of staff, a report on a message they remove that they changed the admins since", async () => {
+      const s = await scenario({ reported: { role: "TENANT_ADMIN" } });
+      expect((await assignAdmin(s)).status).toBeLessThan(300);
+      // That report was filed ten minutes ago and their change came five minutes ago; someone else reports the message now.
+      const now = Date.now();
+      await ctx.db.update(chatReports).set({ createdAt: new Date(now - 600_000) }).where(eq(chatReports.id, s.reportId));
+      await ctx.db.update(auditLog).set({ createdAt: new Date(now - 300_000) }).where(and(eq(auditLog.tenantId, s.tenant.id), eq(auditLog.action, "platform.tenant.admin.assign")));
+      const [later] = await ctx.db
+        .insert(chatReports)
+        .values({ tenantId: s.tenant.id, targetKind: "MESSAGE", targetId: s.messageId, conversationId: s.conversationId, reporterMembershipId: (await bareMember(ctx, s.tenant.id)).id, reportedMembershipId: s.reported.membership.id, reason: "SPAM", contextMessageIds: [s.messageId] })
+        .returning();
+      expect((await s.as(staff).view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+
+      expect((await s.as(staff).resolve(later!.id, { action: "REMOVE_MESSAGE" })).status).toBe(200);
+      expect((await messageRow(s.messageId)).removedAt).toBeInstanceOf(Date);
+      expect(await reportRow(s.reportId)).toMatchObject({ status: "OPEN", resolvedByUserId: null });
+      expect((await auditRows(s.tenant.id, "chat_report.resolve")).map((r) => r.targetId)).toEqual([later!.id]);
+      // The message is gone, so whoever takes it has only to close it.
+      const other = await otherStaff();
+      expect((await s.as(other).resolve(s.reportId, { action: "REMOVE_MESSAGE" })).status).toBe(200);
+      expect(await reportRow(s.reportId)).toMatchObject({ status: "RESOLVED", resolutionAction: "REMOVE_MESSAGE" });
+    });
+
+    it("counts a change stamped up to a minute before the report, which an overlapping transaction can be, and not one before that", async () => {
+      const s = await scenario();
+      expect((await removeAdmin(s, s.neutral.membership.id)).status).toBe(204);
+      const [change] = await auditRows(s.tenant.id, "platform.tenant.admin.remove");
+      const filedAt = (await reportRow(s.reportId)).createdAt.getTime();
+      const stamp = (offsetMs: number) => ctx.db.update(auditLog).set({ createdAt: new Date(filedAt + offsetMs) }).where(eq(auditLog.id, change!.id));
+      // Begun before the report was filed and committed after it: still counts.
+      await stamp(-50_000);
+      expect((await s.as(staff).view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+      // Made before the report, beyond any transaction that could have overlapped it.
+      await stamp(-70_000);
+      expect(await platformRow(staff, s.reportId)).toMatchObject({ needsOtherStaff: false });
+      expect((await s.as(staff).view(s.reportId)).status).toBe(200);
+    });
+
+    it("counts only their own changes to this institution's admins", async () => {
+      // Escalated as no admin is left, so only the rule could keep staff out.
+      const s = await scenario({ noNeutralAdmin: true });
+      // A plain member suspended and reinstated, or given the staff flag and back, isn't a change of admins.
+      expect((await s.as(staff).suspend(s.reported.membership.id)).status).toBe(200);
+      expect((await s.as(staff).reinstate(s.reported.membership.id)).status).toBe(200);
+      expect((await setStaffFlag(s.reported.user.id, true)).status).toBe(200);
+      expect((await setStaffFlag(s.reported.user.id, false)).status).toBe(200);
+      // Nor is one at another institution.
+      const elsewhere = await scenario();
+      expect((await removeAdmin(elsewhere, elsewhere.neutral.membership.id)).status).toBe(204);
+      expect(await platformRow(staff, s.reportId)).toMatchObject({ needsOtherStaff: false });
+      expect((await s.as(staff).view(s.reportId)).status).toBe(200);
+
+      // An institution's own admin escalating a report holds back no member of staff.
+      const t = await scenario({ reporter: { role: "TENANT_ADMIN" } });
+      expect((await t.as(t.reporter).suspend(t.neutral.membership.id)).status).toBe(200);
+      expect((await t.as(staff).view(t.reportId)).status).toBe(200);
+    });
+
+    it("judges an admin by the role they held at the change, so a later change to them doesn't let staff back in", async () => {
+      const suspended = await scenario();
+      expect((await suspended.as(staff).suspend(suspended.neutral.membership.id)).status).toBe(200);
+      const flagged = await scenario();
+      expect((await setStaffFlag(flagged.neutral.user.id, true)).status).toBe(200);
+      for (const s of [suspended, flagged]) {
+        // No longer an admin there by now, which the report stays staff's without.
+        await ctx.db.update(memberships).set({ role: "MEMBER" }).where(eq(memberships.id, s.neutral.membership.id));
+        expect((await s.as(staff).view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+      }
+    });
+
+    it("doesn't count a change to someone who wasn't an admin then, though they are now, and reads an older row by the role now", async () => {
+      const s = await scenario({ reported: { role: "TENANT_ADMIN" } });
+      const plain = await bareMember(ctx, s.tenant.id);
+      expect((await s.as(staff).suspend(plain.id)).status).toBe(200);
+      const flagged = await createUser(ctx);
+      const flaggedMembership = await createMembership(ctx, s.tenant.id, flagged.id);
+      expect((await setStaffFlag(flagged.id, true)).status).toBe(200);
+      // Both made admins there since, by someone else.
+      await ctx.db.update(memberships).set({ role: "TENANT_ADMIN" }).where(inArray(memberships.id, [plain.id, flaggedMembership.id]));
+      expect(await platformRow(staff, s.reportId)).toMatchObject({ needsOtherStaff: false });
+      expect((await s.as(staff).view(s.reportId)).status).toBe(200);
+
+      // Rows written before the role and adminOf were recorded go by the role now, one key missing at a time.
+      const rewrite = async (action: string, metadata: Record<string, unknown>) => ctx.db.update(auditLog).set({ metadata }).where(and(eq(auditLog.action, action), eq(auditLog.targetId, action === "membership.suspend" ? plain.id : flagged.id)));
+      await rewrite("platform.admin.grant", {});
+      expect((await s.as(staff).view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+      await rewrite("platform.admin.grant", { adminOf: [] });
+      await rewrite("membership.suspend", { from: "APPROVED", to: "SUSPENDED", reason: "Being tested" });
+      expect((await s.as(staff).view(s.reportId)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
     });
   });
 

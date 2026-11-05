@@ -1,4 +1,4 @@
-import type { AdminChatReportDto, AdminChatReportViewDto, AdminChatReportsQuery, ChatReportResolveInput, PlatformChatReportDto } from "@illuminize/shared";
+import { NEEDS_OTHER_STAFF_TEXT, type AdminChatReportDto, type AdminChatReportViewDto, type AdminChatReportsQuery, type ChatReportResolveInput, type PlatformChatReportDto } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient, Tx } from "../../db/client";
 import { toAdminChatReportDto, toAdminChatReportViewDto, toPlatformChatReportDto } from "../../dto/chat.dto";
@@ -25,11 +25,16 @@ export const chatReportScope = (viewer: ChatReportViewer): ChatReportScope => ({
 
 const notFound = () => AppError.notFound("Report not found");
 
-/** A report this viewer may act on. Anyone it names gets what a report that doesn't exist gets, so an id can't confirm one. */
+/**
+ * A report this viewer may act on. Anyone it names gets what a report that doesn't exist gets, so an id can't confirm one.
+ * A member of staff who changed the institution's admins after it was filed, which may be what made it staff's, leaves it
+ * to another member of staff.
+ */
 async function reachableReport(db: DbClient, tenantId: string, id: string, viewer: ChatReportViewer): Promise<FoundChatReport> {
   const found = await findChatReport(db, tenantId, id, viewer.userId);
   if (!found || found.named) throw notFound();
   if (viewer.isPlatformAdmin && !found.escalated) throw AppError.forbidden("This report is for the institution's own admins");
+  if (viewer.isPlatformAdmin && found.rosterChangedByViewer) throw AppError.forbidden(NEEDS_OTHER_STAFF_TEXT, "NEEDS_OTHER_STAFF");
   return found;
 }
 
@@ -111,7 +116,8 @@ export async function resolveChatReport(ctx: AppContext, tenantCtx: TenantContex
     await recordAuditStrict(tx, auditEntry(tenantId, viewer, "chat_report.resolve", id, metadata));
     if (input.action === "REMOVE_MESSAGE") {
       await removeReportedMessage(ctx, tx, tenantCtx, viewer, report, note);
-      const others = await closeOpenReportsOnMessage(tx, tenantId, report.targetId, { ...closing, resolutionNote: "auto: message removed" });
+      // Staff leave open any they must leave to another member of staff, who can close them as the message is gone.
+      const others = await closeOpenReportsOnMessage(tx, tenantId, report.targetId, { ...closing, resolutionNote: "auto: message removed" }, viewer.isPlatformAdmin ? viewer.userId : undefined);
       // One row each, so that each is hidden from whoever its own report names.
       for (const other of others) {
         const entry = auditEntry(tenantId, viewer, "chat_report.resolve", other.id, { ...metadata, viaReportId: id });

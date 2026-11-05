@@ -365,7 +365,8 @@ export async function adminTransition(
         action: `membership.${action}`,
         targetType: "membership",
         targetId: target.id,
-        metadata: { from: target.status, to: next, reason: reason ?? null },
+        // The role says whether this changed who is an admin, which chat reports read (rosterChangedBy).
+        metadata: { from: target.status, to: next, reason: reason ?? null, role: target.role },
         ip: actor.ip,
       });
       if (action === "approve" || action === "reject") {
@@ -394,12 +395,14 @@ export async function approveAllPending(ctx: AppContext, tenantCtx: TenantContex
     const rows = await approveAllPendingRepo(tx, tenant.id, actor.userId);
     if (rows.length === 0) return rows;
     const ids = rows.map((r) => r.id);
+    // Admins among them, whom the apps never leave waiting but data can: this changed who is an admin (rosterChangedBy).
+    const adminIds = rows.filter((r) => r.role === "TENANT_ADMIN").map((r) => r.id);
     await recordAuditStrict(tx, {
       tenantId: tenant.id,
       actorUserId: actor.userId,
       actorMembershipId: actor.membershipId ?? null,
       action: "membership.approve_all",
-      metadata: { count: rows.length, membershipIds: ids },
+      metadata: { count: rows.length, membershipIds: ids, ...(adminIds.length ? { adminIds } : {}) },
       ip: actor.ip,
     });
     await markAdminNoticesHandled(ctx, tx, { tenantId: tenant.id, tenantSlug: tenant.slug, type: "NEW_MEMBER_PENDING", ids });

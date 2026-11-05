@@ -555,18 +555,45 @@ try {
     await page.click('[role="tab"]:has-text("Resolved")');
     await page.waitForSelector("text=No resolved escalated reports");
 
-    // The seed has no escalated report, so this row is answered here, to measure one and to follow where it links.
+    // The seed has no escalated report, so these rows are answered here, to measure them and to follow where they link.
+    // The nav's count reads the same list, so it answers 3 as well.
     const listUrl = "**/api/v1/platform/chat-reports*";
     const member = (fullName) => ({ id: "00000000-0000-4000-8000-000000000001", fullName, avatarUrl: null });
-    const report = { id: "00000000-0000-4000-8000-000000000002", targetKind: "MESSAGE", reason: "HARASSMENT", status: "OPEN", reporter: member("Venkataraghavan Subramaniam Iyer"), reported: member("Anantharamakrishnan Chandrasekaran"), resolutionAction: null, resolvedAt: null, createdAt: new Date().toISOString(), tenant: { slug: "demo-university", name: "Demo University of Science and Technology" } };
-    await page.route(listUrl, (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [report], page: 1, pageSize: 25, total: 1 }) }));
+    const report = { id: "00000000-0000-4000-8000-000000000002", targetKind: "MESSAGE", reason: "HARASSMENT", status: "OPEN", reporter: member("Venkataraghavan Subramaniam Iyer"), reported: member("Anantharamakrishnan Chandrasekaran"), resolutionAction: null, resolvedAt: null, createdAt: new Date().toISOString(), tenant: { slug: "demo-university", name: "Demo University of Science and Technology" }, basis: "REPORTED_ADMIN", needsOtherStaff: false, noStaffCanTake: false };
+    // One this member of staff can't take, having changed that institution's admins since it was filed.
+    const notTheirs = { ...report, id: "00000000-0000-4000-8000-000000000003", reason: "SPAM", tenant: { slug: "demo-college", name: "Demo College" }, basis: "NO_ELIGIBLE_ADMIN", needsOtherStaff: true };
+    // And one no other member of staff may take either, so it says how to get one.
+    const nobodys = { ...notTheirs, id: "00000000-0000-4000-8000-000000000004", tenant: { slug: "demo-school", name: "Demo School" }, noStaffCanTake: true };
+    // Closed, so it waits for nobody, though its messages still aren't this member of staff's to read.
+    const closed = { ...notTheirs, id: "00000000-0000-4000-8000-000000000005", status: "RESOLVED", resolutionAction: "NONE", resolvedAt: new Date().toISOString() };
+    await page.route(listUrl, (r) => {
+      const data = new URL(r.request().url()).searchParams.get("status") === "RESOLVED" ? [closed] : [report, notTheirs, nobodys];
+      return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data, page: 1, pageSize: 25, total: data.length }) });
+    });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${BASE}/platform/chat-reports`);
     const link = page.locator('main a[href="/t/demo-university/admin/chat-reports?status=OPEN"]');
     await link.waitFor();
+    const navLink = page.locator('nav[aria-label="Platform sections"]').getByRole("link", { name: "Chat reports, 3 open", exact: true });
+    await navLink.locator('span[aria-hidden="true"]', { hasText: /^3$/ }).waitFor();
+    const needsOther = "You changed this institution's admins after this report was filed, so another member of Illuminize staff needs to handle it.";
+    const noneYet = "No other member of staff can take it yet: make someone a platform admin under Users.";
+    const theirs = page.locator("main li", { hasText: "Demo University of Science and Technology" });
+    await theirs.getByText("About an admin", { exact: true }).waitFor();
+    if (await theirs.getByText("another member of Illuminize staff").count()) throw new Error("a report this member of staff can take says another must");
+    const other = page.locator("main li", { hasText: "Demo College" });
+    await other.getByText("No other admin", { exact: true }).waitFor();
+    await other.getByText(needsOther, { exact: true }).waitFor();
+    if (await other.locator("a").count()) throw new Error("a report another member of staff must handle still links to where it's handled");
+    await page.locator("main li", { hasText: "Demo School" }).getByText(`${needsOther} ${noneYet}`, { exact: true }).waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (overflow > 0) throw new Error(`the platform chat reports page scrolls sideways by ${overflow}px on a phone`);
     await shot("p01b-platform-chat-reports");
+    await page.click('[role="tab"]:has-text("Resolved")');
+    const closedRow = page.locator("main li", { hasText: "Demo College" });
+    await closedRow.getByText("You changed this institution's admins after this report was filed, so you can't open it.", { exact: true }).waitFor();
+    if (await closedRow.locator("a").count()) throw new Error("a closed report this member of staff can't open still links to it");
+    if (await page.locator("main").getByText("needs to handle it").count()) throw new Error("a closed report says another member of staff needs to handle it");
     await page.unroute(listUrl);
     await page.setViewportSize({ width: 1280, height: 900 });
   });

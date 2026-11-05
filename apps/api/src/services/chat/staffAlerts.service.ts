@@ -1,15 +1,15 @@
 import type { AppContext } from "../../context";
 import type { Tx } from "../../db/client";
 import { runInTransaction } from "../../lib/transaction";
-import { claimEscalatedReports, releaseStaffAlert, type ClaimedReport } from "../../repositories/chatReports.repo";
-import { listStaffNotNamedBy } from "../../repositories/users.repo";
+import { claimEscalatedReports, listStaffWhoMayTake, releaseStaffAlert, type ClaimedReport } from "../../repositories/chatReports.repo";
 import { queueMessages } from "../messages/message.service";
 
 const SWEEP_BATCH = 100;
 
 /**
  * Tells Illuminize staff about reports just claimed by claimEscalatedReports, once per claim and staff member, leaving out
- * staff a report names. Queued with no institution, so it's neither billed to the one the report is in nor counted as its
+ * staff a report names and staff who changed its institution's admins since it was filed, who must leave it to another
+ * (NEEDS_OTHER_STAFF). Queued with no institution, so it's neither billed to the one the report is in nor counted as its
  * messages. The payload holds ids alone; the template reads the rest when it sends, and cancels if the report has closed.
  * A claim left with nobody to tell (staff changed since it was made) is released for a later sweep. Returns how many
  * reports staff were alerted to.
@@ -17,7 +17,7 @@ const SWEEP_BATCH = 100;
 export async function alertStaff(ctx: AppContext, tx: Tx, claimed: ClaimedReport[]): Promise<number> {
   let alerted = 0;
   for (const report of claimed) {
-    const staff = await listStaffNotNamedBy(tx, report.id);
+    const staff = await listStaffWhoMayTake(tx, report.id);
     if (!staff.length) {
       await releaseStaffAlert(tx, report.tenantId, report.id);
       continue;

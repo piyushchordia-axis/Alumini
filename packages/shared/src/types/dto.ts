@@ -10,6 +10,7 @@ import type {
   ChatParticipantRole,
   ChatParticipantState,
   ChatReportAction,
+  ChatReportEscalationBasis,
   ChatReportTargetKind,
   CompanySize,
   ContentType,
@@ -750,6 +751,12 @@ export interface AdminChatReportDto {
 
 export interface PlatformChatReportDto extends AdminChatReportDto {
   tenant: { slug: string; name: string };
+  /** Why it's staff's, as things stand now: about an admin wins when both apply. */
+  basis: ChatReportEscalationBasis;
+  /** The member of staff asking changed the institution's admins after it was filed: another member of staff must handle it (NEEDS_OTHER_STAFF). */
+  needsOtherStaff: boolean;
+  /** No member of staff may take it at present: needsOtherStaff, and every other is named in it or changed its admins too. */
+  noStaffCanTake: boolean;
 }
 
 export interface AdminChatReportMessageDto {

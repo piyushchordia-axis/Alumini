@@ -1,6 +1,6 @@
 import { CHAT_REPORT_TARGET_KIND_LABELS, EMAIL_VERIFICATION_TTL_SECONDS, REPORT_REASON_LABELS, jobPlaceLabel, type MessageChannel } from "@illuminize/shared";
 import type { AppContext } from "../../context";
-import { findChatReport, releaseStaffAlert } from "../../repositories/chatReports.repo";
+import { findChatReport, listStaffWhoMayTake, releaseStaffAlert } from "../../repositories/chatReports.repo";
 import { findEmailVerification } from "../../repositories/emailVerifications.repo";
 import { findInvitationById } from "../../repositories/invitations.repo";
 import { findMembershipById, findMembershipByIdUnscoped } from "../../repositories/memberships.repo";
@@ -295,7 +295,8 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
   STAFF_CHAT_REPORT: {
     channels: ["EMAIL", "WHATSAPP", "SMS"],
     priority: 2,
-    // Re-checked at send time: the recipient still staff, and the report still open, still escalated and not naming them.
+    // Re-checked at send time: the recipient still staff, and the report still open, still escalated, not naming them and
+    // not left to another member of staff by them.
     load: async (ctx, p, message) => {
       const user = message.recipientUserId ? await findUserById(ctx.db, message.recipientUserId) : undefined;
       if (!user?.isPlatformAdmin) return { cancel: "no longer Illuminize staff" };
@@ -306,6 +307,11 @@ export const messageTemplates: { [T in MessageType]: MessageTemplate<T> } = {
         // Its admins can handle it again. Should it become staff's later, the sweep claims it and alerts them then.
         await releaseStaffAlert(ctx.db, p.tenantId, p.chatReportId);
         return { cancel: "report no longer for staff" };
+      }
+      if (found.rosterChangedByViewer) {
+        // They changed its admins since it was queued. With nobody left who may take it, the sweep alerts whoever may next.
+        if (!(await listStaffWhoMayTake(ctx.db, p.chatReportId)).length) await releaseStaffAlert(ctx.db, p.tenantId, p.chatReportId);
+        return { cancel: "another member of staff must handle it" };
       }
       const tenant = await findTenantById(ctx.db, p.tenantId);
       if (!tenant) return { cancel: "institution gone" };

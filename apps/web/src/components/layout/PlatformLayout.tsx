@@ -1,14 +1,18 @@
-import { formatPhone } from "@illuminize/shared";
-import { useQueryClient } from "@tanstack/react-query";
+import { formatCount, formatPhone } from "@illuminize/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, type ComponentType } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { IconAnalytics, IconAudit, IconBuilding, IconMessages, IconProfile, IconScale, IconSpark, type IconProps } from "@/components/icons";
 import { api } from "@/lib/api";
+import { qk } from "@/lib/queryKeys";
 import { resetTheme } from "@/lib/theme";
 import { useAuthStore } from "@/stores/authStore";
 
 type PlatformIcon = ComponentType<IconProps>;
+
+/** One row is enough: the count is the page's total. */
+const OPEN_CHAT_REPORTS = { status: "OPEN", page: 1, pageSize: 1 } as const;
 
 export function PlatformLayout() {
   const navigate = useNavigate();
@@ -18,12 +22,14 @@ export function PlatformLayout() {
   useEffect(() => {
     resetTheme();
   }, []);
-  const items: { to: string; label: string; icon: PlatformIcon }[] = [
+  // Escalated reports that are open, which reach staff by email too, but this is where they're worked through.
+  const openChatReports = useQuery({ queryKey: qk.platform.chatReports(OPEN_CHAT_REPORTS), queryFn: () => api.platform.chatReports.list(OPEN_CHAT_REPORTS), refetchInterval: 60_000 }).data?.total;
+  const items: { to: string; label: string; icon: PlatformIcon; open?: number }[] = [
     { to: "/platform/tenants", label: "Institutions", icon: IconBuilding },
     { to: "/platform/users", label: "Users", icon: IconProfile },
     { to: "/platform/stats", label: "Stats", icon: IconAnalytics },
     { to: "/platform/compare", label: "Compare", icon: IconScale },
-    { to: "/platform/chat-reports", label: "Chat reports", icon: IconMessages },
+    { to: "/platform/chat-reports", label: "Chat reports", icon: IconMessages, open: openChatReports },
     { to: "/platform/audit", label: "Audit log", icon: IconAudit },
   ];
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -58,9 +64,14 @@ export function PlatformLayout() {
         <aside className="w-full shrink-0 md:w-56">
           <nav aria-label="Platform sections" className="flex gap-1 overflow-x-auto rounded-xl bg-slate-800 p-2 md:flex-col">
             {items.map((i) => (
-              <NavLink key={i.to} to={i.to} className={linkClass}>
+              <NavLink key={i.to} to={i.to} className={linkClass} aria-label={i.open ? `${i.label}, ${formatCount(i.open)} open` : undefined}>
                 <i.icon size={16} />
                 <span className="whitespace-nowrap">{i.label}</span>
+                {!!i.open && (
+                  <span aria-hidden className="ml-auto rounded-full bg-amber-400 px-1.5 text-xs font-semibold text-slate-900">
+                    {formatCount(i.open)}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>

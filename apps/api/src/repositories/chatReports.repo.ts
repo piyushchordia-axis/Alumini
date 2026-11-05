@@ -2,8 +2,9 @@ import type { ReportStatus } from "@illuminize/shared";
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { DbClient, Tx } from "../db/client";
-import { chatMessages, chatReports, memberships, tenants } from "../db/schema";
+import { chatMessages, chatReports, memberships, tenants, users } from "../db/schema";
 import { senderColumns, type ChatSender, type MessageWithSender } from "./chat.repo";
+import type { UserRow } from "./users.repo";
 
 export type ChatReportRow = typeof chatReports.$inferSelect;
 export type ChatReportInsert = typeof chatReports.$inferInsert;
@@ -17,8 +18,11 @@ export async function insertChatReport(db: DbClient, values: ChatReportInsert): 
 // These read the chat_reports row of the query around them, spelled out: in a single-table select Drizzle drops the table
 // name from an interpolated column, and an unqualified tenant_id would then mean the memberships one and always match.
 
-/** Whether the report names any membership of this user, as its reporter or as its reported member. */
-export const reportNamesUser = (userId: string): SQL => sql`exists (select 1 from memberships m where m.user_id = ${userId} and m.id in (chat_reports.reporter_membership_id, chat_reports.reported_membership_id))`;
+/**
+ * Whether the report names any membership of this user (an id, or a column of the query around it), as its reporter or as
+ * its reported member.
+ */
+export const reportNamesUser = (userId: string | SQL): SQL => sql`exists (select 1 from memberships m where m.user_id = ${userId} and m.id in (chat_reports.reporter_membership_id, chat_reports.reported_membership_id))`;
 
 const reportedIsAdmin: SQL = sql`exists (select 1 from memberships m where m.id = chat_reports.reported_membership_id and m.role = 'TENANT_ADMIN' and m.status = 'APPROVED')`;
 
@@ -30,6 +34,54 @@ const noEligibleAdmin: SQL = sql`not exists (select 1 from memberships m join us
 
 /** Whether the report is for Illuminize staff, worked out on each read so that it follows who is an admin today. */
 const reportIsEscalated: SQL = sql`(${reportedIsAdmin} or ${noEligibleAdmin})`;
+
+/**
+ * A status change's target held the admin role then, as the row records (`role`), or, on a row written before it was
+ * recorded, holds it now.
+ */
+const changedAnAdmin: SQL = sql`case when a.metadata->'role' is not null then a.metadata->>'role' = 'TENANT_ADMIN' else exists (select 1 from memberships m where m.id = a.target_id and m.role = 'TENANT_ADMIN') end`;
+
+/** A staff flag change's target was an admin of the report's institution then (`adminOf`), or, on an older row, is now. */
+const flaggedAnAdminThere: SQL = sql`case when a.metadata->'adminOf' is not null then a.metadata->'adminOf' @> jsonb_build_array(chat_reports.tenant_id::text) else exists (select 1 from memberships m where m.user_id = a.target_id and m.tenant_id = chat_reports.tenant_id and m.role = 'TENANT_ADMIN') end`;
+
+/**
+ * Whether this user (an id, or a column of the query around it) changed who is an admin of the report's institution
+ * after it was filed, which can be what made it staff's: assigning or removing an admin, changing a role, approving,
+ * suspending or reinstating an admin, or turning the staff flag of one of its admins on or off. Read from the audit rows
+ * these changes write in their own transaction (recordAuditStrict), so none can happen unrecorded; a new way to change
+ * the admins needs its action here.
+ *
+ * Left out are changes that can't make a report staff's, so staff can act on what it's about and still close it: any to
+ * its reporter, whom neither reason for escalating reads, and taking the admin role from its reported member (suspending
+ * them, removing or demoting them), which can only end "About an admin". Giving it back (reinstating, assigning,
+ * promoting) still counts. An approval counts only where the row records an admin's, which the apps never leave waiting.
+ *
+ * Both timestamps are when their transaction began, not when it committed, so a change that began just before the report
+ * and committed after it carries the earlier time: one up to a minute before the report counts too. There's no upper
+ * bound, as escalation is worked out on each read, so a later change can make even a closed report staff's to view.
+ */
+const rosterChangedBy = (userId: string | SQL): SQL =>
+  sql`exists (select 1 from audit_log a where a.actor_user_id = ${userId} and a.created_at >= chat_reports.created_at - interval '1 minute' and (
+    (a.tenant_id = chat_reports.tenant_id and a.target_id is distinct from chat_reports.reporter_membership_id and (
+      a.action = 'platform.tenant.admin.assign'
+      or (a.action = 'platform.tenant.admin.remove' and a.target_id is distinct from chat_reports.reported_membership_id)
+      or (a.action = 'membership.role_change' and (a.target_id is distinct from chat_reports.reported_membership_id or a.metadata->>'to' = 'TENANT_ADMIN'))
+      or (a.action = 'membership.suspend' and a.target_id is distinct from chat_reports.reported_membership_id and ${changedAnAdmin})
+      or (a.action = 'membership.reinstate' and ${changedAnAdmin})
+      or (a.action = 'membership.approve' and a.metadata->>'role' = 'TENANT_ADMIN')
+      or (a.action = 'membership.approve_all' and a.metadata->'adminIds' is not null)
+    ))
+    or (a.action in ('platform.admin.grant', 'platform.admin.revoke') and ${flaggedAnAdminThere} and not ${reportNamesUser(sql`a.target_id`)})
+  ))`;
+
+/**
+ * A member of staff (an id, or a column of the query around it) may take the report: it doesn't name them, and they
+ * haven't changed its institution's admins since it was filed.
+ */
+const staffMayTake = (userId: string | SQL): SQL => sql`(not ${reportNamesUser(userId)} and not ${rosterChangedBy(userId)})`;
+
+/** Some member of Illuminize staff may take the report. */
+const someStaffMayTake: SQL = sql`exists (select 1 from users u where u.is_platform_admin and ${staffMayTake(sql`u.id`)})`;
 
 export interface ChatReportScope {
   viewerUserId: string;
@@ -80,12 +132,32 @@ export async function listChatReports(db: DbClient, tenantId: string, scope: Cha
   return { rows, total: count?.count ?? 0 };
 }
 
+export interface EscalatedChatReportRow extends ChatReportQueueRow {
+  tenant: { slug: string; name: string };
+  /** Why it's staff's: about an admin when true, otherwise no other admin can handle it. */
+  reportedIsAdmin: boolean;
+  /** This staff user changed the institution's admins after it was filed, so another member of staff handles it. */
+  needsOtherStaff: boolean;
+  /** No member of staff may take it at present: this one needs another, and every other is named in it or changed its admins too. */
+  noStaffCanTake: boolean;
+}
+
 /** For the platform console: every institution's escalated reports, leaving out any naming this staff user. */
-export async function listEscalatedChatReports(db: DbClient, viewerUserId: string, q: { status: ReportStatus; page: number; pageSize: number }): Promise<{ rows: Array<ChatReportQueueRow & { tenant: { slug: string; name: string } }>; total: number }> {
+export async function listEscalatedChatReports(db: DbClient, viewerUserId: string, q: { status: ReportStatus; page: number; pageSize: number }): Promise<{ rows: EscalatedChatReportRow[]; total: number }> {
   const where = and(eq(chatReports.status, q.status), inScope({ viewerUserId, escalatedOnly: true }));
+  const needsOtherStaff = rosterChangedBy(viewerUserId);
   const [rows, [count]] = await Promise.all([
     db
-      .select({ report: queueColumns, reporter: reporterColumns, reported: reportedColumns, tenant: { slug: tenants.slug, name: tenants.name } })
+      .select({
+        report: queueColumns,
+        reporter: reporterColumns,
+        reported: reportedColumns,
+        tenant: { slug: tenants.slug, name: tenants.name },
+        reportedIsAdmin: sql<boolean>`${reportedIsAdmin}`,
+        needsOtherStaff: sql<boolean>`${needsOtherStaff}`,
+        // Looked for only when this member of staff can't take it themselves.
+        noStaffCanTake: sql<boolean>`case when ${needsOtherStaff} then not ${someStaffMayTake} else false end`,
+      })
       .from(chatReports)
       .innerJoin(tenants, eq(tenants.id, chatReports.tenantId))
       .leftJoin(reporter, eq(reporter.id, chatReports.reporterMembershipId))
@@ -115,12 +187,22 @@ export interface FoundChatReport {
   escalated: boolean;
   /** Which of the two reasons for escalating applies, when one does. */
   reportedIsAdmin: boolean;
+  /** The viewer changed the institution's admins after it was filed (see rosterChangedBy). */
+  rosterChangedByViewer: boolean;
 }
 
 /** One report and how it stands for this viewer. */
 export async function findChatReport(db: DbClient, tenantId: string, id: string, viewerUserId: string): Promise<FoundChatReport | undefined> {
   const [row] = await db
-    .select({ report: chatReports, reporter: reporterColumns, reported: reportedColumns, named: sql<boolean>`${reportNamesUser(viewerUserId)}`, escalated: sql<boolean>`${reportIsEscalated}`, reportedIsAdmin: sql<boolean>`${reportedIsAdmin}` })
+    .select({
+      report: chatReports,
+      reporter: reporterColumns,
+      reported: reportedColumns,
+      named: sql<boolean>`${reportNamesUser(viewerUserId)}`,
+      escalated: sql<boolean>`${reportIsEscalated}`,
+      reportedIsAdmin: sql<boolean>`${reportedIsAdmin}`,
+      rosterChangedByViewer: sql<boolean>`${rosterChangedBy(viewerUserId)}`,
+    })
     .from(chatReports)
     .leftJoin(reporter, eq(reporter.id, chatReports.reporterMembershipId))
     .leftJoin(reported, eq(reported.id, chatReports.reportedMembershipId))
@@ -150,12 +232,15 @@ export async function closeChatReport(db: DbClient, tenantId: string, id: string
   return row!;
 }
 
-/** Closes every report still open on a removed message, and says which they were and who filed them. */
-export async function closeOpenReportsOnMessage(db: DbClient, tenantId: string, messageId: string, values: ChatReportClosing): Promise<Array<{ id: string; reporterMembershipId: string | null }>> {
+/**
+ * Closes every report still open on a removed message, and says which they were and who filed them. A member of staff
+ * closing them (`staffUserId`) leaves open those they changed the institution's admins since, for another member of staff.
+ */
+export async function closeOpenReportsOnMessage(db: DbClient, tenantId: string, messageId: string, values: ChatReportClosing, staffUserId?: string): Promise<Array<{ id: string; reporterMembershipId: string | null }>> {
   return db
     .update(chatReports)
     .set(values)
-    .where(and(eq(chatReports.tenantId, tenantId), eq(chatReports.targetKind, "MESSAGE"), eq(chatReports.targetId, messageId), eq(chatReports.status, "OPEN")))
+    .where(and(eq(chatReports.tenantId, tenantId), eq(chatReports.targetKind, "MESSAGE"), eq(chatReports.targetId, messageId), eq(chatReports.status, "OPEN"), staffUserId ? sql`not ${rosterChangedBy(staffUserId)}` : undefined))
     .returning({ id: chatReports.id, reporterMembershipId: chatReports.reporterMembershipId });
 }
 
@@ -178,20 +263,17 @@ export interface ClaimedReport {
   claimedAt: Date;
 }
 
-/** Some member of Illuminize staff whom the report doesn't name, so an alert about it has somebody to go to. */
-const staffToAlert: SQL = sql`exists (select 1 from users u where u.is_platform_admin and not exists (select 1 from memberships m where m.user_id = u.id and m.id in (chat_reports.reporter_membership_id, chat_reports.reported_membership_id)))`;
-
 /**
  * Marks open escalated reports that staff haven't been told about as told, oldest first, and returns them, so each is
- * alerted once while it stays theirs. Leaves a report no member of staff may be told about (every one is named in it) for
- * when there is one. One statement, which skips rows another transaction holds (another sweep, or an admin closing the
- * report): the next sweep finds them if they're still open.
+ * alerted once while it stays theirs. Leaves a report no member of staff may take (every one is named in it or changed its
+ * institution's admins since) for when one may. One statement, which skips rows another transaction holds (another sweep,
+ * or an admin closing the report): the next sweep finds them if they're still open.
  */
 export async function claimEscalatedReports(db: DbClient, opts: { reportId?: string; limit: number }): Promise<ClaimedReport[]> {
   const unalerted = db
     .select({ id: chatReports.id })
     .from(chatReports)
-    .where(and(eq(chatReports.status, "OPEN"), isNull(chatReports.staffAlertedAt), reportIsEscalated, staffToAlert, opts.reportId ? eq(chatReports.id, opts.reportId) : undefined))
+    .where(and(eq(chatReports.status, "OPEN"), isNull(chatReports.staffAlertedAt), reportIsEscalated, someStaffMayTake, opts.reportId ? eq(chatReports.id, opts.reportId) : undefined))
     .orderBy(asc(chatReports.createdAt))
     .limit(opts.limit)
     .for("update", { skipLocked: true });
@@ -201,6 +283,19 @@ export async function claimEscalatedReports(db: DbClient, opts: { reportId?: str
     .where(inArray(chatReports.id, unalerted))
     .returning({ id: chatReports.id, tenantId: chatReports.tenantId, claimedAt: chatReports.staffAlertedAt });
   return rows.map((r) => ({ ...r, claimedAt: r.claimedAt! }));
+}
+
+/**
+ * The members of Illuminize staff who may take the report (see staffMayTake), whom its alerts go to. users.id is spelled
+ * out: in a single-table select Drizzle leaves the table off an interpolated column, and a bare id here would mean the
+ * membership's.
+ */
+export async function listStaffWhoMayTake(db: DbClient, reportId: string): Promise<UserRow[]> {
+  return db
+    .select()
+    .from(users)
+    .where(and(eq(users.isPlatformAdmin, true), sql`exists (select 1 from chat_reports where chat_reports.id = ${reportId} and ${staffMayTake(sql`users.id`)})`))
+    .orderBy(users.createdAt);
 }
 
 /**

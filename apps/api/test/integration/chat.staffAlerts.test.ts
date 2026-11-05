@@ -146,15 +146,64 @@ describe.skipIf(!dbAvailable)("staff alerts for escalated chat reports", () => {
     expect(await alerts()).toEqual([]);
     expect((await reportRow(reportId)).staffAlertedAt).toBeNull();
 
-    // Staff take the admin role from the only admin who could handle it.
+    // Staff take the admin role from the only admin who could handle it, so it's for another member of staff.
     expect((await api().delete(`/api/v1/platform/tenants/${s.tenant.id}/admins/${s.neutral!.membership.id}`).set(staff.headers)).status).toBe(204);
     await sweep();
-    expect(await recipients()).toEqual(bothStaff());
+    expect(await recipients()).toEqual([other.id]);
     expect(await sweepEscalatedChatReports(ctx)).toBe(0);
     await ctx.jobs.drain();
-    expect(await alerts()).toHaveLength(2);
-    expect(emails().map((e) => e.text)).toEqual([expect.stringContaining(NO_OTHER_ADMIN), expect.stringContaining(NO_OTHER_ADMIN)]);
+    expect(await alerts()).toHaveLength(1);
+    expect(emails().map((e) => [e.to, e.text])).toEqual([["other@illuminize.test", expect.stringContaining(NO_OTHER_ADMIN)]]);
     expectNoWords([emails(), await alerts()], SECRET, DETAILS, ...NAMES);
+
+    const view = (headers: Record<string, string>) => api().post(`/api/v1/t/${s.tenant.slug}/admin/chat-reports/${reportId}/view`).set(headers).send();
+    expect((await view(staff.headers)).body.error).toMatchObject({ code: "NEEDS_OTHER_STAFF" });
+    expect((await view(auth((await loginAs(ctx, other.phoneE164)).accessToken))).status).toBe(200);
+  });
+
+  it("holds a report no member of staff may take, saying so in the console, and alerts whoever may next", async () => {
+    const s = await scenario();
+    const reportId = await s.file();
+    const otherHeaders = auth((await loginAs(ctx, other.phoneE164)).accessToken);
+    const admins = (headers: Record<string, string>) => api().post(`/api/v1/platform/tenants/${s.tenant.id}/admins`).set(headers);
+    const row = async () => ((await api().get("/api/v1/platform/chat-reports").set(staff.headers)).body.data as Array<{ id: string }>).find((r) => r.id === reportId);
+    // One member of staff takes the only admin's role; the other adds an admin and takes the role back, so both changed them.
+    expect((await api().delete(`/api/v1/platform/tenants/${s.tenant.id}/admins/${s.neutral!.membership.id}`).set(staff.headers)).status).toBe(204);
+    expect(await row()).toMatchObject({ needsOtherStaff: true, noStaffCanTake: false });
+    const added = await admins(otherHeaders).send({ phone: (await createUser(ctx)).phoneE164, fullName: "Added Admin" });
+    expect(added.status).toBeLessThan(300);
+    expect((await api().delete(`/api/v1/platform/tenants/${s.tenant.id}/admins/${added.body.data.id}`).set(otherHeaders)).status).toBe(204);
+    expect(await row()).toMatchObject({ needsOtherStaff: true, noStaffCanTake: true });
+    expect(await sweepEscalatedChatReports(ctx)).toBe(0);
+    expect((await reportRow(reportId)).staffAlertedAt).toBeNull();
+    expect(await alerts()).toEqual([]);
+
+    // A third member of staff, whom only they may alert.
+    const third = await createUser(ctx);
+    expect((await api().post(`/api/v1/platform/users/${third.id}/platform-admin`).set(staff.headers).send({ enabled: true })).status).toBe(200);
+    expect(await row()).toMatchObject({ needsOtherStaff: true, noStaffCanTake: false });
+    expect(await sweepEscalatedChatReports(ctx)).toBe(1);
+    expect(await recipients()).toEqual([third.id]);
+  });
+
+  it.each([
+    ["another may take it, so the claim stands", false],
+    ["nobody may, so the claim is released for whoever may next", true],
+  ])("cancels an alert to a member of staff who changed its admins before it went out: %s", async (_, both) => {
+    // About an admin, so it stays staff's whoever is added.
+    const s = await scenario({ reportedRole: "TENANT_ADMIN" });
+    const reportId = await s.file();
+    expect(await recipients()).toEqual(bothStaff());
+    const addAdmin = async (headers: Record<string, string>) => expect((await api().post(`/api/v1/platform/tenants/${s.tenant.id}/admins`).set(headers).send({ phone: (await createUser(ctx)).phoneE164, fullName: "Added Admin" })).status).toBeLessThan(300);
+    await addAdmin(staff.headers);
+    if (both) await addAdmin(auth((await loginAs(ctx, other.phoneE164)).accessToken));
+    await ctx.jobs.drain();
+    const cancelled = (await alerts()).filter((a) => a.status === "CANCELLED");
+    expect(cancelled.map((a) => a.recipientUserId).sort()).toEqual(both ? bothStaff() : [staff.id]);
+    for (const alert of cancelled) expect(alert.lastError).toBe("another member of staff must handle it");
+    expect(emails().map((e) => e.to)).toEqual(both ? [] : ["other@illuminize.test"]);
+    expect((await reportRow(reportId)).staffAlertedAt).toEqual(both ? null : expect.any(Date));
+    expect(await sweepEscalatedChatReports(ctx)).toBe(0);
   });
 
   it("catches an escalation an institution's own admin causes: the reporter, an admin, suspending the only other one", async () => {
@@ -241,15 +290,14 @@ describe.skipIf(!dbAvailable)("staff alerts for escalated chat reports", () => {
     expect(emails()).toEqual([]);
     expect(await sweepEscalatedChatReports(ctx)).toBe(0);
 
-    // Then staff take the admin role from the neutral admin, the only one left who could handle it.
+    // Then staff take the admin role from the neutral admin, the only one left who could handle it, and leave it to the other.
     expect((await api().delete(`/api/v1/platform/tenants/${s.tenant.id}/admins/${s.neutral!.membership.id}`).set(staff.headers)).status).toBe(204);
     expect(await sweepEscalatedChatReports(ctx)).toBe(1);
     await ctx.jobs.drain();
-    expect(emails().map((e) => e.to).sort()).toEqual(["other@illuminize.test", "staff@illuminize.test"]);
-    expect(emails().map((e) => e.text)).toEqual([expect.stringContaining(NO_OTHER_ADMIN), expect.stringContaining(NO_OTHER_ADMIN)]);
+    expect(emails().map((e) => [e.to, e.text])).toEqual([["other@illuminize.test", expect.stringContaining(NO_OTHER_ADMIN)]]);
     const rows = await alerts();
     expect(rows.filter((a) => a.status === "CANCELLED")).toHaveLength(2);
-    expect(rows.filter((a) => a.status === "SENT").map((a) => a.contextId)).toEqual([reportId, reportId]);
+    expect(rows.filter((a) => a.status === "SENT").map((a) => [a.contextId, a.recipientUserId])).toEqual([[reportId, other.id]]);
     expect(await sweepEscalatedChatReports(ctx)).toBe(0);
   });
 

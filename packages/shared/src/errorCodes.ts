@@ -35,6 +35,8 @@ export const ERROR_CODES = [
   /** A group's own send limit, shared by everyone in it, as opposed to RATE_LIMITED, which is the member's own. */
   "CHAT_GROUP_BUSY",
   "NEEDS_ANOTHER_ADMIN",
+  /** A member of staff changed an institution's admins after a chat report there was filed, so another one must handle it. */
+  "NEEDS_OTHER_STAFF",
   "INTERNAL",
 ] as const;
 
