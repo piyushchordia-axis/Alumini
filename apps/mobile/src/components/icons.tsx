@@ -2,7 +2,8 @@ import type { ReactElement, ReactNode } from "react";
 import type { ColorValue } from "react-native";
 import { Circle, Path, Rect, Svg } from "react-native-svg";
 
-export type IconProps = { size?: number; color?: ColorValue };
+/** `fill` and `fillOpacity` are drawn only by the four reaction icons, to mark the member's own reaction; the rest stay outlines. */
+export type IconProps = { size?: number; color?: ColorValue; fill?: ColorValue; fillOpacity?: number };
 type Props = IconProps;
 
 function Base({ size = 20, children }: Props & { children: ReactNode }) {
@@ -95,6 +96,16 @@ export function IconProfile({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconShield({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 3 4 7v5c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V7z" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconAdmin({ size = 20, color }: Props) {
+  return <IconShield size={size} color={color} />;
+}
 export function IconCamera({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -133,6 +144,27 @@ export function IconChevronDown({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconChevronUp({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m6 15 6-6 6 6" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconChevronLeft({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m15 6-6 6 6 6" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconChevronRight({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m9 6 6 6-6 6" {...stroke(color)} />
+    </Base>
+  );
+}
 export function IconMore({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -162,6 +194,23 @@ export function IconBell({ size = 20, color }: Props) {
     </Base>
   );
 }
+export function IconBellOff({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6" {...stroke(color)} />
+      <Path d="M10 19a2 2 0 0 0 4 0" {...stroke(color)} />
+      <Path d="M4 4l16 16" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconSearch({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="11" cy="11" r="7" {...stroke(color)} />
+      <Path d="m20 20-4-4" {...stroke(color)} />
+    </Base>
+  );
+}
 export function IconSettings({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
@@ -177,31 +226,31 @@ export function IconComment({ size = 20, color }: Props) {
     </Base>
   );
 }
-export function IconLike({ size = 20, color }: Props) {
+export function IconLike({ size = 20, color, fill, fillOpacity }: Props) {
   return (
     <Base size={size} color={color}>
-      <Path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 2 2v3h5.2a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17 20H7" {...stroke(color)} />
+      <Path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 2 2v3h5.2a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17 20H7" {...stroke(color)} fill={fill} fillOpacity={fillOpacity} />
     </Base>
   );
 }
-export function IconLove({ size = 20, color }: Props) {
+export function IconLove({ size = 20, color, fill, fillOpacity }: Props) {
   return (
     <Base size={size} color={color}>
-      <Path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" {...stroke(color)} />
+      <Path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" {...stroke(color)} fill={fill} fillOpacity={fillOpacity} />
     </Base>
   );
 }
-export function IconCelebrate({ size = 20, color }: Props) {
+export function IconCelebrate({ size = 20, color, fill, fillOpacity }: Props) {
   return (
     <Base size={size} color={color}>
-      <Path d="M8 22 4 12l6 2 2-8 2 8 6-2-4 10z" {...stroke(color)} />
+      <Path d="M8 22 4 12l6 2 2-8 2 8 6-2-4 10z" {...stroke(color)} fill={fill} fillOpacity={fillOpacity} />
     </Base>
   );
 }
-export function IconInsight({ size = 20, color }: Props) {
+export function IconInsight({ size = 20, color, fill, fillOpacity }: Props) {
   return (
     <Base size={size} color={color}>
-      <Path d="M9 18h6M10 21h4M8 14a5 5 0 1 1 8 0c-.8.9-1.5 1.6-1.5 3h-5c0-1.4-.7-2.1-1.5-3z" {...stroke(color)} />
+      <Path d="M9 18h6M10 21h4M8 14a5 5 0 1 1 8 0c-.8.9-1.5 1.6-1.5 3h-5c0-1.4-.7-2.1-1.5-3z" {...stroke(color)} fill={fill} fillOpacity={fillOpacity} />
     </Base>
   );
 }
@@ -231,6 +280,123 @@ export function IconSpark({ size = 20, color }: Props) {
   return (
     <Base size={size} color={color}>
       <Path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5z" {...stroke(color)} />
+    </Base>
+  );
+}
+
+/* Composer, admin console and file actions, drawn as the web set draws them. */
+export function IconImage({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="3" y="4" width="18" height="16" rx="2" {...stroke(color)} />
+      <Circle cx="9" cy="10" r="1.5" {...stroke(color)} />
+      <Path d="m21 16-4.5-4.5L9 19" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconPoll({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M6 20V10M12 20V4M18 20v-7" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconDashboard({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="3" y="3" width="8" height="8" rx="1.5" {...stroke(color)} />
+      <Rect x="13" y="3" width="8" height="5" rx="1.5" {...stroke(color)} />
+      <Rect x="13" y="10" width="8" height="11" rx="1.5" {...stroke(color)} />
+      <Rect x="3" y="13" width="8" height="8" rx="1.5" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconAnalytics({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconFlag({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M5 21V4M5 4h10l-1.5 4L15 12H5" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconFields({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="4" y="4" width="7" height="7" rx="1.5" {...stroke(color)} />
+      <Rect x="13" y="4" width="7" height="7" rx="1.5" {...stroke(color)} />
+      <Rect x="4" y="13" width="7" height="7" rx="1.5" {...stroke(color)} />
+      <Rect x="13" y="13" width="7" height="7" rx="1.5" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconAudit({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconDownload({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 4v11M7 10l5 5 5-5M5 20h14" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconUpload({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 16V5M7 10l5-5 5 5M5 20h14" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconCopy({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Rect x="8" y="8" width="12" height="12" rx="2" {...stroke(color)} />
+      <Path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconPlus({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 5v14M5 12h14" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconPalette({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M12 3a9 9 0 0 0 0 18c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.7-9-7.7z" {...stroke(color)} />
+      <Path d="M7.5 12h.01M9 7.5h.01M14 6.5h.01M17.5 10h.01" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconTrendUp({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m3 17 6-6 4 4 8-8M15 7h6v6" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconTrendDown({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="m3 7 6 6 4-4 8 8M15 17h6v-6" {...stroke(color)} />
+    </Base>
+  );
+}
+export function IconTrendFlat({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Path d="M3 12h18M17 8l4 4-4 4" {...stroke(color)} />
     </Base>
   );
 }
@@ -363,7 +529,30 @@ export function IconAlert({ size = 20, color }: Props) {
   );
 }
 
-export type NavIconName = "feed" | "messages" | "jobs" | "directory" | "events" | "groups" | "mentors" | "businesses" | "funding" | "posts" | "profile" | "more" | "switch" | "signOut" | "bell";
+export type NavIconName =
+  | "feed"
+  | "messages"
+  | "jobs"
+  | "directory"
+  | "events"
+  | "groups"
+  | "mentors"
+  | "businesses"
+  | "funding"
+  | "posts"
+  | "profile"
+  | "admin"
+  | "dashboard"
+  | "analytics"
+  | "flag"
+  | "fields"
+  | "audit"
+  | "mail"
+  | "settings"
+  | "more"
+  | "switch"
+  | "signOut"
+  | "bell";
 
 const NAV: Record<NavIconName, (p: Props) => ReactElement> = {
   feed: IconFeed,
@@ -377,6 +566,14 @@ const NAV: Record<NavIconName, (p: Props) => ReactElement> = {
   funding: IconFunding,
   posts: IconPosts,
   profile: IconProfile,
+  admin: IconAdmin,
+  dashboard: IconDashboard,
+  analytics: IconAnalytics,
+  flag: IconFlag,
+  fields: IconFields,
+  audit: IconAudit,
+  mail: IconMail,
+  settings: IconSettings,
   more: IconMore,
   switch: IconSwitch,
   signOut: IconSignOut,

@@ -111,12 +111,15 @@ export function IconProfile(p: IconProps) {
     </Svg>
   );
 }
-export function IconAdmin(p: IconProps) {
+export function IconShield(p: IconProps) {
   return (
     <Svg {...p}>
       <path d="M12 3 4 7v5c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V7z" />
     </Svg>
   );
+}
+export function IconAdmin(p: IconProps) {
+  return <IconShield {...p} />;
 }
 export function IconSwitch(p: IconProps) {
   return (
@@ -144,6 +147,23 @@ export function IconBell(p: IconProps) {
     <Svg {...p}>
       <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6" />
       <path d="M10 19a2 2 0 0 0 4 0" />
+    </Svg>
+  );
+}
+export function IconBellOff(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+      <path d="M4 4l16 16" />
+    </Svg>
+  );
+}
+export function IconSearch(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
     </Svg>
   );
 }
@@ -191,6 +211,27 @@ export function IconChevronDown(p: IconProps) {
   return (
     <Svg {...p}>
       <path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}
+export function IconChevronUp(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m6 15 6-6 6 6" />
+    </Svg>
+  );
+}
+export function IconChevronLeft(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m15 6-6 6 6 6" />
+    </Svg>
+  );
+}
+export function IconChevronRight(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m9 6 6 6-6 6" />
     </Svg>
   );
 }
@@ -292,6 +333,72 @@ export function IconAudit(p: IconProps) {
   return (
     <Svg {...p}>
       <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </Svg>
+  );
+}
+export function IconDownload(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+    </Svg>
+  );
+}
+export function IconUpload(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 16V5M7 10l5-5 5 5M5 20h14" />
+    </Svg>
+  );
+}
+export function IconCopy(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+    </Svg>
+  );
+}
+export function IconPlus(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 5v14M5 12h14" />
+    </Svg>
+  );
+}
+export function IconPalette(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 3a9 9 0 0 0 0 18c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.7-9-7.7z" />
+      <path d="M7.5 12h.01M9 7.5h.01M14 6.5h.01M17.5 10h.01" />
+    </Svg>
+  );
+}
+export function IconScale(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M12 4v16M8 20h8M5 7h14" />
+      <path d="M5 7l-2.5 6a2.5 2.5 0 0 0 5 0zM19 7l-2.5 6a2.5 2.5 0 0 0 5 0z" />
+    </Svg>
+  );
+}
+export function IconTrendUp(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m3 17 6-6 4 4 8-8M15 7h6v6" />
+    </Svg>
+  );
+}
+export function IconTrendDown(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m3 7 6 6 4-4 8 8M15 17h6v-6" />
+    </Svg>
+  );
+}
+export function IconTrendFlat(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M3 12h18M17 8l4 4-4 4" />
     </Svg>
   );
 }
@@ -456,6 +563,13 @@ export type NavIconName =
   | "posts"
   | "profile"
   | "admin"
+  | "dashboard"
+  | "analytics"
+  | "flag"
+  | "fields"
+  | "audit"
+  | "mail"
+  | "settings"
   | "switch"
   | "signOut"
   | "more"
@@ -474,6 +588,13 @@ const NAV: Record<NavIconName, (p: IconProps) => ReactElement> = {
   posts: IconPosts,
   profile: IconProfile,
   admin: IconAdmin,
+  dashboard: IconDashboard,
+  analytics: IconAnalytics,
+  flag: IconFlag,
+  fields: IconFields,
+  audit: IconAudit,
+  mail: IconMail,
+  settings: IconSettings,
   switch: IconSwitch,
   signOut: IconSignOut,
   more: IconMore,
