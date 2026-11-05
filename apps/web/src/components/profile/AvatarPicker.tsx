@@ -1,5 +1,5 @@
-import { ALLOWED_IMAGE_MIME, imageFileProblem } from "@illuminize/shared";
-import { errorMessage, isUploadCancelled, shrinkPhoto, startUpload } from "@illuminize/shared/client";
+import { ALLOWED_IMAGE_MIME, IMAGE_TYPE_PROBLEM, imageFileProblem } from "@illuminize/shared";
+import { errorMessage, isUploadCancelled, prepareImageFile, startUpload, UploadCancelledError } from "@illuminize/shared/client";
 import { useEffect, useId, useRef, useState } from "react";
 import { IconCamera } from "@/components/icons";
 import { Avatar, Button } from "@/components/ui";
@@ -45,14 +45,22 @@ export function AvatarPicker({
   // Leaving the page gives up on an upload still running.
   useEffect(() => () => running.current?.cancel(), []);
 
+  // As with ImageUploader, only the prepared file is checked: a HEIC photo Safari can decode becomes a JPEG.
   const pick = async (picked: File) => {
     setProblem(null);
-    const wrongType = imageFileProblem({ type: picked.type });
-    if (wrongType) return setProblem(wrongType);
+    if (!picked.type.startsWith("image/")) return setProblem(IMAGE_TYPE_PROBLEM);
     uploading(true);
     setStatus("Uploading photo…");
+    // Cancel while the photo is being prepared stops it going up.
+    let cancelled = false;
+    running.current = {
+      cancel: () => {
+        cancelled = true;
+      },
+    };
     try {
-      const file = await shrinkPhoto(picked);
+      const file = await prepareImageFile(picked, { purpose: "avatar" });
+      if (cancelled) throw new UploadCancelledError();
       const tooBig = imageFileProblem(file);
       if (tooBig) {
         setProblem(tooBig);
@@ -84,7 +92,7 @@ export function AvatarPicker({
           Profile photo
         </p>
         <p id={hintId} className="mt-0.5 text-sm text-slate-500">
-          Members recognise faces first. A JPEG, PNG or WebP up to 5 MB.
+          Members recognise faces first. Large photos are made smaller for you.
         </p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
           <input

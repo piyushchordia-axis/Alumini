@@ -1,6 +1,8 @@
-import { AVATAR_SIZE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
+import { AVATAR_SIZE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { AppError } from "./errors";
+
+export { MAX_IMAGE_SIDE };
 
 export type ImageMime = "image/jpeg" | "image/png" | "image/webp";
 
@@ -10,8 +12,6 @@ export const IMAGE_EXTENSIONS: Record<ImageMime, string> = {
   "image/webp": "webp",
 };
 
-/** Longest side of a stored image; larger ones are scaled down, smaller ones left as they are. */
-export const MAX_IMAGE_SIDE = 2048;
 /** Refuses anything larger before decoding it, so a small file that unpacks to a huge bitmap can't exhaust memory. */
 export const MAX_INPUT_PIXELS = 40_000_000;
 /**

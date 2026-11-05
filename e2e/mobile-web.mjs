@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, dropFrames, expectSvgNoEmoji, reconnect,scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, apiSession, bigPhoto, dropFrames, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -270,6 +270,22 @@ try {
     await shown(page.getByRole("button", { name: "Edit profile" })).click();
     await page.waitForURL("**/t/demo-university/profile/edit");
     await shown(page.getByText("Members recognise faces first", { exact: false })).waitFor();
+    // Cancel while a photo is still being prepared: the picker is free again at once, and nothing goes up. Preparing is
+    // held here so the press lands during it.
+    const camera = await bigPhoto(page);
+    const hold = await holdPhotoPreparation(page);
+    const preparing = page.waitForEvent("filechooser");
+    await shown(page.getByRole("button", { name: "Add photo", exact: true })).click();
+    await (await preparing).setFiles(camera);
+    await hold.held();
+    await shown(page.getByRole("button", { name: "Cancel upload", exact: true })).click();
+    await page.getByText("Upload cancelled.", { exact: true }).first().waitFor({ state: "attached" });
+    await shown(page.getByRole("button", { name: "Add photo", exact: true })).waitFor();
+    await hold.release();
+    // Long enough for the prepared photo to have gone up, had the cancel not stopped it.
+    await page.waitForTimeout(1500);
+    hold.stop();
+    if (hold.uploads()) throw new Error("a photo cancelled while it was being prepared was uploaded anyway");
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
     const chooser = page.waitForEvent("filechooser");
     await shown(page.getByRole("button", { name: "Add photo", exact: true })).click();
@@ -731,6 +747,12 @@ try {
     await (await chooser).setFiles({ name: "logo.png", mimeType: "image/png", buffer: png });
     await visible(page.getByRole("button", { name: "Change logo" })).waitFor();
     await visible(page.getByRole("button", { name: "Remove logo", exact: true })).waitFor();
+    // Then one straight off a camera, too big to send as it is: the app makes it smaller first, and the form shows it.
+    await pickBigPhoto(page, async (file) => {
+      const chooser = page.waitForEvent("filechooser");
+      await visible(page.getByRole("button", { name: "Change logo" })).click();
+      await (await chooser).setFiles(file);
+    });
     await field("Contact email").fill(`mobile${unique}@example.com`);
     await field("Contact phone").fill("+91 22 5550 0198");
 

@@ -6,7 +6,7 @@ import { useImageUpload } from "@/hooks/useImagePicker";
 import { colors, elevation, radius, spacing } from "@/theme";
 
 const SIZE = 96;
-const HINT = "Members recognise faces first. A JPEG, PNG or WebP up to 5 MB.";
+const HINT = "Members recognise faces first. Large photos are made smaller for you.";
 
 /**
  * The member's profile photo: a round preview (initials until there is one), and buttons to add, change or remove it, as

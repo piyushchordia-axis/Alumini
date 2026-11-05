@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { dropFrames, expectSvgNoEmoji, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { bigPhoto, dropFrames, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -617,9 +617,9 @@ try {
     await page.selectOption('select[name="category"]', "FOOD_BEVERAGE");
     await page.fill('input[name="city"]', "Mumbai");
     await page.fill('textarea[name="description"]', "Sourdough baked for the smoke tests every morning.");
-    await page.setInputFiles('input[type="file"]', { name: "logo.png", mimeType: "image/png", buffer: PNG });
-    // In the form: the header's avatar is the member's photo from /uploads/ too.
-    await page.locator('form img[src*="/uploads/"]').waitFor();
+    // A logo straight off a camera, too big to send as it is: the browser makes it smaller first, and the form shows it.
+    const logo = await pickBigPhoto(page, (file) => page.setInputFiles('input[type="file"]', file));
+    await page.locator(`form img[src="${logo}"]`).waitFor();
     await page.getByRole("button", { name: "Remove logo", exact: true }).waitFor();
     await page.fill('input[name="contactEmail"]', contact);
     await page.fill('input[name="contactPhone"]', "+91 22 5550 0199");
@@ -684,6 +684,19 @@ try {
     await photo.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not a photo") });
     await picker.getByRole("alert").filter({ hasText: "Choose a JPEG, PNG or WebP image." }).waitFor();
     await shot("08d-profile-photo-error");
+    // Cancel while a photo is still being prepared: nothing goes up. Preparing is held here so the press lands during it.
+    const camera = await bigPhoto(page);
+    const hold = await holdPhotoPreparation(page);
+    await photo.setInputFiles(camera);
+    await hold.held();
+    await picker.getByRole("button", { name: "Cancel upload", exact: true }).click();
+    await hold.release();
+    await picker.getByText("Upload cancelled.", { exact: true }).waitFor({ state: "attached" });
+    await picker.getByRole("button", { name: "Add photo", exact: true }).waitFor();
+    // Long enough for the prepared photo to have gone up, had the cancel not stopped it.
+    await page.waitForTimeout(1500);
+    hold.stop();
+    if (hold.uploads()) throw new Error("a photo cancelled while it was being prepared was uploaded anyway");
     await photo.setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
     await picker.getByRole("button", { name: "Change photo", exact: true }).waitFor();
     await picker.getByRole("button", { name: "Remove photo", exact: true }).waitFor();

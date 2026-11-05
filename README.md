@@ -363,8 +363,11 @@ the role line) and short Open to badges that screen readers hear in full.
 
 ### Photos and uploads
 
-Every image goes through `POST /t/:slug/uploads` (a JPEG, PNG or WebP of at most 5 MB in the `file` field, its type
-read from its bytes) and is re-encoded with sharp before it's stored (`apps/api/src/lib/images.ts`):
+Every image goes through `POST /t/:slug/uploads` (a JPEG, PNG or WebP of at most 5 MB in the `file` field) and is
+re-encoded with sharp before it's stored (`apps/api/src/lib/images.ts`). Its type is read from its bytes and the declared
+type is ignored: phones label a converted photo with its source's type, so only a file declared as something other than
+an image (or `application/octet-stream`) is turned away unread. A body over 5 MB gets 413 with the apps' own words,
+"Choose an image under 5 MB." Each image is:
 
 - turned upright from its EXIF orientation, with all metadata dropped, GPS position included;
 - scaled down to at most 2048 pixels on the longest side (never enlarged), keeping its format, and re-encoded smaller
@@ -394,11 +397,30 @@ part, with any transparency on white. A purpose the API doesn't know is refused 
   stays, so the sweep tries again. Only profile photos are ever deleted.
 - **CDN copies.** S3 objects are cached as immutable for a year, so a CDN in front of the bucket may keep serving a
   deleted photo until its copy expires.
+- **The apps prepare every photo before sending it.** What a picker or a browser says about a photo (type, size,
+  dimensions) describes the photo picked, not the file sent, so no picked file goes up as it is:
+  - **On a phone,** `useImageUpload` picks at full quality, so the picker makes no lossy copy of its own, and
+    `preparePickedPhoto` (`apps/mobile/src/lib/photos.ts`, on expo-image-manipulator) decodes the photo (HEIC and HEIF
+    too) at most 2048 pixels on its longest side (1024 for a profile photo), so a 50-megapixel photo is never held in
+    memory whole, turns it upright and saves it again. It becomes a JPEG at quality 0.85, or a PNG when the source may
+    be see-through (anything but a JPEG, HEIC or HEIF: a PNG, WebP or GIF, or a type the picker didn't give). A phone
+    paints nothing under a JPEG, so see-through parts saved as one turn black: a PNG over 5 MB is drawn smaller instead
+    (each side × 0.7, until it fits). Its size is read from the file written (expo-file-system), and both the picker's
+    full-size copy in the app's cache and the prepared one are deleted once the photo has gone. Cancel works while it is
+    being prepared, and a photo that can't be read says "Couldn't open that photo. Try another one."
+  - **In a browser** (the web app, and the phone app's web build), `prepareImageFile`
+    (`packages/shared/src/client/imageUpload.ts`) does the same on a canvas, for posts, covers and logos
+    (`ImageUploader`) as for profile photos (`AvatarPicker`, always a JPEG on white). A canvas can paint white under a
+    JPEG, so a PNG over 5 MB becomes a JPEG on white. Every file is decoded, however small, since only that gives its
+    sides (a 300 KB PNG can be 9000 pixels wide, over the server's 40 megapixels); an allowed one that already fits goes
+    as it is. A file the browser can't decode (HEIC outside Safari) is refused with "Choose a JPEG, PNG or WebP image."
+    The file inputs list only those three types, so iPhone Safari hands a HEIC photo over as a JPEG.
+  - Each app then checks the prepared file (`imageFileProblem`) and uploads it with a 90-second timeout, given up on
+    when the screen closes.
 - **Both apps** use an `AvatarPicker`: a 96px round preview with initials, **Add photo**, **Change photo** and **Remove
-  photo**, the server's type and size checks before sending (`imageFileProblem`), a large photo shrunk to 1024 pixels
-  in the browser first, progress, and cancel with a 90-second timeout. Errors show inline and are announced. Saving
-  waits while a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop.
-  An avatar shows initials until its photo loads, and falls back to them if it fails.
+  photo**, the photo prepared as above, progress, and cancel. Errors show inline and are announced. Saving waits while
+  a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop. An avatar
+  shows initials until its photo loads, and falls back to them if it fails.
 
 ### Rich text
 
@@ -1040,10 +1062,13 @@ cp .env.example .env                 # EXPO_PUBLIC_API_URL=http://10.0.2.2:4000 
 npx expo start                        # then press a / i, or scan with Expo Go
 ```
 
-`expo-notifications`, `expo-image-picker`, `expo-secure-store` and `react-native-svg` are native modules: use a
-development build (`npx expo run:android`, or `npx expo run:ios` on a Mac) rather than Expo Go for push notifications.
-A development build made before `react-native-svg` was added (it draws every icon) lacks it and must be rebuilt; Expo
-Go already includes it. EAS Build works too, but the repo has no `eas.json` yet: run `npx expo install expo-dev-client`
+`expo-notifications`, `expo-image-picker`, `expo-image-manipulator`, `expo-file-system`, `expo-document-picker`,
+`expo-sharing`, `expo-clipboard`, `expo-secure-store` and `react-native-svg` are native modules: use a development build
+(`npx expo run:android`, or `npx expo run:ios` on a Mac) rather than Expo Go for push notifications. A development build
+made before one of them was added lacks it and must be rebuilt, and Metro restarted (`pnpm mobile`): `react-native-svg`
+draws every icon, `expo-image-manipulator` and `expo-file-system` prepare photos, and the document picker, sharing and
+clipboard modules are there for the admin console's CSV import, exports and invitation links. Expo Go already includes
+them all. EAS Build works too, but the repo has no `eas.json` yet: run `npx expo install expo-dev-client`
 and `eas build:configure` first, then `eas build --profile development`. Images and tokens degrade gracefully on the web
 export.
 
@@ -1131,7 +1156,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   TalkBack focus after removing or finishing a list row, on the copy banner and its Undo, and on the "Not now" note,
   links opening the browser, the chip rows keeping the chosen chip in view, VoiceOver and TalkBack on a job's matched
   skills and its card, a job's add-skills link bringing back a profile editor already open, and the edit screen's
-  scroll to a section (`measureLayout`) on the new architecture.
+  scroll to a section (`measureLayout`) on the new architecture. Photo preparation added HEIC from an iPhone and HEIF
+  from Android, 48 and 50 megapixel photos, transparent PNG and GIF logos and a large cut-out PNG, cancelling while a
+  photo is prepared and iPhone Safari's own HEIC conversion.
+  The keyboard fix for Android's edge-to-edge windows needs the long forms checked.
 - **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
 **Smaller follow-ups.**

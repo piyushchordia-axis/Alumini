@@ -69,12 +69,13 @@ Covers:
 - an RSVP; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
   More filters leaving Priya out, and Priya's card with her headline, then her profile: headline, skills, her current
   role before her past one, studies here and elsewhere, and a LinkedIn link with the right target and rel;
-- businesses: search and filters, contact details only on a listing's own page; add, edit, find it in My posts and
-  delete it;
-- My profile: the photo picker refusing a text file beside it, a saved photo served as a 512-pixel square JPEG, and
-  initials when a photo can't load; a headline, skills, a GitHub handle turned into its address and a past role, saved
-  together, with an end year before the start refused in its row and a server error on `experiences.0.endYear` shown
-  there; the meter moving to 75 with four skills, a link and a past role saved, asking for neither skills nor a link,
+- businesses: search and filters, contact details only on a listing's own page; add (its logo a 4000 × 3000 photo of
+  over 5 MB, made smaller in the browser before it goes up), edit, find it in My posts and delete it;
+- My profile: the photo picker refusing a text file beside it, Cancel upload pressed while a photo is still being
+  prepared sending nothing, a saved photo served as a 512-pixel square JPEG, and initials when a photo can't load; a
+  headline, skills, a GitHub handle turned into its address and a past role, saved together, with an end year before
+  the start refused in its row and a server error on `experiences.0.endYear` shown there; the meter moving to 75 with
+  four skills, a link and a past role saved, asking for neither skills nor a link,
   and its bio item linking to About you; `#work` landing on Work on a phone with no sideways scrolling; and all of it
   on the profile other members open, found by the new headline; Delete account's confirm dialog, saying a suspension
   or blocks come back with the number, cancelled with the account still there;
@@ -161,7 +162,8 @@ Covers:
   and the card gone after a reload;
 - a post with a photo, editing it, the celebrations card and a poll vote; a poll with several choices, its drawn boxes
   saying which are chosen (`aria-checked`) before the vote;
-- Edit profile: a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
+- Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
+  nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
   row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
   still to add, skills no longer among it, and `?section=about` scrolling About you into view; Delete my account's
@@ -183,7 +185,8 @@ Covers:
   with the right target and rel;
 - businesses behind More: search, filters and contact details only on a listing's own page; the description's bullets
   as one list with the bullet marks hidden from screen readers, its numbered steps read out from 1 with the numbers on
-  the left, and its link; add, edit, My posts and delete through the confirm sheet;
+  the left, and its link; add (its logo changed to a 4000 × 3000 photo of over 5 MB, made smaller before it goes up),
+  edit, My posts and delete through the confirm sheet;
 - notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
   and a notification tap landing on its target;
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including a report from tapping a
@@ -366,7 +369,7 @@ second copy of a screen, or back to the page the button was on.
 **Businesses and shared screens**
 
 - [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
-      picker and shows the picked image.
+      picker and shows the logo once it's uploaded.
 - [ ] Tab labels on screens with tabs (My posts, Jobs, Mentors, Groups) aren't clipped.
 - [ ] TalkBack or VoiceOver, on Zylo Labs in Businesses: the contact buttons read "Website" (with a hint that it opens
       in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
@@ -375,6 +378,27 @@ second copy of a screen, or back to the page the button was on.
 - [ ] TalkBack or VoiceOver, on the waiting screen: sign one phone out, join Demo College with a number that isn't in
       the demo data, and submit for approval. The screen reads "Awaiting approval" and its text, with nothing read for
       the icon above them. Sign Rahul back in afterwards.
+
+**Photos**
+
+Every photo is prepared on the phone before it goes up (README → Photos and uploads). Take the photos below with the
+phone's own camera first, so they are in its library. Each one should upload, with no message under the button, and
+show in its preview and, once saved, on its card or page the right way up.
+
+- [ ] iPhone, with Settings → Camera → Formats → High Efficiency on (photos saved as HEIC): a photo as a post's image,
+      an event's cover, a business's logo and a job's logo.
+- [ ] iPhone 15 Pro or later, a 48-megapixel photo (Settings → Camera → Formats → Resolution Control on, then 48 MP in
+      the Camera app), or a panorama: as a profile photo (the system editor crops it, then the round preview shows it)
+      and as a post's image.
+- [ ] Android: a HEIF photo (on a Samsung, Camera settings → Picture formats → High efficiency pictures; or a .heic
+      sent from an iPhone and saved to the gallery) and a full-resolution photo of 50 megapixels or more, each as a
+      post's image. On a phone with little memory, the app doesn't close while preparing it.
+- [ ] A PNG logo and a GIF logo with see-through backgrounds (save them from a browser to the library), and a large
+      cut-out PNG (a 3000 × 3000 photo of a person on a clear background) as a post's image: on the business's card
+      and page and in the post, the background stays see-through, not black or white.
+- [ ] Pick a large photo as a profile photo and choose Cancel upload at once, while it is still being prepared: the
+      button goes back to Add photo with "Upload cancelled." read out, and nothing is uploaded (no photo appears).
+- [ ] The web app in iPhone Safari: a HEIC photo as a post's image uploads and shows, the right way up.
 
 **Profiles and registration**
 
@@ -393,6 +417,11 @@ leave without sending, or he'll be waiting for approval there.
       network) stay above the keyboard, with nothing hidden behind it. On Work, choose Add a past role and type in each
       of its boxes, the years too: Done and Remove stay reachable. Do the same on My profile → Edit profile, down to the
       links in About you, and in Add a place of study.
+- [ ] Android especially: the long forms (Edit profile, Post a job, Add a business, Plan a gathering, New post) move up
+      with the keyboard, so the box being typed in and the button at the bottom can be reached, with no blank band
+      above the keyboard and nothing hidden under it. Closing the keyboard puts the form back, with no gap left at the
+      bottom. These screens now make room for the keyboard on Android too, as the chats do, since an edge-to-edge window
+      no longer shrinks for it.
 - [ ] Android: on Work and About you, the back button goes to the step before, keeping what was typed; on Basics it
       leaves registration. iPhone: swiping from the left edge goes back only from Basics; on Work and About you it does
       nothing, and the step bar and Back move between the steps.

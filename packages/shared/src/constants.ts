@@ -469,6 +469,10 @@ export const UPLOAD_PURPOSES = ["image", "avatar"] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 /** Side of the square a profile photo is cropped to, in pixels. */
 export const AVATAR_SIZE = 512;
+/** Longest side of a stored image; the server scales larger ones down, and the apps prepare photos to fit it. */
+export const MAX_IMAGE_SIDE = 2048;
+/** JPEG quality (0 to 1) the apps save a prepared photo at; the server encodes it once more. */
+export const UPLOAD_JPEG_QUALITY = 0.85;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 export const MIN_BATCH_YEAR = 1950;

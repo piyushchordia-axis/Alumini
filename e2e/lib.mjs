@@ -216,3 +216,89 @@ export async function expectSvgNoEmoji(locator, where) {
   if (emoji) throw new Error(`${where} shows the emoji ${emoji[0]}: "${text}"`);
   if (!(await locator.locator("svg").count())) throw new Error(`${where} draws no SVG icon`);
 }
+
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const isUpload = (request) => request.method() === "POST" && /\/uploads(\?|$)/.test(request.url());
+
+/** A photo as a camera takes it, too big to upload as it is: a 4000 × 3000 JPEG of over 5 MB, made in the page. */
+export async function bigPhoto(page) {
+  const base64 = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 4000;
+    canvas.height = 3000;
+    const g = canvas.getContext("2d");
+    const pixels = g.createImageData(canvas.width, canvas.height);
+    // Noise, which JPEG can't squeeze, keeps the file over the limit.
+    let seed = 1;
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const n = seed >>> 24;
+      pixels.data[i] = n;
+      pixels.data[i + 1] = (n * 7) & 255;
+      pixels.data[i + 2] = (n * 13) & 255;
+      pixels.data[i + 3] = 255;
+    }
+    g.putImageData(pixels, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+  });
+  const buffer = Buffer.from(base64, "base64");
+  if (buffer.length <= MAX_UPLOAD_BYTES) throw new Error(`the camera-sized photo is only ${buffer.length} bytes, under the upload limit`);
+  return { name: "camera.jpg", mimeType: "image/jpeg", buffer };
+}
+
+/**
+ * Picks a bigPhoto, `pick(file)` choosing it the way the page does, and fails unless the app prepared it before sending
+ * it: the request's body (its Content-Length, as Chromium sent it; Playwright's body size leaves out a file part) is
+ * under the upload limit, the upload answers 201, and the form shows the stored photo. Gives the stored photo's URL.
+ */
+export async function pickBigPhoto(page, pick) {
+  const file = await bigPhoto(page);
+  const request = page.waitForRequest(isUpload);
+  await pick(file);
+  const sent = await request;
+  const answer = await sent.response();
+  const length = Number(await sent.headerValue("content-length"));
+  if (!(length > 0)) throw new Error("couldn't read the size of the photo's upload");
+  if (length >= MAX_UPLOAD_BYTES) throw new Error(`the app sent the photo as it was picked (${length} bytes), not prepared`);
+  if (answer?.status() !== 201) throw new Error(`the photo's upload answered ${answer?.status()}: ${await answer?.text()}`);
+  const { url } = (await answer.json()).data;
+  const preview = page.locator(`img[src="${url}"]`).locator("visible=true").first();
+  await preview.waitFor();
+  await preview.evaluate((img) => img.decode());
+  return url;
+}
+
+/**
+ * Holds the page's photo decoding (`createImageBitmap`, where preparing a photo starts) so a script can act while a photo
+ * is being prepared. `held()` waits until a photo is held, `release()` lets it go on and stops holding, and `uploads()`
+ * counts the uploads the page has sent since the hold began.
+ */
+export async function holdPhotoPreparation(page) {
+  await page.evaluate(() => {
+    const real = window.createImageBitmap;
+    const waiting = [];
+    window.__photoHold = { real, waiting };
+    window.createImageBitmap = (...args) => new Promise((resolve, reject) => waiting.push(() => real.apply(window, args).then(resolve, reject)));
+  });
+  let uploads = 0;
+  const count = (request) => {
+    if (isUpload(request)) uploads += 1;
+  };
+  page.on("request", count);
+  return {
+    held: () => page.waitForFunction(() => window.__photoHold.waiting.length > 0),
+    release: async () => {
+      await page.evaluate(() => {
+        const hold = window.__photoHold;
+        window.createImageBitmap = hold.real;
+        for (const go of hold.waiting.splice(0)) go();
+      });
+    },
+    uploads: () => uploads,
+    stop: () => page.off("request", count),
+  };
+}

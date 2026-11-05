@@ -1,10 +1,12 @@
+import { IMAGE_SIZE_PROBLEM, MAX_UPLOAD_BYTES } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { uploads } from "../../src/db/schema";
+import { keys } from "../../src/redis/keys";
 import { S3Storage } from "../../src/services/storage";
-import { CAMERA_MAKE, CORRUPT_PNG, GPS_MARKER, cameraJpeg, testPng } from "../helpers/images";
+import { CAMERA_MAKE, CORRUPT_PNG, GPS_MARKER, HEIC_START, cameraJpeg, testAvif, testPng } from "../helpers/images";
 import { createTenant, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -142,6 +144,76 @@ describe.skipIf(!dbAvailable)("image uploads", () => {
     expect(spoof.body.error.code).toBe("UNSUPPORTED_MEDIA");
     const missing = await api().post(base).set(member.headers);
     expect(missing.status).toBe(400);
+  });
+
+  it("decides by the bytes, not the type a phone or browser declares", async () => {
+    const { send, fetchStored } = await setup();
+    // Android labels a photo it saved as JPEG with its source's type.
+    const converted = await send(await cameraJpeg(), { filename: "IMG_0001.HEIC", contentType: "image/heic" });
+    expect(converted.status).toBe(201);
+    expect(converted.body.data.url).toMatch(/\.jpg$/);
+    expect((await fetchStored(converted.body.data.url)).meta).toMatchObject({ format: "jpeg", width: 40, height: 80 });
+    const [row] = await ctx.db.select().from(uploads).where(eq(uploads.storageKey, ctx.storage.keyFromUrl(converted.body.data.url)!));
+    expect(row?.contentType).toBe("image/jpeg");
+    // A browser sends a file it can't name as octet-stream.
+    expect((await send(PNG, { filename: "photo", contentType: "application/octet-stream" })).status).toBe(201);
+
+    // HEIC can't be decoded here, so the apps convert it first; whatever it is called, it is refused by its bytes.
+    for (const contentType of ["image/heic", "image/jpeg"]) {
+      const heic = await send(HEIC_START, { filename: "IMG_0002.HEIC", contentType });
+      expect(heic.status, contentType).toBe(415);
+      expect(heic.body.error.code).toBe("UNSUPPORTED_MEDIA");
+    }
+    // So is HEIF the server could decode (AVIF): only JPEG, PNG and WebP are stored.
+    expect((await send(await testAvif(), { filename: "a.avif", contentType: "image/avif" })).status).toBe(415);
+    // A declared non-image is still turned away before it is read.
+    const pdf = await send(Buffer.from("%PDF-1.7\n"), { filename: "cv.pdf", contentType: "application/pdf" });
+    expect(pdf.status).toBe(415);
+    expect(pdf.body.error.code).toBe("UNSUPPORTED_MEDIA");
+    expect(await ctx.db.select().from(uploads)).toHaveLength(2);
+  });
+
+  it("refuses a file over 5 MB in the apps' words, and records nothing", async () => {
+    const { send } = await setup();
+    const big = await send(Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0xff), { filename: "big.jpg", contentType: "image/jpeg" });
+    expect(big.status).toBe(413);
+    expect(big.body.error).toMatchObject({ code: "PAYLOAD_TOO_LARGE", message: IMAGE_SIZE_PROBLEM });
+    expect(big.body.error.message).toBe("Choose an image under 5 MB.");
+    // One at the limit is read, and then judged by its bytes.
+    const atLimit = await send(Buffer.alloc(MAX_UPLOAD_BYTES, 0xff), { filename: "big.jpg", contentType: "image/jpeg" });
+    expect(atLimit.status).toBe(415);
+    expect(await ctx.db.select().from(uploads)).toHaveLength(0);
+  });
+
+  it("counts refused files against the limits, which run before the file is read", async () => {
+    const previous = process.env.RATE_LIMIT_IN_TESTS;
+    process.env.RATE_LIMIT_IN_TESTS = "1";
+    try {
+      const { tenant, member, send } = await setup();
+      const today = () => new Date().toISOString().slice(0, 10);
+      const days = new Set([today()]);
+      await ctx.redis.set(keys.rateLimit("uploads", member.user.id), "17", "EX", 3600);
+
+      const pdf = await send(Buffer.from("%PDF-1.7\n"), { filename: "cv.pdf", contentType: "application/pdf" });
+      expect(pdf.status).toBe(415);
+      expect(pdf.headers["x-ratelimit-remaining"]).toBe("2");
+      const big = await send(Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0xff), { filename: "big.jpg", contentType: "image/jpeg" });
+      expect(big.status).toBe(413);
+      expect(big.headers["x-ratelimit-remaining"]).toBe("1");
+      expect((await send(PNG)).status).toBe(201);
+      const over = await send(PNG);
+      expect(over.status).toBe(429);
+      expect(over.body.error.code).toBe("RATE_LIMITED");
+
+      // The institution's daily count took the three the member's limit let through.
+      days.add(today());
+      let counted = 0;
+      for (const day of days) counted += Number((await ctx.redis.get(keys.uploadsDay(tenant.id, day))) ?? 0);
+      expect(counted).toBe(3);
+    } finally {
+      if (previous === undefined) delete process.env.RATE_LIMIT_IN_TESTS;
+      else process.env.RATE_LIMIT_IN_TESTS = previous;
+    }
   });
 
   it("deletes the stored file when the ledger can't record it", async () => {

@@ -100,7 +100,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   Posts, comments and chat stay plain text.
 - **Uploads.** Every image goes through `storeUpload` (`processImage` in `src/lib/images.ts`, then the `uploads`
   ledger). A profile photo changes only through `applyAvatarChange`, inside the saving transaction: it must be an avatar
-  the member (or the editing admin) uploaded here, and the photo it replaces is deleted after commit if unused.
+  the member (or the editing admin) uploaded here, and the photo it replaces is deleted after commit if unused. The
+  server decides by the bytes, never the declared type. A picked file is never uploaded as it is: pickers prepare every
+  pick (`useImageUpload` with `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with
+  `prepareImageFile` on web) and check the prepared file with `imageFileProblem`, and the phone deletes both the
+  picker's copy and the prepared one afterwards.
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
   details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
   date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.
@@ -192,6 +196,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - sharp decodes and re-encodes every upload, so upload tests use real images made at test time
   (`test/helpers/images.ts`); a few fake bytes after a PNG header get 415. Its native build is per platform: don't
   share `node_modules` between Windows and a dev container.
+- expo-image-picker's `mimeType` and `fileSize` describe the source photo on Android, not the file it hands back (a
+  HEIF saved as a JPEG is still labelled image/heif, with the original's size), and iOS returns a HEIC photo as it is
+  whenever there is no editing, at any `quality` (quality 1 copies the original file). Trust neither:
+  `preparePickedPhoto` saves every pick again and reads the size from the file it wrote. A phone writes a JPEG's
+  see-through parts black (expo-image-manipulator paints nothing under them), so anything that may be transparent stays
+  a PNG.
 - Hermes may lack parts of `Intl` (compact numbers, some date formatting): shared code the phone app runs writes such
   text by hand, as `formatSalary` and `applicationsLine` do.
 - A page holding a form waits only for its queries' first answer (`isLoading && !isFetched`, see `RegisterPage`): a
@@ -216,8 +226,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
   - the gaps to close before launch and the smaller follow-ups in README → "Known gaps / next steps";
-  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration and jobs
-    added more), none run yet;
+  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration, jobs and
+    photo preparation added more), none run yet;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
   - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers

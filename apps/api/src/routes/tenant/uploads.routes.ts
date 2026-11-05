@@ -1,4 +1,4 @@
-import { ALLOWED_IMAGE_MIME, MAX_UPLOAD_BYTES, uploadQuerySchema } from "@illuminize/shared";
+import { IMAGE_SIZE_PROBLEM, MAX_UPLOAD_BYTES, uploadQuerySchema } from "@illuminize/shared";
 import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import type { AppContext } from "../../context";
@@ -12,11 +12,21 @@ import { storeUpload } from "../../services/uploads.service";
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  // The declared type only turns away what is plainly not a photo. Phones label a converted photo with its source's type
+  // (a JPEG as image/heic) and browsers send an unknown one as octet-stream, so storeUpload decides by the bytes.
   fileFilter: (_req, file, cb) => {
-    if ((ALLOWED_IMAGE_MIME as readonly string[]).includes(file.mimetype)) cb(null, true);
+    if (file.mimetype.startsWith("image/") || file.mimetype === "application/octet-stream") cb(null, true);
     else cb(new AppError(415, "UNSUPPORTED_MEDIA", "Only JPEG, PNG and WebP images are allowed"));
   },
 });
+
+/** Reads the one file, refusing one over the limit in the words the apps use for their own check. */
+const singleFile: RequestHandler = (req, res, next) => {
+  upload.single("file")(req, res, (err?: unknown) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") return next(new AppError(413, "PAYLOAD_TOO_LARGE", IMAGE_SIZE_PROBLEM));
+    next(err);
+  });
+};
 
 /**
  * Who may upload into an institution's storage: its members (approved, or pending/rejected while they fix their
@@ -74,7 +84,7 @@ export function uploadRoutes(ctx: AppContext): Router {
     validQuery,
     rateLimit(ctx, { bucket: "uploads", limit: 20, windowSec: 3600, keyFn: byUser }),
     tenantDailyQuota(ctx),
-    upload.single("file"),
+    singleFile,
     route({ query: uploadQuerySchema }, async ({ req, res, query }) => {
       const file = req.file;
       if (!file) throw AppError.badRequest("Attach an image in the 'file' field");

@@ -33,3 +33,16 @@ export function cameraJpeg(): Promise<Buffer> {
 
 /** PNG magic bytes followed by noise: passes the type check, fails to decode. */
 export const CORRUPT_PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+
+/**
+ * The start of an iPhone's HEIC photo: its file-type box (brand heic, compatible with mif1 and heic), then padding.
+ * sharp's prebuilt libvips can't make or read HEVC-coded HEIC, so this stands in for one.
+ */
+export const HEIC_START = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic", "ascii"), Buffer.alloc(4), Buffer.from("mif1heic", "ascii"), Buffer.alloc(256)]);
+
+/** An AVIF image: HEIF, like an iPhone's photo, but coded in AV1, which sharp can make and decode. */
+export function testAvif(): Promise<Buffer> {
+  return sharp({ create: { width: 32, height: 24, channels: 3, background: "#336699" } })
+    .avif()
+    .toBuffer();
+}

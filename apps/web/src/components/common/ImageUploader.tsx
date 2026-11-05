@@ -1,7 +1,7 @@
-import { ALLOWED_IMAGE_MIME, imageFileProblem } from "@illuminize/shared";
-import { errorMessage } from "@illuminize/shared/client";
+import { ALLOWED_IMAGE_MIME, IMAGE_TYPE_PROBLEM, imageFileProblem } from "@illuminize/shared";
+import { errorMessage, isUploadCancelled, prepareImageFile, startUpload } from "@illuminize/shared/client";
 import clsx from "clsx";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconClose, IconImage } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -31,28 +31,43 @@ export function ImageUploader({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const running = useRef<{ cancel: () => void } | null>(null);
   const [busy, setBusy] = useState(false);
   // Shown beside the button, in the same words as the profile photo picker and the mobile app.
   const [problem, setProblem] = useState<string | null>(null);
 
-  const pick = async (file: File) => {
+  // Leaving the page gives up on an upload still running.
+  useEffect(() => () => running.current?.cancel(), []);
+
+  // The picked file's type and size describe the source: a large photo is made smaller, and one the browser can decode but
+  // the server can't take (HEIC in Safari) becomes a JPEG, so only the prepared file is checked.
+  const pick = async (picked: File) => {
     setProblem(null);
-    const bad = imageFileProblem(file);
-    if (bad) {
-      if (ref.current) ref.current.value = "";
-      return setProblem(bad);
-    }
+    if (ref.current) ref.current.value = "";
+    if (!picked.type.startsWith("image/")) return setProblem(IMAGE_TYPE_PROBLEM);
     setBusy(true);
     onBusyChange?.(true);
+    let cancelled = false;
+    running.current = {
+      cancel: () => {
+        cancelled = true;
+      },
+    };
     try {
-      const { url } = await api.uploads.upload(slug, file);
+      const file = await prepareImageFile(picked, { purpose: "image" });
+      if (cancelled) return;
+      const bad = imageFileProblem(file);
+      if (bad) return setProblem(bad);
+      const upload = startUpload((signal) => api.uploads.upload(slug, file, { signal }));
+      running.current = upload;
+      const { url } = await upload.promise;
       onChange([...urls, url].slice(0, max));
     } catch (err) {
-      setProblem(errorMessage(err));
+      if (!isUploadCancelled(err)) setProblem(errorMessage(err));
     } finally {
+      running.current = null;
       setBusy(false);
       onBusyChange?.(false);
-      if (ref.current) ref.current.value = "";
     }
   };
 
@@ -69,6 +84,7 @@ export function ImageUploader({
         ))}
       {showTrigger && urls.length < max && (
         <>
+          {/* No HEIC in the list, so iPhone Safari hands a HEIC photo over as a JPEG. */}
           <input ref={ref} type="file" accept={ALLOWED_IMAGE_MIME.join(",")} className="hidden" onChange={(e) => e.target.files?.[0] && void pick(e.target.files[0])} />
           <Button
             type="button"
