@@ -1,9 +1,9 @@
-import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength } from "@illuminize/shared";
-import { errorMessage } from "@illuminize/shared/client";
+import { DELETE_ACCOUNT_CONFIRM, PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength } from "@illuminize/shared";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { Alert, Pressable, Text } from "react-native";
+import { Pressable, Text } from "react-native";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconBell, IconMail, IconPosts } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
@@ -27,7 +27,9 @@ export default function MyProfileScreen() {
   const slug = tenant.slug;
   const signOut = useSignOut();
   const deleteAccount = useDeleteAccount();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<unknown>(null);
   // Mentor and Open to work aren't on the membership: they come with the profile other members open.
   const asOthersSeeIt = useQuery({ queryKey: qk.member(slug, membership.id), queryFn: () => api.directory.profile(slug, membership.id), enabled: tenant.settings.features.directory });
   const summary = { ...membership, isMentor: asOthersSeeIt.data?.isMentor, isOpenToWork: asOthersSeeIt.data?.isOpenToWork };
@@ -39,24 +41,17 @@ export default function MyProfileScreen() {
       void qc.invalidateQueries({ queryKey: qk.member(slug, membership.id) });
     }, [qc, slug, membership.id]),
   );
-  const confirmDelete = () =>
-    Alert.alert("Delete account?", "This removes your Illuminize account and all memberships. Messages you sent stay in other people's chats and groups, shown as from a Deleted member, and groups you own pass to the member who has been in them longest. It cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          setDeleting(true);
-          try {
-            await deleteAccount();
-          } catch (err) {
-            Alert.alert("Could not delete your account", errorMessage(err));
-          } finally {
-            setDeleting(false);
-          }
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+    } catch (err) {
+      setDeleteError(err);
+    } finally {
+      setDeleting(false);
+    }
+  };
   return (
     <Screen title="My profile">
       {/* What's saved, laid out as on the member's own page. A current pupil sees their links here; nobody else does. */}
@@ -135,7 +130,25 @@ export default function MyProfileScreen() {
         </Pressable>
       </Card>
       <Button title="Sign out" variant="outline" onPress={() => void signOut(`/t/${slug}`)} />
-      <Button title="Delete my account" variant="ghost" loading={deleting} onPress={confirmDelete} />
+      <Button
+        title="Delete my account"
+        variant="ghost"
+        onPress={() => {
+          setDeleteError(null);
+          setConfirmingDelete(true);
+        }}
+      />
+      <ConfirmSheet
+        open={confirmingDelete}
+        title={DELETE_ACCOUNT_CONFIRM.title}
+        body={DELETE_ACCOUNT_CONFIRM.body}
+        confirmLabel={DELETE_ACCOUNT_CONFIRM.confirm}
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Screen>
   );
 }

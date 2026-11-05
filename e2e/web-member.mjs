@@ -801,6 +801,20 @@ try {
     await shot("08i-profile-details");
   });
 
+  await step("my profile: Delete account asks first, saying a suspension or blocks would come back with the number, and Cancel keeps the account", async () => {
+    await page.goto(BASE + "/t/demo-university/app/profile");
+    await page.waitForSelector('h1:has-text("My profile")');
+    await page.getByRole("button", { name: "Delete account", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Delete your account?", exact: true });
+    await dialog.getByText("If you were suspended at an institution, or members there had blocked you, that still applies if you join again with this number.", { exact: false }).waitFor();
+    await shot("08j-delete-account-confirm");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    // Still there: the session still reads the profile.
+    await page.reload();
+    await page.waitForSelector('h1:has-text("My profile")');
+  });
+
   await step("jobs: the skills on your profile are marked on a job's page and come first on its card", async () => {
     // The step above gave this member "typescript" and "aws", the seeded Backend job's second and fourth skills. At a
     // phone's width, where a card mustn't grow.

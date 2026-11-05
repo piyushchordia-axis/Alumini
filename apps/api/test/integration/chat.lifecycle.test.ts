@@ -4,13 +4,14 @@ import { and, eq, sql } from "drizzle-orm";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, memberships, mentorProfiles, mentorships, notifications, referralRequests, tenants } from "../../src/db/schema";
+import { chatBlocks, chatConversations, chatGroups, chatMessages, chatParticipants, chatReports, deletedAccountBlocks, memberships, mentorProfiles, mentorships, notifications, referralRequests, tenants } from "../../src/db/schema";
+import { phoneHash } from "../../src/lib/phoneHash";
 import { runInTransaction } from "../../src/lib/transaction";
 import { chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
-import { acceptedThread, ageRequest, chatApi, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
-import { auth, createMembership, createTenant, loginAs, memberSession } from "../helpers/factories";
+import { acceptedThread, ageRequest, chatApi, comparable, comparableMessage, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
+import { PROFILE, auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { acceptedMentorship, askMentor, mentorshipApi, NOTE, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { acceptedReferral, askForReferral, postReferralJob, REFERRAL_NOTE, referralsApi } from "../helpers/referrals";
@@ -68,22 +69,48 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
       expect([row.directLowId, row.directHighId].filter(Boolean)).toEqual([b.membership.id]);
     });
 
-    it("removes their participant row and blocks, and lets the same phone start afresh", async () => {
+    it("removes their participant row and blocks, keeps the blocks on them for their number, and gives those back unseen when it joins again", async () => {
       const { tenant, a, b, chat } = await setup();
+      const [c, d] = [await memberSession(ctx, tenant.id), await memberSession(ctx, tenant.id)];
       const id = await acceptedThread(ctx, tenant.slug, a, b);
       await chat(b).block(a.membership.id);
+      // One they placed, which goes with them.
+      await chat(a).block(c.membership.id);
+      const [placed] = await ctx.db.select().from(chatBlocks).where(eq(chatBlocks.blockerMembershipId, b.membership.id));
       await deleteAccount(a);
       expect(await ctx.db.select().from(chatParticipants).where(eq(chatParticipants.conversationId, id))).toHaveLength(1);
       expect(await ctx.db.select().from(chatBlocks)).toEqual([]);
+      const held = await ctx.db.select().from(deletedAccountBlocks);
+      expect(held).toEqual([{ phoneHash: phoneHash(ctx.config, a.user.phoneE164), tenantId: tenant.id, blockerMembershipId: b.membership.id, blockedAt: placed!.createdAt }]);
+      expect(JSON.stringify(held)).not.toContain(a.user.phoneE164.slice(3));
 
+      // Back through the real sign-in and registration.
       const session = await loginAs(ctx, a.user.phoneE164);
       expect(session.user.id).not.toBe(a.user.id);
-      const membership = await createMembership(ctx, tenant.id, session.user.id);
-      const back = { membership, headers: auth(session.accessToken) };
-      const fresh = await chat(back as Session).direct(b.membership.id, "New me");
-      expect(fresh.status).toBe(201);
-      expect(fresh.body.data.conversation.id).not.toBe(id);
-      expect(fresh.body.data.message.seq).toBe(1);
+      const joined = await request(ctx.app).post(`/api/v1/t/${tenant.slug}/memberships`).set(auth(session.accessToken)).send(PROFILE);
+      expect(joined.status).toBe(201);
+      expect(joined.body.data.status).toBe("APPROVED");
+      const back = chatApi(ctx, tenant.slug, { headers: auth(session.accessToken) });
+      expect(await ctx.db.select().from(deletedAccountBlocks)).toEqual([]);
+      expect(await ctx.db.select().from(chatBlocks)).toEqual([expect.objectContaining({ blockerMembershipId: b.membership.id, blockedMembershipId: joined.body.data.id, createdAt: placed!.createdAt })]);
+      expect((await chat(b).blocks()).body.data.map((r: { member: { id: string } }) => r.member.id)).toEqual([joined.body.data.id]);
+
+      // Their first message to the blocker is withheld, and looks to them like any first message to someone who hasn't.
+      const normal = await chat(c).direct(d.membership.id, "New me", "key-for-comparing-1");
+      const blocked = await back.direct(b.membership.id, "New me", "key-for-comparing-2");
+      expect(blocked.status).toBe(normal.status);
+      expect(blocked.body.data.conversation.id).not.toBe(id);
+      expect(comparable(blocked.body.data.conversation)).toEqual(comparable(normal.body.data.conversation));
+      expect(comparableMessage(blocked.body.data.message)).toEqual(comparableMessage(normal.body.data.message));
+      const view = async (as: ReturnType<typeof chatApi>, conversationId: string) => ({
+        thread: comparable((await as.get(conversationId)).body.data),
+        listRow: comparable(((await as.list()).body.data as ChatConversationDto[]).find((t) => t.id === conversationId)!),
+        badge: (await as.badge()).body.data,
+      });
+      expect(await view(back, blocked.body.data.conversation.id)).toEqual(await view(chat(c), normal.body.data.conversation.id));
+      const [stored] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, blocked.body.data.conversation.id));
+      expect(stored!.withheld).toBe(true);
+      expect((await chat(b).list("REQUESTS")).body.data).toEqual([]);
     });
 
     it("lets one member keep threads with several people who've since deleted their accounts", async () => {

@@ -104,7 +104,9 @@ export function RegisterPage() {
             const m = await api.membership.register(slug, values);
             qc.setQueryData(qk.membership(slug), m);
             await qc.invalidateQueries({ queryKey: qk.me });
-            toast.success(m.status === "APPROVED" ? `Welcome to ${t.name}!` : "Submitted for approval");
+            // A suspension held from a deleted account comes back SUSPENDED: no toast, the pending page says so (as on mobile).
+            if (m.status === "APPROVED") toast.success(`Welcome to ${t.name}!`);
+            else if (m.status === "PENDING") toast.success("Submitted for approval");
             navigate(m.status === "APPROVED" ? `/t/${slug}/app` : `/t/${slug}/pending`, { replace: true });
           }}
         />

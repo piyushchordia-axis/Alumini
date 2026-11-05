@@ -837,6 +837,27 @@ because admins can read everything in that view. Instead:
   left empty.
 - All sessions are revoked once it commits, and their devices' push tokens are forgotten. Their profile photos that no
   other profile shows are deleted then too.
+- **Safety holds.** A suspension, and each block other members placed on them, is kept under a keyed hash of their
+  phone number (HMAC-SHA256 of the E.164 number with `PHONE_HASH_KEY`, or a key derived from `JWT_SECRET`) in
+  `deleted_account_suspensions` and `deleted_account_blocks`. Nothing else about them goes in those tables, blocks they
+  placed go, and an account with neither leaves no row there (the audit row below keeps the hash all the same). Before
+  reading what to keep, the deletion takes the locks the cascade would (the user's row, then their memberships), so a
+  suspension or a block still being committed, or a membership a rejoin is inserting, is waited for and kept rather than
+  deleted unseen. Holds don't expire: one ends when it's taken back, or when the blocker's membership or the institution
+  is deleted. If the number joins that institution again (registering, or staff making them an admin), the new
+  membership takes them back in its transaction, so a registration that fails leaves them held: a suspension makes it a
+  suspended member ("Suspended before this account was deleted"), whatever an invitation or the approval mode would
+  give, with no request for admins and a `membership.suspension_restored` audit row; held blocks are placed again with
+  their first date, silently ("Blocks are invisible", above). From then on they're an ordinary suspension (the
+  Suspended tab, Reinstate) and ordinary blocks (Blocked members, Unblock); there is no screen for holds. Staff
+  assigning such a number as an admin get "This member is suspended. Reinstate them first.", as for any suspended
+  member, once the suspension is back. Both apps' confirmation says so before anything is deleted. A number stored
+  before today's length rules is hashed as stored, so such an account can still be deleted.
+- It's audited as `auth.account_deleted` in the same transaction (no actor, the user as target, the request's IP), with
+  the phone hash, the number of memberships and of suspensions kept, never the number itself or anything about blocks.
+  Every deletion writes this row, whether or not anything is held, and audit rows are never purged: the keyed hash of
+  every deleted account's number stays in the platform audit log, which staff can read. Migration 0032 took the raw
+  number out of the rows earlier deletions wrote.
 
 **Suspending a member** blocks their REST calls in that institution and stops chat delivery to them (`chatRecipients()`
 leaves them out). Their live connection stays open, because they may be active in other institutions. Their chat
@@ -1045,6 +1066,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   `CORS_ORIGINS`, `PLATFORM_ADMIN_PHONES` and the OTP provider variables. Production refuses `OTP_PROVIDER=console`
   (codes would only be logged) unless `OTP_ALLOW_CONSOLE_IN_PRODUCTION=true` for a throwaway demo. Put Redis in
   persistent (AOF) mode.
+- `PHONE_HASH_KEY` (optional, at least 32 characters) keys the hash kept of a deleted account's phone number. Set it
+  once and keep it: changing it, or `JWT_SECRET` while it's unset, forgets every suspension and block held for
+  deleted accounts.
 - `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) limits image uploads per institution per day; `BILLING_TIMEZONE` sets the
   billing calendar.
 - Every upload is re-encoded with sharp inside the API process, at most two images at a time per process, and each can
@@ -1082,11 +1106,14 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 **To close before launch.**
 
 - **Legal.** There is no privacy policy. Children's data (India's DPDP Act, going by the +91 numbers) and a retention
-  period for messages and for removed message text need a lawyer's review.
+  period for messages and for removed message text need a lawyer's review. The policy must also cover keeping a keyed
+  hash of a deleted account's phone number with no expiry (see "Account deletion and suspension"): in the holds, for as
+  long as a suspension or a member's block on them stands, and in the `auth.account_deleted` audit row every deletion
+  writes, held or not, for good, next to the old user id and the request's IP. Whoever has the key can find the number
+  from the hash by trying every number. It must cover too the raw numbers a deletion still leaves: in invitations, in
+  outbound message records, and in the `platform.tenant.create` audit row of an institution whose first admin they
+  were (its `initialAdmin`).
 - **The pupil rule trusts what members enter.** A pupil who gives a false batch year or date of birth gets through.
-- **Deleting and rejoining clears blocks and a suspension.** Someone blocked or suspended can delete their account and
-  sign in again with the same phone. Fixing it means keeping a hashed phone after deletion, which waits for the
-  privacy policy.
 - **The platform console shows no count of escalated chat reports** yet: staff are alerted by email (see "Chat reports
   and admin access"), but its nav has no badge.
 - **Staff can change who is an admin and then read a report that change escalated.** Each staff action records why it
@@ -1120,7 +1147,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     the thread accepted, while the other still sees their own request waiting and can't write.
   - Withheld messages leave a jump in `seq` for the blocker after an unblock, which costs their app one gap fill that
     finds nothing.
-  - `auth.account_deleted` is audited before the deletion's transaction, so a deletion that fails still leaves the row.
+  - Rotating `PHONE_HASH_KEY` (or `JWT_SECRET` while it stands in for one) forgets every hold, and the hash of a phone
+    number can be found by trying every number if the key leaks. Two people deleting their accounts at the same moment,
+    one of whom had blocked the other, can make one deletion fail (on the blocker's membership going, or a deadlock);
+    it succeeds when tried again.
   - Deleting an account sends no `chat:changed` to the other member of each 1:1 thread, so an open thread shows the
     deleted member until it next refetches.
 - Mentorship: while mentorship or messaging is off, or the mentor is a current pupil, the decline route is gated but

@@ -52,6 +52,7 @@ import {
 import { findOrCreateUserByPhone, findUserById, searchUsers, updateUser } from "../repositories/users.repo";
 import type { AuthContext, MembershipRow, TenantRow } from "../types/request";
 import { recordAudit, recordAuditStrict } from "./audit.service";
+import { heldSuspensionColumns, restoreHeldSanctions, takeHeldSanctions } from "./deletedAccounts.service";
 import { featuresToStore, invalidateTenantCache } from "./tenant.service";
 
 interface PlatformActor extends AuthContext {
@@ -120,53 +121,62 @@ function fallbackAdminBatchYear(tenant: Pick<TenantRow, "timezone">, settings: {
   return Math.max(settings.minBatchYear, Math.min(settings.maxBatchYear, lastYear));
 }
 
+const SUSPENDED_ADMIN = "This member is suspended. Reinstate them first.";
+
+interface EnsuredAdmin {
+  membership: MembershipRow;
+  created: boolean;
+  from: MembershipRow["status"] | null;
+  /** Inserted with a suspension held from a deleted account, so not an admin. */
+  suspended: boolean;
+}
+
 /**
  * Makes someone an admin here, a new member or an existing one. Never lifts a suspension: that's a reinstatement, which the
  * institution's admins record with a reason, and the member's row is held from this check to the change so one can't land
- * in between. Runs in the caller's transaction, which audits it.
+ * in between. A new membership takes back what the number held here before an account of theirs was deleted: blocks, and
+ * a suspension, which it's inserted with as a plain member (`suspended`), for the caller to refuse once that's committed.
+ * Runs in the caller's transaction, which audits it.
  */
 async function ensureAdminMembership(
+  ctx: AppContext,
   db: DbClient,
   tenant: TenantRow,
   input: AssignAdminInput,
-  actorUserId: string,
+  actor: PlatformActor,
   fallbackBatchYear: number,
-): Promise<{ membership: MembershipRow; created: boolean; from: MembershipRow["status"] | null }> {
+): Promise<EnsuredAdmin> {
   const { e164, region } = normalizePhone(input.phone);
   const user = await findOrCreateUserByPhone(db, e164, region);
   const found = await findMembership(db, tenant.id, user.id);
   if (found) await lockMembership(db, tenant.id, found.id);
   const existing = found && (await findMembershipById(db, tenant.id, found.id));
-  if (existing?.status === "SUSPENDED") throw AppError.conflict("This member is suspended. Reinstate them first.");
-  const result = existing
-    ? {
-        membership: (await updateMembership(db, tenant.id, existing.id, {
-          role: "TENANT_ADMIN",
-          status: "APPROVED",
-          statusReason: null,
-          statusChangedAt: existing.status === "APPROVED" ? existing.statusChangedAt : new Date(),
-          statusChangedByUserId: existing.status === "APPROVED" ? existing.statusChangedByUserId : actorUserId,
-        }))!,
-        created: false,
-        from: existing.status,
-      }
-    : {
-        membership: await insertMembership(db, {
-          tenantId: tenant.id,
-          userId: user.id,
-          role: "TENANT_ADMIN",
-          status: "APPROVED",
-          statusChangedAt: new Date(),
-          statusChangedByUserId: actorUserId,
-          fullName: input.fullName,
-          batchYear: input.batchYear ?? fallbackBatchYear,
-          professionType: "OTHER",
-          city: tenant.city,
-          country: tenant.country,
-        }),
-        created: true,
-        from: null,
-      };
+  if (existing?.status === "SUSPENDED") throw AppError.conflict(SUSPENDED_ADMIN);
+  let result: EnsuredAdmin;
+  if (existing) {
+    const membership = (await updateMembership(db, tenant.id, existing.id, {
+      role: "TENANT_ADMIN",
+      status: "APPROVED",
+      statusReason: null,
+      statusChangedAt: existing.status === "APPROVED" ? existing.statusChangedAt : new Date(),
+      statusChangedByUserId: existing.status === "APPROVED" ? existing.statusChangedByUserId : actor.userId,
+    }))!;
+    result = { membership, created: false, from: existing.status, suspended: false };
+  } else {
+    const held = await takeHeldSanctions(ctx, db, tenant.id, e164);
+    const membership = await insertMembership(db, {
+      tenantId: tenant.id,
+      userId: user.id,
+      ...(held.suspendedAt ? { role: "MEMBER", ...heldSuspensionColumns() } : { role: "TENANT_ADMIN", status: "APPROVED", statusChangedAt: new Date(), statusChangedByUserId: actor.userId }),
+      fullName: input.fullName,
+      batchYear: input.batchYear ?? fallbackBatchYear,
+      professionType: "OTHER",
+      city: tenant.city,
+      country: tenant.country,
+    });
+    await restoreHeldSanctions(db, membership, held, { actorUserId: actor.userId, actorMembershipId: null, ip: actor.ip });
+    result = { membership, created: true, from: null, suspended: !!held.suspendedAt };
+  }
   // The user's row after the membership's, as registering and editing a profile take them: the other way round, assigning
   // someone as they register could deadlock.
   if (!user.displayName) await updateUser(db, user.id, { displayName: input.fullName });
@@ -199,7 +209,9 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
       updatedByUserId: actor.userId,
     });
     if (input.initialAdmin) {
-      await ensureAdminMembership(tx, tenant, input.initialAdmin, actor.userId, fallbackAdminBatchYear(tenant, settings));
+      const ensured = await ensureAdminMembership(ctx, tx, tenant, input.initialAdmin, actor, fallbackAdminBatchYear(tenant, settings));
+      // A new institution holds nothing, so no suspension can come back with the number; refused all the same if one did.
+      if (ensured.suspended) throw AppError.conflict(SUSPENDED_ADMIN);
     }
     await recordAuditStrict(tx, {
       tenantId: tenant.id,
@@ -279,7 +291,9 @@ export async function listPlatformTenantAdmins(ctx: AppContext, tenantId: string
 export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, tenantId: string, input: AssignAdminInput): Promise<AdminMemberDto> {
   const { tenant, settings } = await loadTenant(ctx, tenantId);
   const membership = await runInTransaction(ctx, async (tx) => {
-    const { membership, created, from } = await ensureAdminMembership(tx, tenant, input, actor.userId, fallbackAdminBatchYear(tenant, settings));
+    const { membership, created, from, suspended } = await ensureAdminMembership(ctx, tx, tenant, input, actor, fallbackAdminBatchYear(tenant, settings));
+    // Their suspension came back with their number: kept, so the institution sees it and can lift it, but not made an admin.
+    if (suspended) return null;
     await recordAuditStrict(tx, {
       tenantId,
       actorUserId: actor.userId,
@@ -291,6 +305,7 @@ export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, t
     });
     return membership;
   });
+  if (!membership) throw AppError.conflict(SUSPENDED_ADMIN);
   const { user } = (await findMembershipWithUser(ctx.db, tenantId, membership.id))!;
   return toAdminMemberDto(membership, user);
 }

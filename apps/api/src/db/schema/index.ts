@@ -20,3 +20,4 @@ export * from "./chat";
 export * from "./mentorship";
 export * from "./referrals";
 export * from "./uploads";
+export * from "./deletedAccounts";

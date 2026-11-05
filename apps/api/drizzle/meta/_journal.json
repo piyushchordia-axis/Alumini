@@ -225,6 +225,13 @@
       "when": 1793876352497,
       "tag": "0031_chat_report_staff_alert",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793882461445,
+      "tag": "0032_deleted_account_holds",
+      "breakpoints": true
     }
   ]
 }

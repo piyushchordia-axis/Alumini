@@ -34,6 +34,7 @@ import type { AuthContext, MembershipRow, TenantContext, TenantRow } from "../ty
 import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
+import { heldSuspensionColumns, restoreHeldSanctions, takeHeldSanctions } from "./deletedAccounts.service";
 import { notify, notifyTenantAdmins } from "./notifications/notification.service";
 import { applyAvatarChange } from "./uploads.service";
 
@@ -108,7 +109,8 @@ function assertBatchYear(tenantCtx: TenantContext, batchYear: number | undefined
 /**
  * Joins (or re-applies to) an institution. An open invitation for the person's OTP-verified phone lets them in even
  * when self-registration is closed, approves them straight away when the institution auto-approves invitees, and is
- * marked accepted in the same transaction. An invitation never lifts a suspension.
+ * marked accepted in the same transaction. An invitation never lifts a suspension, nor one held from before the account
+ * was deleted, which a new membership is inserted with (and so tells no admin of a request).
  */
 export async function registerMembership(ctx: AppContext, tenantCtx: TenantContext, actor: Actor, input: MembershipProfileInput): Promise<MembershipDto> {
   const { tenant, settings } = tenantCtx;
@@ -148,17 +150,19 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
       }))!;
       action = "membership.reapply";
     } else {
+      // Their number may have been suspended here, or blocked, before an earlier account of theirs was deleted.
+      const held = await takeHeldSanctions(ctx, tx, tenant.id, user?.phoneE164);
       row = await insertMembership(tx, {
         tenantId: tenant.id,
         userId: actor.userId,
-        status,
         role: "MEMBER",
         fullName: input.fullName,
         batchYear: input.batchYear,
         professionType: input.professionType,
         ...profileColumns(input, tenant),
-        statusChangedAt: status === "APPROVED" ? new Date() : null,
+        ...(held.suspendedAt ? heldSuspensionColumns() : { status, statusChangedAt: status === "APPROVED" ? new Date() : null }),
       });
+      await restoreHeldSanctions(tx, row, held, { actorUserId: actor.userId, actorMembershipId: row.id, ip: actor.ip });
       action = "membership.create";
     }
     row = await applyPupilRules(tx, tenant, row);

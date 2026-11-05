@@ -12,6 +12,11 @@ const envSchema = z.object({
 
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   OTP_PEPPER: z.string().min(16, "OTP_PEPPER must be at least 16 characters"),
+  /**
+   * Keys the hash of a deleted account's phone number, which brings back a suspension or blocks if the number joins
+   * again. Defaults to a key derived from JWT_SECRET. Changing either key forgets every such hold.
+   */
+  PHONE_HASH_KEY: z.string().min(32, "PHONE_HASH_KEY must be at least 32 characters").optional(),
   ACCESS_TOKEN_TTL_SEC: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_SEC: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),
 

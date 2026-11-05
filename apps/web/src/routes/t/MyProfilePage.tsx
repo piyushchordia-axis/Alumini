@@ -1,8 +1,9 @@
-import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength, type ProfileSection } from "@illuminize/shared";
+import { DELETE_ACCOUNT_CONFIRM, PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength, type ProfileSection } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -25,6 +26,15 @@ export function MyProfilePage() {
   const others = memberships.filter((m) => m.tenant.slug !== tenant.slug);
   const fields = useProfileFields(tenant.slug);
   const { hash } = useLocation();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteAccount = useMutation({
+    mutationFn: () => api.me.deleteAccount(),
+    onSuccess: () => {
+      qc.clear();
+      navigate("/");
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
   // Mentor and Open to work aren't on the membership: they come with the profile other members open, fetched afresh
   // each visit, so offering to mentor or looking for work elsewhere shows on return.
   const asOthersSeeIt = useQuery({
@@ -130,18 +140,20 @@ export function MyProfilePage() {
           >
             Sign out
           </Button>
-          <Button
-            variant="danger"
-            onClick={async () => {
-              if (!confirm("Delete your Illuminize account and all your memberships? Messages you sent stay in other people's chats and groups, shown as from a Deleted member, and groups you own pass to the member who has been in them longest. This cannot be undone.")) return;
-              await api.me.deleteAccount();
-              qc.clear();
-              navigate("/");
-            }}
-          >
+          <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
             Delete account
           </Button>
         </div>
+        <ConfirmDialog
+          open={confirmingDelete}
+          title={DELETE_ACCOUNT_CONFIRM.title}
+          body={DELETE_ACCOUNT_CONFIRM.body}
+          confirmLabel={DELETE_ACCOUNT_CONFIRM.confirm}
+          destructive
+          busy={deleteAccount.isPending}
+          onConfirm={() => deleteAccount.mutate()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       </Card>
     </div>
   );

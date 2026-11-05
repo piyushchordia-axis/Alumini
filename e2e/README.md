@@ -76,7 +76,8 @@ Covers:
   together, with an end year before the start refused in its row and a server error on `experiences.0.endYear` shown
   there; the meter moving to 75 with four skills, a link and a past role saved, asking for neither skills nor a link,
   and its bio item linking to About you; `#work` landing on Work on a phone with no sideways scrolling; and all of it
-  on the profile other members open, found by the new headline;
+  on the profile other members open, found by the new headline; Delete account's confirm dialog, saying a suspension
+  or blocks come back with the number, cancelled with the account still there;
 - matching skills at a phone's width, with "typescript, aws" among the skills just saved: the Backend Engineer card
   showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, its link's name saying
   "(you have this)" after each; its page keeping the job's order, the same two checked, and "You have 2 of 4 skills";
@@ -163,7 +164,8 @@ Covers:
 - Edit profile: a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
   row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
-  still to add, skills no longer among it, and `?section=about` scrolling About you into view;
+  still to add, skills no longer among it, and `?section=about` scrolling About you into view; Delete my account's
+  confirm sheet, saying a suspension or blocks come back with the number, cancelled with the account still there;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; My posts from the More
   hub, its tabs scrolling rather than truncating;
 - jobs: seeded cards with place, pay, experience and "+1 more" skills; the Work mode and experience filters behind
@@ -404,6 +406,11 @@ leave without sending, or he'll be waiting for approval there.
       heading. This checks the scroll to a section (`measureLayout`) on the new architecture.
 - [ ] TalkBack or VoiceOver, on Rahul's feed: Not now on "Complete your profile" moves focus to "Hidden for 14 days. My
       profile always shows what's left to add." The card stays away on the other phone and after restarting the app.
+- [ ] TalkBack or VoiceOver, on Rahul's My profile: Delete my account opens the confirm sheet (it used to be a system
+      alert). It's read as an alert named "Delete your account?", then the whole explanation, including "If you were
+      suspended at an institution, or members there had blocked you, that still applies if you join again with this
+      number.", then Delete account and Cancel, and focus stays in the sheet until it closes. Cancel (and Android's
+      back button) closes it and leaves the account. Don't confirm it as Rahul.
 - [ ] Links open the phone's browser, and coming back finds the app where it was: LinkedIn on Priya's profile
       (Directory), Apply and the address in How to apply on "Backend Engineer (Node.js)", its website under About the
       company, and the map link in the Mumbai alumni coffee meetup. The meetup's email address opens the mail app.

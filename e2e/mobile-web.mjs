@@ -393,6 +393,24 @@ try {
     }
     if (!(top > 0 && top < 250)) throw new Error(`?section=about left "About you" ${Math.round(top)}px down the screen`);
     await shot("m04i-profile-edit-about");
+  });
+
+  // Alert.alert, which asked before, does nothing on the web export: the sheet works on both.
+  await step("my profile: Delete my account asks first in a sheet, saying a suspension or blocks would come back with the number, and Cancel keeps the account", async () => {
+    const shown = (locator) => locator.locator("visible=true").last();
+    await page.goto(BASE + "/t/demo-university/profile");
+    await shown(page.getByRole("button", { name: "Delete my account", exact: true })).click();
+    const sheet = page.getByRole("alertdialog", { name: "Delete your account?", exact: true });
+    await sheet.getByText("If you were suspended at an institution, or members there had blocked you, that still applies if you join again with this number.", { exact: false }).waitFor();
+    const cancel = sheet.getByRole("button", { name: "Cancel", exact: true });
+    // The sheet slides up from below the screen: the shot waits until it's all in view.
+    for (let i = 0; i < 30 && !(await cancel.evaluate((el) => el.getBoundingClientRect().bottom <= window.innerHeight)); i++) await page.waitForTimeout(100);
+    await shot("m04j-delete-account-confirm");
+    await cancel.click();
+    await sheet.waitFor({ state: "hidden" });
+    // Still signed in, and still a member: the profile reads the same after a reload.
+    await page.reload();
+    await shown(page.getByRole("button", { name: "Delete my account", exact: true })).waitFor();
     // The next step starts on the feed.
     await page.goto(BASE + "/t/demo-university/feed");
     await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();

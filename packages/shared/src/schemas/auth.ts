@@ -51,3 +51,12 @@ export const deleteAccountSchema = z.object({
   confirm: z.literal(true),
 });
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+
+/** What deleting an account asks first, word for word on web and mobile. */
+export const DELETE_ACCOUNT_CONFIRM = {
+  title: "Delete your account?",
+  body:
+    "This removes your Illuminize account and all your memberships. Messages you sent stay in other people's chats and groups, shown as from a Deleted member, and groups you own pass to the member who has been in them longest. " +
+    "If you were suspended at an institution, or members there had blocked you, that still applies if you join again with this number. This cannot be undone.",
+  confirm: "Delete account",
+} as const;
