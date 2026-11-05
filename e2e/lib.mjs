@@ -274,6 +274,63 @@ export async function expectChosenChip(chip, where) {
   return { icon: look.icon, chip: look.chip };
 }
 
+/**
+ * Page colours as pageColours gives them: both apps' plain page, and the tints of it that the Institution colour
+ * background gives Demo University (#1d4ed8) and Shri Gujarati Samaj (#c2410c): 8% of the brand (pageBackdrop).
+ */
+export const PAGE_COLOURS = { plain: "241 245 249", demoUniversity: "230 236 249", samaj: "244 235 233" };
+/** A card's own background, as pageColours reads it. */
+export const WHITE = "255 255 255";
+/**
+ * The phone app's grey text as textColour reads it: slate-500 on the plain page, slate-600 on a tint or a photo. (The
+ * web app's Tailwind greys are oklch() and read a little differently, so the web journey compares before and after.)
+ */
+export const GREY_TEXT = { plain: "100 116 139", dim: "71 85 105" };
+
+/** The text colour of `locator`, as "r g b" (painted over white and read back, as pageColours does). */
+export async function textColour(locator) {
+  return locator.evaluate((el) => {
+    const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    g.fillStyle = "#ffffff";
+    g.fillRect(0, 0, 1, 1);
+    g.fillStyle = getComputedStyle(el).color;
+    g.fillRect(0, 0, 1, 1);
+    return [...g.getImageData(0, 0, 1, 1).data.slice(0, 3)].join(" ");
+  });
+}
+
+/**
+ * The colours around `locator` (one element, such as a card), each as "r g b": `own`, the element's own background, or
+ * null when it paints none, so a card that lost its background can't read as white; `surface`, what its content sits
+ * on (its own background, or else the nearest box around it that paints one); and `page`, the nearest box around it that
+ * paints a background and spans the window's width, so a card or a tray in between doesn't count. Each colour is painted
+ * over white and read back, as computed colours come as rgb(), oklch() or color().
+ */
+export async function pageColours(locator) {
+  return locator.evaluate((el) => {
+    const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    const paint = (colour) => {
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, 1, 1);
+      g.fillStyle = colour;
+      g.fillRect(0, 0, 1, 1);
+      return [...g.getImageData(0, 0, 1, 1).data.slice(0, 3)].join(" ");
+    };
+    const background = (box) => getComputedStyle(box).backgroundColor;
+    const clear = (colour) => colour === "transparent" || /^rgba\(.*,\s*0\)$/.test(colour);
+    const width = document.documentElement.clientWidth;
+    let surface = el;
+    while (surface && clear(background(surface))) surface = surface.parentElement;
+    let page = el.parentElement;
+    while (page && (clear(background(page)) || page.getBoundingClientRect().width < width - 1)) page = page.parentElement;
+    return {
+      own: clear(background(el)) ? null : paint(background(el)),
+      surface: surface ? paint(background(surface)) : null,
+      page: page ? paint(background(page)) : null,
+    };
+  });
+}
+
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const isUpload = (request) => request.method() === "POST" && /\/uploads(\?|$)/.test(request.url());
 

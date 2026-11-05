@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { expectSvgNoEmoji, scriptNotification } from "./lib.mjs";
+import { PAGE_COLOURS, WHITE, expectSvgNoEmoji, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -565,6 +565,61 @@ try {
     } finally {
       await page.setViewportSize({ width: 1280, height: 900 });
     }
+  });
+
+  await step("a background chosen on My profile tints the member app, saved, but not the admin console, and Plain puts it back", async () => {
+    await page.goto(`${BASE}/t/demo-university/app/profile`);
+    const group = page.getByRole("radiogroup", { name: "Background", exact: true });
+    const tile = (name) => group.getByRole("radio", { name, exact: true });
+    await tile("Plain").waitFor();
+    // Demo University has no cover, so no Cover tile; Plain is chosen until the member chooses another.
+    for (const [name, checked] of [["Plain", "true"], ["Institution colour", "false"], ["Your photo", "false"]]) {
+      if ((await tile(name).getAttribute("aria-checked")) !== checked) throw new Error(`the ${name} tile has aria-checked ${await tile(name).getAttribute("aria-checked")}, expected ${checked}`);
+    }
+    if (await tile("Institution cover").count()) throw new Error("an institution without a cover offers the Institution cover tile");
+    const main = page.locator("main").first();
+    if ((await pageColours(main)).page !== PAGE_COLOURS.plain) throw new Error("My profile isn't on the plain page before a background is chosen");
+    // Grey text on the page itself (the header's "Signed in as …"), which steps one shade darker on a tint.
+    const greyLine = page.locator("main h1 + p").first();
+    const plainGrey = await textColour(greyLine);
+    const choose = async (name) => {
+      const saved = page.waitForResponse((r) => /\/t\/demo-university\/memberships\/me\/appearance$/.test(r.url()) && r.request().method() === "PATCH");
+      await tile(name).click();
+      if (!(await saved).ok()) throw new Error(`choosing ${name} wasn't saved`);
+      if ((await tile(name).getAttribute("aria-checked")) !== "true") throw new Error(`the ${name} tile isn't checked once saved`);
+    };
+    await choose("Institution colour");
+    const tinted = (await pageColours(main)).page;
+    if (tinted !== PAGE_COLOURS.demoUniversity) throw new Error(`with Institution colour chosen the page is rgb ${tinted}, not Demo University's tint ${PAGE_COLOURS.demoUniversity}`);
+    const tintGrey = await textColour(greyLine);
+    const lightness = (rgb) => rgb.split(" ").reduce((sum, c) => sum + Number(c), 0);
+    if (!(lightness(tintGrey) < lightness(plainGrey))) throw new Error(`grey text on the tint is rgb ${tintGrey}, not darker than on the plain page (${plainGrey})`);
+    // Saved on the membership, so a fresh load has it, on the feed too, where post cards stay white: each paints white
+    // itself, so the tint can't show through one.
+    await page.goto(`${BASE}/t/demo-university/app/feed`);
+    const card = page.locator("main article").first();
+    await card.waitFor();
+    const feed = await pageColours(card);
+    if (feed.page !== PAGE_COLOURS.demoUniversity) throw new Error(`the feed is rgb ${feed.page} after a reload, not Demo University's tint`);
+    if (feed.own !== WHITE) throw new Error(`a post card's own background is ${feed.own ? `rgb ${feed.own}` : "clear"} on the tinted feed, not white`);
+    await shot("a09c-appearance-colour");
+    // The console, Branding included, shows the institution as everyone sees it.
+    const plainConsole = async (where) => {
+      const consolePage = (await pageColours(page.locator("main").first())).page;
+      if (consolePage !== PAGE_COLOURS.plain) throw new Error(`${where} is rgb ${consolePage} under the admin's own background, not the plain page`);
+    };
+    await page.goto(`${BASE}/t/demo-university/admin/dashboard`);
+    await page.locator("main h1").first().waitFor();
+    await plainConsole("the admin dashboard");
+    await page.goto(`${BASE}/t/demo-university/admin/settings`);
+    await page.getByRole("tab", { name: "Branding", exact: true }).click();
+    await page.waitForSelector("text=Preview");
+    await plainConsole("the Branding tab");
+    await page.goto(`${BASE}/t/demo-university/app/profile`);
+    await tile("Plain").waitFor();
+    await choose("Plain");
+    if ((await pageColours(main)).page !== PAGE_COLOURS.plain) throw new Error("Plain didn't put the plain page back");
+    if ((await textColour(greyLine)) !== plainGrey) throw new Error("Plain didn't put the plain page's grey text back");
   });
 
   await step("platform admin signs in and sees institutions", async () => {

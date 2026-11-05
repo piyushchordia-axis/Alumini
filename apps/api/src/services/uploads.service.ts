@@ -1,13 +1,13 @@
-import type { UploadPurpose } from "@illuminize/shared";
+import { resolveAppearance, type UploadPurpose } from "@illuminize/shared";
 import type { AppContext } from "../context";
 import type { DbClient } from "../db/client";
 import { AppError } from "../lib/errors";
 import { IMAGE_EXTENSIONS, processImage, sniffImageType } from "../lib/images";
 import { afterCommit, runInTransaction } from "../lib/transaction";
 import { listMembershipsForUser, lockMembershipAvatarUrl } from "../repositories/memberships.repo";
-import { deleteUploadById, findUploadByKey, insertUpload, isPhotoShown, listAvatarUploadKeys, listUnshownAvatarKeys } from "../repositories/uploads.repo";
+import { deleteUploadById, findUploadByKey, insertUpload, isPhotoPurpose, isPhotoShown, listAvatarUploadKeys, listUnshownAvatarKeys } from "../repositories/uploads.repo";
 
-/** How long a photo may sit unsaved (picked in a form that was never submitted) before the sweep deletes it. */
+/** How long a profile or background photo may sit unsaved (picked and never saved) before the sweep deletes it. */
 export const UNSAVED_AVATAR_GRACE_MS = 2 * 24 * 60 * 60_000;
 const SWEEP_BATCH = 200;
 const SWEEP_MAX_BATCHES = 10;
@@ -61,31 +61,63 @@ export async function applyAvatarChange(
   if (next === undefined) return;
   const previous = membershipId ? ((await lockMembershipAvatarUrl(tx, tenantId, membershipId)) ?? null) : null;
   if (next === previous) return;
-  if (next !== null) {
-    const key = ctx.storage.keyFromUrl(next);
-    const upload = key ? await findUploadByKey(tx, key, { lock: "share" }) : undefined;
-    const own = !!upload && upload.tenantId === tenantId && upload.purpose === "avatar" && !!upload.userId && uploaderIds.includes(upload.userId);
-    if (!own) throw AppError.badRequest("The profile photo must be uploaded here", [{ path: "avatarUrl", message: "Upload a photo from your device" }]);
+  if (next !== null && !(await isOwnPhotoUpload(ctx, tx, tenantId, next, "avatar", uploaderIds))) {
+    throw AppError.badRequest("The profile photo must be uploaded here", [{ path: "avatarUrl", message: "Upload a photo from your device" }]);
   }
-  const replaced = previous ? ctx.storage.keyFromUrl(previous) : null;
+  await removeAfterCommit(ctx, tx, previous);
+}
+
+/**
+ * The profile photo's rules (see applyAvatarChange) for a member's own background photo, changing from `previous` to
+ * `next` (undefined leaves it alone) inside the transaction that saves it. `previous` is the photo saved now, read with
+ * their row locked (lockMembershipAppearance). A new photo must be a backdrop they uploaded to this institution: only they
+ * ever change it. Once the change commits, the photo it replaces is deleted if nothing shows it.
+ */
+export async function applyBackdropPhotoChange(
+  ctx: AppContext,
+  tx: DbClient,
+  tenantId: string,
+  change: { previous: string | null; next: string | null | undefined; uploaderId: string },
+): Promise<void> {
+  const { previous, next, uploaderId } = change;
+  if (next === undefined || next === previous) return;
+  if (next !== null && !(await isOwnPhotoUpload(ctx, tx, tenantId, next, "backdrop", [uploaderId]))) {
+    throw AppError.badRequest("The background photo must be uploaded here", [{ path: "photoUrl", message: "Upload a photo from your device" }]);
+  }
+  await removeAfterCommit(ctx, tx, previous);
+}
+
+/** Whether `url` is an upload of `purpose` to this institution by one of `uploaderIds`, locking its ledger row for share. */
+async function isOwnPhotoUpload(ctx: AppContext, tx: DbClient, tenantId: string, url: string, purpose: UploadPurpose, uploaderIds: string[]): Promise<boolean> {
+  const key = ctx.storage.keyFromUrl(url);
+  const upload = key ? await findUploadByKey(tx, key, { lock: "share" }) : undefined;
+  return !!upload && upload.tenantId === tenantId && upload.purpose === purpose && !!upload.userId && uploaderIds.includes(upload.userId);
+}
+
+async function removeAfterCommit(ctx: AppContext, tx: DbClient, replacedUrl: string | null): Promise<void> {
+  const replaced = replacedUrl ? ctx.storage.keyFromUrl(replacedUrl) : null;
   if (replaced) await afterCommit(ctx, tx, () => removeAvatarsIfUnused(ctx, [replaced]));
 }
 
 /**
- * For account deletion, before the memberships go: the keys of every avatar the user uploaded and of the photos their
- * memberships show (an admin may have uploaded one). Pass them to removeAvatarsIfUnused once the deletion commits.
+ * For account deletion, before the memberships go: the keys of every profile and background photo the user uploaded and
+ * of the photos their memberships show (an admin may have uploaded a profile photo). Pass them to removeAvatarsIfUnused
+ * once the deletion commits.
  */
 export async function avatarKeysOfUser(ctx: AppContext, db: DbClient, userId: string): Promise<string[]> {
-  const shown = (await listMembershipsForUser(db, userId)).flatMap(({ membership }) => {
-    const key = membership.avatarUrl ? ctx.storage.keyFromUrl(membership.avatarUrl) : null;
-    return key ? [key] : [];
-  });
+  const shown = (await listMembershipsForUser(db, userId)).flatMap(({ membership }) =>
+    [membership.avatarUrl, resolveAppearance(membership.appearance).photoUrl].flatMap((url) => {
+      const key = url ? ctx.storage.keyFromUrl(url) : null;
+      return key ? [key] : [];
+    }),
+  );
   return listAvatarUploadKeys(db, userId, shown);
 }
 
 /**
- * Deletes each avatar upload no membership shows any more, file and ledger row, and returns how many went. Runs after
- * the change that let go of them has committed, and never throws: a photo left behind is only wasted space.
+ * Deletes each profile or background photo upload no membership shows any more, file and ledger row, and returns how
+ * many went. Runs after the change that let go of them has committed, and never throws: a photo left behind is only
+ * wasted space.
  *
  * Each runs in its own transaction that locks the ledger row first, then checks the memberships in a separate
  * statement, which under READ COMMITTED sees whatever a save holding the row (see applyAvatarChange) committed while
@@ -98,7 +130,7 @@ export async function removeAvatarsIfUnused(ctx: AppContext, keys: string[]): Pr
     try {
       const gone = await runInTransaction(ctx, async (tx) => {
         const upload = await findUploadByKey(tx, key, { lock: "update" });
-        if (!upload || upload.purpose !== "avatar") return false;
+        if (!upload || !isPhotoPurpose(upload.purpose)) return false;
         if (await isPhotoShown(tx, upload.tenantId, key)) return false;
         await ctx.storage.delete(key);
         await deleteUploadById(tx, upload.id);
@@ -106,15 +138,15 @@ export async function removeAvatarsIfUnused(ctx: AppContext, keys: string[]): Pr
       });
       if (gone) removed++;
     } catch (err) {
-      ctx.logger.warn({ err, key }, "Could not remove an unused profile photo");
+      ctx.logger.warn({ err, key }, "Could not remove an unused photo");
     }
   }
   return removed;
 }
 
 /**
- * The background sweep: deletes avatar uploads older than UNSAVED_AVATAR_GRACE_MS that no profile shows. They are
- * photos picked in a form that was never saved (or picked again before saving), and ones a failed clean-up left.
+ * The sweep: deletes profile and background photo uploads older than UNSAVED_AVATAR_GRACE_MS that no membership shows.
+ * They are photos picked in a form that was never saved (or picked again before saving), and ones a failed clean-up left.
  */
 export async function sweepUnusedAvatars(ctx: AppContext, now = new Date()): Promise<{ removed: number }> {
   const before = new Date(now.getTime() - UNSAVED_AVATAR_GRACE_MS);
@@ -126,7 +158,7 @@ export async function sweepUnusedAvatars(ctx: AppContext, now = new Date()): Pro
     // A short batch was the last; one where nothing went (storage refusing) would only repeat itself.
     if (keys.length < SWEEP_BATCH || gone === 0) break;
   }
-  if (removed > 0) ctx.logger.info({ removed }, "Removed unsaved profile photos");
+  if (removed > 0) ctx.logger.info({ removed }, "Removed unsaved photos");
   return { removed };
 }
 

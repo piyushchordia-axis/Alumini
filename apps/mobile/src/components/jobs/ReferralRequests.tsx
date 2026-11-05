@@ -110,7 +110,8 @@ export function ReferralsWayOut({ slug, box, onBoxChange, onBack }: { slug: stri
     );
   if (received.items.length === 0 && sent.items.length === 0) return <ReferralsUnavailable onBack={onBack} />;
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    // On the Jobs screen's own page, so the member's background shows through.
+    <View style={{ flex: 1 }}>
       <ReferralRequests slug={slug} box={box} onBoxChange={onBoxChange} limited header={<WayOutBanner text={referralsWayOutText(tenant.shortName ?? tenant.name, membership.chatEligible)} />} />
     </View>
   );

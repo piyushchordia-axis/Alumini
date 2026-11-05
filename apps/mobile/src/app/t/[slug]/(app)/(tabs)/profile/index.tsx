@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Pressable, Text } from "react-native";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { IconBell, IconDashboard, IconMail, IconPosts } from "@/components/icons";
+import { IconBell, IconDashboard, IconMail, IconPalette, IconPosts } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
@@ -91,6 +91,10 @@ export default function MyProfileScreen() {
         <Pressable onPress={() => router.push(`/t/${slug}/profile/account`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
           <IconMail size={18} color={theme.primary} />
           <Text style={{ color: theme.primary, fontWeight: "600" }}>Email & account</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push(`/t/${slug}/profile/appearance`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
+          <IconPalette size={18} color={theme.primary} />
+          <Text style={{ color: theme.primary, fontWeight: "600" }}>Appearance</Text>
         </Pressable>
         {isTenantAdmin && (
           <Pressable onPress={() => router.push(adminHomeHref(slug))} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>

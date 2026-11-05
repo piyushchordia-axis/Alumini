@@ -19,7 +19,7 @@ const PNG_SHRINK_TRIES = 3;
 /**
  * Turns a picked photo into one the server takes: decoded (HEIC and HEIF too), upright, at most the purpose's longest
  * side, and saved as a JPEG, or as a PNG when the source may be see-through (anything but a JPEG, HEIC or HEIF; the
- * server puts a profile photo on white). A phone paints nothing under a JPEG, so a transparent bitmap saved as one turns
+ * server puts a profile or background photo on white). A phone paints nothing under a JPEG, so a transparent bitmap saved as one turns
  * black: a PNG over the upload limit is drawn smaller instead, keeping its see-through parts. The picker's type, size
  * and dimensions describe the source, not this file, so every pick is saved again (an Android picker can label a HEIF
  * photo image/jpeg) and the size is read from the file written. The copy carries no EXIF or GPS position. Throws when the

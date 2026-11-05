@@ -1,4 +1,4 @@
-import { AVATAR_SIZE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
+import { AVATAR_SIZE, BACKDROP_MAX_SIDE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { AppError } from "./errors";
 
@@ -88,9 +88,9 @@ const tooLarge = (message: string) => new AppError(413, "PAYLOAD_TOO_LARGE", mes
  * Re-encodes an upload so what is stored is only pixels: turned upright from its EXIF orientation, with every bit of
  * metadata (GPS position, camera, EXIF) dropped, which is sharp's default output. Images keep their format and are
  * scaled to at most MAX_IMAGE_SIDE; an avatar becomes an AVATAR_SIZE square JPEG cropped around the most interesting
- * part, with any transparency on white. A file that doesn't decode is 415. One with too many pixels, one too big to
- * decode, or one whose result would still be over `maxBytes` (a file that compresses far better than its resized
- * pixels can) is 413.
+ * part, with any transparency on white; a backdrop (a member's background) becomes a JPEG of at most BACKDROP_MAX_SIDE,
+ * on white. A file that doesn't decode is 415. One with too many pixels, one too big to decode, or one whose result would
+ * still be over `maxBytes` (a file that compresses far better than its resized pixels can) is 413.
  */
 export function processImage(input: Buffer, mime: ImageMime, purpose: UploadPurpose, { maxBytes = MAX_UPLOAD_BYTES }: { maxBytes?: number } = {}): Promise<ProcessedImage> {
   return imageSlot(async () => {
@@ -105,9 +105,11 @@ export function processImage(input: Buffer, mime: ImageMime, purpose: UploadPurp
       const result =
         purpose === "avatar"
           ? await encodeFirstThatFits(await avatarPipeline(open, width, height), [(s) => s.jpeg({ quality: 82, mozjpeg: true })], maxBytes)
-          : await encodeFirstThatFits(open().autoOrient().resize(MAX_IMAGE_SIDE, MAX_IMAGE_SIDE, { fit: "inside", withoutEnlargement: true }), ENCODERS[mime], maxBytes);
+          : purpose === "backdrop"
+            ? await encodeFirstThatFits(fitInside(open, BACKDROP_MAX_SIDE).flatten({ background: "#ffffff" }), BACKDROP_ENCODERS, maxBytes)
+            : await encodeFirstThatFits(fitInside(open, MAX_IMAGE_SIDE), ENCODERS[mime], maxBytes);
       if (!result) throw tooLarge("The image is too large once processed. Use a smaller or simpler one.");
-      return { ...result, mime: purpose === "avatar" ? "image/jpeg" : mime };
+      return { ...result, mime: purpose === "image" ? mime : "image/jpeg" };
     } catch (err) {
       if (err instanceof AppError) throw err;
       if (err instanceof Error && /pixel limit/i.test(err.message)) throw tooLarge(`The image is too large. Use one under ${MAX_INPUT_PIXELS / 1_000_000} megapixels.`);
@@ -122,6 +124,14 @@ const ENCODERS: Record<ImageMime, Array<(s: Sharp) => Sharp>> = {
   "image/png": [(s) => s.png(), (s) => s.png({ palette: true })],
   "image/webp": [(s) => s.webp({ quality: 85 }), (s) => s.webp({ quality: 70 })],
 };
+
+/** A background lies under a veil that hides most of its detail, so it can lose more than a photo shown as it is. */
+const BACKDROP_ENCODERS: Array<(s: Sharp) => Sharp> = [(s) => s.jpeg({ quality: 78, mozjpeg: true }), (s) => s.jpeg({ quality: 65, mozjpeg: true })];
+
+/** Upright, and scaled down to at most `maxSide` on its longest side, never up. */
+function fitInside(open: () => Sharp, maxSide: number): Sharp {
+  return open().autoOrient().resize(maxSide, maxSide, { fit: "inside", withoutEnlargement: true });
+}
 
 async function encodeFirstThatFits(image: Sharp, encoders: Array<(s: Sharp) => Sharp>, maxBytes: number): Promise<Omit<ProcessedImage, "mime"> | null> {
   for (const encode of encoders) {

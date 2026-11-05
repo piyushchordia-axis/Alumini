@@ -2,6 +2,7 @@ import {
   PROFILE_MAX_EDUCATION,
   isCurrentPupil,
   profileLinkSchemas,
+  resolveAppearance,
   sortEducation,
   type AdminMemberDto,
   type AuditDto,
@@ -22,7 +23,8 @@ import { toTenantSummaryDto } from "./tenant.dto";
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
-function membershipFields(m: MembershipRow, fields: ProfileFieldAnswerDto[]): Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt"> {
+/** What the member and admins both see. Their own view adds the rest, such as their background, which only they see. */
+function membershipFields(m: MembershipRow, fields: ProfileFieldAnswerDto[]): Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt" | "appearance"> {
   return {
     id: m.id,
     tenantId: m.tenantId,
@@ -72,6 +74,7 @@ export function toMembershipDto(m: MembershipRow, tenant: Pick<TenantRow, "type"
     ...membershipFields(m, fields),
     chatEligible: m.status === "APPROVED" && !isCurrentPupil(tenant, m),
     profileNudgeDismissedAt: iso(m.profileNudgeDismissedAt),
+    appearance: resolveAppearance(m.appearance),
   };
 }
 

@@ -232,6 +232,13 @@
       "when": 1793882461445,
       "tag": "0032_deleted_account_holds",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793897511038,
+      "tag": "0033_member_appearance",
+      "breakpoints": true
     }
   ]
 }

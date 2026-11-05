@@ -145,14 +145,14 @@ export default function JobsScreen() {
                   {available && <Choice kind="checkbox" label={CAN_REFER_BADGE} checked={canRefer} onPress={() => setCanRefer(!canRefer)} />}
                   <Row style={{ justifyContent: "space-between" }}>
                     <Pressable ref={filtersToggle} onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" aria-expanded={showFilters} style={{ minHeight: 44, justifyContent: "center" }}>
-                      <Text style={{ color: theme.primary, fontWeight: "600" }}>
+                      <Text style={{ color: theme.pageInk, fontWeight: "600" }}>
                         {showFilters ? "Hide filters" : "Filters"}
                         {moreActive ? ` (${moreActive})` : ""}
                       </Text>
                     </Pressable>
                     {moreActive > 0 && (
                       <Pressable onPress={clearMore} accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center" }}>
-                        <Text style={{ color: colors.muted }}>Clear filters</Text>
+                        <Text style={{ color: theme.pageMuted }}>Clear filters</Text>
                       </Pressable>
                     )}
                   </Row>

@@ -1,4 +1,4 @@
-import { ALLOWED_IMAGE_MIME, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, UPLOAD_JPEG_QUALITY, type UploadPurpose } from "../constants";
+import { ALLOWED_IMAGE_MIME, BACKDROP_MAX_SIDE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, UPLOAD_JPEG_QUALITY, type UploadPurpose } from "../constants";
 import { imageFileProblem } from "../schemas/uploads";
 
 /** How long an upload may take before the apps give up on it and say so. */
@@ -56,6 +56,8 @@ export const PHOTO_UPLOAD_MAX_SIDE = 1024;
 const PREPARE: Record<UploadPurpose, { maxSide: number; flatten: boolean; reencodeFromBytes?: number }> = {
   avatar: { maxSide: PHOTO_UPLOAD_MAX_SIDE, flatten: true, reencodeFromBytes: 512 * 1024 },
   image: { maxSide: MAX_IMAGE_SIDE, flatten: false },
+  // The server stores a background as a JPEG on white of at most this size, so nothing larger is worth sending.
+  backdrop: { maxSide: BACKDROP_MAX_SIDE, flatten: true },
 };
 
 /**
@@ -135,12 +137,12 @@ interface BrowserImaging {
 /**
  * In a browser, turns a picked photo into one the server takes before it is uploaded (see photoUploadPlan): upright, at
  * most the purpose's longest side, and a JPEG on white, or a PNG that keeps the transparency of a source that may have
- * some and isn't a profile photo (a JPEG on white after all if that PNG would be over the upload limit). A browser that
- * can decode HEIC (Safari) makes a JPEG of one. A phone camera's 6 MB photo becomes a few hundred kilobytes: under the
- * limit, and quick on a slow connection. Every file is decoded, however small, since only that gives its sides: a 300 KB
- * PNG can be 9000 pixels wide, over the server's 40 megapixels. Gives back the file as it was when it is an allowed photo
- * that needs nothing, when the browser can't decode it (imageFileProblem then says why), or when the result isn't smaller
- * and the file can go as it is.
+ * some and isn't a profile or background photo (a JPEG on white after all if that PNG would be over the upload limit).
+ * A browser that can decode HEIC (Safari) makes a JPEG of one. A phone camera's 6 MB photo becomes a few hundred
+ * kilobytes: under the limit, and quick on a slow connection. Every file is decoded, however small, since only that gives
+ * its sides: a 300 KB PNG can be 9000 pixels wide, over the server's 40 megapixels. Gives back the file as it was when it
+ * is an allowed photo that needs nothing, when the browser can't decode it (imageFileProblem then says why), or when the
+ * result isn't smaller and the file can go as it is.
  */
 export async function prepareImageFile(file: File, { purpose = "image" }: { purpose?: UploadPurpose } = {}): Promise<File> {
   // The browser's own types are not in every app's build (the API's has none), so the little used here is spelled out.

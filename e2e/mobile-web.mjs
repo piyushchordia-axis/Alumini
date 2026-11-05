@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -2492,6 +2492,65 @@ try {
     } finally {
       await notice.stop();
     }
+  });
+
+  await step("Appearance: Institution colour tints the member app, saved, but not the console, and Plain puts it back", async () => {
+    await page.goto(SAMAJ + "/profile");
+    const link = page.getByRole("link", { name: "Appearance", exact: true }).locator("visible=true").last();
+    await expectSvgNoEmoji(link, "My profile's Appearance link");
+    const box = await link.boundingBox();
+    if (!box || box.height < 44) throw new Error(`My profile's Appearance link is ${box?.height}px tall, under 44px`);
+    await link.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/profile/appearance");
+    const group = page.getByRole("radiogroup", { name: "Background", exact: true }).locator("visible=true").last();
+    await group.waitFor();
+    const tile = (name) => group.getByRole("radio", { name, exact: true });
+    // The Samaj has no cover, so no Cover tile; Plain is chosen until the member chooses another.
+    const tiles = await group.getByRole("radio").evaluateAll((radios) => radios.map((r) => `${r.getAttribute("aria-label")}:${r.getAttribute("aria-checked")}`));
+    if (tiles.join() !== "Plain:true,Institution colour:false,Your photo:false") throw new Error(`the Background tiles are ${tiles.join(", ")}`);
+    for (const name of ["Plain", "Institution colour", "Your photo"]) {
+      const tileBox = await tile(name).boundingBox();
+      if (!tileBox || tileBox.height < 44) throw new Error(`the ${name} tile is ${tileBox?.height}px tall, under 44px`);
+    }
+    if ((await pageColours(group)).page !== PAGE_COLOURS.plain) throw new Error("the Appearance screen isn't on the plain page before a background is chosen");
+    // Grey text (Muted), one shade darker on a tint.
+    const greyLine = page.getByText(/^Your background for /).locator("visible=true").last();
+    if ((await textColour(greyLine)) !== GREY_TEXT.plain) throw new Error(`grey text on the plain page is rgb ${await textColour(greyLine)}, not slate-500`);
+    const choose = async (name) => {
+      const saved = page.waitForResponse((r) => /\/t\/shri-gujarati-samaj\/memberships\/me\/appearance$/.test(r.url()) && r.request().method() === "PATCH");
+      await tile(name).click();
+      if (!(await saved).ok()) throw new Error(`choosing ${name} wasn't saved`);
+      await group.locator(`[aria-label="${name}"][aria-checked="true"]`).waitFor();
+    };
+    await choose("Institution colour");
+    const tinted = (await pageColours(group)).page;
+    if (tinted !== PAGE_COLOURS.samaj) throw new Error(`with Institution colour chosen the Appearance screen is rgb ${tinted}, not the Samaj's tint ${PAGE_COLOURS.samaj}`);
+    if ((await textColour(greyLine)) !== GREY_TEXT.dim) throw new Error(`grey text on the tint is rgb ${await textColour(greyLine)}, not slate-600`);
+    await shot("m10b-appearance-colour");
+    // Saved on the membership, so a fresh load has it, on the feed's own shell, where post cards stay white: each paints
+    // white itself, so the tint can't show through one.
+    await page.goto(SAMAJ + "/feed");
+    const card = page
+      .locator("div")
+      .filter({ has: page.locator('[aria-label="Like"]') })
+      .filter({ has: page.getByRole("link") })
+      .locator("visible=true")
+      .last();
+    await card.waitFor();
+    const feed = await pageColours(card);
+    if (feed.page !== PAGE_COLOURS.samaj) throw new Error(`the feed is rgb ${feed.page} after a reload, not the Samaj's tint`);
+    if (feed.own !== WHITE) throw new Error(`a post card's own background is ${feed.own ? `rgb ${feed.own}` : "clear"} on the tinted feed, not white`);
+    // The console shows the institution as everyone sees it.
+    await page.goto(SAMAJ + "/admin");
+    const needsYou = page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last();
+    await needsYou.waitFor();
+    const consolePage = (await pageColours(needsYou)).page;
+    if (consolePage !== PAGE_COLOURS.plain) throw new Error(`the admin console is rgb ${consolePage} under the admin's own background, not the plain page`);
+    await page.goto(SAMAJ + "/profile/appearance");
+    await group.waitFor();
+    await choose("Plain");
+    if ((await pageColours(group)).page !== PAGE_COLOURS.plain) throw new Error("Plain didn't put the plain page back");
+    if ((await textColour(greyLine)) !== GREY_TEXT.plain) throw new Error("Plain didn't put the plain page's grey text back");
   });
 
   await step("an admin who loses the role is taken out of the console, and More drops its row", async () => {

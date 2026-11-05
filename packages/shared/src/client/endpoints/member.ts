@@ -1,4 +1,4 @@
-import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MembershipProfileInput, MembershipProfileUpdate, MentorProfileUpsertInput, MentorsQuery, MentorshipRequestCreateInput, MentorshipRequestsQuery, NotificationPrefsUpdate, ReferralRequestCreateInput, ReferralRequestsQuery, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
+import type { AttendeesQuery, BusinessCreateInput, BusinessListQuery, BusinessUpdateInput, ChatConversationsQuery, ChatDirectCreateInput, ChatGroupCandidatesQuery, ChatGroupCreateInput, ChatGroupsQuery, ChatGroupUpdateInput, ChatMessageCreateInput, ChatMessagesQuery, ChatMuteInput, ChatReadInput, ChatReportCreateInput, CommentCreateInput, DirectoryQuery, EventCreateInput, EventListQuery, EventUpdateInput, FundingCreateInput, FundingListQuery, FundingUpdateInput, JobCreateInput, JobListQuery, JobSeekerUpsertInput, JobUpdateInput, MemberAppearanceUpdate, MembershipProfileInput, MembershipProfileUpdate, MentorProfileUpsertInput, MentorsQuery, MentorshipRequestCreateInput, MentorshipRequestsQuery, NotificationPrefsUpdate, ReferralRequestCreateInput, ReferralRequestsQuery, NotificationsQuery, PaymentConfirmInput, PostCreateInput, PostListQuery, PostUpdateInput, ReportCreateInput, CursorQuery } from "../..";
 import type {
   CommentDto,
   CursorPage,
@@ -68,6 +68,8 @@ export function membershipEndpoints(core: ApiCore) {
     updateMe: (slug: string, input: MembershipProfileUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me", tenantSlug: slug, body: input }),
     /** Keeps the feed's profile-strength card away for PROFILE_NUDGE_SNOOZE_DAYS, on every device. */
     dismissProfileNudge: (slug: string) => core.data<MembershipDto>({ method: "POST", path: "/memberships/me/profile-nudge/dismiss", tenantSlug: slug }),
+    /** Changes the member's background here, on every device. Keys left out stay as they are. */
+    updateAppearance: (slug: string, input: MemberAppearanceUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me/appearance", tenantSlug: slug, body: input }),
   };
 }
 
@@ -274,8 +276,8 @@ export interface NativeFile {
 export function uploadEndpoints(core: ApiCore) {
   return {
     /**
-     * `purpose: "avatar"` for a profile photo: the server crops it square, and a profile accepts no other kind. `signal`
-     * cancels it (see startUpload).
+     * `purpose: "avatar"` for a profile photo: the server crops it square, and a profile accepts no other kind; likewise
+     * `"backdrop"` for a member's background photo. `signal` cancels it (see startUpload).
      */
     upload: (slug: string, file: Blob | NativeFile, opts: { filename?: string; purpose?: UploadPurpose; signal?: AbortSignal } = {}) => {
       const formData = new FormData();

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { AppearanceSettings } from "@/components/profile/AppearanceSettings";
 import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -103,6 +104,7 @@ export function MyProfilePage() {
       <Card className="p-5">
         <EmailSettings />
       </Card>
+      <AppearanceSettings />
       <Card className="p-5">
         <h2 className="font-semibold text-slate-900">Your institutions</h2>
         <ul className="mt-3 divide-y divide-slate-100">

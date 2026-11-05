@@ -54,6 +54,7 @@ Member UI follows the same craft rules as web (see root `CLAUDE.md` → **UI / U
 
 - SVG icons from `src/components/icons.tsx` (`react-native-svg`). Section tabs use icon *names* in `src/lib/sections.ts`, not emoji. Do not use emoji for nav, empty states, or chrome badges.
 - Theme tokens and elevation live in `src/theme`. Cards should read above the page background; landing is brand-first (full-bleed cover + institution hero).
+- The page is the member's chosen background: shells take its colour from `useTheme().page` and draw `PageBackdrop` (`Screen`, `SectionScreen`, `StackScreen` do), never `colors.bg`; a view that is sometimes the whole screen wraps in `PageFill`. Grey text on the page uses `Muted` or `theme.pageMuted`, brand text on it `theme.pageInk`. The admin console's wrappers and `ChatScreen` put the plain page back with `PlainPage`.
 - Feature parity: every member-facing and institution-admin change ships on web and mobile in the same change, logic both need living in `packages/shared`; the platform (staff) console is web only.
 - Admin pages not yet in the phone app (its console's home lists them as on the web console for now): member detail, moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log. When one lands, add its section to `MOBILE_ADMIN_SECTIONS` (`packages/shared/src/lib/admin.ts`) and take it off this list, CLAUDE.md's and README's.
 - After `expo install` of a native module, restart Metro; a server started before the install will fail to resolve it.

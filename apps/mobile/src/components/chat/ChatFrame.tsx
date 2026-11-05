@@ -7,7 +7,7 @@ import { IconLock } from "@/components/icons";
 import { Avatar, Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { homeHref } from "@/lib/sections";
-import { colors, spacing } from "@/theme";
+import { colors, PlainPage, spacing, useTheme } from "@/theme";
 
 /**
  * Back to whatever opened this. With nothing behind it, which the (app) anchor should rule out, the home section: a chat
@@ -27,9 +27,12 @@ export function useLeaveChatScreen() {
 export function ChatScreen({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
-    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ flex: 1, backgroundColor: colors.bg, paddingLeft: insets.left, paddingRight: insets.right }}>
-      {children}
-    </KeyboardAvoidingView>
+    // Chats stay on the plain page whatever background the member chose, and so does everything in them that reads it.
+    <PlainPage>
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ flex: 1, backgroundColor: colors.bg, paddingLeft: insets.left, paddingRight: insets.right }}>
+        {children}
+      </KeyboardAvoidingView>
+    </PlainPage>
   );
 }
 
@@ -71,11 +74,13 @@ export const iconButton = { width: 44, height: 44, borderRadius: 22, alignItems:
  * `icon` is an SVG from `components/icons.tsx`, such as `<IconLock size={32} color={colors.faint} />`; screen readers skip it.
  */
 export function ChatNotice({ icon, title, text, children }: { icon?: ReactElement; title: string; text?: string; children?: ReactNode }) {
+  // On the page it sits on: a job that can't be shown is on the member's background, a chat on the plain page.
+  const { pageMuted } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.sm }}>
       {icon ? <View aria-hidden>{icon}</View> : null}
       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" }}>{title}</Text>
-      {text ? <Text style={{ fontSize: 14, color: colors.muted, textAlign: "center", maxWidth: 320 }}>{text}</Text> : null}
+      {text ? <Text style={{ fontSize: 14, color: pageMuted, textAlign: "center", maxWidth: 320 }}>{text}</Text> : null}
       {children ? <View style={{ marginTop: spacing.md, gap: spacing.sm, width: "100%", maxWidth: 320 }}>{children}</View> : null}
     </View>
   );

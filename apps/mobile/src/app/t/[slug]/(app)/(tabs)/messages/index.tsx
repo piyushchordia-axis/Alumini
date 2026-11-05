@@ -3,7 +3,7 @@ import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMut
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
-import { Avatar, Button, EmptyState, ListEmpty, SectionScreen, Tabs } from "@/components/ui";
+import { Avatar, Button, EmptyState, ListEmpty, Muted, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -94,13 +94,14 @@ export default function MessagesScreen() {
 
   return (
     <SectionScreen>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm, backgroundColor: colors.bg }}>
+      {/* On the page itself, so the member's background shows behind the title as it does below the list. */}
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
             Messages
           </Text>
           <Pressable onPress={() => router.push(`/t/${slug}/messages/blocked`)} accessibilityRole="link" accessibilityLabel="Blocked members" style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm }}>
-            <Text style={{ fontSize: 13, color: colors.muted }}>Blocked members</Text>
+            <Muted size={13}>Blocked members</Muted>
           </Pressable>
         </View>
         {features.messaging && (

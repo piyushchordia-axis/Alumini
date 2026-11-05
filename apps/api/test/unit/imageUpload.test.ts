@@ -1,4 +1,4 @@
-import { IMAGE_TYPE_PROBLEM, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, UPLOAD_JPEG_QUALITY, imageFileProblem } from "@illuminize/shared";
+import { BACKDROP_MAX_SIDE, IMAGE_TYPE_PROBLEM, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, UPLOAD_JPEG_QUALITY, imageFileProblem } from "@illuminize/shared";
 import { PHOTO_UPLOAD_MAX_SIDE, fitWithin, photoUploadPlan, prepareImageFile } from "@illuminize/shared/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -61,6 +61,17 @@ describe("photoUploadPlan", () => {
     expect(photoUploadPlan(jpeg(512 * KB - 1, 800, 800), "avatar").reencode).toBe(false);
     expect(photoUploadPlan(jpeg(512 * KB, 800, 800), "avatar").reencode).toBe(true);
     expect(photoUploadPlan(jpeg(4 * MB, 800, 800), "image").reencode).toBe(false);
+  });
+
+  it("fits a background photo within the 1600 pixels the server keeps, and leaves a smaller one as it is", () => {
+    expect(BACKDROP_MAX_SIDE).toBe(1600);
+    expect(photoUploadPlan(jpeg(3 * MB, 4000, 3000), "backdrop")).toEqual({ reencode: true, maxSide: 1600, width: 1600, height: 1200, keepsAlpha: false });
+    expect(photoUploadPlan(jpeg(100 * KB, 10, 1601), "backdrop").reencode).toBe(true);
+    // Shown full screen, unlike a profile photo, so a large file within the side isn't shrunk for its size alone.
+    expect(photoUploadPlan(jpeg(2 * MB, 1600, 900), "backdrop")).toEqual({ reencode: false, maxSide: 1600, width: 1600, height: 900, keepsAlpha: false });
+    // A phone saves it again whatever it is, and keeps a PNG a PNG (its see-through parts would turn black), which the
+    // server then puts on white.
+    expect(photoUploadPlan({ type: "image/png", size: 10 * KB, width: 100, height: 100 }, "backdrop", { always: true })).toMatchObject({ reencode: true, keepsAlpha: true });
   });
 
   it("saves it again whatever it looks like when asked to (a phone's picker can mislabel HEIF)", () => {
@@ -195,6 +206,16 @@ describe("prepareImageFile", () => {
     const prepared = await prepareImageFile(photo("photo.webp", "image/webp", 4 * MB));
     expect(facts(prepared)).toMatchObject({ name: "photo.jpg", type: "image/jpeg", size: 900 * KB });
     expect(seen.canvases[0]!.ops).toEqual(["draw 2048x1536", PNG_AT, "fill #ffffff 2048x1536", "draw 2048x1536", JPEG_AT]);
+  });
+
+  it("makes a background photo a JPEG on white of at most 1600 pixels, a PNG included", async () => {
+    const seen = fakeBrowser({ sizes: { "wall.png": { width: 3200, height: 2400 }, "IMG_0004.jpg": { width: 4000, height: 3000 } }, encoded: () => 300 * KB });
+    const fromPng = await prepareImageFile(photo("wall.png", "image/png", 3 * MB), { purpose: "backdrop" });
+    expect(facts(fromPng)).toMatchObject({ name: "wall.jpg", type: "image/jpeg", size: 300 * KB });
+    expect(seen.canvases[0]).toMatchObject({ width: 1600, height: 1200, ops: ["fill #ffffff 1600x1200", "draw 1600x1200", JPEG_AT] });
+    const fromCamera = await prepareImageFile(photo("IMG_0004.jpg", "image/jpeg", 4 * MB), { purpose: "backdrop" });
+    expect(facts(fromCamera)).toMatchObject({ name: "IMG_0004.jpg", type: "image/jpeg", size: 300 * KB });
+    expect(seen.canvases[1]).toMatchObject({ width: 1600, height: 1200 });
   });
 
   it("makes a profile photo of 512 KB or more a JPEG on white of at most 1024 pixels, a PNG included", async () => {

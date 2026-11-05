@@ -118,6 +118,13 @@ export const OPEN_TO_LABELS: Record<OpenTo, string> = {
   INVESTING: "Investing",
 };
 
+/**
+ * The background a member chooses for the signed-in app, at one institution: the plain page, a tint of the institution's
+ * colour, the institution's cover photo, or a photo of their own (see pageBackdrop).
+ */
+export const MEMBER_BACKDROPS = ["PLAIN", "BRAND", "COVER", "PHOTO"] as const;
+export type MemberBackdrop = (typeof MEMBER_BACKDROPS)[number];
+
 export const WORK_MODES = ["ON_SITE", "HYBRID", "REMOTE"] as const;
 export type WorkMode = (typeof WORK_MODES)[number];
 export const WORK_MODE_LABELS: Record<WorkMode, string> = {
@@ -467,11 +474,16 @@ export const MAX_POST_IMAGES = 4;
 export const MAX_POLL_OPTIONS = 6;
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
-/** What an upload is for (`?purpose=`). An avatar is cropped to a square JPEG and is the only kind a profile photo may use. */
-export const UPLOAD_PURPOSES = ["image", "avatar"] as const;
+/**
+ * What an upload is for (`?purpose=`). An avatar is cropped to a square JPEG and is the only kind a profile photo may use;
+ * a backdrop is a JPEG of at most BACKDROP_MAX_SIDE and the only kind a member's own background may use.
+ */
+export const UPLOAD_PURPOSES = ["image", "avatar", "backdrop"] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 /** Side of the square a profile photo is cropped to, in pixels. */
 export const AVATAR_SIZE = 512;
+/** Longest side of a member's background photo. It sits under a veil that hides most of its detail. */
+export const BACKDROP_MAX_SIDE = 1600;
 /** Longest side of a stored image; the server scales larger ones down, and the apps prepare photos to fit it. */
 export const MAX_IMAGE_SIDE = 2048;
 /** JPEG quality (0 to 1) the apps save a prepared photo at; the server encodes it once more. */

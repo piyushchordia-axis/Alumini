@@ -13,6 +13,7 @@ export default function ProfileStack() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="account" />
       <Stack.Screen name="notification-settings" />
+      <Stack.Screen name="appearance" />
     </Stack>
   );
 }

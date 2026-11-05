@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { STORAGE_KEY_PATTERN, type StorageProvider, type StoredFile } from "./StorageProvider";
+import { keyAfterPrefix, STORAGE_KEY_PATTERN, type StorageProvider, type StoredFile } from "./StorageProvider";
 
 export interface S3StorageConfig {
   bucket: string;
@@ -47,8 +47,6 @@ export class S3Storage implements StorageProvider {
   }
 
   keyFromUrl(url: string): string | null {
-    if (!url.startsWith(this.urlPrefix)) return null;
-    const key = url.slice(this.urlPrefix.length);
-    return STORAGE_KEY_PATTERN.test(key) ? key : null;
+    return keyAfterPrefix(url, this.urlPrefix);
   }
 }

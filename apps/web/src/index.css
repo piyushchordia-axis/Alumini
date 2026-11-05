@@ -39,6 +39,8 @@
   --color-primary-wash: rgb(var(--c-primary-wash));
   --color-primary-ring: rgb(var(--c-primary-ring));
   --color-on-primary: rgb(var(--c-on-primary));
+  /* The brand as text on the member app's page (pageInk): HomeLayout sets --c-page-ink on a tint or a photo. */
+  --color-page-ink: rgb(var(--c-page-ink, var(--c-primary)));
   --color-secondary: rgb(var(--c-secondary));
   --font-sans: var(--font-body);
   --font-family-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
@@ -48,6 +50,15 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+/* On a member's Institution colour tint or background photo (HomeLayout's data-backdrop, "tint" or "image"), grey text
+   steps one shade darker, slate-500 to slate-600 and slate-400 to slate-500, so it reads at least as well as on the
+   plain page, even where the veil lets a dark photo through. Tailwind's own values, written out: here
+   var(--color-slate-500) would read the darker one set on the line above. */
+[data-backdrop] {
+  --color-slate-500: oklch(44.6% 0.043 257.281);
+  --color-slate-400: oklch(55.4% 0.046 257.417);
 }
 
 body {

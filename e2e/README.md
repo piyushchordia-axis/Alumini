@@ -156,6 +156,10 @@ Covers:
   console's dashboard counts it, the count in amber, and the sidebar's row named the same on a wider screen), and
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
   status tabs, a member's page and the Branding tab;
+- Appearance on My profile, as the Demo University admin: Plain chosen and no Cover tile without a cover; Institution
+  colour saved and tinting the page (Demo University's tint) with its grey text a shade darker, on the feed after a
+  reload too, with post cards painting their own white; the console's dashboard and Branding tab staying on the plain
+  page; and Plain putting the page and its grey text back;
 - the platform console: login, onboarding an institution with its first admin, a billing plan and usage, stats and
   user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and rows
   on a phone: the nav item's open count, why each is staff's, "About an admin" or "No other admin", and reports another
@@ -242,8 +246,12 @@ Covers:
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
   review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
   still on the web console; Back to More and to My profile; an admin notice tapped in Notifications opening the console,
-  with Back returning to the list; and, with the role taken away (answered by the script), the console leaving for the
-  feed with one set of tabs, More dropping its row, and the console opened cold doing the same;
+  with Back returning to the list; Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
+  tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
+  darker, and the feed after a reload with its post cards painting their own white, the console's home staying on the
+  plain page, and Plain putting the page and its grey text back; and, with the role taken away (answered by the
+  script), the console leaving for the feed with one set of tabs, More dropping its row, and the console opened cold
+  doing the same;
 - the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi and Diya
   Raval with their details line and 44px actions named for them, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
@@ -562,3 +570,21 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] TalkBack or VoiceOver on the members list: the status tabs are read as tabs with their counts, and each row's
       buttons with the member's name ("Approve Parth Joshi", "Reject Parth Joshi"), so one row's can't be mistaken for
       the next's. The admin's own row (search Jignesh under Approved) says "You" and has no buttons.
+
+**Appearance**
+
+On Rahul's phone, under My profile → Appearance. Choose Plain again at the end, so the other checks see the plain page.
+
+- [ ] Choose Your photo and pick a photo (on the iPhone, a HEIC one): it uploads, its tile shows it under the veil, and
+      Feed, Jobs, a job's page and My profile show it faintly behind white cards, the right way up. Rahul's web app shows
+      the same background after a reload.
+- [ ] On a low-end Android, with the photo behind, scroll the feed and a long job's page: scrolling stays smooth, the
+      photo stays put while the cards move over it, and opening or closing a screen doesn't flash another background.
+- [ ] With the photo behind, grey text written straight on the page (the line at the top of Notification settings)
+      reads easily, outdoors too.
+- [ ] Choose Change photo and then Cancel upload while a large photo is still being prepared: the background stays as
+      it was, and "Upload cancelled." is read out. Remove photo goes back to Plain, and focus moves to the Your photo
+      tile.
+- [ ] TalkBack or VoiceOver: the tiles are read as radio buttons in a "Background" group, saying which is checked, and
+      Your photo, with no photo yet, says it opens your photos.
+- [ ] As the Samaj admin (above), with Institution colour chosen: the console's screens stay on the plain page.

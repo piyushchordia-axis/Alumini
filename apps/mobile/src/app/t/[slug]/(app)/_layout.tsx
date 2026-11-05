@@ -9,6 +9,7 @@ import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { useTenant } from "@/hooks/useTenant";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
+import { ThemeProvider } from "@/theme";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
@@ -60,7 +61,10 @@ export default function AppLayout() {
   const isTenantAdmin = membership.data.role === "TENANT_ADMIN" || !!user?.isPlatformAdmin;
   return (
     <MembershipContext.Provider value={{ tenant: tenant.data, membership: membership.data, isTenantAdmin }}>
-      <Stack screenOptions={{ headerShown: false }} />
+      {/* The member's own background here, for every page they see as a member; the console puts the plain one back (PlainPage). */}
+      <ThemeProvider tenant={tenant.data} appearance={membership.data.appearance}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </ThemeProvider>
     </MembershipContext.Provider>
   );
 }

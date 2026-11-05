@@ -140,15 +140,17 @@ export function brandTones(primary: string): BrandTones {
 }
 
 /**
- * `base` with as much of the brand colour mixed in, up to 8%, as keeps slate-500 text on it at least as readable as on
- * the plain page (#f1f5f9, about 4.34:1), so a page tinted with the brand is never harder to read than a plain one.
+ * `base` with as much of the brand colour mixed in, up to 8%, as keeps `text` (grey text on the page, slate-500 unless
+ * the page darkens it) at least as readable as slate-500 on the plain page (#f1f5f9, about 4.34:1), so a page tinted
+ * with the brand is never harder to read than a plain one. With slate-500 that leaves only a trace of the brand; a page
+ * that writes its grey text in slate-600 (a member's Institution colour background) gets the whole 8%.
  */
-export function pageTint(primary: string, base = "#f8fafc"): string {
+export function pageTint(primary: string, base = "#f8fafc", text = SLATE_500): string {
   const brand = parseHex(primary) ? primary : FALLBACK_PRIMARY;
   const floor = contrastRatio(SLATE_500, PLAIN_PAGE);
   for (let percent = 8; percent > 0; percent -= 0.5) {
     const tint = mixHex(brand, base, percent / 100);
-    if (contrastRatio(SLATE_500, tint) >= floor) return tint;
+    if (contrastRatio(text, tint) >= floor) return tint;
   }
   return toHex(rgbOf(base));
 }

@@ -1,4 +1,4 @@
-import type { ProfileEducationDto, ProfileExperienceDto } from "@illuminize/shared";
+import type { MemberAppearance, ProfileEducationDto, ProfileExperienceDto } from "@illuminize/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -71,6 +71,8 @@ export const memberships = pgTable(
     education: jsonValue<ProfileEducationDto[]>("education").notNull().default(sql`'[]'::jsonb`),
     /** When they last dismissed the feed's profile-strength card, which then stays away for PROFILE_NUDGE_SNOOZE_DAYS. */
     profileNudgeDismissedAt: timestamp("profile_nudge_dismissed_at", { withTimezone: true, precision: 3 }),
+    /** The background they chose for the app here. Keys may be missing: read it through resolveAppearance. */
+    appearance: jsonValue<MemberAppearance>("appearance").notNull().default(sql`'{}'::jsonb`),
     avatarUrl: text("avatar_url"),
     isPhoneVisible: boolean("is_phone_visible").notNull().default(false),
     /** Shown on the feed's celebrations card on their birthday (day and month only) / membership anniversary. */

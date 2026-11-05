@@ -1,8 +1,8 @@
 import { errorMessage, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useRouter } from "expo-router";
-import { View } from "react-native";
 import { ChatNotice } from "@/components/chat/ChatFrame";
 import { IconJobs, IconLock } from "@/components/icons";
+import { PageFill } from "@/components/PageBackdrop";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { jobsHref } from "@/lib/referrals";
@@ -30,12 +30,14 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
   const answered = isApiClientError(error) && !isTransientError(error);
   const said = jobUnavailableText(error);
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    // Often the whole screen (a job that won't open has no shell around it), when it draws the page itself; inside a
+    // shell, the shell's page shows through.
+    <PageFill>
       <ChatNotice icon={<IconJobs size={32} color={colors.faint} />} title={title ?? said.heading} text={text ?? said.body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         <BackToJobs />
       </ChatNotice>
-    </View>
+    </PageFill>
   );
 }
 
@@ -43,10 +45,10 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
 export function ReferralsUnavailable({ onBack }: { /** In place of going back down the stack, on the Jobs screen itself. */ onBack?: () => void }) {
   const { tenant } = useMembership();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <PageFill>
       <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Referrals aren't available" text={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         {onBack ? <Button title="Back to jobs" accessibilityRole="link" onPress={onBack} /> : <BackToJobs />}
       </ChatNotice>
-    </View>
+    </PageFill>
   );
 }

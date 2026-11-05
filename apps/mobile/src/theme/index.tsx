@@ -1,4 +1,4 @@
-import { brandTones, parseHex, type TenantPublicDto } from "@illuminize/shared";
+import { brandTones, DIM_PAGE_TEXT, pageBackdrop, pageInk, parseHex, type MemberAppearance, type PageBackdropSpec, type TenantPublicDto } from "@illuminize/shared";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 export const colors = {
@@ -50,16 +50,28 @@ export interface Theme {
   primaryRing: string;
   /** Text on the brand colour: white, or near-black on a light brand. */
   onPrimary: string;
+  /**
+   * What a page draws behind its content: the member's background at this institution inside the signed-in app
+   * (pageBackdrop), the plain page everywhere else. Page shells take their colour from here, not from `colors.bg`.
+   */
+  page: PageBackdropSpec;
+  /** Grey text written on the page itself, not in a card: `colors.muted`, one shade darker on a tint or a photo (`Muted` uses it). */
+  pageMuted: string;
+  /** The brand as text written on the page itself (a Filters toggle): the brand, darkened on a tint or a photo (pageInk). */
+  pageInk: string;
 }
 
+type ThemeTenant = Pick<TenantPublicDto, "primaryColor" | "secondaryColor"> & Partial<Pick<TenantPublicDto, "coverImageUrl">>;
+
 const DEFAULT_PRIMARY = "#1d4ed8";
+const PLAIN_PAGE = pageBackdrop(null, null);
 
 function soft(hex: string): string {
   const c = parseHex(hex) ?? parseHex(DEFAULT_PRIMARY)!;
   return `rgba(${c.r},${c.g},${c.b},0.12)`;
 }
 
-function build(primary: string, secondary: string): Theme {
+function build(primary: string, secondary: string, page: PageBackdropSpec): Theme {
   const tones = brandTones(primary);
   return {
     primary,
@@ -69,20 +81,35 @@ function build(primary: string, secondary: string): Theme {
     primaryWash: tones.wash,
     primaryRing: tones.ring,
     onPrimary: tones.onPrimary,
+    page,
+    pageMuted: page.dimText ? DIM_PAGE_TEXT : colors.muted,
+    pageInk: pageInk(primary, page),
   };
 }
 
-const DEFAULT: Theme = build(DEFAULT_PRIMARY, "#0f172a");
+const DEFAULT: Theme = build(DEFAULT_PRIMARY, "#0f172a", PLAIN_PAGE);
 
-export function themeFor(tenant?: Pick<TenantPublicDto, "primaryColor" | "secondaryColor"> | null): Theme {
+/** The institution's theme; `appearance`, the member's own, gives its pages their background. */
+export function themeFor(tenant?: ThemeTenant | null, appearance?: MemberAppearance | null): Theme {
   if (!tenant) return DEFAULT;
-  return build(tenant.primaryColor, tenant.secondaryColor);
+  const page = appearance ? pageBackdrop(appearance, { primaryColor: tenant.primaryColor, coverImageUrl: tenant.coverImageUrl ?? null }) : PLAIN_PAGE;
+  return build(tenant.primaryColor, tenant.secondaryColor, page);
 }
 
 const ThemeContext = createContext<Theme>(DEFAULT);
 
-export function ThemeProvider({ tenant, children }: { tenant?: Pick<TenantPublicDto, "primaryColor" | "secondaryColor"> | null; children: ReactNode }) {
-  const value = useMemo(() => themeFor(tenant), [tenant]);
+export function ThemeProvider({ tenant, appearance, children }: { tenant?: ThemeTenant | null; appearance?: MemberAppearance | null; children: ReactNode }) {
+  const value = useMemo(() => themeFor(tenant, appearance), [tenant, appearance]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+/**
+ * Puts the plain page back under the member's background, for the admin console: the console, and any preview of the
+ * institution's look in it, show the institution as everyone else sees it.
+ */
+export function PlainPage({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  const value = useMemo(() => (theme.page === PLAIN_PAGE ? theme : build(theme.primary, theme.secondary, PLAIN_PAGE)), [theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { STORAGE_KEY_PATTERN, type StorageProvider, type StoredFile } from "./StorageProvider";
+import { keyAfterPrefix, STORAGE_KEY_PATTERN, type StorageProvider, type StoredFile } from "./StorageProvider";
 
 /**
  * Files under UPLOAD_DIR/<tenantId>/, served by Express at /uploads. Fine for development and single-server setups;
@@ -32,8 +32,6 @@ export class LocalDiskStorage implements StorageProvider {
   }
 
   keyFromUrl(url: string): string | null {
-    if (!url.startsWith(this.urlPrefix)) return null;
-    const key = url.slice(this.urlPrefix.length);
-    return STORAGE_KEY_PATTERN.test(key) ? key : null;
+    return keyAfterPrefix(url, this.urlPrefix);
   }
 }

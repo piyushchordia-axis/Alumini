@@ -9,7 +9,7 @@ import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { GroupCard, InvitationCard } from "@/components/groups/GroupCards";
 import { IconGroups, IconMail, IconSearch } from "@/components/icons";
-import { Button, EmptyState, Input, ListEmpty, SectionScreen, Tabs } from "@/components/ui";
+import { Button, EmptyState, Input, ListEmpty, Muted, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge } from "@/hooks/useChat";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -173,7 +173,7 @@ export default function GroupsScreen() {
             <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
               Groups
             </Text>
-            <Text style={{ fontSize: 13, color: colors.muted }}>Shared conversations with other members</Text>
+            <Muted size={13}>Shared conversations with other members</Muted>
           </View>
           <Button title="Create group" accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups/new`)} />
         </View>

@@ -28,7 +28,7 @@ import { IconLock, IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCards";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, SectionScreen, Spinner, Tabs } from "@/components/ui";
+import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, Muted, SectionScreen, Spinner, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -226,7 +226,7 @@ function Title({ subtitle }: { subtitle?: string }) {
       <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
         Mentors
       </Text>
-      {subtitle ? <Text style={{ fontSize: 13, color: colors.muted }}>{subtitle}</Text> : null}
+      {subtitle ? <Muted size={13}>{subtitle}</Muted> : null}
     </View>
   );
 }

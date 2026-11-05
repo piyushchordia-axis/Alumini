@@ -23,6 +23,7 @@ import type {
   JobSeniority,
   JobType,
   MaritalStatus,
+  MemberBackdrop,
   MembershipRole,
   MentorArea,
   MentorAvailability,
@@ -338,8 +339,17 @@ export interface MembershipDto {
   chatEligible: boolean;
   /** When they last dismissed the feed's profile-strength card (see showProfileNudge). */
   profileNudgeDismissedAt: string | null;
+  /** The background they chose for the app here. Only they see it, so only their own membership carries it. */
+  appearance: MemberAppearanceDto;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A member's background choice, every key filled in (see resolveAppearance; pageBackdrop says what to draw). */
+export interface MemberAppearanceDto {
+  backdrop: MemberBackdrop;
+  /** Their own background photo, kept while they use another backdrop so they can switch back. */
+  photoUrl: string | null;
 }
 
 /** A past role on a profile. Years may be blank. */
@@ -444,7 +454,7 @@ export interface MemberProfileDto extends MemberCardDto {
   canMessage: boolean;
 }
 
-export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt"> {
+export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt" | "appearance"> {
   userId: string;
   phone: string;
   lastActiveAt: string | null;

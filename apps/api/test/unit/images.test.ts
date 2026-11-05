@@ -43,6 +43,38 @@ describe("processImage", () => {
     expect(out).toMatchObject({ mime: "image/jpeg", width: 512, height: 512 });
   });
 
+  it("makes a background a JPEG on white of at most 1600 pixels, upright, never enlarged", async () => {
+    const seeThrough = await sharp({ create: { width: 3200, height: 1000, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .png()
+      .toBuffer();
+    const wide = await processImage(seeThrough, "image/png", "backdrop");
+    expect(wide).toMatchObject({ mime: "image/jpeg", width: 1600, height: 500 });
+    expect(await sharp(wide.buffer).metadata()).toMatchObject({ format: "jpeg", width: 1600, height: 500, hasAlpha: false });
+    // Its see-through pixels are white, not black.
+    const { data } = await sharp(wide.buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(Math.min(data[0]!, data[1]!, data[2]!)).toBeGreaterThan(240);
+
+    const small = await processImage(await strip(400, 300), "image/png", "backdrop");
+    expect(small).toMatchObject({ mime: "image/jpeg", width: 400, height: 300 });
+
+    // A camera photo stored on its side comes out upright: 40 wide by 80 high.
+    const turned = await sharp({ create: { width: 80, height: 40, channels: 3, background: "#cc2828" } })
+      .withMetadata({ orientation: 6 })
+      .jpeg()
+      .toBuffer();
+    expect(await processImage(turned, "image/jpeg", "backdrop")).toMatchObject({ mime: "image/jpeg", width: 40, height: 80 });
+  });
+
+  it("saves a background that is over the size limit at its lower quality, and refuses one that still doesn't fit", async () => {
+    const input = await noise(600);
+    const full = await processImage(input, "image/png", "backdrop");
+    const smaller = await processImage(input, "image/png", "backdrop", { maxBytes: full.buffer.length - 1 });
+    expect(smaller).toMatchObject({ mime: "image/jpeg", width: 600, height: 600 });
+    expect(smaller.buffer.length).toBeLessThan(full.buffer.length);
+    const refused = await refusal(processImage(input, "image/png", "backdrop", { maxBytes: 5_000 }));
+    expect(refused).toMatchObject({ status: 413, code: "PAYLOAD_TOO_LARGE" });
+  });
+
   it("re-encodes a PNG that comes out over the size limit as a palette PNG, and refuses one that still doesn't fit", async () => {
     const input = await noise(200);
     const full = await processImage(input, "image/png", "image");

@@ -1,10 +1,21 @@
 import { and, asc, eq, inArray, like, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import type { UploadPurpose } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { memberships, uploads } from "../db/schema";
 import { escapeLike } from "./content.common";
 
 export type UploadRow = typeof uploads.$inferSelect;
 export type UploadInsert = typeof uploads.$inferInsert;
+
+/**
+ * The uploads a membership shows as its own photos: a profile photo (avatar) and a background (backdrop). Only these are
+ * ever deleted, once nothing shows them; an image in a post or a listing stays.
+ */
+export const PHOTO_PURPOSES = ["avatar", "backdrop"] as const satisfies readonly UploadPurpose[];
+
+export function isPhotoPurpose(purpose: UploadPurpose): boolean {
+  return (PHOTO_PURPOSES as readonly UploadPurpose[]).includes(purpose);
+}
 
 export async function insertUpload(db: DbClient, values: UploadInsert): Promise<UploadRow> {
   const [row] = await db.insert(uploads).values(values).returning();
@@ -26,12 +37,12 @@ export async function deleteUploadById(db: DbClient, id: string): Promise<void> 
 }
 
 /**
- * Whether a membership of the institution shows the photo. A membership refers to a photo by URL, which ends with the
- * key whatever the provider's address.
+ * Whether a membership of the institution shows the photo, as its profile photo or its background. A membership refers to
+ * a photo by URL, which ends with the key whatever the provider's address.
  */
 function showsPhoto(tenantId: SQL | string, storageKey: SQL | string): SQL {
   const key = typeof storageKey === "string" ? `%/${escapeLike(storageKey)}` : sql`'%/' || ${storageKey}`;
-  return and(eq(memberships.tenantId, tenantId), like(memberships.avatarUrl, key))!;
+  return and(eq(memberships.tenantId, tenantId), or(like(memberships.avatarUrl, key), like(sql`${memberships.appearance} ->> 'photoUrl'`, key)))!;
 }
 
 export async function isPhotoShown(db: DbClient, tenantId: string, storageKey: string): Promise<boolean> {
@@ -39,18 +50,18 @@ export async function isPhotoShown(db: DbClient, tenantId: string, storageKey: s
   return rows.length > 0;
 }
 
-/** Keys of the avatar uploads among `keys`, plus every avatar the user uploaded. */
+/** Keys of the photo uploads (PHOTO_PURPOSES) among `keys`, plus every photo the user uploaded. */
 export async function listAvatarUploadKeys(db: DbClient, userId: string, keys: string[]): Promise<string[]> {
   const rows = await db
     .select({ key: uploads.storageKey })
     .from(uploads)
-    .where(and(eq(uploads.purpose, "avatar"), or(eq(uploads.userId, userId), keys.length > 0 ? inArray(uploads.storageKey, keys) : undefined)));
+    .where(and(inArray(uploads.purpose, PHOTO_PURPOSES), or(eq(uploads.userId, userId), keys.length > 0 ? inArray(uploads.storageKey, keys) : undefined)));
   return rows.map((r) => r.key);
 }
 
 /**
- * Avatar uploads from before `before` that no membership shows: photos picked and never saved, or let go of by a change
- * whose clean-up failed. Oldest first. Keys hold no LIKE wildcards (see STORAGE_KEY_PATTERN), so the key column can go
+ * Photo uploads (PHOTO_PURPOSES) from before `before` that no membership shows: photos picked and never saved, or let go
+ * of by a change whose clean-up failed. Oldest first. Keys hold no LIKE wildcards (see STORAGE_KEY_PATTERN), so the key column can go
  * into the pattern as it is.
  */
 export async function listUnshownAvatarKeys(db: DbClient, before: Date, limit: number): Promise<string[]> {
@@ -59,7 +70,7 @@ export async function listUnshownAvatarKeys(db: DbClient, before: Date, limit: n
     .from(uploads)
     .where(
       and(
-        eq(uploads.purpose, "avatar"),
+        inArray(uploads.purpose, PHOTO_PURPOSES),
         lt(uploads.createdAt, before),
         notExists(db.select({ id: memberships.id }).from(memberships).where(showsPhoto(sql`${uploads.tenantId}`, sql`${uploads.storageKey}`))),
       ),

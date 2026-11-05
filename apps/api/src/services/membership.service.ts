@@ -4,6 +4,8 @@ import {
   sortExperiences,
   type AdminMemberDto,
   type AdminMembersQuery,
+  type MemberAppearance,
+  type MemberAppearanceUpdate,
   type MembershipDto,
   type MembershipProfileInput,
   type MembershipProfileUpdate,
@@ -25,6 +27,8 @@ import {
   insertMembership,
   listMembersForAdmin,
   lockMembership,
+  lockMembershipAppearance,
+  setMembershipAppearance,
   setProfileNudgeDismissedAt,
   updateMembership,
 } from "../repositories/memberships.repo";
@@ -39,7 +43,7 @@ import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
 import { heldSuspensionColumns, restoreHeldSanctions, takeHeldSanctions } from "./deletedAccounts.service";
 import { markAdminNoticesHandled, notify, notifyTenantAdmins } from "./notifications/notification.service";
-import { applyAvatarChange } from "./uploads.service";
+import { applyAvatarChange, applyBackdropPhotoChange } from "./uploads.service";
 
 /** An admin acting on a member, or Illuminize staff. */
 export interface Actor extends AuthContext {
@@ -235,6 +239,27 @@ export async function dismissProfileNudge(ctx: AppContext, tenantCtx: TenantCont
   const row = await setProfileNudgeDismissedAt(ctx.db, tenantCtx.tenant.id, membership.id, new Date());
   if (!row) throw AppError.notFound("Membership not found");
   return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
+}
+
+/**
+ * Changes the member's background here. Keys the change leaves out stay as stored, unknown ones included. Not audited:
+ * like the profile-strength card, it is their own view of the app, which nobody else sees.
+ */
+export async function updateMyAppearance(ctx: AppContext, tenantCtx: TenantContext, membership: MembershipRow, input: MemberAppearanceUpdate): Promise<MembershipDto> {
+  const tenantId = tenantCtx.tenant.id;
+  const row = await runInTransaction(ctx, async (tx) => {
+    const stored = await lockMembershipAppearance(tx, tenantId, membership.id);
+    if (stored === undefined) throw AppError.notFound("Membership not found");
+    const next: MemberAppearance = { ...stored };
+    if (input.backdrop !== undefined) next.backdrop = input.backdrop;
+    if (input.photoUrl !== undefined) next.photoUrl = input.photoUrl;
+    if (next.backdrop === "PHOTO" && !next.photoUrl) throw AppError.badRequest("Upload a photo first", [{ path: "photoUrl", message: "Upload a photo first" }]);
+    const previous = typeof stored.photoUrl === "string" ? stored.photoUrl : null;
+    await applyBackdropPhotoChange(ctx, tx, tenantId, { previous, next: input.photoUrl, uploaderId: membership.userId });
+    return setMembershipAppearance(tx, tenantId, membership.id, next);
+  });
+  if (!row) throw AppError.notFound("Membership not found");
+  return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantId, row.id, "self"));
 }
 
 /**

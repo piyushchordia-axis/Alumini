@@ -43,7 +43,7 @@ export interface JobPayloads {
   "chat.pushEvent": { tenantId: string; conversationId: string; kind: Exclude<ChatPushKind, "CHAT_MESSAGE" | "CHAT_GROUP_INVITE">; actorMembershipId: string | null };
   /** Tell members they've been invited to a group. They aren't in it, so this names them rather than reading its participants. */
   "chat.pushGroupInvite": { tenantId: string; conversationId: string; inviteeMembershipIds: string[] };
-  /** Delete profile photos that were uploaded but never saved to a profile (see sweepUnusedAvatars). */
+  /** Delete profile and background photos that were uploaded but never saved (see sweepUnusedAvatars). */
   "uploads.sweepAvatars": Record<string, never>;
   /** Alert Illuminize staff to chat reports that have become theirs since they were filed (see sweepEscalatedChatReports). */
   "chatReports.alertStaff": Record<string, never>;

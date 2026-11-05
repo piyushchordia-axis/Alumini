@@ -1,8 +1,8 @@
-import { adminConsoleLabel, adminWaitingCount, chatAvailable, splitSections, type MemberSection } from "@illuminize/shared";
+import { adminConsoleLabel, adminWaitingCount, chatAvailable, pageBackdrop, pageInk, parseHex, splitSections, type MemberSection } from "@illuminize/shared";
 import { chatBadgeLabel, groupsBadgeLabel, type ChatBadgeLabel } from "@illuminize/shared/chat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { IconBell, IconDashboard, NavIcon, type NavIconName } from "@/components/icons";
 import { Avatar, Modal } from "@/components/ui";
@@ -76,17 +76,37 @@ export function HomeLayout() {
     }
   };
 
+  // The sidebar sits on the page, so its current link is written in the page's ink (the brand, darkened on a tint or a photo).
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
       "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-[var(--duration-fast)]",
-      isActive ? "bg-primary/12 font-semibold text-primary shadow-[inset_3px_0_0_0_rgb(var(--c-primary))]" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800",
+      isActive ? "bg-primary/12 font-semibold text-page-ink shadow-[inset_3px_0_0_0_rgb(var(--c-primary))]" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800",
     );
   const sheetRow = "flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium";
   const sheetLinkClass = ({ isActive }: { isActive: boolean }) => clsx(sheetRow, isActive ? "bg-primary/12 font-semibold text-primary" : "text-slate-700 hover:bg-slate-100");
+  // The member's own background. Set here, on the member app's root, and not on the document, so the admin console and
+  // the platform console (other layouts) stay plain. On a tint or a photo (dimText), grey text on the page steps one
+  // shade darker (index.css) and brand text on it takes pageInk.
+  const backdrop = pageBackdrop(membership.appearance, tenant);
+  const ink = backdrop.dimText ? parseHex(pageInk(tenant.primaryColor, backdrop)) : null;
+  const rootStyle = { "--surface-page": backdrop.color, ...(ink ? { "--c-page-ink": `${ink.r} ${ink.g} ${ink.b}` } : {}) } as CSSProperties;
 
   return (
-    // A full-height screen scrolls inside itself, so the page around it is exactly the window.
-    <div className={clsx("bg-[var(--surface-page)]", fullHeight ? "flex h-dvh flex-col overflow-hidden" : "min-h-full")}>
+    // A full-height screen scrolls inside itself, so the page around it is exactly the window. `isolate` keeps the photo
+    // layer's negative z-index above this root's own background.
+    <div
+      data-backdrop={backdrop.imageUrl ? "image" : backdrop.dimText ? "tint" : undefined}
+      style={rootStyle}
+      className={clsx("isolate bg-[var(--surface-page)]", fullHeight ? "flex h-dvh flex-col overflow-hidden" : "min-h-full")}
+    >
+      {backdrop.imageUrl && (
+        // Fixed, so it stays put while the page scrolls. The veil in the page colour lets through only a soft wash of the
+        // photo, over which grey text on the page reads one shade darker (index.css).
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(backdrop.imageUrl)})` }} />
+          <div className="absolute inset-0 bg-[var(--surface-page)]" style={{ opacity: backdrop.scrim }} />
+        </div>
+      )}
       <header className={clsx("sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md", immersive && "max-md:hidden")}>
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
           <NavLink to={homePath(tenant.slug, tenant.settings.features)} className="flex min-w-0 items-center gap-2">

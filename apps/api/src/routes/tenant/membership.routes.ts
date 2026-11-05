@@ -1,10 +1,10 @@
-import { membershipProfileSchema, membershipProfileUpdateSchema } from "@illuminize/shared";
+import { memberAppearanceUpdateSchema, membershipProfileSchema, membershipProfileUpdateSchema } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { requireMember } from "../../middleware/tenant";
 import { ok, route } from "../../middleware/validate";
-import { dismissProfileNudge, getMyMembership, registerMembership, updateMyProfile } from "../../services/membership.service";
+import { dismissProfileNudge, getMyMembership, registerMembership, updateMyAppearance, updateMyProfile } from "../../services/membership.service";
 import { getFieldsForMember } from "../../services/profileFields.service";
 import { findMyInvitation } from "../../services/invitations.service";
 
@@ -48,6 +48,14 @@ export function membershipRoutes(ctx: AppContext): Router {
     requireMember,
     route({ body: membershipProfileUpdateSchema }, async ({ req, res, body }) => {
       ok(res, await updateMyProfile(ctx, req.tenantCtx!, req.membership!, body));
+    }),
+  );
+
+  router.patch(
+    "/memberships/me/appearance",
+    requireMember,
+    route({ body: memberAppearanceUpdateSchema }, async ({ req, res, body }) => {
+      ok(res, await updateMyAppearance(ctx, req.tenantCtx!, req.membership!, body));
     }),
   );
 

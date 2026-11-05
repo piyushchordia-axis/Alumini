@@ -193,7 +193,8 @@ before showing the demo.
   left open can't overturn another admin's decision: the API refuses (409) and the apps say where the member stands now.
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
-  tagline, welcome message) drives the landing page and the app theme.
+  tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
+  It doesn't set the background of a member's pages: each member chooses their own (see **Appearance**).
 - A trigger (migration 0005) stamps `memberships.approved_at` when a membership becomes approved.
 
 ### Feature switches
@@ -408,7 +409,9 @@ an image (or `application/octet-stream`) is turned away unread. A body over 5 MB
   when it won't decode. Each API process works on at most two images at once.
 
 `?purpose=avatar` (the default is `image`) makes a profile photo: a 512×512 JPEG cropped around the most interesting
-part, with any transparency on white. A purpose the API doesn't know is refused before the rate limits count it.
+part, with any transparency on white. `?purpose=backdrop` makes a member's background photo (see **Appearance**): a JPEG
+on white of at most 1600 pixels on its longest side. A purpose the API doesn't know is refused before the rate limits
+count it.
 
 - **Who may upload:** members (approved, or pending or rejected while they fix their registration; not suspended),
   anyone registering where self-registration is open, anyone holding an open invitation (so an invitee at a closed
@@ -424,9 +427,10 @@ part, with any transparency on white. A purpose the API doesn't know is refused 
 - **Clean-up.** After the change commits, a replaced or removed photo's file and ledger row are deleted when no profile
   in the institution still shows it. The save and the delete both lock the photo's ledger row, so a concurrent save
   can't lose a photo in use. Deleting an account deletes the user's photos that nothing else shows. The
-  `uploads.sweepAvatars` job runs every six hours and deletes avatar uploads more than two days old that no profile
-  shows (photos picked in a form that was never saved). Storage errors are logged and never fail a request; the row
-  stays, so the sweep tries again. Only profile photos are ever deleted.
+  `uploads.sweepAvatars` job runs every six hours and deletes avatar and background uploads more than two days old
+  that no profile or background shows (photos picked in a form that was never saved). Storage errors are logged and
+  never fail a request; the row stays, so the sweep tries again. Only profile and background photos are ever deleted;
+  a background photo follows the profile photo's rules throughout (see **Appearance**).
 - **CDN copies.** S3 objects are cached as immutable for a year, so a CDN in front of the bucket may keep serving a
   deleted photo until its copy expires.
 - **The apps prepare every photo before sending it.** What a picker or a browser says about a photo (type, size,
@@ -453,6 +457,39 @@ part, with any transparency on white. A purpose the API doesn't know is refused 
   photo**, the photo prepared as above, progress, and cancel. Errors show inline and are announced. Saving waits while
   a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop. An avatar
   shows initials until its photo loads, and falls back to them if it fails.
+
+### Appearance
+
+Each member chooses the background of the signed-in app under **My profile → Appearance** (a card on the web, a screen
+in the phone app): **Plain**, **Institution colour**, **Institution cover** (offered only where the institution has a
+cover) or **Your photo**. It's saved on their membership (`memberships.appearance`, changed with
+`PATCH /t/:slug/memberships/me/appearance`), so it's chosen per institution and is the same on the web and the phone.
+Only they see it: their own membership carries it, and no admin, directory or "Use details from …" view does.
+
+- **Only the page changes.** Posts, cards, the header and the tab bar stay white, chats stay plain, and the apps stay
+  light: there's no dark mode yet (see Known gaps). The page changes as soon as a tile is chosen and goes back if the
+  save fails.
+- **Institution colour** is a light tint of the brand (`pageTint`, 8% of it). **A cover or a photo** lies under a veil
+  of the plain page colour at 85%, so only a soft wash of it shows. On either, grey text on the page itself steps one
+  shade darker (slate-500 to slate-600: the web's `[data-backdrop]` rule, the phone's `theme.pageMuted` and `Muted`), so
+  it reads at least as well as on the plain page, and brand-coloured text on the page (the web sidebar's current link,
+  the phone's Filters toggles) takes `pageInk`, the brand darkened as far as it must be to read at 4.5:1 on the darkest
+  the page gets. Without its photo (an institution that took its cover away) the page is plain, and the choice comes
+  back with the photo.
+- **Where it's drawn.** The rules are in `packages/shared/src/lib/appearance.ts`: `resolveAppearance` reads a missing or
+  unknown key as Plain, `pageBackdrop` says what to draw, and the helpers beside it say which tiles to offer. The web
+  draws it in `HomeLayout`, the member app's own layout. The phone app's `(app)` layout gives every page under it a
+  theme with it (`theme.page`), and the page shells (`Screen`, `SectionScreen`, `StackScreen`) take their colour from
+  it and draw `PageBackdrop`.
+- **The admin console stays plain** on both apps, whatever the admin chose for themselves, so it shows the institution
+  as members see it: on the web `AdminLayout` is outside `HomeLayout`, and in the phone app `AdminScreen` and
+  `AdminListScreen` put the plain page back (`PlainPage`).
+- **A background photo follows the profile photo's rules** (see Photos and uploads). The apps prepare it before it goes
+  (at most 1600 pixels, a JPEG on white) and upload it with `?purpose=backdrop`; only the member's own background upload
+  at that institution is accepted. A replaced or removed one is deleted after the change commits if nothing else shows
+  it, and so are a deleted account's and those uploaded but never saved (the sweep). Choosing **Your photo** with no
+  photo is refused ("Upload a photo first"). **Remove photo** goes back to Plain when the photo is the background, and
+  leaves another choice as it is.
 
 ### Rich text
 
@@ -519,9 +556,9 @@ OTP delivery is pluggable (`OTP_PROVIDER`):
 ### Background jobs
 
 Work that can wait (push notifications and Expo receipts, outbound messages, invitations, announcements, celebrations,
-the weekly digest, chat pushes, staff alerts for escalated chat reports and the sweep of unsaved profile photos) runs on
-BullMQ queues in Redis: `jobs`, `messages` and `chat`. Code inside a request queues a job; it never calls slow providers
-itself.
+the weekly digest, chat pushes, staff alerts for escalated chat reports and the sweep of unsaved profile and background
+photos) runs on BullMQ queues in Redis: `jobs`, `messages` and `chat`. Code inside a request queues a job; it never calls
+slow providers itself.
 
 - **Where workers run.** `WORKER_MODE=inline` (the default outside production, so `pnpm demo` needs nothing extra)
   runs them inside the API process. In production the default is `separate`: run `pnpm worker` locally, or
@@ -902,8 +939,8 @@ because admins can read everything in that view. Instead:
   without notifying anyone. Accepted referrals stay accepted.
 - Their business listings go, and the open reports on them are resolved. Chat reports survive with the deleted party
   left empty.
-- All sessions are revoked once it commits, and their devices' push tokens are forgotten. Their profile photos that no
-  other profile shows are deleted then too.
+- All sessions are revoked once it commits, and their devices' push tokens are forgotten. Their profile and background
+  photos that no other profile shows are deleted then too.
 - **Safety holds.** A suspension, and each block other members placed on them, is kept under a keyed hash of their
   phone number (HMAC-SHA256 of the E.164 number with `PHONE_HASH_KEY`, or a key derived from `JWT_SECRET`) in
   `deleted_account_suspensions` and `deleted_account_blocks`. Nothing else about them goes in those tables, blocks they
@@ -1027,7 +1064,7 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 | Public | `GET /tenants`, `GET /tenants/:slug`, `GET /invites/:token`, `GET/POST /unsubscribe`, `GET /health`, `POST /webhooks/razorpay` |
 | Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`, `POST /auth/email/verify` |
 | Me | `GET /me`, `GET /me/profile-copy` (`?exclude=<slug>`), `GET/POST/DELETE /me/email`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
-| Tenant `/t/:slug` | `memberships` (register, me, update, invitation, `me/profile-nudge/dismiss`), `profile-fields`, `uploads` (`?purpose=image\|avatar`), `directory` (+ `filters`, and one member's profile), `jobs` (+ `seekers`, and referral requests: `jobs/:id/referrals`, `jobs/referrals/mine`, `jobs/referrals/summary`, `jobs/referrals/:id/accept/decline/withdraw/report`), `funding`, `businesses`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
+| Tenant `/t/:slug` | `memberships` (register, me, update, invitation, `me/profile-nudge/dismiss`, `me/appearance`), `profile-fields`, `uploads` (`?purpose=image\|avatar\|backdrop`), `directory` (+ `filters`, and one member's profile), `jobs` (+ `seekers`, and referral requests: `jobs/:id/referrals`, `jobs/referrals/mine`, `jobs/referrals/summary`, `jobs/referrals/:id/accept/decline/withdraw/report`), `funding`, `businesses`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
 | Tenant chat `/t/:slug/chat` | `direct` (send a first message; `direct/:membershipId` finds a thread), `conversations` (`?inbox=MAIN\|REQUESTS`; one; `messages` with `?cursor` or `?afterSeq`; send; `read`, `mute`, `accept`, `decline`), `badge`, `blocks` (list, block, unblock), `messages/:id/report`, `groups` (list, create, `invites` for the member's own invitations; per group: get, edit or archive, `members`, `invite-candidates`, `join`, `leave`, `invites` to invite, `invites/accept`, `invites/decline`, `members/:membershipId` to remove) |
 | Tenant mentorship `/t/:slug/mentorship` | `me` (get, save, stop mentoring), `summary`, `mentors` (+ one), `requests` (send, list, `accept/decline/withdraw/end/report`) |
 | Tenant admin `/t/:slug/admin` | `dashboard`, `analytics`, `exports/members.csv`, `exports/activity.csv`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `mentors/:membershipId/remove`, `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `chat-reports` (list; `view`, `resolve`, `dismiss` are POSTs), `settings`, `branding`, `profile-fields`, `invitations` (import/send/revoke), `announcements/audience`, `audit` |
@@ -1152,17 +1189,19 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   `EMAIL_VERIFY_GLOBAL_DAILY_CAP` (see `apps/api/.env.example`).
 - Deploy the worker together with, or before, the API: new job types (announcement fan-out, celebrations, digest, and
   the chat pushes on the `chat` queue) are queued by the API and must have a worker that knows them. The worker also
-  runs the six-hourly sweep that deletes unsaved profile photos, so give it the API's storage settings: the same
-  `UPLOAD_DIR` volume with local storage, or the same bucket with S3.
+  runs the six-hourly sweep that deletes unsaved profile and background photos, so give it the API's storage settings:
+  the same `UPLOAD_DIR` volume with local storage, or the same bucket with S3.
 - Uploads: `STORAGE_PROVIDER=local` (default) keeps images under `UPLOAD_DIR`, served from `/uploads`, which suits one
   server with a persistent disk. For anything else set `STORAGE_PROVIDER=s3` with an S3-compatible bucket (AWS S3,
   Cloudflare R2 with `S3_REGION=auto`, DigitalOcean Spaces, MinIO): `S3_BUCKET`, `S3_PUBLIC_BASE_URL` (the bucket's
   public URL or a CDN), optional `S3_ENDPOINT`/`S3_FORCE_PATH_STYLE`, and keys or the default AWS credentials. The
   bucket must be publicly readable; objects are immutable and cached for a year. `/uploads` keeps serving older local
   files after a switch. Try it locally with `docker compose --profile s3 up -d` (MinIO, see `apps/api/.env.example`).
-  The API and the worker delete replaced and unsaved profile photos, so S3 credentials need `DeleteObject` as well as
-  `PutObject`; a refused delete is logged, and the sweep tries again. A CDN may keep serving a deleted photo until its
-  cached copy expires, and files stored on local disk before a switch to S3 are never deleted from it.
+  The API and the worker delete replaced and unsaved profile and background photos, so S3 credentials need
+  `DeleteObject` as well as `PutObject`; a refused delete is logged, and the sweep tries again. A CDN may keep serving a
+  deleted photo until its cached copy expires, and files stored on local disk before a switch to S3 are never deleted
+  from it. The API knows its own files by `S3_PUBLIC_BASE_URL` (or `PUBLIC_BASE_URL`) as written and as a URL parser
+  writes it (a lower-case host, no default port), since a background photo's address is saved in that form.
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
   at the API (or proxy `/api` and `/uploads`).
 - CI (`.github/workflows/ci.yml`) checks that sharp loads, then runs lint, typecheck, the API test-suite against
@@ -1202,7 +1241,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   skills and its card, a job's add-skills link bringing back a profile editor already open, and the edit screen's
   scroll to a section (`measureLayout`) on the new architecture. Photo preparation added HEIC from an iPhone and HEIF
   from Android, 48 and 50 megapixel photos, transparent PNG and GIF logos and a large cut-out PNG, cancelling while a
-  photo is prepared and iPhone Safari's own HEIC conversion.
+  photo is prepared and iPhone Safari's own HEIC conversion. Appearance added picking a background photo and
+  scrolling over one on a low-end Android.
   The keyboard fix for Android's edge-to-edge windows needs the long forms checked.
 - **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
@@ -1242,11 +1282,12 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     dialog and refreshes the list.
   - Illuminize staff reach only escalated chat reports, even in an institution where they are genuine admins.
 - Uploads:
-  - A CDN in front of S3 may keep serving a deleted profile photo until its cached copy expires.
-  - Only a profile photo has to be the member's own upload. Job company logos, business logos, post images and event
-    covers take any http(s) address, so one can point at someone else's upload, or at a server that logs whoever views
-    it.
-  - Only profile photos are ever deleted: other uploads stay in storage after whatever used them changes or goes.
+  - A CDN in front of S3 may keep serving a deleted profile or background photo until its cached copy expires.
+  - Only a profile or background photo has to be the member's own upload. Job company logos, business logos, post
+    images and event covers take any http(s) address, so one can point at someone else's upload, or at a server that
+    logs whoever views it.
+  - Only profile and background photos are ever deleted: other uploads stay in storage after whatever used them changes
+    or goes.
 - Links:
   - In rich text, an address whose host is written beyond ASCII (an internationalised domain) stays plain text rather
     than becoming a link.
@@ -1285,6 +1326,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
   - UI follow-ups: deeper tenant theming / branding preview in admin, and skeleton loaders and purposeful motion.
+  - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
+    mode. Members choose only their pages' background (see Appearance).
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls on both
     apps and in the consoles (close, back, send, checkmarks, the analytics arrows) rather than the shared SVG set.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.

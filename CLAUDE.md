@@ -25,7 +25,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `src/lib/profile.ts` holds the profile's sections and registration steps, strength, hidden inputs and "Use details
   from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
-  of an institution colour (`brandTones`).
+  of an institution colour (`brandTones`); `lib/appearance.ts` a member's background (`resolveAppearance`,
+  `pageBackdrop` and the tiles both apps offer).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -109,7 +110,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   server decides by the bytes, never the declared type. A picked file is never uploaded as it is: pickers prepare every
   pick (`useImageUpload` with `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with
   `prepareImageFile` on web) and check the prepared file with `imageFileProblem`, and the phone deletes both the
-  picker's copy and the prepared one afterwards.
+  picker's copy and the prepared one afterwards. A member's background photo (purpose `backdrop`) follows the profile
+  photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it.
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
   details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
   date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.
@@ -136,9 +138,17 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which a pale brand loses
     in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where they can't outrank
     it.
-  - **Elevation.** Page background (`--surface-page` / `colors.bg`) is quieter than content. Level 1: posts and list
-    modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write surfaces
-    (`elevation={2}`). Do not flatten feed cards into the page.
+  - **Elevation.** Page background (web `--surface-page`, mobile `useTheme().page.color`) is quieter than content.
+    Level 1: posts and list modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write
+    surfaces (`elevation={2}`). Do not flatten feed cards into the page.
+  - **Member background.** The page is the member's chosen background (Appearance): page shells take its colour from
+    the theme (web `HomeLayout`'s `--surface-page`; mobile `useTheme().page` in `Screen`, `SectionScreen` and
+    `StackScreen`, which draw `PageBackdrop`), not `colors.bg`, and a view inside a shell leaves its background clear
+    rather than painting the plain colour over it (one that is sometimes the whole screen wraps in `PageFill`). On a
+    tint or a photo, grey text on the page is one shade darker (web `[data-backdrop]`; mobile `Muted` or
+    `theme.pageMuted`, never `colors.muted` on the page) and brand text on it takes `pageInk` (web `text-page-ink`,
+    mobile `theme.pageInk`). Cards, chrome and chats stay white or plain. The admin console and chats stay plain: web
+    `AdminLayout` is outside `HomeLayout`; mobile `AdminScreen` / `AdminListScreen` and `ChatScreen` wrap in `PlainPage`.
   - **Typography.** Web: Manrope (display) + Source Sans 3 (body) via `index.html` / CSS vars. Keep page titles from
     dwarfing body copy (`PageHeader` uses a locked scale).
   - **Landing / auth.** Brand-first full-bleed cover in `AuthShell` (web) and the tenant landing screen (mobile);
@@ -263,8 +273,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     preparation and the admin console added more), none run yet;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
-  - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers
-    take any http(s) address), only profile photos are ever deleted, and a CDN may serve a deleted one until it expires;
+  - uploads: only a profile or background photo must be the member's own upload (job and business logos, post images
+    and event covers take any http(s) address), only those are ever deleted, and a CDN may serve a deleted one until it
+    expires;
+  - no dark mode: the apps are light only, and members choose just their pages' background;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
   - admin pages not yet in the phone app, which show there as on the web console for now: member detail, moderation,
     reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log (README → Known

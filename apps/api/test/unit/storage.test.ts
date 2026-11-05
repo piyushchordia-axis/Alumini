@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { linkUrlSchema } from "@illuminize/shared";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/env";
 import { createStorage, LocalDiskStorage, S3Storage } from "../../src/services/storage";
@@ -34,6 +35,20 @@ describe("S3 storage", () => {
     expect(s3.commands[1]).toBeInstanceOf(DeleteObjectCommand);
     expect((s3.commands[1] as DeleteObjectCommand).input).toEqual({ Bucket: "alumni-photos", Key: saved.key });
     await expect(storage.delete("../../etc/passwd")).rejects.toThrow(/invalid storage key/);
+  });
+
+  it("knows its own files by a base URL written any way, as well as the address saved as a link (URL.href)", async () => {
+    for (const publicBaseUrl of ["https://CDN.Example.com:443/photos", "https://cdn.example.com/photos/", "https://bücher.example/photos"]) {
+      const storage = new S3Storage({ bucket: "b", region: "auto", forcePathStyle: false, publicBaseUrl }, fakeS3().client);
+      const saved = await storage.save({ tenantId: TENANT, buffer: Buffer.from("jpg"), mime: "image/jpeg", extension: "jpg" });
+      expect(storage.keyFromUrl(saved.url), publicBaseUrl).toBe(saved.key);
+      // A background photo's address goes through linkUrlSchema, which stores it as the parser writes it.
+      const asLink = linkUrlSchema.parse(saved.url);
+      expect(storage.keyFromUrl(asLink), asLink).toBe(saved.key);
+      expect(storage.keyFromUrl(`https://elsewhere.example.com/photos/${saved.key}`)).toBeNull();
+      expect(storage.keyFromUrl(`${new URL(publicBaseUrl).origin}/other/${saved.key}`)).toBeNull();
+    }
+    expect(new S3Storage({ bucket: "b", region: "auto", forcePathStyle: false, publicBaseUrl: "https://cdn.example.com/photos" }, fakeS3().client).keyFromUrl("not a url")).toBeNull();
   });
 
   it("is chosen by STORAGE_PROVIDER and needs a bucket and public URL", () => {
@@ -101,6 +116,14 @@ describe("local disk storage", () => {
     expect(await readFile(join(dir, saved.key), "utf8")).toBe("hello");
     expect(storage.keyFromUrl(saved.url)).toBe(saved.key);
     expect(storage.keyFromUrl("http://localhost:4000/uploads/../secrets.png")).toBeNull();
+    expect(storage.keyFromUrl(`http://localhost:4000/uploads/x/../../${saved.key}`)).toBeNull();
+    // An upper-case host or a default port in PUBLIC_BASE_URL still matches the address saved as a link.
+    const shouty = new LocalDiskStorage(dir, "http://LOCALHOST:80");
+    const other = await shouty.save({ tenantId: TENANT, buffer: Buffer.from("hi"), mime: "image/png", extension: "png" });
+    expect(other.url).toBe(`http://LOCALHOST:80/uploads/${other.key}`);
+    expect(shouty.keyFromUrl(other.url)).toBe(other.key);
+    expect(shouty.keyFromUrl(linkUrlSchema.parse(other.url))).toBe(other.key);
+    await shouty.delete(other.key);
     await storage.delete(saved.key);
     await expect(stat(join(dir, saved.key))).rejects.toThrow();
     await storage.delete(saved.key); // deleting again is fine

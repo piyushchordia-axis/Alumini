@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type Re
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
 import { StackHeader } from "@/components/StackHeader";
 import { IconAlert, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
@@ -40,21 +41,26 @@ export function Screen({
   refreshControl?: ReactElement<RefreshControlProps>;
   style?: ViewStyle;
 }) {
+  const { page } = useTheme();
   const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={[{ flex: scroll ? undefined : 1 }, style]}>{children}</View>;
   const edges: Edge[] = topInset && title == null ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
   return (
-    <SafeAreaView style={styles.screen} edges={edges}>
-      {title != null && <StackHeader title={title} actions={actions} badge={badge} fallbackHref={fallbackHref} />}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
-        {scroll ? (
-          <ScrollView ref={scrollRef} refreshControl={refreshControl} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
-            {content}
-          </ScrollView>
-        ) : (
-          content
-        )}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    // The page is the member's background (theme.page): the plain page outside the signed-in app and in the console.
+    <PageShell>
+      <SafeAreaView style={[styles.screen, { backgroundColor: page.color }]} edges={edges}>
+        <PageBackdrop />
+        {title != null && <StackHeader title={title} actions={actions} badge={badge} fallbackHref={fallbackHref} />}
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+          {scroll ? (
+            <ScrollView ref={scrollRef} refreshControl={refreshControl} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
+              {content}
+            </ScrollView>
+          ) : (
+            content
+          )}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </PageShell>
   );
 }
 
@@ -515,8 +521,10 @@ export function Row({ children, style, gap = spacing.sm }: { children: ReactNode
   return <View style={[{ flexDirection: "row", alignItems: "center", gap, flexWrap: "wrap" }, style]}>{children}</View>;
 }
 
+/** Grey text, one shade darker (slate-600) on a tint or a background photo (theme.pageMuted), so it reads wherever it sits. */
 export function Muted({ children, size = 12 }: { children: ReactNode; size?: number }) {
-  return <Text style={{ color: colors.muted, fontSize: size }}>{children}</Text>;
+  const { pageMuted } = useTheme();
+  return <Text style={{ color: pageMuted, fontSize: size }}>{children}</Text>;
 }
 
 export function Body({ children }: { children: ReactNode }) {

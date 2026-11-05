@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { discardPickedPhoto, discardPreparedPhoto, preparePickedPhoto } from "@/lib/photos";
 
 export interface ImageUploadOptions {
-  /** "avatar" for a profile photo, which the server crops to a square JPEG. */
+  /** "avatar" for a profile photo, which the server crops to a square JPEG; "backdrop" for the member's background photo. */
   purpose?: UploadPurpose;
   /**
    * Offer the phone's square crop after picking. The web build has no crop step, so the server's crop is what guarantees

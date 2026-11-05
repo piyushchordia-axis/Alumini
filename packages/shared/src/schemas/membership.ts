@@ -3,6 +3,7 @@ import {
   CELEBRATION_KINDS,
   INDUSTRIES,
   MARITAL_STATUSES,
+  MEMBER_BACKDROPS,
   MEMBERSHIP_ROLES,
   MEMBERSHIP_STATUSES,
   MIN_BATCH_YEAR,
@@ -152,6 +153,18 @@ export type MembershipProfileInput = z.infer<typeof membershipProfileSchema>;
 
 export const membershipProfileUpdateSchema = membershipProfileSchema.partial();
 export type MembershipProfileUpdate = z.infer<typeof membershipProfileUpdateSchema>;
+
+/**
+ * A change to the member's background here. A key left out stays as stored, so choosing a backdrop keeps the photo for
+ * later. A new photo must be one they uploaded here with purpose "backdrop"; "PHOTO" needs a photo.
+ */
+export const memberAppearanceUpdateSchema = z
+  .object({
+    backdrop: z.enum(MEMBER_BACKDROPS).optional(),
+    photoUrl: linkUrlSchema.nullable().optional(),
+  })
+  .strict();
+export type MemberAppearanceUpdate = z.infer<typeof memberAppearanceUpdateSchema>;
 
 export const memberReasonSchema = z.object({ reason: trimmedString(500, 3) });
 export type MemberReasonInput = z.infer<typeof memberReasonSchema>;

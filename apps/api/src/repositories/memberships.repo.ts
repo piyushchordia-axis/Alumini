@@ -1,4 +1,4 @@
-import { wallPartsInZone } from "@illuminize/shared";
+import { wallPartsInZone, type MemberAppearance } from "@illuminize/shared";
 import { and, desc, eq, gte, ilike, inArray, isNotNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { jobSeekers, memberActivityDays, memberships, tenants, users } from "../db/schema";
@@ -111,6 +111,31 @@ export async function updateMembership(db: DbClient, tenantId: string, id: strin
   const [row] = await db
     .update(memberships)
     .set({ ...values, updatedAt: new Date() })
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .returning();
+  return row;
+}
+
+/**
+ * The member's appearance as saved now, holding their row until the transaction ends as lockMembershipAvatarUrl does.
+ * Undefined for no such membership; a stored value that isn't an object (only a hand edit could make one) reads as empty.
+ */
+export async function lockMembershipAppearance(db: DbClient, tenantId: string, id: string): Promise<MemberAppearance | undefined> {
+  const [row] = await db
+    .select({ appearance: memberships.appearance })
+    .from(memberships)
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .for("no key update");
+  if (!row) return undefined;
+  const stored: unknown = row.appearance;
+  return stored && typeof stored === "object" && !Array.isArray(stored) ? (stored as MemberAppearance) : {};
+}
+
+/** Leaves updated_at alone: a background only the member sees doesn't change the profile. */
+export async function setMembershipAppearance(db: DbClient, tenantId: string, id: string, appearance: MemberAppearance): Promise<MembershipRow | undefined> {
+  const [row] = await db
+    .update(memberships)
+    .set({ appearance })
     .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
     .returning();
   return row;
