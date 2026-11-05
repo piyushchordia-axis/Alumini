@@ -1,4 +1,4 @@
-import { mentorshipKeys } from "@illuminize/shared";
+import { isAdminNotification, mentorshipKeys } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { AppState } from "react-native";
@@ -23,6 +23,8 @@ export function RealtimeBridge() {
       realtime.on("notification:new", (e) => {
         qc.setQueryData(qk.unread(e.tenantSlug), { count: e.unreadCount });
         void qc.invalidateQueries({ queryKey: qk.notifications(e.tenantSlug), predicate: (q) => q.queryKey.length === 2 });
+        // Something new waits for an admin, so the console's counts and lists are out of date.
+        if (isAdminNotification(e.notification.type)) void qc.invalidateQueries({ queryKey: ["admin", e.tenantSlug] });
       }),
       // A request or mentorship changed, on either side, notified or not (a withdrawal tells nobody): lists and pages refetch.
       realtime.on("mentorship:changed", (e) => void qc.invalidateQueries({ queryKey: mentorshipKeys.all(e.tenantSlug) })),
@@ -40,6 +42,7 @@ export function RealtimeBridge() {
         void qc.invalidateQueries({ queryKey: ["mentorship"] });
         void qc.invalidateQueries({ queryKey: ["referrals"] });
         void qc.invalidateQueries({ queryKey: ["job"] });
+        void qc.invalidateQueries({ queryKey: ["admin"] });
       }),
     ];
     return () => offs.forEach((off) => off());

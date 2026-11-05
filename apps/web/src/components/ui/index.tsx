@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
-import { IconProfile } from "@/components/icons";
+import { IconChevronRight, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 
 /* ---------- Button ---------- */
@@ -231,7 +231,8 @@ export function ErrorBox({ error, className }: { error: unknown; className?: str
 
 export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: Array<{ value: T; label: ReactNode; count?: number }>; value: T; onChange: (v: T) => void; className?: string }) {
   return (
-    <div className={clsx("flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1", className)} role="tablist">
+    // max-w-full: a strip sized to its tabs (w-fit) scrolls inside itself on a phone rather than widening the page.
+    <div className={clsx("flex max-w-full gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1", className)} role="tablist">
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -356,13 +357,21 @@ export function Pagination({ page, pageSize, total, onChange }: { page: number; 
   );
 }
 
-export function Stat({ label, value, hint }: { label: ReactNode; value: ReactNode; hint?: ReactNode }) {
+/**
+ * A figure on a card. `attention` draws work waiting in amber, as the phone app's console tiles do; `linked` adds the
+ * chevron of a tile that opens its section (the caller wraps it in the link).
+ */
+export function Stat({ label, value, hint, attention, linked }: { label: ReactNode; value: ReactNode; hint?: ReactNode; attention?: boolean; linked?: boolean }) {
   return (
-    <Card className="p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
+    // Not a Card with an amber className: two border and background colours would leave the winner to the CSS order.
+    <div className={clsx("rounded-xl p-4", attention ? "border border-amber-300 bg-amber-50 shadow-[var(--shadow-1)]" : cardElevationClass[1])}>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1 text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
+        {linked && <IconChevronRight size={16} className="text-slate-400" />}
+      </div>
+      <div className={clsx("mt-1 text-2xl font-semibold", attention ? "text-amber-800" : "text-slate-900")}>{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
-    </Card>
+    </div>
   );
 }
 

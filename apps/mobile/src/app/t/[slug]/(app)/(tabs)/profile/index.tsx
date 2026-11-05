@@ -4,11 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Pressable, Text } from "react-native";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { IconBell, IconMail, IconPosts } from "@/components/icons";
+import { IconBell, IconDashboard, IconMail, IconPosts } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
 import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { adminHomeHref } from "@/lib/admin";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { useDeleteAccount, useSignOut } from "@/lib/session";
@@ -91,7 +92,12 @@ export default function MyProfileScreen() {
           <IconMail size={18} color={theme.primary} />
           <Text style={{ color: theme.primary, fontWeight: "600" }}>Email & account</Text>
         </Pressable>
-        {isTenantAdmin && <Muted>Admin tools (approvals, moderation, settings) are available on the web console.</Muted>}
+        {isTenantAdmin && (
+          <Pressable onPress={() => router.push(adminHomeHref(slug))} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
+            <IconDashboard size={18} color={theme.primary} />
+            <Text style={{ color: theme.primary, fontWeight: "600" }}>Admin console</Text>
+          </Pressable>
+        )}
       </Card>
       <Card>
         <Text style={{ fontWeight: "700", color: colors.text }}>Your institutions</Text>

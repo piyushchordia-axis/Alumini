@@ -1,7 +1,7 @@
 import { jobsQuery, notificationTarget } from "@illuminize/shared";
 
-/** Screen for a notification (list tap or push tap). Mobile has no admin console, so admin notifications open nothing. */
-export function notificationHref(slug: string, type: string, data: unknown): `/t/${string}` | null {
+/** Screen for a notification (list tap or push tap). Admin notices open the console, for admins only. */
+export function notificationHref(slug: string, type: string, data: unknown, { isAdmin }: { isAdmin: boolean }): `/t/${string}` | null {
   const t = notificationTarget(type, data);
   if (!t) return null;
   const base = `/t/${slug}` as const;
@@ -32,6 +32,7 @@ export function notificationHref(slug: string, type: string, data: unknown): `/t
     case "celebrations":
       return `${base}/feed`;
     case "admin":
-      return null;
+      // The console's home, which shows what's waiting, until the notice's own section is in the phone app.
+      return isAdmin ? `${base}/admin` : null;
   }
 }

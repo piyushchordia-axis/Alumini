@@ -412,6 +412,61 @@ try {
     if (!rahul?.includes("Founder and CEO of Zylo Labs") || !rahul.includes("Fundraising; Lending")) throw new Error(`Rahul's profile details are missing from the export: ${rahul}`);
   });
 
+  await step("the app's header links to the console on a phone, and every admin page fits one", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    try {
+      // Its icon alone at this width, a 44px target named with the work waiting, which it reads from the console's own
+      // counts: the reported business listing is still open, so there is some.
+      const dashboard = page.waitForResponse((r) => /\/api\/v1\/t\/demo-university\/admin\/dashboard$/.test(r.url()) && r.request().method() === "GET");
+      await page.goto(`${BASE}/t/demo-university/app/feed`);
+      const d = (await (await dashboard).json()).data;
+      const waiting = d.pendingMembers + d.pendingContent + d.openReports + d.openChatReports;
+      if (d.openReports < 1) throw new Error("the dashboard counts no open report, with the business listing's still open");
+      const name = `Admin console, ${waiting} waiting`;
+      const admin = page.locator("header").getByRole("link", { name, exact: true });
+      await admin.waitFor();
+      const box = await admin.boundingBox();
+      if (!box || box.width < 44 || box.height < 44) throw new Error(`the header's Admin link is ${box?.width}×${box?.height}px, under 44px`);
+      await expectSvgNoEmoji(admin, "the header's Admin link");
+      // The count shows, in the amber of work waiting rather than the red of unread.
+      const badge = admin.getByText(String(waiting), { exact: true });
+      await badge.waitFor();
+      if (!/\bbg-amber-/.test((await badge.getAttribute("class")) ?? "")) throw new Error("the header's Admin link's count isn't amber");
+      // The sidebar's row, on a wider screen, carries the same count.
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.locator('aside nav[aria-label="Main"]').getByRole("link", { name, exact: true }).waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await admin.click();
+      await page.waitForURL(/\/admin\/dashboard$/);
+
+      const fits = async (where) => {
+        await page.locator("main h1").first().waitFor();
+        await page.waitForLoadState("networkidle");
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        if (overflow > 0) throw new Error(`${where} scrolls sideways by ${overflow}px on a phone`);
+      };
+      await fits("the dashboard");
+      // Every section in the console's nav, then views inside them: other status tabs, a member's page, and Branding.
+      const sections = await page.locator('nav[aria-label="Admin sections"] a').evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+      const tabs = ["members?status=APPROVED", "members?status=REJECTED", "members?status=SUSPENDED", "moderation?status=APPROVED", "moderation?status=REMOVED", "reports?status=RESOLVED"].map((p) => `/t/demo-university/admin/${p}`);
+      for (const path of [...sections, ...tabs]) {
+        await page.goto(BASE + path);
+        await fits(path);
+      }
+      await page.goto(`${BASE}/t/demo-university/admin/members?status=APPROVED`);
+      await page.locator('main a[href*="/admin/members/"]').first().click();
+      await page.waitForURL(/\/admin\/members\/[0-9a-f-]+$/);
+      await fits("a member's admin page");
+      await page.goto(`${BASE}/t/demo-university/admin/settings`);
+      await page.getByRole("tab", { name: "Branding", exact: true }).click();
+      await page.waitForSelector("text=Preview");
+      await fits("the Branding tab");
+      await shot("a09b-admin-phone");
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
+  });
+
   await step("platform admin signs in and sees institutions", async () => {
     await page.goto(`${BASE}/t/demo-university/app/profile`);
     await page.click('button:has-text("Sign out")');

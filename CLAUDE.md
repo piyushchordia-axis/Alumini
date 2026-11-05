@@ -10,10 +10,12 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 - `apps/web`: React 19, Vite, Tailwind v4, TanStack Query. Holds the member app, tenant admin (`routes/t/admin`) and
   platform console (`routes/platform`). Design tokens live in `src/index.css`; SVG icons in `src/components/icons.tsx`;
   shared primitives in `src/components/ui`.
-- `apps/mobile`: Expo SDK 58 with expo-router, members only. Screens are in `src/app`. Theme tokens in `src/theme`;
+- `apps/mobile`: Expo SDK 58 with expo-router: the member app and the institution admin console
+  (`src/app/t/[slug]/(app)/admin`, a stack above the tabs). Screens are in `src/app`. Theme tokens in `src/theme`;
   SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx`. Chrome:
   `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen` (pushed screens), `ChatHeader` (chat
-  overlays). Do not use native stack headers for member chrome (see Gotchas).
+  overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
+  to the console's home). Do not use native stack headers for member chrome (see Gotchas).
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React; `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections;
@@ -109,8 +111,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
   details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
   date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.
-- **Feature parity.** Every member-facing feature ships on **web and mobile** in the same change — including visual
-  design. Admin and platform consoles are web only.
+- **Feature parity.** Every member-facing feature, and every page and action of the institution admin console (web
+  `routes/t/admin`, mobile `(app)/admin`), ships on **web and mobile** in the same change — including visual design.
+  Logic both consoles need (labels, state machines, query keys, tiles, counts and formatters) lives in
+  `packages/shared` (`lib/admin.ts` and its siblings), not in either app. Only the platform (Illuminize staff) console
+  is web only; staff who aren't members of an institution use its admin console on the web. While the console's pages
+  come to the phone one at a time, `MOBILE_ADMIN_SECTIONS` lists those it has, and README → Known gaps the rest.
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
   full glassmorphism. Prefer opaque high-contrast content; soft blur only on sticky chrome (header / tab bar).
   - **Icons.** Chrome uses the shared SVG stroke set (`components/icons.tsx` on web and mobile). Do not use emoji as
@@ -136,7 +142,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Landing / auth.** Brand-first full-bleed cover in `AuthShell` (web) and the tenant landing screen (mobile);
     institution name is the hero; one CTA; features below the fold with SVG + text.
   - **Nav.** Sidebar / tabs need ≥40–44px targets, clear active weight (primary wash + stronger text), and SVG icons.
-    Admin chrome stays denser and more tool-like than the member app.
+    Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
+    chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
+    way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row
+    only.
   - **Mobile headers.** Native stack headers float over content on device — do not use them for member chrome. Tab
     roots: `SectionScreen` (draws `MemberAppBar`, owns status-bar inset) and `headerShown: false` on the tab stack
     index. Pushed details/modals: `Screen title="…"` or `StackScreen` / `StackHeader`, stacks with
@@ -183,7 +192,15 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   (`tabBarButton: () => null`). A route folder with no `Tabs.Screen` silently redirects to the first visible tab, so
   e2e opens every section. A cold deep link seeds the stack's anchor with the detail's params. Pushing onto another
   tab's stack (the feed's profile card opening Edit profile) needs `{ withAnchor: true }`, or that stack holds only the
-  pushed screen and Back and Save leave it behind.
+  pushed screen and Back and Save leave it behind. The admin console is a stack above the tabs (anchor `index`): a push
+  tap opens it with `withAnchor`, and with `router.navigate` while that institution (or none) is on screen, since `push`
+  stacks a second copy of a console home already in front (StackRouter's PUSH always adds a route), and on a cold start
+  a second institution over the one the start screen redirects to; a tap in the Notifications list opens it without
+  `withAnchor` (so Back returns to the list), and leaving it
+  for a member screen uses `router.dismissTo`, as groups and mentors do (also its guard: `Redirect` would replace the
+  console with a second set of tabs). Typed routes (`apps/mobile/.expo/types`, gitignored) are written by the dev server
+  (`pnpm mobile`) or an export (`pnpm e2e:mobile:export`): regenerate them before `pnpm typecheck` after adding a route,
+  or it checks pushes against the old list. CI has none and doesn't lint mobile, so run the root `pnpm lint` locally.
 - Mobile native stack headers (`headerShown: true` / old `detailHeader`) float over the scene on device — search bars
   and titles draw under the status bar and the header. Always use the in-tree bars (`MemberAppBar`, `StackHeader`,
   `ChatHeader`) and keep tab/detail stacks at `headerShown: false`. On web, inactive tab scenes stay mounted: the tabs
@@ -195,7 +212,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   and `ConfirmDialog` (web).
 - In development, OTP requests are rate-limited per phone and IP; `pnpm db:reset` clears them. A full e2e run makes 20
   code requests, the whole per-IP hour (refused ones count), so `e2e/lib.mjs` signs each phone in once per run: reuse
-  `apiSession`, don't add logins.
+  `apiSession`, don't add logins. mobile-web's admin journey signs in the Samaj admin (`+919000000004`) as the forced
+  sign-out's next person, in place of a fresh number, so a full run stays at 20.
 - Charts are hand-built SVG in `apps/web/src/components/charts`. Series colours come from the validated palette in
   `chartUtils.ts` (fixed order, colour-blind checked), never from tenant brand colours.
 - After adding a native Expo module (e.g. `react-native-svg`), restart Metro (`pnpm mobile`); a server started before
@@ -235,14 +253,16 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
   - the gaps to close before launch and the smaller follow-ups in README → "Known gaps / next steps";
-  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration, jobs and
-    photo preparation added more), none run yet;
+  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration, jobs, photo
+    preparation and the admin console added more), none run yet;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
   - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers
     take any http(s) address), only profile photos are ever deleted, and a CDN may serve a deleted one until it expires;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-    admin Members status tabs can still overflow on narrow phones (list rows were reflowed);
+  - admin pages not yet in the phone app, which show there as on the web console for now: members, member detail,
+    moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log
+    (README → Known gaps lists them too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

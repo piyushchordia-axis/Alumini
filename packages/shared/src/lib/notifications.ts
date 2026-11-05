@@ -1,4 +1,4 @@
-import type { MentorshipBox, NotificationType, ReferralBox, TenantFeatures } from "../constants";
+import { CONTENT_TYPES, type ContentType, type MentorshipBox, type NotificationType, type ReferralBox, type TenantFeatures } from "../constants";
 import type { NotificationDto, NotificationSubjectDto } from "../types/dto";
 import { chatAvailable, connectionsAvailable } from "./features";
 
@@ -136,7 +136,16 @@ export type NotificationTarget =
   /** The Jobs section's Referrals tab, on the list the request is in: received as the job's poster, sent as the one asking. */
   | { kind: "referral"; box: ReferralBox }
   | { kind: "profile" }
-  | { kind: "admin"; section: "members" | "moderation" | "reports" | "chat-reports" };
+  /** A console section, with the ids of what the notice is about when it carried them. */
+  | {
+      kind: "admin";
+      section: "members" | "moderation" | "reports" | "chat-reports";
+      membershipId?: string;
+      contentType?: ContentType;
+      contentId?: string;
+      reportId?: string;
+      chatReportId?: string;
+    };
 
 interface NotificationData {
   postId?: string;
@@ -146,6 +155,31 @@ interface NotificationData {
   conversationId?: string;
   /** Which of the recipient's lists a mentorship or referral request is in. */
   box?: string;
+  membershipId?: string;
+  reportId?: string;
+  chatReportId?: string;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Only an id that is a UUID: it goes into a route, and a push can carry anything. */
+function uuidOf(value: unknown): string | undefined {
+  return typeof value === "string" && UUID.test(value) ? value : undefined;
+}
+
+type AdminTarget = Extract<NotificationTarget, { kind: "admin" }>;
+type AdminIds = Omit<AdminTarget, "kind" | "section">;
+
+/** With the ids that checked out: one that didn't is left out rather than undefined. */
+function adminTarget(section: AdminTarget["section"], ids: AdminIds): AdminTarget {
+  return { kind: "admin", section, ...(Object.fromEntries(Object.entries(ids).filter(([, id]) => id !== undefined)) as AdminIds) };
+}
+
+/** The item a notice is about, when it named both its type and a UUID. */
+function adminContentIds(d: NotificationData): Pick<AdminIds, "contentType" | "contentId"> {
+  const contentId = uuidOf(d.contentId);
+  const contentType = CONTENT_TYPES.find((t) => t === d.contentType);
+  return contentId && contentType ? { contentType, contentId } : {};
 }
 
 function contentTarget(d: NotificationData): NotificationTarget | null {
@@ -203,10 +237,10 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
   MEMBERSHIP_REJECTED: profileTarget,
   MEMBERSHIP_SUSPENDED: profileTarget,
   MEMBERSHIP_REINSTATED: profileTarget,
-  NEW_MEMBER_PENDING: () => ({ kind: "admin", section: "members" }),
-  CONTENT_PENDING: () => ({ kind: "admin", section: "moderation" }),
-  REPORT_FILED: () => ({ kind: "admin", section: "reports" }),
-  CHAT_REPORT_FILED: () => ({ kind: "admin", section: "chat-reports" }),
+  NEW_MEMBER_PENDING: (d) => adminTarget("members", { membershipId: uuidOf(d.membershipId) }),
+  CONTENT_PENDING: (d) => adminTarget("moderation", adminContentIds(d)),
+  REPORT_FILED: (d) => adminTarget("reports", { reportId: uuidOf(d.reportId), ...adminContentIds(d) }),
+  CHAT_REPORT_FILED: (d) => adminTarget("chat-reports", { chatReportId: uuidOf(d.chatReportId) }),
   CHAT_MESSAGE_REMOVED: chatTarget,
   CHAT_MESSAGE: chatTarget,
   CHAT_REQUEST: chatTarget,

@@ -1,10 +1,10 @@
-import { chatAvailable, splitSections, type MemberSection } from "@illuminize/shared";
+import { adminConsoleLabel, adminWaitingCount, chatAvailable, splitSections, type MemberSection } from "@illuminize/shared";
 import { chatBadgeLabel, groupsBadgeLabel, type ChatBadgeLabel } from "@illuminize/shared/chat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState } from "react";
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { IconBell, NavIcon, type NavIconName } from "@/components/icons";
+import { IconBell, IconDashboard, NavIcon, type NavIconName } from "@/components/icons";
 import { Avatar, Modal } from "@/components/ui";
 import { useChatBadge, useChatScope } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
@@ -51,6 +51,12 @@ export function HomeLayout() {
   const pollInterval = usePollInterval();
   const unread = useQuery({ queryKey: qk.unread(tenant.slug), queryFn: () => api.notifications.unreadCount(tenant.slug), refetchInterval: pollInterval });
   const unreadCount = unread.data?.count ?? 0;
+  // The console's own counts. An admin notice arriving live refreshes them, and so does reconnecting (RealtimeBridge);
+  // the slow poll, as the console's, catches work another admin has done, which tells nobody, as this layout stays
+  // mounted and the web app doesn't refetch on focus.
+  const adminDashboard = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug), enabled: isTenantAdmin, refetchInterval: pollInterval });
+  const adminWaiting = adminDashboard.data ? adminWaitingCount(adminDashboard.data) : 0;
+  const adminLabel = adminConsoleLabel(adminWaiting);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const qc = useQueryClient();
@@ -89,8 +95,10 @@ export function HomeLayout() {
           </NavLink>
           <div className="ml-auto flex items-center gap-1">
             {isTenantAdmin && (
-              <NavLink to={`/t/${tenant.slug}/admin`} className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:block">
-                Admin
+              <NavLink to={`/t/${tenant.slug}/admin`} aria-label={adminLabel} className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:px-3">
+                <IconDashboard size={20} />
+                <span className="hidden sm:inline">Admin</span>
+                {adminWaiting > 0 && <NavBadge count={adminWaiting} tone="warning" />}
               </NavLink>
             )}
             <NavLink to={`${base}/notifications`} className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}>
@@ -128,8 +136,9 @@ export function HomeLayout() {
               <NavLabel icon="profile" label="My profile" />
             </NavLink>
             {isTenantAdmin && (
-              <NavLink to={`/t/${tenant.slug}/admin`} className={linkClass}>
-                <NavLabel icon="admin" label="Admin console" />
+              <NavLink to={`/t/${tenant.slug}/admin`} className={linkClass} aria-label={adminWaiting > 0 ? adminLabel : undefined}>
+                <NavLabel icon="dashboard" label="Admin console" />
+                {adminWaiting > 0 && <NavBadge count={adminWaiting} tone="warning" className="ml-auto" />}
               </NavLink>
             )}
             <NavLink to="/?switch=1" className={linkClass({ isActive: false })}>
@@ -194,8 +203,9 @@ export function HomeLayout() {
             <NavLabel icon="profile" label="My profile" />
           </NavLink>
           {isTenantAdmin && (
-            <NavLink to={`/t/${tenant.slug}/admin`} className={sheetLinkClass}>
-              <NavLabel icon="admin" label="Admin console" />
+            <NavLink to={`/t/${tenant.slug}/admin`} className={sheetLinkClass} aria-label={adminWaiting > 0 ? adminLabel : undefined}>
+              <NavLabel icon="dashboard" label="Admin console" />
+              {adminWaiting > 0 && <NavBadge count={adminWaiting} tone="warning" className="ml-auto" />}
             </NavLink>
           )}
           <NavLink to="/?switch=1" className={sheetLinkClass({ isActive: false })}>
@@ -210,10 +220,16 @@ export function HomeLayout() {
   );
 }
 
+const NAV_BADGE_TONES = {
+  danger: "bg-red-500 text-white",
+  // Work waiting for an admin, in the console's amber.
+  warning: "bg-amber-100 text-amber-800",
+};
+
 /** A count on a navigation link. Hidden from screen readers, because the link's own name says it. */
-function NavBadge({ count, className }: { count: number; className?: string }) {
+function NavBadge({ count, tone = "danger", className }: { count: number; tone?: keyof typeof NAV_BADGE_TONES; className?: string }) {
   return (
-    <span aria-hidden className={clsx("rounded-full bg-red-500 px-1.5 text-[10px] font-semibold leading-4 text-white", className)}>
+    <span aria-hidden className={clsx("rounded-full px-1.5 text-[10px] font-semibold leading-4", NAV_BADGE_TONES[tone], className)}>
       {count > 99 ? "99+" : count}
     </span>
   );

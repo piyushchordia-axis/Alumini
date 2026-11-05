@@ -41,6 +41,8 @@ export function RealtimeBridge() {
         void qc.invalidateQueries({ queryKey: ["mentorship"] });
         void qc.invalidateQueries({ queryKey: ["referrals"] });
         void qc.invalidateQueries({ queryKey: ["job"] });
+        // The admin console's counts, which the app's header shows too.
+        void qc.invalidateQueries({ queryKey: ["admin"] });
       }),
     ];
     return () => offs.forEach((off) => off());

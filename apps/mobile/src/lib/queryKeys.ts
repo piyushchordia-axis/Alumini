@@ -1,4 +1,8 @@
+import { adminKeys } from "@illuminize/shared";
+
 export const qk = {
+  /** The admin console's, the same as the web's. */
+  admin: adminKeys,
   tenants: (q?: string) => ["tenants", q ?? ""] as const,
   tenant: (slug: string) => ["tenant", slug] as const,
   me: ["me"] as const,

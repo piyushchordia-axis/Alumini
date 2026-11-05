@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
-import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
+import type { Href } from "expo-router";
+import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StackHeader } from "@/components/StackHeader";
 import { IconAlert, IconProfile } from "@/components/icons";
@@ -11,7 +12,8 @@ import { colors, radius, spacing, useTheme } from "@/theme";
  * and notch. Pass `title` on pushed stack screens (profile, settings) to draw an in-tree back bar instead of a native
  * header that can float over content, and `actions` for buttons at its end. The content moves up with the keyboard on
  * both platforms: edge to edge, Android no longer resizes the window for it, and where it still does the overlap
- * measures 0 (as in ChatScreen). `scrollRef` reaches the scroll view, to bring part of a long form into view.
+ * measures 0 (as in ChatScreen). `scrollRef` reaches the scroll view, to bring part of a long form into view, and
+ * `refreshControl` gives it pull to refresh. `badge` and `fallbackHref` go to the back bar (see StackHeader).
  */
 export function Screen({
   children,
@@ -20,7 +22,10 @@ export function Screen({
   topInset = false,
   title,
   actions,
+  badge,
+  fallbackHref,
   scrollRef,
+  refreshControl,
   style,
 }: {
   children: ReactNode;
@@ -29,17 +34,20 @@ export function Screen({
   topInset?: boolean;
   title?: string;
   actions?: ReactNode;
+  badge?: string;
+  fallbackHref?: Href;
   scrollRef?: Ref<ScrollViewInstance>;
+  refreshControl?: ReactElement<RefreshControlProps>;
   style?: ViewStyle;
 }) {
   const content = padded ? <View style={[styles.padded, style]}>{children}</View> : <View style={[{ flex: scroll ? undefined : 1 }, style]}>{children}</View>;
   const edges: Edge[] = topInset && title == null ? ["top", "left", "right", "bottom"] : ["left", "right", "bottom"];
   return (
     <SafeAreaView style={styles.screen} edges={edges}>
-      {title != null && <StackHeader title={title} actions={actions} />}
+      {title != null && <StackHeader title={title} actions={actions} badge={badge} fallbackHref={fallbackHref} />}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
         {scroll ? (
-          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
+          <ScrollView ref={scrollRef} refreshControl={refreshControl} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
             {content}
           </ScrollView>
         ) : (

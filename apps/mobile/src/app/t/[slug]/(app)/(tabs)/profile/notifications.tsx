@@ -12,7 +12,7 @@ import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
 export default function NotificationsScreen() {
-  const { tenant } = useMembership();
+  const { tenant, isTenantAdmin } = useMembership();
   const slug = tenant.slug;
   const router = useRouter();
   const qc = useQueryClient();
@@ -46,7 +46,8 @@ export default function NotificationsScreen() {
           </ListEmpty>
         }
         renderItem={({ item: n }) => {
-          const to = notificationHref(slug, n.type, n.data);
+          // No withAnchor, unlike a push: an admin notice's console screen goes back to this list, not the console's home.
+          const to = notificationHref(slug, n.type, n.data, { isAdmin: isTenantAdmin });
           return (
             <Pressable
               accessibilityRole="button"

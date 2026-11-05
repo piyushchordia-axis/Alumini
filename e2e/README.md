@@ -27,6 +27,10 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
 - `lib.mjs` signs each phone in once per run (`apiSession`) and hands the tokens to every browser context that needs
   them (`signedInContext`, `signedInMobileContext`). A new journey should reuse a member already signed in rather than
   add a login.
+- `pnpm e2e:mobile-web`'s third sign-in through the screens is the Shri Gujarati Samaj admin (`+91 90000 00004`): the
+  next person after the forced sign-out, who then walks the admin console. No other script signs him in, so the console
+  costs no code of its own; its steps run on that one session, in order, and need the Samaj demo data as
+  `pnpm db:reset` leaves it.
 - A request refused because the phone asked less than a minute ago still counts. `lib.mjs` waits and asks again, so
   running the scripts straight after one another, when some phones sign in in more than one of them (the pupil, the
   platform admin), can need 21 and stop the last sign-in.
@@ -134,6 +138,10 @@ Covers:
   the reported message, and the page on a phone;
 - analytics charts and the members CSV, with the profile's own columns after "Last active" and Rahul's seeded headline
   and skills in them;
+- at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
+  console's dashboard counts it, the count in amber, and the sidebar's row named the same on a wider screen), and
+  every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
+  status tabs, a member's page and the Branding tab;
 - the platform console: login, onboarding an institution with its first admin, a billing plan and usage, stats and
   user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and a row
   on a phone), opening an institution's admin console without being a member, a school's settings starting with
@@ -206,7 +214,13 @@ Covers:
   even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
   with the reason on each; joining Demo College with Use details from Demo University and Undo keeping a headline
   changed after it, then Submit for approval with its note, landing on the pending screen; switching institution and
-  signing out from the More hub; a forced sign-out leaving nothing cached.
+  signing out from the More hub; a forced sign-out leaving nothing cached;
+- the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", and My profile's link; the
+  console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
+  review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
+  still on the web console; Back to More and to My profile; an admin notice tapped in Notifications opening the console,
+  with Back returning to the list; and, with the role taken away (answered by the script), the console leaving for the
+  feed with one set of tabs, More dropping its row, and the console opened cold doing the same.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -466,3 +480,23 @@ leave without sending, or he'll be waiting for approval there.
       saving, then open Jobs → "Backend Engineer (Node.js)" and choose Add your skills to see which you match. The
       Profile tab comes back with that same editor, scrolled to Work and the headline still typed, and Back (and, on
       the iPhone, the swipe back) goes to My profile, never to a second editor.
+
+**Admin console**
+
+For these, sign one phone in to Shri Gujarati Samaj as its admin, Jignesh Patel (`+91 90000 00004`), who has two members
+waiting for approval. Sign Rahul back in afterwards.
+
+- [ ] More shows Admin console with an amber 2, and TalkBack or VoiceOver reads the row as "Admin console, 2 waiting".
+      My profile has an Admin console link too. Each opens the console, with no tab bar, and Back (and, on the iPhone,
+      the swipe back; on Android, the back button) returns to where it was opened.
+- [ ] TalkBack or VoiceOver, on the console's home: each tile is one stop, read as its label and count ("Pending
+      members, 2"), then its hint; "Needs you", "At a glance" and "Sections" are read as headings; and the icons in the
+      list of sections on the web console are silent.
+- [ ] Pulling the console's home down refreshes it.
+- [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
+      number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the
+      console's home, and Back (and the iPhone's swipe back) goes to the Samaj feed, with one tab bar, never a blank
+      screen; on Android a second Back leaves the app rather than showing the Samaj feed again (the phone remembers the
+      Samaj, so the start screen redirects there as the push opens: one Samaj, not two). Do it again with the app open
+      on another tab: Back returns there. Then once more with the console's home already open: tapping the push keeps
+      it one screen deep, so a single Back leaves the console.

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -9,16 +9,20 @@ import {
   MEMBER_STATUS_TONE,
   MESSAGE_CHANNELS,
   MESSAGE_CHANNEL_LABELS,
+  MOBILE_ADMIN_SECTIONS,
   MODERATION_STATUSES,
   MODERATION_STATUS_TONE,
   NOTIFICATION_CATEGORY,
   NOTIFICATION_TYPES,
   REPORT_STATUSES,
   REPORT_STATUS_LABELS,
+  adminConsoleLabel,
   adminKeys,
   adminWaitingCount,
+  approvalSummary,
   canPin,
   channelName,
+  dashboardTiles,
   dedupeById,
   fieldErrorsFrom,
   formatCalendarDate,
@@ -175,6 +179,110 @@ describe("adminWaitingCount", () => {
 
   it("is 0 when nothing waits", () => {
     expect(adminWaitingCount({ pendingMembers: 0, pendingContent: 0, openReports: 0, openChatReports: 0 })).toBe(0);
+  });
+});
+
+describe("adminConsoleLabel", () => {
+  it("names the way into the console, with the work waiting when there is some", () => {
+    expect(adminConsoleLabel(0)).toBe("Admin console");
+    expect(adminConsoleLabel(2)).toBe("Admin console, 2 waiting");
+    expect(adminConsoleLabel(1500)).toBe("Admin console, 1,500 waiting");
+  });
+});
+
+describe("dashboardTiles", () => {
+  const quiet: DashboardDto = {
+    pendingMembers: 0,
+    approvedMembers: 1234,
+    rejectedMembers: 3,
+    suspendedMembers: 1,
+    newMembersLast30d: 12,
+    activeMembersLast30d: 1050,
+    pendingContent: 0,
+    openReports: 0,
+    openChatReports: 0,
+    upcomingEvents: 2,
+    postsLast7d: 30,
+  };
+  const keys = (tiles: { key: string }[]) => tiles.map((t) => t.key);
+
+  it("puts the work waiting first, opening its section, and the institution at a glance after", () => {
+    const { needs, glance } = dashboardTiles({ ...quiet, pendingMembers: 2 });
+    expect(needs.map((t) => [t.label, t.value, t.section, t.query])).toEqual([
+      ["Pending members", 2, "members", { status: "PENDING" }],
+      ["Content to review", 0, "moderation", undefined],
+    ]);
+    expect(needs.map((t) => t.hint)).toEqual(["Needs your decision", "Posts, jobs, funding, events, businesses"]);
+    expect(glance.map((t) => [t.label, t.value])).toEqual([
+      ["Approved members", 1234],
+      ["New members (30d)", 12],
+      ["Posts (7d)", 30],
+      ["Upcoming events", 2],
+    ]);
+    expect(glance[0]!.hint).toBe("1,050 active in 30 days");
+    for (const t of glance) expect(t.section, t.label).toBeUndefined();
+    // Each tile shows the dashboard's own figure under its key.
+    for (const t of [...needs, ...glance]) expect(t.value, t.label).toBe({ ...quiet, pendingMembers: 2 }[t.key]);
+  });
+
+  it("shows the two kinds of report only while either has one open", () => {
+    expect(keys(dashboardTiles(quiet).needs)).toEqual(["pendingMembers", "pendingContent"]);
+    for (const open of [{ openReports: 1 }, { openChatReports: 1 }, { openReports: 2, openChatReports: 5 }]) {
+      const needs = dashboardTiles({ ...quiet, ...open }).needs;
+      expect(keys(needs), JSON.stringify(open)).toEqual(["pendingMembers", "pendingContent", "openReports", "openChatReports"]);
+      expect(needs.slice(2).map((t) => t.section)).toEqual(["reports", "chatReports"]);
+    }
+  });
+
+  it("marks for attention only work that is waiting, never a figure at a glance", () => {
+    const busy = { ...quiet, pendingMembers: 2, pendingContent: 0, openReports: 1, openChatReports: 0, approvedMembers: 9, upcomingEvents: 4 };
+    const { needs, glance } = dashboardTiles(busy);
+    expect(needs.map((t) => [t.key, t.attention])).toEqual([
+      ["pendingMembers", true],
+      ["pendingContent", false],
+      ["openReports", true],
+      ["openChatReports", false],
+    ]);
+    for (const t of glance) expect(t.attention, t.label).toBe(false);
+  });
+
+  it("opens only sections the console has, each a key of ADMIN_SECTIONS", () => {
+    const all = { ...quiet, pendingMembers: 1, pendingContent: 1, openReports: 1, openChatReports: 1 };
+    const sections = new Set(ADMIN_SECTIONS.map((s) => s.key));
+    for (const t of dashboardTiles(all).needs) expect(sections.has(t.section!), t.label).toBe(true);
+    // A waiting count opens the section that shows that count.
+    for (const t of dashboardTiles(all).needs) expect(ADMIN_SECTIONS.find((s) => s.key === t.section)?.countKey, t.label).toBe(t.key);
+  });
+});
+
+describe("approvalSummary", () => {
+  const sentence = (parts: { text: string; strong?: boolean }[]) => parts.map((p) => (p.strong ? `**${p.text}**` : p.text)).join("");
+
+  it("says whether new members wait for an admin, with the mode in bold", () => {
+    expect(sentence(approvalSummary({ memberApprovalMode: "ADMIN_APPROVAL" }))).toBe("New members are **held for approval**. Content follows your moderation settings.");
+    expect(sentence(approvalSummary({ memberApprovalMode: "AUTO_APPROVE" }))).toBe("New members are **auto-approved**. Content follows your moderation settings.");
+  });
+});
+
+describe("MOBILE_ADMIN_SECTIONS", () => {
+  const consoleRoutes = resolve(ROOT, "apps/mobile/src/app/t/[slug]/(app)/admin");
+
+  it("are sections of the console, each once, with the Dashboard (the phone console's home) among them", () => {
+    const keys = new Set(ADMIN_SECTIONS.map((s) => s.key));
+    for (const key of MOBILE_ADMIN_SECTIONS) expect(keys.has(key), key).toBe(true);
+    expect(new Set(MOBILE_ADMIN_SECTIONS).size).toBe(MOBILE_ADMIN_SECTIONS.length);
+    expect(MOBILE_ADMIN_SECTIONS).toContain("dashboard");
+  });
+
+  it("each have a screen in the phone app, at the web console's path", () => {
+    for (const key of MOBILE_ADMIN_SECTIONS) {
+      const { path } = ADMIN_SECTIONS.find((s) => s.key === key)!;
+      const files = key === "dashboard" ? ["index.tsx"] : [`${path}.tsx`, `${path}/index.tsx`];
+      expect(
+        files.some((f) => existsSync(resolve(consoleRoutes, f))),
+        `${key}: ${files.join(" or ")}`,
+      ).toBe(true);
+    }
   });
 });
 

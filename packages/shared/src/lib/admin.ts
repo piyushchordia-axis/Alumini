@@ -1,5 +1,5 @@
 import type { ContentType, MembershipStatus, ModerationStatus, NotificationType } from "../constants";
-import type { DashboardDto } from "../types/dto";
+import type { DashboardDto, TenantPublicSettings } from "../types/dto";
 import { MONTHS } from "./jobs";
 import { NOTIFICATION_CATEGORY } from "./notifications";
 import { groupDigits } from "./salary";
@@ -75,6 +75,74 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
 /** Everything waiting for an admin, the sections' counts added up: members to decide on, content to review, and open reports of both kinds. */
 export function adminWaitingCount(d: Pick<DashboardDto, AdminWaitingKey>): number {
   return d.pendingMembers + d.pendingContent + d.openReports + d.openChatReports;
+}
+
+/** The accessible name of a way into the console from the member app, with the work waiting: "Admin console, 3 waiting". */
+export function adminConsoleLabel(waiting: number): string {
+  return waiting > 0 ? `Admin console, ${formatCount(waiting)} waiting` : "Admin console";
+}
+
+export type AdminSectionKey = AdminSection["key"];
+
+/**
+ * The sections the phone app's console has so far (its Dashboard is the console's home). It lists the others as on the
+ * web console, and README → Known gaps names them, until every page is in the phone app.
+ */
+export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard"];
+
+/** A figure on the console's home, which both apps draw as a tile. */
+export interface DashboardTile {
+  key: keyof DashboardDto;
+  label: string;
+  value: number;
+  hint?: string;
+  /** The section the tile opens, with the query to open it with. */
+  section?: AdminSectionKey;
+  query?: Readonly<Record<string, string>>;
+  /** Work is waiting: the tile is drawn in amber. */
+  attention: boolean;
+}
+
+/**
+ * The console home's figures: what needs an admin, then the institution at a glance. The two kinds of report show only
+ * while either has one open, as many institutions never get one.
+ */
+export function dashboardTiles(d: DashboardDto): { needs: DashboardTile[]; glance: DashboardTile[] } {
+  const waiting = (key: AdminWaitingKey, label: string, hint: string, section: AdminSectionKey, query?: Record<string, string>): DashboardTile => ({
+    key,
+    label,
+    value: d[key],
+    hint,
+    section,
+    ...(query ? { query } : {}),
+    attention: d[key] > 0,
+  });
+  const needs = [waiting("pendingMembers", "Pending members", "Needs your decision", "members", { status: "PENDING" }), waiting("pendingContent", "Content to review", "Posts, jobs, funding, events, businesses", "moderation")];
+  if (d.openReports > 0 || d.openChatReports > 0) {
+    needs.push(waiting("openReports", "Open reports", "Flagged by members", "reports"), waiting("openChatReports", "Open chat reports", "Private messages members reported", "chatReports"));
+  }
+  const glance: DashboardTile[] = [
+    { key: "approvedMembers", label: "Approved members", value: d.approvedMembers, hint: `${formatCount(d.activeMembersLast30d)} active in 30 days`, attention: false },
+    { key: "newMembersLast30d", label: "New members (30d)", value: d.newMembersLast30d, attention: false },
+    { key: "postsLast7d", label: "Posts (7d)", value: d.postsLast7d, attention: false },
+    { key: "upcomingEvents", label: "Upcoming events", value: d.upcomingEvents, attention: false },
+  ];
+  return { needs, glance };
+}
+
+/** Part of a sentence, set in bold when `strong`. */
+export interface TextSegment {
+  text: string;
+  strong?: boolean;
+}
+
+/** How the institution takes in new members, as the console's home says it, with the mode in bold. */
+export function approvalSummary(settings: Pick<TenantPublicSettings, "memberApprovalMode">): TextSegment[] {
+  return [
+    { text: "New members are " },
+    { text: settings.memberApprovalMode === "ADMIN_APPROVAL" ? "held for approval" : "auto-approved", strong: true },
+    { text: ". Content follows your moderation settings." },
+  ];
 }
 
 /** What can happen to a membership. An admin does all but reapply, which is the member's own. */

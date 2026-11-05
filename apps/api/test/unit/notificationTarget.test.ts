@@ -25,9 +25,34 @@ describe("notificationTarget", () => {
   });
 
   it("sends a chat report to the admin page that holds it, as an admin notification", () => {
-    expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: "r1" })).toEqual({ kind: "admin", section: "chat-reports" });
+    expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: "r1" })).toStrictEqual({ kind: "admin", section: "chat-reports" });
     expect(notificationTarget("CHAT_REPORT_FILED", {})).toEqual({ kind: "admin", section: "chat-reports" });
     expect(NOTIFICATION_CATEGORY.CHAT_REPORT_FILED).toBe("ADMIN");
+  });
+
+  it("carries the ids of what an admin notice is about, so the console can open it", () => {
+    const id = "3f2b8a4e-9c1d-4e5f-8a7b-0c1d2e3f4a5b";
+    const other = "AB12CD34-0000-4000-8000-1234567890EF";
+    expect(notificationTarget("NEW_MEMBER_PENDING", { membershipId: id })).toStrictEqual({ kind: "admin", section: "members", membershipId: id });
+    expect(notificationTarget("CONTENT_PENDING", { contentType: "JOB", contentId: id })).toStrictEqual({ kind: "admin", section: "moderation", contentType: "JOB", contentId: id });
+    expect(notificationTarget("REPORT_FILED", { reportId: other, contentType: "POST", contentId: id })).toStrictEqual({ kind: "admin", section: "reports", reportId: other, contentType: "POST", contentId: id });
+    expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: id })).toStrictEqual({ kind: "admin", section: "chat-reports", chatReportId: id });
+  });
+
+  it("leaves out an admin notice's id that isn't a UUID, or content of a type there isn't, keeping the section", () => {
+    const id = "3f2b8a4e-9c1d-4e5f-8a7b-0c1d2e3f4a5b";
+    for (const bad of ["", "m1", "../../settings", `${id}/../x`, ` ${id}`, `${id}?status=APPROVED`, "3f2b8a4e9c1d4e5f8a7b0c1d2e3f4a5b", 42, null, { id }]) {
+      expect(notificationTarget("NEW_MEMBER_PENDING", { membershipId: bad }), String(bad)).toStrictEqual({ kind: "admin", section: "members" });
+      expect(notificationTarget("CHAT_REPORT_FILED", { chatReportId: bad }), String(bad)).toStrictEqual({ kind: "admin", section: "chat-reports" });
+      expect(notificationTarget("REPORT_FILED", { reportId: bad, contentType: "POST", contentId: bad }), String(bad)).toStrictEqual({ kind: "admin", section: "reports" });
+    }
+    // Both halves of the item or neither: a type alone, or an id of a type nobody moderates, opens the section.
+    expect(notificationTarget("CONTENT_PENDING", { contentType: "JOB" })).toStrictEqual({ kind: "admin", section: "moderation" });
+    expect(notificationTarget("CONTENT_PENDING", { contentId: id })).toStrictEqual({ kind: "admin", section: "moderation" });
+    for (const contentType of ["job", "CHAT", "constructor", "__proto__"]) {
+      expect(notificationTarget("CONTENT_PENDING", { contentType, contentId: id }), contentType).toStrictEqual({ kind: "admin", section: "moderation" });
+    }
+    expect(notificationTarget("REPORT_FILED", { reportId: id, contentType: "POST", contentId: "p1" })).toStrictEqual({ kind: "admin", section: "reports", reportId: id });
   });
 
   it("points a removed message at its thread, and counts it among a member's own account notices", () => {

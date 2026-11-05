@@ -9,8 +9,9 @@ institutions and keep offline billing (chargeback) records from a platform conso
   steps), a community feed with polls and announcements, a jobs board with structured job posts and referral requests,
   a funding board, a business directory, the batch directory, events with RSVPs, birthdays and anniversaries, a weekly
   digest, and private contact: direct messages (each starting as a request), group chats and mentorship.
-- **Institution admins** (web): member approval, content moderation and reports, chat reports with an audited view,
-  feature switches and branding, profile questions, invitations, announcements, analytics and CSV exports.
+- **Institution admins** (web and phone app): member approval, content moderation and reports, chat reports with an
+  audited view, feature switches and branding, profile questions, invitations, announcements, analytics and CSV
+  exports.
 - **Illuminize staff** (web): onboarding, billing plans and usage, a comparison of institutions for chargeback, and the
   chat reports escalated to them.
 
@@ -18,7 +19,7 @@ institutions and keep offline billing (chargeback) records from a platform conso
 | --- | --- | --- |
 | API | Node 22, TypeScript, Express 5, Drizzle ORM, Postgres 16, Redis | `apps/api` |
 | Web (members + admins + platform console) | React 19, Vite, Tailwind v4, react-router 7, TanStack Query | `apps/web` |
-| Mobile (members) | Expo SDK 58, expo-router, React Native | `apps/mobile` |
+| Mobile (members and institution admins) | Expo SDK 58, expo-router, React Native | `apps/mobile` |
 | Shared | zod schemas, DTO types, typed API client used by both apps | `packages/shared` |
 
 ## Try it
@@ -180,6 +181,12 @@ before showing the demo.
   events, business listings and groups (like a moderated Facebook group). Comments are never held but can be removed,
   and neither are chat messages, which never reach moderation at all. Tenant admins' own content is always published.
   Members can report content; admins resolve reports by removing content or dismissing them.
+- The **admin console** is in the web app and the phone app. On the web, the header links to it at every width, and the
+  link, the sidebar and the More sheet show an amber count of what's waiting (pending members, content to review, open
+  reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
+  profile, and admin notices open it too: a stack of its own above the tabs, opening on the dashboard. Its pages are
+  coming to the phone one at a time (see Known gaps). The app opens only for an institution's members, so Illuminize
+  staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the app theme.
 - A trigger (migration 0005) stamps `memberships.approved_at` when a membership becomes approved.
@@ -1223,8 +1230,13 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
+- The admin console in the phone app:
+  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: members,
+    member detail, moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the
+    audit log. Until each lands, its tile on the console's home (members, moderation and both kinds of report have one)
+    opens nothing, and its admin notices open the console's home.
+  - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
-  - The admin Members status tabs can still overflow sideways on narrow phones (member rows reflow; tabs don't wrap).
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and

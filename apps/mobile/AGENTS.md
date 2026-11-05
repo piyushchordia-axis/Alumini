@@ -38,6 +38,7 @@ Native stack headers float over content on device. **Do not** set `headerShown: 
 | Tab list root (feed, jobs, directory, …) | `SectionScreen` → draws `MemberAppBar` | index: `headerShown: false` |
 | Pushed detail / modal (job, post, profile, …) | `Screen title="…"` or `StackScreen` / `StackHeader` | stack: `screenOptions={{ headerShown: false }}`; keep `presentation: "modal"` where needed |
 | Chat overlay under `(app)/` | `ChatScreen` + `ChatHeader` | parent already `headerShown: false` |
+| Admin console screen under `(app)/admin` | `AdminScreen` (scrolling) or `AdminListScreen` (lists): the Admin badge, Back falling back to the console's home | admin stack `headerShown: false`, anchor `index`; modals keep `presentation: "modal"` |
 | Auth without a bar | `Screen topInset` | n/a |
 
 `MemberAppBar`, `StackHeader`, and `ChatHeader` each own `paddingTop: insets.top`. Do not pad the app bar via `SectionScreen`/`StackScreen` `style` — put padding on an inner content view.
@@ -53,7 +54,8 @@ Member UI follows the same craft rules as web (see root `CLAUDE.md` → **UI / U
 
 - SVG icons from `src/components/icons.tsx` (`react-native-svg`). Section tabs use icon *names* in `src/lib/sections.ts`, not emoji. Do not use emoji for nav, empty states, or chrome badges.
 - Theme tokens and elevation live in `src/theme`. Cards should read above the page background; landing is brand-first (full-bleed cover + institution hero).
-- Feature parity: every member-facing visual change ships on web and mobile in the same change.
+- Feature parity: every member-facing and institution-admin change ships on web and mobile in the same change, logic both need living in `packages/shared`; the platform (staff) console is web only.
+- Admin pages not yet in the phone app (its console's home lists them as on the web console for now): members, member detail, moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log. When one lands, add its section to `MOBILE_ADMIN_SECTIONS` (`packages/shared/src/lib/admin.ts`) and take it off this list, CLAUDE.md's and README's.
 - After `expo install` of a native module, restart Metro; a server started before the install will fail to resolve it.
 - OTP phone fields: hold one `{ country, number }` entry, read every change to the box with `readPhoneEntry(country, raw, entry)` and every country picked with `readPhoneEntry(country, entry.held ?? entry.number)` from `@illuminize/shared` (`clampNationalNumber`, India max 10, is its last step), and send `phoneEntryToE164`. Show a stored number with `formatPhone`.
 

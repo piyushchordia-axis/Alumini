@@ -10,7 +10,9 @@ mkdirSync(SHOTS, { recursive: true });
 const unique = String(Date.now()).slice(-8);
 const PHONE = `7${unique.slice(0, 9).padEnd(9, "3")}`;
 const PHONE_2 = `6${unique.slice(0, 9).padEnd(9, "4")}`;
-const PHONE_3 = `6${unique.slice(0, 9).padEnd(9, "5")}`;
+// Jignesh Patel, the Samaj admin: the next person to sign in after a forced sign-out, then the admin console's journey,
+// so the console costs no code of its own. No other script signs him in.
+const SAMAJ_ADMIN = "9000000004";
 const results = [];
 const step = async (name, fn) => {
   try {
@@ -2285,12 +2287,135 @@ try {
     membership.answer(401, "SESSION_REVOKED");
     await membership.refetch();
     await page.waitForURL("**/t/demo-university/login");
-    // The next person's membership can't load, so the old one would be all there is to show.
+    // The next person's membership can't load, so the old one would be all there is to show. (The Samaj admin isn't a
+    // member here, so it couldn't load for him anyway.)
     membership.answer(503, "INTERNAL");
-    await signIn(PHONE_3);
+    await signIn(SAMAJ_ADMIN);
     await page.getByText("e2e INTERNAL").waitFor();
     if (await barTab("More").locator("visible=true").count()) throw new Error("the next person to sign in saw the last member's cached membership");
     await membership.stop();
+  });
+
+  // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
+  // until then the console's home lists them as on the web console.
+  const SAMAJ = BASE + "/t/shri-gujarati-samaj";
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Members", "Moderation", "Reports", "Chat reports", "Invitations", "Profile fields", "Settings", "Audit log"];
+  // The row's name carries the count of work waiting, once the counts have loaded.
+  const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
+  const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
+  // The page, and each scrolling area around `content` (something in the screen's body). react-native-web clips a
+  // vertical ScrollView's sideways overflow (overflow-x: hidden), so a body too wide for the phone is cut off without
+  // ever widening the page: the ScrollView's own width is what shows it.
+  const fitsPhone = async (where, content) => {
+    const { overflow, scrollers } = await content.evaluate((el) => {
+      const widths = [document.documentElement.scrollWidth - document.documentElement.clientWidth];
+      let scrollers = 0;
+      for (let box = el.parentElement; box; box = box.parentElement) {
+        const { overflowX, overflowY } = getComputedStyle(box);
+        if (overflowX !== "hidden" || (overflowY !== "auto" && overflowY !== "scroll")) continue;
+        scrollers += 1;
+        widths.push(box.scrollWidth - box.clientWidth);
+      }
+      return { overflow: Math.max(...widths), scrollers };
+    });
+    if (!scrollers) throw new Error(`found no scrolling area around ${where}'s body to measure`);
+    if (overflow > 0) throw new Error(`${where} is wider than the phone by ${overflow}px`);
+  };
+
+  await step("an admin opens the console from More and from My profile, and its home shows what's waiting", async () => {
+    await page.goto(SAMAJ);
+    await barTab("More").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/more");
+    // Parth Joshi and Diya Raval wait for approval; nothing else does.
+    const row = page.getByRole("link", { name: /^Admin console, \d+ waiting$/ }).locator("visible=true").first();
+    await row.waitFor();
+    const name = await row.getAttribute("aria-label");
+    if (name !== "Admin console, 2 waiting") throw new Error(`the More row is named "${name}", expected "Admin console, 2 waiting"`);
+    await expectSvgNoEmoji(row, "the More hub's Admin console row");
+    await row.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+
+    // What needs the admin, in amber when above 0, each named by its label and count.
+    const pending = page.getByLabel("Pending members, 2", { exact: true });
+    await pending.waitFor();
+    if ((await pending.evaluate((tile) => getComputedStyle(tile).backgroundColor)) !== "rgb(255, 251, 235)") throw new Error("the Pending members tile isn't amber with members waiting");
+    const content = page.getByLabel("Content to review, 0", { exact: true });
+    if ((await content.evaluate((tile) => getComputedStyle(tile).backgroundColor)) === "rgb(255, 251, 235)") throw new Error("the Content to review tile is amber with nothing waiting");
+    // No report is open, so neither report tile shows.
+    if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
+    for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
+    await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
+    // Until a section is in the phone app, the home lists it as on the web console, and its tile opens nothing.
+    await page.getByText("On the web console for now:", { exact: true }).waitFor();
+    const listed = (await page.getByRole("list").filter({ hasText: "Audit log" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
+    if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
+    if (await page.getByRole("link", { name: /^Pending members/ }).count()) throw new Error("the Pending members tile links to a section the phone app doesn't have yet");
+    // The console is a stack of its own above the tabs, as on the web: no tab bar.
+    if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
+    await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
+    await shot("m10-admin-console");
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/more");
+
+    // My profile's way in.
+    await hubRow("My profile").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/profile");
+    const link = page.getByRole("link", { name: "Admin console", exact: true }).locator("visible=true").last();
+    await expectSvgNoEmoji(link, "My profile's Admin console link");
+    const box = await link.boundingBox();
+    if (!box || box.height < 44) throw new Error(`My profile's Admin console link is ${box?.height}px tall, under 44px`);
+    await link.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await page.getByLabel("Pending members, 2", { exact: true }).waitFor();
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/profile");
+  });
+
+  await step("an admin notice tapped in the list opens the console, and Back returns to the list", async () => {
+    // Every admin notice opens the console's home until its own section is in the phone app.
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "CHAT_REPORT_FILED", data: { chatReportId: "00000000-0000-4000-8000-0000000000c1" }, title: "A message was reported" });
+    try {
+      await page.goto(SAMAJ + "/profile/notifications");
+      await page.getByText("A message was reported", { exact: true }).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+      await page.getByLabel("Pending members, 2", { exact: true }).waitFor();
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
+    } finally {
+      await notice.stop();
+    }
+  });
+
+  await step("an admin who loses the role is taken out of the console, and More drops its row", async () => {
+    await page.goto(SAMAJ + "/more");
+    await consoleRow().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await page.getByLabel("Pending members, 2", { exact: true }).waitFor();
+    // The API's own answer with the role taken away, found by a refetch, as when another admin demotes them.
+    const url = "**/api/v1/t/shri-gujarati-samaj/memberships/me";
+    await page.route(url, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      return route.fulfill({ response, json: { data: { ...(await response.json()).data, role: "MEMBER" } } });
+    });
+    // Routed after, so it runs first: it counts the requests and passes each on to the answer above.
+    const membership = await scriptMembership(page, "shri-gujarati-samaj");
+    try {
+      await membership.refetch();
+      await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+      // Down to the tabs underneath, not a second set of them on top of the console.
+      if ((await barTab("More").locator("visible=true").count()) !== 1) throw new Error("leaving the console left more than one tab bar");
+      await barTab("More").click();
+      await hubRow("My profile").waitFor();
+      if (await page.getByRole("link", { name: /^Admin console/ }).locator("visible=true").count()) throw new Error("More still offers the admin console to someone who isn't an admin");
+      // Opened cold, as from a link or a push, the console sends them to the member app too.
+      await page.goto(SAMAJ + "/admin");
+      await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+      await barTab("More").waitFor();
+    } finally {
+      await membership.stop();
+      await page.unroute(url);
+    }
   });
 
   console.log(results.join("\n"));
