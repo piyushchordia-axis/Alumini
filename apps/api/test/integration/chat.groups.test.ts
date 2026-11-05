@@ -846,19 +846,21 @@ describe.skipIf(!dbAvailable)("groups", () => {
   });
 
   describe("demo data", () => {
-    it("seeds an open and an invite-only group in the university only, with one pending invitation and none of the e2e members", async () => {
+    it("seeds an open and an invite-only group in the university and the Samaj only, each with one pending invitation, and none of the e2e members", async () => {
       const { tenantIds } = await seedCore(ctx.db, ["+919999999999"]);
       const membershipIds = await seedMembers(ctx.db, tenantIds);
       await seedDemoHistory(ctx.db, tenantIds, membershipIds);
       await seedConnections(ctx.db, tenantIds, membershipIds);
       await seedConnections(ctx.db, tenantIds, membershipIds);
       const uni = tenantIds["demo-university"]!;
+      const samaj = tenantIds["shri-gujarati-samaj"]!;
+      const bothInviteOnly = [
+        [uni, "INVITE_ONLY"],
+        [samaj, "INVITE_ONLY"],
+      ].sort();
 
       const groups = await ctx.db.select().from(chatGroups);
-      expect(groups.map((g) => [g.tenantId, g.visibility]).sort()).toEqual([
-        [uni, "INVITE_ONLY"],
-        [uni, "OPEN"],
-      ]);
+      expect(groups.map((g) => [g.tenantId, g.visibility]).sort()).toEqual([...bothInviteOnly, [uni, "OPEN"], [samaj, "OPEN"]].sort());
       for (const g of groups) {
         expect(g).toMatchObject({ moderationStatus: "APPROVED", approvedName: g.name, approvedDescription: g.description, archivedAt: null });
         expect(g.approvedAt).toBeInstanceOf(Date);
@@ -880,8 +882,8 @@ describe.skipIf(!dbAvailable)("groups", () => {
         if (g.visibility === "INVITE_ONLY") expect(Math.max(...active.map((p) => p.joinedSeq))).toBeGreaterThan(0);
       }
       const invited = await ctx.db.select().from(chatParticipants).where(eq(chatParticipants.state, "INVITED"));
-      expect(invited).toHaveLength(1);
-      expect(groups.find((g) => g.conversationId === invited[0]!.conversationId)!.visibility).toBe("INVITE_ONLY");
+      const invitedTo = invited.map((p) => groups.find((g) => g.conversationId === p.conversationId)!);
+      expect(invitedTo.map((g) => [g.tenantId, g.visibility]).sort()).toEqual(bothInviteOnly);
 
       // Nobody the e2e journeys sign in as is in a group or invited to one, so their inboxes and badges stay as they expect.
       const named = ["+919100000003", "+919100000004", "+919100000005", "+919100000006", "+919000000001"].map((p) => membershipIds[`demo-university:${p}`]!);

@@ -72,7 +72,19 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     const named = rows.filter((r) => !r.phone.startsWith("+9193"));
     const rich = named.filter(({ m }) => m.headline && m.skills.length >= 3 && m.experiences.length + m.education.length > 0 && m.openTo.length + Number(!!m.linkedinUrl) > 0);
     expect(rich.map((r) => `${r.tenant.slug}:${r.phone}`).sort()).toEqual(
-      ["demo-university:+919100000001", "demo-university:+919100000002", "demo-university:+919100000005", "demo-university:+919100000006", "demo-college:+919100000011", "demo-college:+919100000012", "demo-school:+919100000023"].sort(),
+      [
+        "demo-university:+919100000001",
+        "demo-university:+919100000002",
+        "demo-university:+919100000005",
+        "demo-university:+919100000006",
+        "demo-college:+919100000011",
+        "demo-college:+919100000012",
+        "demo-school:+919100000023",
+        "shri-gujarati-samaj:+919100000031",
+        "shri-gujarati-samaj:+919100000032",
+        "shri-gujarati-samaj:+919100000035",
+        "shri-gujarati-samaj:+919100000036",
+      ].sort(),
     );
     expect(named.find((r) => r.phone === "+919100000001")?.m).toMatchObject({ industry: "BANKING_FINANCE", fieldOfStudy: "Computer Science", openTo: ["HIRING", "COLLABORATING"] });
 
@@ -85,7 +97,10 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     expect(withDetails.filter(({ m }) => m.experiences.length > 0).length).toBeGreaterThan(5);
     expect(withDetails.filter(({ m }) => m.education.length > 0).length).toBeGreaterThan(5);
 
+    // The Samaj's 20 came later, from a stream of their own, so the first three institutions' 110 are as they were.
+    expect(generated.filter((r) => r.tenant.slug === "shri-gujarati-samaj")).toHaveLength(20);
     const core = generated
+      .filter((r) => r.tenant.slug !== "shri-gujarati-samaj")
       .map(({ m, phone }) => [phone, m.fullName, m.batchYear, m.city, m.country, m.professionType, m.companyName, m.designation, m.dateOfBirth, m.linkedinUrl] as const)
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     expect(core).toHaveLength(110);

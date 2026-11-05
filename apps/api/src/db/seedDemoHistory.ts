@@ -149,6 +149,14 @@ const STUDIES_HERE: Record<string, ReadonlyArray<readonly [degree: string, field
     ["B.E.", "Mechanical Engineering"],
     ["B.E.", "Civil Engineering"],
   ],
+  "shri-gujarati-samaj": [
+    ["B.Com", "Commerce"],
+    ["BBA", "Business Administration"],
+    ["B.E.", "Computer Engineering"],
+    ["B.E.", "Mechanical Engineering"],
+    ["B.Pharm", "Pharmacy"],
+    ["CA", "Accountancy"],
+  ],
 };
 /** Where the school's alumni went next, and how many years it took. */
 const AFTER_SCHOOL = [
@@ -298,6 +306,10 @@ const FIELDS: Record<string, FieldSeed[]> = {
     { key: "house", label: "School house", type: "SELECT", options: opts("Red", "Blue", "Green", "Yellow"), filterable: true },
     { key: "year_joined", label: "Year you joined the school", type: "NUMBER" },
   ],
+  "shri-gujarati-samaj": [
+    { key: "chapter", label: "Chapter", type: "SELECT", options: opts("Ahmedabad", "Surat", "Rajkot", "Diaspora"), filterable: true },
+    { key: "interests", label: "Community interests", type: "MULTI_SELECT", options: opts("Garba and cultural events", "Business networking", "Youth programmes", "Education support", "Seva and charity"), filterable: true },
+  ],
 };
 
 /** A member's answer to one of the questions. */
@@ -323,6 +335,7 @@ const GENERATED: Record<string, { count: number; batches: [number, number]; pref
   "demo-university": { count: 64, batches: [1998, 2024], prefix: "+919310" },
   "demo-college": { count: 28, batches: [1995, 2023], prefix: "+919320" },
   "demo-school": { count: 18, batches: [2000, 2024], prefix: "+919330" },
+  "shri-gujarati-samaj": { count: 20, batches: [1990, 2024], prefix: "+919340" },
 };
 
 async function chunked<T>(rows: T[], size: number, fn: (chunk: T[]) => Promise<unknown>): Promise<void> {

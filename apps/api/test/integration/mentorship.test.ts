@@ -990,7 +990,7 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
   });
 
   describe("demo data", () => {
-    it("seeds mentors in the university only, a request waiting and a mentorship under way with the chat it opened, and none of the e2e members", async () => {
+    it("seeds mentors in the university and the Samaj only, requests waiting and a mentorship under way with the chat it opened, and none of the e2e members", async () => {
       const { tenantIds } = await seedCore(ctx.db, ["+919999999999"]);
       const membershipIds = await seedMembers(ctx.db, tenantIds);
       await seedDemoHistory(ctx.db, tenantIds, membershipIds);
@@ -1000,23 +1000,27 @@ describe.skipIf(!dbAvailable)("mentorship", () => {
       await seedConnections(ctx.db, tenantIds, membershipIds);
       expect(await count()).toEqual(before);
       const uni = tenantIds["demo-university"]!;
+      const samaj = tenantIds["shri-gujarati-samaj"]!;
+      const where = <T extends { tenantId: string }>(rows: T[], tenantId: string) => rows.filter((r) => r.tenantId === tenantId);
 
       const profiles = await ctx.db.select().from(mentorProfiles);
-      expect(profiles.length).toBeGreaterThanOrEqual(3);
-      expect(profiles.every((p) => p.tenantId === uni && p.isActive && p.areas.length >= 1 && p.areas.length <= 5)).toBe(true);
-      expect(new Set(profiles.flatMap((p) => p.areas)).size).toBeGreaterThanOrEqual(5);
+      expect(profiles.every((p) => [uni, samaj].includes(p.tenantId) && p.isActive && p.areas.length >= 1 && p.areas.length <= 5)).toBe(true);
+      expect(where(profiles, uni).length).toBeGreaterThanOrEqual(3);
+      expect(new Set(where(profiles, uni).flatMap((p) => p.areas)).size).toBeGreaterThanOrEqual(5);
+      expect(where(profiles, samaj)).toHaveLength(2);
       const all = await ctx.db.select().from(mentorships);
-      expect(all.map((r) => r.status).sort()).toEqual(["ACCEPTED", "REQUESTED"]);
-      expect(all.every((r) => r.tenantId === uni && !r.suppressed && r.note.length >= 10 && r.note.length <= 500)).toBe(true);
-      const mentorIds = new Set(profiles.map((p) => p.membershipId));
-      expect(all.every((r) => mentorIds.has(r.mentorMembershipId!))).toBe(true);
+      expect(where(all, uni).map((r) => r.status).sort()).toEqual(["ACCEPTED", "REQUESTED"]);
+      expect(where(all, samaj).map((r) => r.status).sort()).toEqual(["ACCEPTED", "REQUESTED", "REQUESTED"]);
+      expect(all.every((r) => !r.suppressed && r.note.length >= 10 && r.note.length <= 500)).toBe(true);
+      expect(all.every((r) => profiles.some((p) => p.membershipId === r.mentorMembershipId && p.tenantId === r.tenantId))).toBe(true);
 
-      const accepted = all.find((r) => r.status === "ACCEPTED")!;
-      expect(await conversationRow(ctx, accepted.conversationId!)).toMatchObject({ origin: "MENTORSHIP", originId: accepted.id, directState: "ACCEPTED", requesterMembershipId: null });
-      const thread = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, accepted.conversationId!));
-      const first = thread.find((t) => t.seq === 1)!;
-      expect(first).toMatchObject({ body: accepted.note, senderMembershipId: accepted.menteeMembershipId, clientKey: `origin-${accepted.id}` });
-      expect(thread.map((t) => t.seq).sort((x, y) => x - y)).toEqual(Array.from({ length: thread.length }, (_, i) => i + 1));
+      for (const accepted of all.filter((r) => r.status === "ACCEPTED")) {
+        expect(await conversationRow(ctx, accepted.conversationId!)).toMatchObject({ origin: "MENTORSHIP", originId: accepted.id, directState: "ACCEPTED", requesterMembershipId: null });
+        const thread = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, accepted.conversationId!));
+        const first = thread.find((t) => t.seq === 1)!;
+        expect(first).toMatchObject({ body: accepted.note, senderMembershipId: accepted.menteeMembershipId, clientKey: `origin-${accepted.id}` });
+        expect(thread.map((t) => t.seq).sort((x, y) => x - y)).toEqual(Array.from({ length: thread.length }, (_, i) => i + 1));
+      }
 
       // Nobody an e2e journey signs in as mentors, asks or is asked, so what those journeys see stays as it was.
       const e2ePhones = ["+919100000003", "+919100000004", "+919100000005", "+919100000006", "+919000000001", "+91931000006", "+91931000007", "+91931000012", "+91931000013"];

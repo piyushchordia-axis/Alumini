@@ -913,7 +913,7 @@ describe.skipIf(!dbAvailable)("referrals", () => {
   });
 
   describe("demo data", () => {
-    it("seeds two jobs that take requests in the university only, one waiting and one accepted with its chat, and none of the e2e members", async () => {
+    it("seeds jobs that take requests in the university and the Samaj only, each with one waiting and one accepted with its chat, and none of the e2e members", async () => {
       const { tenantIds } = await seedCore(ctx.db, ["+919999999999"]);
       const membershipIds = await seedMembers(ctx.db, tenantIds);
       await seedContent(ctx.db, tenantIds, membershipIds);
@@ -924,22 +924,30 @@ describe.skipIf(!dbAvailable)("referrals", () => {
       await seedConnections(ctx.db, tenantIds, membershipIds);
       expect(await count()).toEqual(before);
       const uni = tenantIds["demo-university"]!;
+      const samaj = tenantIds["shri-gujarati-samaj"]!;
 
       const offering = await ctx.db.select().from(jobs).where(eq(jobs.canRefer, true));
-      expect(offering.map((j) => [j.tenantId, j.title]).sort()).toEqual([
-        [uni, "Associate Product Manager"],
-        [uni, "Backend Engineer (Node.js)"],
-      ]);
+      expect(offering.map((j) => [j.tenantId, j.title]).sort()).toEqual(
+        [
+          [uni, "Associate Product Manager"],
+          [uni, "Backend Engineer (Node.js)"],
+          [samaj, "Associate Product Manager"],
+        ].sort(),
+      );
       const all = await allRows();
-      expect(all.map((x) => x.status).sort()).toEqual(["ACCEPTED", "REQUESTED"]);
-      expect(all.every((x) => x.tenantId === uni && !x.suppressed && x.note.length >= 10 && x.note.length <= 500)).toBe(true);
-      for (const x of all) expect(offering.find((j) => j.id === x.jobId)).toMatchObject({ authorMembershipId: x.posterMembershipId, title: x.jobTitle, companyName: x.jobCompany });
+      expect(all.every((x) => !x.suppressed && x.note.length >= 10 && x.note.length <= 500)).toBe(true);
+      for (const x of all) expect(offering.find((j) => j.id === x.jobId)).toMatchObject({ tenantId: x.tenantId, authorMembershipId: x.posterMembershipId, title: x.jobTitle, companyName: x.jobCompany });
 
-      const accepted = all.find((x) => x.status === "ACCEPTED")!;
-      expect(await conversationRow(ctx, accepted.conversationId!)).toMatchObject({ origin: "REFERRAL", originId: accepted.id, directState: "ACCEPTED", requesterMembershipId: null });
-      const thread = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, accepted.conversationId!));
-      expect(thread.find((t) => t.seq === 1)).toMatchObject({ body: accepted.note, senderMembershipId: accepted.requesterMembershipId, clientKey: `origin-${accepted.id}` });
-      expect(thread.map((t) => t.seq).sort((x, y) => x - y)).toEqual(Array.from({ length: thread.length }, (_, i) => i + 1));
+      for (const tenantId of [uni, samaj]) {
+        const here = all.filter((x) => x.tenantId === tenantId);
+        expect(here.map((x) => x.status).sort()).toEqual(["ACCEPTED", "REQUESTED"]);
+        const accepted = here.find((x) => x.status === "ACCEPTED")!;
+        expect(await conversationRow(ctx, accepted.conversationId!)).toMatchObject({ origin: "REFERRAL", originId: accepted.id, directState: "ACCEPTED", requesterMembershipId: null });
+        const thread = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, accepted.conversationId!));
+        expect(thread.find((t) => t.seq === 1)).toMatchObject({ body: accepted.note, senderMembershipId: accepted.requesterMembershipId, clientKey: `origin-${accepted.id}` });
+        expect(thread.map((t) => t.seq).sort((x, y) => x - y)).toEqual(Array.from({ length: thread.length }, (_, i) => i + 1));
+      }
+      expect(all).toHaveLength(4);
 
       // Nobody an e2e journey signs in as asks or is asked, so what those journeys see stays as it was.
       const e2ePhones = ["+919100000003", "+919100000004", "+919100000005", "+919100000006", "+919000000001", "+91931000006", "+91931000007", "+91931000012", "+91931000013"];

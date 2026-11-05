@@ -40,8 +40,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 
 Demo logins (OTP `123456` in development):
 - platform admin `+919999999999`;
-- tenant admins `+919000000001` (demo-university), `+919000000002` (demo-college) and `+919000000003` (demo-school);
-- members `+9191000000xx`; `+919100000026` is a current pupil at demo-school. README "Demo data" lists the Wave 2 seed.
+- tenant admins `+919000000001` (demo-university), `+919000000002` (demo-college), `+919000000003` (demo-school) and `+919000000004` (shri-gujarati-samaj);
+- members `+9191000000xx`; `+919100000026` is a current pupil at demo-school; Samaj showcase members `+919100000031`–`038`. README "Demo data" lists the Wave 2 seed.
 
 The development is done on Windows too: scripts must stay cross-platform. No bash, no `VAR=x cmd`, no `rm -rf` in
 package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` for file paths.

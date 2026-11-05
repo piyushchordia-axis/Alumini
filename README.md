@@ -106,9 +106,11 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 | Tenant admin, Demo University (`demo-university`) | `+919000000001` | members auto-approved, content published immediately; an open chat report and a reported business listing |
 | Tenant admin, Demo College (`demo-college`) | `+919000000002` | admin approves members **and** content; has pending members, pending posts/job/event/business listing and an open spam report |
 | Tenant admin, Demo School (`demo-school`) | `+919000000003` | admin approves members, content published immediately; messaging, groups and mentorship start off, as at any school |
+| Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
+| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` pending approval |
 | Members | `+9191000000xx` | see `apps/api/src/db/seed.ts` |
 | Current pupil, Demo School | `+919100000026` | Naina Sen, batch two years from now: never sees messages, groups, mentors or referrals |
-| Generated members | `+91931…`, `+91932…`, `+91933…` | 110 extra alumni across the three institutions, approved over the last six months |
+| Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months |
 
 Any other phone number registers as a brand-new member.
 

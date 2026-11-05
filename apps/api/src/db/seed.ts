@@ -78,6 +78,22 @@ export const SEED = {
       contentModerationMode: "AUTO_APPROVE" as const,
       adminPhone: "+919000000003",
     },
+    {
+      slug: "shri-gujarati-samaj",
+      name: "Shri Gujarati Samaj",
+      shortName: "SGS",
+      type: "OTHER" as const,
+      city: "Ahmedabad",
+      country: "IN",
+      primaryColor: "#c2410c",
+      secondaryColor: "#7c2d12",
+      tagline: "Community, culture and connection.",
+      welcomeMessage:
+        "Welcome to the Shri Gujarati Samaj member network. Stay in touch with the community, share opportunities and take part in events.",
+      memberApprovalMode: "ADMIN_APPROVAL" as const,
+      contentModerationMode: "AUTO_APPROVE" as const,
+      adminPhone: "+919000000004",
+    },
   ],
 };
 
@@ -174,6 +190,17 @@ export const SEED_MEMBERS: Record<string, MemberSeed[]> = {
     { phone: "+919100000023", fullName: "Nikhil Bose", batchYear: 2013, professionType: "EMPLOYED", companyName: "Goldman Sachs", designation: "VP", city: "Singapore", country: "SG" },
     { phone: "+919100000024", fullName: "Tara Pillai", batchYear: 2017, professionType: "EMPLOYED", companyName: "Swiggy", city: "Bengaluru", country: "IN", status: "PENDING" },
     { phone: "+919100000025", fullName: "Dev Malhotra", batchYear: 2022, professionType: "STUDENT", city: "Chennai", country: "IN", status: "PENDING" },
+  ],
+  "shri-gujarati-samaj": [
+    { phone: "+919000000004", fullName: "Jignesh Patel", batchYear: 1998, professionType: "EMPLOYED", companyName: "Shri Gujarati Samaj", designation: "Community Administrator", city: "Ahmedabad", country: "IN", role: "TENANT_ADMIN", bio: "Looking after member approvals and community events for the Samaj." },
+    { phone: "+919100000031", fullName: "Hetal Shah", batchYear: 2005, professionType: "BUSINESS_OWNER", companyName: "Shah Fabrics", designation: "Proprietor", city: "Surat", country: "IN", bio: "Third-generation textile trader. Happy to help members sourcing fabric or visiting Surat.", interests: ["textiles", "trade"] },
+    { phone: "+919100000032", fullName: "Ravi Mehta", batchYear: 2012, professionType: "EMPLOYED", companyName: "Tata Consultancy Services", designation: "Product Manager", city: "Ahmedabad", country: "IN", bio: "Product at TCS Digital. Often in London for client work.", interests: ["product", "startups"] },
+    { phone: "+919100000033", fullName: "Kiran Parikh", batchYear: 2008, professionType: "BUSINESS_OWNER", companyName: "Parikh Jewellers", designation: "Managing Partner", city: "Surat", country: "IN", bio: "Diamond and gold jewellery for retail and export.", interests: ["jewellery", "export"] },
+    { phone: "+919100000034", fullName: "Asha Desai", batchYear: 2022, professionType: "STUDENT", companyName: "Nirma University", city: "Ahmedabad", country: "IN", bio: "Final-year BBA. Looking for internships in marketing or operations." },
+    { phone: "+919100000035", fullName: "Bhavin Trivedi", batchYear: 1996, professionType: "EMPLOYED", companyName: "HDFC Bank", designation: "Senior Vice President", city: "Ahmedabad", country: "IN", bio: "SME banking. Glad to mentor members starting or expanding a business.", interests: ["finance", "mentoring"] },
+    { phone: "+919100000036", fullName: "Nisha Modi", batchYear: 2010, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Senior Consultant", city: "New Jersey", country: "US", bio: "Strategy consulting in the US. Happy to chat about moving abroad.", interests: ["consulting", "diaspora"] },
+    { phone: "+919100000037", fullName: "Parth Joshi", batchYear: 2018, professionType: "EMPLOYED", companyName: "Infosys", designation: "Senior Developer", city: "Pune", country: "IN", status: "PENDING" },
+    { phone: "+919100000038", fullName: "Diya Raval", batchYear: 2020, professionType: "FOUNDER", companyName: "Raval Foods", city: "Rajkot", country: "IN", status: "PENDING" },
   ],
 };
 
@@ -306,6 +333,67 @@ const SEED_PROFILES: Record<string, Record<string, SeedProfile>> = {
       education: [studied("INSEAD", "MBA", null, 2019, 2020), studied("Shri Ram College of Commerce", "B.Com", "Commerce", 2013, 2016)],
       linkedinUrl: "https://www.linkedin.com/in/nikhil-bose-sg",
       openTo: ["INVESTING"],
+    },
+  },
+  "shri-gujarati-samaj": {
+    // Hetal Shah: Surat textiles, open to hiring and collaborating.
+    "+919100000031": {
+      headline: "Proprietor of Shah Fabrics: cotton and blended fabrics for export",
+      industry: "MANUFACTURING_ENGINEERING",
+      careerStartYear: 2005,
+      skills: ["Textile trade", "Export documentation", "Sourcing", "Negotiation"],
+      degree: "B.Com",
+      fieldOfStudy: "Commerce",
+      experiences: [pastRole("Shah Fabrics", "Sales manager", 2005, 2012)],
+      websiteUrl: "https://example.com/shah-fabrics",
+      openTo: ["HIRING", "COLLABORATING"],
+    },
+    // Ravi Mehta: product at TCS, refers for openings.
+    "+919100000032": {
+      headline: "Product manager at TCS Digital, working on enterprise apps",
+      industry: "IT_SERVICES",
+      careerStartYear: 2012,
+      skills: ["Product management", "Agile", "Stakeholder management", "SQL"],
+      degree: "B.E.",
+      fieldOfStudy: "Computer Engineering",
+      experiences: [pastRole("Wipro", "Business analyst", 2012, 2016)],
+      linkedinUrl: "https://www.linkedin.com/in/ravi-mehta-product",
+      openTo: ["HIRING"],
+    },
+    // Kiran Parikh: jewellery, raising a small expansion round.
+    "+919100000033": {
+      headline: "Managing partner at Parikh Jewellers, Surat",
+      industry: "RETAIL_CONSUMER",
+      careerStartYear: 2008,
+      skills: ["Jewellery retail", "Diamond sourcing", "Export", "Brand building"],
+      degree: "BBA",
+      fieldOfStudy: "Business Administration",
+      websiteUrl: "https://example.com/parikh-jewellers",
+      openTo: ["COLLABORATING"],
+    },
+    // Bhavin Trivedi: SME banking mentor and angel cheques.
+    "+919100000035": {
+      headline: "Senior vice president, SME banking at HDFC Bank",
+      industry: "BANKING_FINANCE",
+      careerStartYear: 1996,
+      skills: ["SME lending", "Credit", "Fundraising advice", "Board mentoring"],
+      degree: "MBA",
+      fieldOfStudy: "Finance",
+      experiences: [pastRole("ICICI Bank", "Relationship manager", 1996, 2004)],
+      linkedinUrl: "https://www.linkedin.com/in/bhavin-trivedi-sme",
+      openTo: ["INVESTING"],
+    },
+    // Nisha Modi: diaspora consultant.
+    "+919100000036": {
+      headline: "Senior consultant at Deloitte, strategy and operations",
+      industry: "CONSULTING",
+      careerStartYear: 2010,
+      skills: ["Strategy", "Operations", "US immigration basics", "Career coaching"],
+      degree: "B.Com",
+      fieldOfStudy: "Commerce",
+      education: [studied("Rutgers University", "MBA", null, 2014, 2016)],
+      linkedinUrl: "https://www.linkedin.com/in/nisha-modi-deloitte",
+      openTo: ["HIRING"],
     },
   },
 };
@@ -578,6 +666,81 @@ export async function seedContent(db: Db, tenantIds: Record<string, string>, m: 
     created++;
   }
 
+  // ---------- shri-gujarati-samaj (ADMIN members / AUTO content) ----------
+  const samaj = tenantIds["shri-gujarati-samaj"]!;
+  if (!(await hasContent(samaj))) {
+    const admin = mid("shri-gujarati-samaj", "+919000000004");
+    const hetal = mid("shri-gujarati-samaj", "+919100000031");
+    const ravi = mid("shri-gujarati-samaj", "+919100000032");
+    const kiran = mid("shri-gujarati-samaj", "+919100000033");
+    const asha = mid("shri-gujarati-samaj", "+919100000034");
+    const bhavin = mid("shri-gujarati-samaj", "+919100000035");
+    const nisha = mid("shri-gujarati-samaj", "+919100000036");
+
+    const [welcome, p1, p2, p3] = await db
+      .insert(posts)
+      .values([
+        { tenantId: samaj, authorMembershipId: admin, body: "Welcome to the Shri Gujarati Samaj member network! Introduce yourself: chapter, city and what you do. Membership requests are reviewed by the Samaj office.", isPinned: true, ...approved },
+        { tenantId: samaj, authorMembershipId: hetal, body: "Shah Fabrics has a new range of cotton blends for export. Samaj members get preferential rates — message me if you're sourcing for a brand or a shop.", ...approved },
+        { tenantId: samaj, authorMembershipId: nisha, body: "Any Samaj members in the New York / New Jersey area? Thinking of a small dinner before Diwali.", ...approved },
+        { tenantId: samaj, authorMembershipId: bhavin, body: "Opening a few mentorship slots for members starting or expanding an SME. Happy to talk credit, cash flow and when to raise.", ...approved },
+      ])
+      .returning();
+    await db.insert(postComments).values([
+      { tenantId: samaj, postId: welcome!.id, authorMembershipId: ravi, body: "Ravi, Ahmedabad chapter, product at TCS. Glad to be here.", ...approved },
+      { tenantId: samaj, postId: welcome!.id, authorMembershipId: asha, body: "Asha, final year at Nirma. Looking forward to the events!", ...approved },
+      { tenantId: samaj, postId: p1!.id, authorMembershipId: kiran, body: "We buy from you already — the new blends look good.", ...approved },
+      { tenantId: samaj, postId: p2!.id, authorMembershipId: ravi, body: "I'll be in Jersey next month. Count me in if the dates work.", ...approved },
+    ]);
+    await db.insert(postReactions).values([
+      { tenantId: samaj, postId: p1!.id, membershipId: kiran, type: "LIKE" },
+      { tenantId: samaj, postId: p1!.id, membershipId: admin, type: "CELEBRATE" },
+      { tenantId: samaj, postId: welcome!.id, membershipId: hetal, type: "LIKE" },
+      { tenantId: samaj, postId: p3!.id, membershipId: asha, type: "INSIGHTFUL" },
+      { tenantId: samaj, postId: p2!.id, membershipId: bhavin, type: "LIKE" },
+    ]);
+    await db.execute(sql`update posts set comment_count = (select count(*) from post_comments c where c.post_id = posts.id and c.moderation_status = 'APPROVED'), reaction_count = (select count(*) from post_reactions r where r.post_id = posts.id) where tenant_id = ${samaj}`);
+
+    await db.insert(jobs).values([
+      { tenantId: samaj, authorMembershipId: ravi, title: "Associate Product Manager", companyName: "TCS Digital", location: "Ahmedabad", workMode: "ON_SITE", jobType: "FULL_TIME", description: "Entry product role on an enterprise client account. 1–3 years experience. Samaj referrals welcome.", contactEmail: "ravi.mehta@example.com", salaryNote: "₹12–18 LPA", ...approved },
+      { tenantId: samaj, authorMembershipId: hetal, title: "Export Documentation Executive", companyName: "Shah Fabrics", location: "Surat", workMode: "ON_SITE", jobType: "FULL_TIME", description: "Handle shipping documents, LC paperwork and buyer follow-ups. Gujarati and English; prior export experience preferred.", applyUrl: "https://example.com/shah-fabrics/careers", ...approved },
+      { tenantId: samaj, authorMembershipId: nisha, title: "Summer Intern – Strategy", companyName: "Deloitte", location: "New York", workMode: "ON_SITE", jobType: "INTERNSHIP", description: "10-week internship for final-year students. Visa sponsorship not available; US work authorisation required.", ...approved },
+      { tenantId: samaj, authorMembershipId: kiran, title: "Store Manager – Ring Road", companyName: "Parikh Jewellers", location: "Surat", workMode: "ON_SITE", jobType: "FULL_TIME", description: "Closed — position filled.", isClosed: true, ...approved },
+    ]);
+    await db.insert(jobSeekers).values({
+      tenantId: samaj,
+      membershipId: asha,
+      note: "Final-year BBA at Nirma. Looking for marketing or operations internships in Ahmedabad or Surat this summer.",
+      preferredRoles: "Marketing Intern, Operations Intern",
+      preferredLocations: "Ahmedabad, Surat",
+      isActive: true,
+    });
+
+    await db.insert(fundingListings).values([
+      { tenantId: samaj, authorMembershipId: kiran, kind: "SEEKING", title: "Parikh Jewellers expansion", stage: "SEED", amountMinMinor: 50_000_000, amountMaxMinor: 100_000_000, currency: "INR", pitch: "Opening a second showroom on Ring Road and a small e-commerce catalogue. Seeking ₹50L–₹1Cr from community angels who know retail.", sectors: ["retail", "jewellery"], websiteUrl: "https://example.com/parikh-jewellers", ...approved },
+      { tenantId: samaj, authorMembershipId: bhavin, kind: "OFFERING", title: "Angel cheques for Samaj founders", stage: "PRE_SEED", amountMinMinor: 2_500_000, amountMaxMinor: 15_000_000, currency: "INR", pitch: "Writing ₹25L–₹1.5Cr cheques into Gujarat-based SMEs and consumer brands founded by Samaj members. Happy to lead or follow.", sectors: ["SME", "consumer", "manufacturing"], ...approved },
+    ]);
+
+    const [navratri, meetup, past] = await db
+      .insert(events)
+      .values([
+        { tenantId: samaj, authorMembershipId: admin, title: "Samaj Navratri Garba Night 2026", description: "Nine evenings of Garba at the Samaj hall, with dinner on the final night. Members and families welcome.\n\n- Entry with membership card\n- Traditional attire preferred\n- Kids welcome until 9pm\n\nRSVP so we can plan seating and prasadam.", kind: "ORGANISED_EVENT", city: "Ahmedabad", venueName: "Shri Gujarati Samaj Hall", address: "Samaj Campus, CG Road, Ahmedabad 380009", startAt: inDays(28, 19), endAt: inDays(28, 23), timezone: "Asia/Kolkata", maxAttendees: 500, ...approved },
+        { tenantId: samaj, authorMembershipId: hetal, title: "Surat chapter coffee meetup", description: "Saturday morning coffee for Surat members. Trade talk optional — mostly catching up.", kind: "CASUAL_MEETUP", city: "Surat", venueName: "Cafe Coffee Day, Ring Road", startAt: inDays(10, 11), endAt: inDays(10, 13), timezone: "Asia/Kolkata", ...approved },
+        { tenantId: samaj, authorMembershipId: nisha, title: "NJ Diwali potluck", description: "Thank you to everyone who brought a dish. Photos in the group soon.", kind: "CASUAL_MEETUP", city: "Edison", venueName: "Community Centre", startAt: inDays(-25, 18), endAt: inDays(-25, 21), timezone: "America/New_York", ...approved },
+      ])
+      .returning();
+    await db.insert(eventRsvps).values([
+      { tenantId: samaj, eventId: navratri!.id, membershipId: hetal, status: "YES" },
+      { tenantId: samaj, eventId: navratri!.id, membershipId: ravi, status: "YES" },
+      { tenantId: samaj, eventId: navratri!.id, membershipId: asha, status: "YES" },
+      { tenantId: samaj, eventId: navratri!.id, membershipId: bhavin, status: "MAYBE" },
+      { tenantId: samaj, eventId: meetup!.id, membershipId: kiran, status: "YES" },
+      { tenantId: samaj, eventId: meetup!.id, membershipId: admin, status: "MAYBE" },
+      { tenantId: samaj, eventId: past!.id, membershipId: ravi, status: "NO" },
+    ]);
+    created++;
+  }
+
   await db.execute(sql`update events set yes_count = (select count(*) from event_rsvps r where r.event_id = events.id and r.status = 'YES'), maybe_count = (select count(*) from event_rsvps r where r.event_id = events.id and r.status = 'MAYBE')`);
   return created;
 }
@@ -588,6 +751,7 @@ export async function seedBilling(db: Db, tenantIds: Record<string, string>, cre
     { slug: "demo-university", values: { billingModel: "PER_ACTIVE_USER", billingCycle: "MONTHLY", currency: "INR", pricePerActiveUserMinor: 5000, effectiveFrom: "2026-01-01", includedChannels: ["WHATSAPP", "SMS", "EMAIL"], messageRatesMinor: { WHATSAPP: 80, SMS: 25, EMAIL: 0.5 }, notes: "₹50 per active member per month, invoiced quarterly in arrears. Messages at cost: WhatsApp ₹0.80, SMS ₹0.25, email ₹0.005." } },
     { slug: "demo-college", values: { billingModel: "FLAT_FEE", billingCycle: "YEARLY", currency: "INR", flatFeeMinor: 25_000_000, effectiveFrom: "2026-04-01", notes: "₹2.5L per year, paid by the alumni association." } },
     { slug: "demo-school", values: { billingModel: "FREE", billingCycle: "YEARLY", currency: "INR", effectiveFrom: "2026-01-01", notes: "Pilot — free for the first year." } },
+    { slug: "shri-gujarati-samaj", values: { billingModel: "FLAT_FEE", billingCycle: "YEARLY", currency: "INR", flatFeeMinor: 15_000_000, effectiveFrom: "2026-01-01", notes: "₹1.5L per year, paid by the Samaj office." } },
   ];
   for (const p of plans) {
     const tenantId = tenantIds[p.slug];
@@ -633,6 +797,17 @@ async function seedBusinessListings(db: Db, tenantIds: Record<string, string>, m
       { tenantId: col, authorMembershipId: member("+919100000012"), name: "Sharma Architects", category: "REAL_ESTATE", city: "Hyderabad", description: "Residential and small commercial design across Telangana. Free first consultation for DCE alumni.", websiteUrl: "https://example.com/sharma-architects", contactEmail: "studio@sharmaarchitects.example", ...approved(21) },
       { tenantId: col, authorMembershipId: member("+919100000013"), name: "Maple Immigration Advisors", category: "CONSULTING", city: "Toronto", description: "Licensed advice for engineers moving to Canada, from study permits to permanent residence.", contactEmail: "hello@mapleadvisors.example", contactPhone: "+1 416 555 0105", ...approved(12) },
       { tenantId: col, authorMembershipId: member("+919100000011"), name: "Joshi Automation Services", category: "LOGISTICS", city: "Pune", description: "Installation and upkeep of warehouse conveyors for third-party logistics firms around Pune.", contactEmail: "service@joshiautomation.example", moderationStatus: "PENDING", createdAt: daysAgo(1) },
+    ]);
+  }
+
+  const samaj = tenantIds["shri-gujarati-samaj"];
+  if (samaj && (await isEmpty(samaj))) {
+    const member = (phone: string) => mid("shri-gujarati-samaj", phone);
+    await db.insert(businessListings).values([
+      { tenantId: samaj, authorMembershipId: member("+919100000031"), name: "Shah Fabrics", category: "MANUFACTURING", city: "Surat", description: "Cotton and blended fabrics for domestic brands and export. Preferential rates for Samaj members.\n\n- Mill visits by appointment\n- Sample packs for new buyers\n- Shipping advice for first-time exporters\n\nCatalogue: https://example.com/shah-fabrics/catalogue", websiteUrl: "https://example.com/shah-fabrics", contactEmail: "orders@shahfabrics.example", contactPhone: "+91 261 555 0201", ...approved(35) },
+      { tenantId: samaj, authorMembershipId: member("+919100000033"), name: "Parikh Jewellers", category: "RETAIL", city: "Surat", description: "Diamond and gold jewellery for retail and export. Custom bridal sets and corporate gifts.", websiteUrl: "https://example.com/parikh-jewellers", contactEmail: "hello@parikhjewellers.example", contactPhone: "+91 261 555 0202", ...approved(22) },
+      { tenantId: samaj, authorMembershipId: member("+919100000036"), name: "Modi Career Advisors", category: "CONSULTING", city: "Edison", description: "Career and relocation coaching for Samaj members moving to the US. Resume reviews and interview practice.", contactEmail: "nisha@modicareer.example", ...approved(14) },
+      { tenantId: samaj, authorMembershipId: member("+919100000032"), name: "Mehta Product Studio", category: "EDUCATION", city: "Ahmedabad", description: "Weekend workshops on product management for early-career professionals in Gujarat.", websiteUrl: "https://example.com/mehta-product", contactEmail: "workshops@mehtaproduct.example", ...approved(8) },
     ]);
   }
 }
@@ -901,17 +1076,211 @@ async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Prom
   await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Naina Sen", batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
 }
 
+/** Direct threads for the Samaj showcase: one accepted chat and one pending request. */
+async function seedSamajChatThreads(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chatConversations).where(eq(chatConversations.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const [hetal, ravi, asha, bhavin] = ["+919100000031", "+919100000032", "+919100000034", "+919100000035"].map(member) as [string, string, string, string];
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: hetal,
+      bId: ravi,
+      requesterId: hetal,
+      state: "ACCEPTED",
+      unreadByRecipient: 1,
+      messages: [
+        { senderId: hetal, body: "Ravi, do you know anyone who needs cotton blends for a small clothing line?", at: ago(5, 120) },
+        { senderId: ravi, body: "A friend in Ahmedabad is starting one. I'll introduce you.", at: ago(5, 60) },
+        { senderId: hetal, body: "Perfect — thank you. Sample pack is ready whenever they want it.", at: ago(1, 30) },
+      ],
+    });
+    await seedDirectThread(tx, {
+      tenantId,
+      aId: asha,
+      bId: bhavin,
+      requesterId: asha,
+      state: "PENDING",
+      messages: [{ senderId: asha, body: "Hi Bhavin, I'm finishing my BBA and would love advice on whether to join a bank or a family business first.", at: ago(1) }],
+    });
+  });
+}
+
+/** An open Ahmedabad chapter group and an invite-only Garba committee. */
+async function seedSamajChatGroups(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chatGroups).where(eq(chatGroups.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, ["+91934000001", "+91934000002", "+91934000003", "+91934000004"])));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const [gen1, gen2, gen3, gen4] = ["+91934000001", "+91934000002", "+91934000003", "+91934000004"].map((p) => byPhone.get(p));
+  const [admin, hetal, ravi, asha] = ["+919000000004", "+919100000031", "+919100000032", "+919100000034"].map(member) as [string, string, string, string];
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const present = <T extends { id: string | undefined }>(rows: T[]) => rows.filter((r): r is T & { id: string } => !!r.id);
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await seedGroup(tx, {
+      tenantId,
+      name: "Ahmedabad chapter",
+      description: "Meetups, job leads and local news for members in and around Ahmedabad.",
+      visibility: "OPEN",
+      members: present([
+        { id: admin, joinedAt: ago(50) },
+        { id: ravi, joinedAt: ago(40) },
+        { id: asha, joinedAt: ago(25) },
+        { id: gen1, joinedAt: ago(20) },
+        { id: gen2, joinedAt: ago(12) },
+      ]),
+      messages: [
+        { senderId: admin, body: "Welcome to the Ahmedabad chapter. Say hello and tell us which area you're in.", at: ago(48) },
+        { senderId: ravi, body: "Navrangpura here. Happy to host a product workshop if there's interest.", at: ago(40) },
+        ...(gen1 ? [{ senderId: gen1, body: "Satellite. Looking forward to Navratri at the hall.", at: ago(18) }] : []),
+        { senderId: asha, body: "Nirma campus — any internship leads for marketing this summer?", at: ago(5) },
+        { senderId: ravi, body: "I'll post a role in Jobs shortly. Watch that section.", at: ago(4, 60) },
+      ],
+    });
+    await seedGroup(tx, {
+      tenantId,
+      name: "Navratri organising committee",
+      description: "Planning Garba nights: volunteers, prasadam and seating.",
+      visibility: "INVITE_ONLY",
+      members: present([
+        { id: admin, joinedAt: ago(30) },
+        { id: hetal, joinedAt: ago(28) },
+        { id: gen3, joinedAt: ago(15) },
+      ]),
+      messages: [
+        { senderId: admin, body: "Can we confirm the hall booking for all nine evenings?", at: ago(29) },
+        { senderId: hetal, body: "Surat chapter can send two volunteers for the final night.", at: ago(27) },
+        ...(gen3 ? [{ senderId: gen3, body: "I'll draft the volunteer roster this week.", at: ago(14) }] : []),
+      ],
+      invited: present([{ id: gen4, at: ago(2) }]),
+    });
+  });
+}
+
+/** Mentors, a waiting request and an accepted mentorship with its chat. */
+async function seedSamajMentorship(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(mentorProfiles).where(eq(mentorProfiles.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const phones = ["+91934000005", "+91934000006"];
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, phones)));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const [waiting, acceptedMentee] = phones.map((p) => byPhone.get(p));
+  const [bhavin, nisha, asha] = ["+919100000035", "+919100000036", "+919100000034"].map(member) as [string, string, string];
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+  const profile = (membershipId: string | undefined, areas: MentorArea[], availability: MentorAvailability, availabilityNote: string | null, note: string, days: number) =>
+    membershipId ? [{ tenantId, membershipId, areas, availability, availabilityNote, note, createdAt: ago(days), updatedAt: ago(days) }] : [];
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    await tx.insert(mentorProfiles).values([
+      ...profile(bhavin, ["ENTREPRENEURSHIP", "FINANCE"], "MONTHLY", "Sunday mornings, Ahmedabad time", "I work in SME banking. Happy to talk credit, cash flow and when to raise for a family business or startup.", 50),
+      ...profile(nisha, ["CAREER_ADVICE", "WORKING_ABROAD", "CONSULTING"], "FORTNIGHTLY", "Weekday evenings, US East time", "I moved from Ahmedabad to New Jersey for consulting. Glad to help with CVs, interviews or settling in the US.", 40),
+    ]);
+    // Named mentee so the Mentors section is useful even before generated history runs.
+    await tx.insert(mentorships).values({ tenantId, mentorMembershipId: nisha, menteeMembershipId: asha, note: "I'm finishing my BBA and considering a master's in the US. Could I ask how you decided and what helped in the first year?", createdAt: ago(2), updatedAt: ago(2) });
+    if (waiting) {
+      await tx.insert(mentorships).values({ tenantId, mentorMembershipId: bhavin, menteeMembershipId: waiting, note: "We're expanding our small manufacturing unit and need advice on working-capital loans versus raising from family.", createdAt: ago(1), updatedAt: ago(1) });
+    }
+    if (acceptedMentee) {
+      const note = "I run a small packaged-food brand in Rajkot and would value advice on distribution into Ahmedabad kiranas.";
+      const [accepted] = await tx
+        .insert(mentorships)
+        .values({ tenantId, mentorMembershipId: bhavin, menteeMembershipId: acceptedMentee, status: "ACCEPTED", note, respondedAt: ago(10), acceptedAt: ago(10), createdAt: ago(11), updatedAt: ago(10) })
+        .returning({ id: mentorships.id });
+      const [first] = await seedDirectThread(tx, {
+        tenantId,
+        aId: acceptedMentee,
+        bId: bhavin,
+        requesterId: acceptedMentee,
+        state: "ACCEPTED",
+        origin: { kind: "MENTORSHIP", id: accepted!.id },
+        messages: [
+          { senderId: acceptedMentee, body: note, at: ago(10) },
+          { senderId: bhavin, body: "Glad to help. Send me your current SKUs and which cities you're in today, and we'll map a simple next step.", at: ago(9, 400) },
+          { senderId: acceptedMentee, body: "Sent — six SKUs, Rajkot and Jamnagar so far.", at: ago(9, 200) },
+        ],
+      });
+      await tx.update(mentorships).set({ conversationId: first!.conversationId }).where(eq(mentorships.id, accepted!.id));
+    }
+  });
+}
+
+/** Referral requests against Ravi's APM job: one waiting, one accepted with chat. */
+async function seedSamajReferrals(db: Db, tenantId: string, member: (phone: string) => string): Promise<void> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(referralRequests).where(eq(referralRequests.tenantId, tenantId));
+  if ((row?.count ?? 0) > 0) return;
+  const [ravi, asha] = ["+919100000032", "+919100000034"].map(member) as [string, string];
+  const offered = await db
+    .update(jobs)
+    .set({ canRefer: true })
+    .where(and(eq(jobs.tenantId, tenantId), eq(jobs.authorMembershipId, ravi), eq(jobs.title, "Associate Product Manager")))
+    .returning();
+  const apm = offered[0];
+  if (!apm) return;
+  const phones = ["+91934000007"];
+  const generated = await db
+    .select({ id: memberships.id, phone: users.phoneE164 })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"), inArray(users.phoneE164, phones)));
+  const byPhone = new Map(generated.map((g) => [g.phone, g.id]));
+  const engineer = byPhone.get("+91934000007");
+  const ago = (days: number, minutes = 0) => new Date(Date.now() - days * DAY - minutes * 60_000);
+
+  await runInTransaction({ db, logger: createLogger("silent", false) }, async (tx) => {
+    const pendingNote = "I'm finishing my BBA with a product internship behind me. Would you be willing to refer me for the APM role?";
+    await tx.insert(referralRequests).values({ tenantId, jobId: apm.id, jobTitle: apm.title, jobCompany: apm.companyName, posterMembershipId: ravi, requesterMembershipId: asha, note: pendingNote, createdAt: ago(1, 100), updatedAt: ago(1, 100) });
+    if (engineer && !(await lockDirectConversation(tx, tenantId, engineer, ravi))) {
+      const note = "I've spent two years as a business analyst on enterprise apps. Would you be willing to refer me for the APM role at TCS Digital?";
+      const [accepted] = await tx
+        .insert(referralRequests)
+        .values({ tenantId, jobId: apm.id, jobTitle: apm.title, jobCompany: apm.companyName, posterMembershipId: ravi, requesterMembershipId: engineer, status: "ACCEPTED", note, respondedAt: ago(3), acceptedAt: ago(3), createdAt: ago(4), updatedAt: ago(3) })
+        .returning({ id: referralRequests.id });
+      const [first] = await seedDirectThread(tx, {
+        tenantId,
+        aId: engineer,
+        bId: ravi,
+        requesterId: engineer,
+        state: "ACCEPTED",
+        origin: { kind: "REFERRAL", id: accepted!.id },
+        messages: [
+          { senderId: engineer, body: note, at: ago(3) },
+          { senderId: ravi, body: "Happy to. Send me your CV and two lines on a product decision you owned, and I'll pass it to the hiring manager.", at: ago(2, 500) },
+          { senderId: engineer, body: "Thank you — emailed both just now.", at: ago(2, 200) },
+        ],
+      });
+      await tx.update(referralRequests).set({ conversationId: first!.conversationId }).where(eq(referralRequests.id, accepted!.id));
+    }
+  });
+}
+
 /** The Wave 2 connections data. Runs after everything else, and each part guards itself, so an existing database gets it from the next seed. */
 export async function seedConnections(db: Db, tenantIds: Record<string, string>, m: Record<string, string>): Promise<void> {
   await seedBusinessListings(db, tenantIds, m);
+  const mid = seededMember(m);
   const uni = tenantIds["demo-university"];
   if (uni) {
-    const mid = seededMember(m);
     await seedChatThreads(db, uni, (phone) => mid("demo-university", phone));
     await seedChatReport(db, uni);
     await seedChatGroups(db, uni, (phone) => mid("demo-university", phone));
     await seedMentorship(db, uni, (phone) => mid("demo-university", phone));
     await seedReferrals(db, uni, (phone) => mid("demo-university", phone));
+  }
+  const samaj = tenantIds["shri-gujarati-samaj"];
+  if (samaj) {
+    await seedSamajChatThreads(db, samaj, (phone) => mid("shri-gujarati-samaj", phone));
+    await seedSamajChatGroups(db, samaj, (phone) => mid("shri-gujarati-samaj", phone));
+    await seedSamajMentorship(db, samaj, (phone) => mid("shri-gujarati-samaj", phone));
+    await seedSamajReferrals(db, samaj, (phone) => mid("shri-gujarati-samaj", phone));
   }
   await seedCurrentPupil(db, tenantIds);
 }
