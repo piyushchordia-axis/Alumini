@@ -22,7 +22,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   numbers (`formatPhone`).
   `src/lib/profile.ts` holds the profile's sections and registration steps, strength, hidden inputs and "Use details
   from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
-  `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser.
+  `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
+  of an institution colour (`brandTones`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -119,6 +120,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     *inside* labeled SVG-framed hit targets only, on a commented `eslint-disable-next-line`. Notification and push
     titles (the API's 📣, 🎂, 🎉) are message text, not icons, and keep theirs. Section maps store icon *names*
     (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`), not emoji.
+  - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black. Brand-coloured
+    text and icons use the ink (web `text-primary-ink`, mobile `theme.primaryInk`) and text on the brand colour uses
+    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the Open to and multiple-choice
+    chips and the reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move over when
+    touched). A chosen state is a wash, a thin ring and the ink, as the reaction chips are (web `bg-primary-wash` and
+    `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which a pale brand loses
+    in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where they can't outrank
+    it.
   - **Elevation.** Page background (`--surface-page` / `colors.bg`) is quieter than content. Level 1: posts and list
     modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write surfaces
     (`elevation={2}`). Do not flatten feed cards into the page.

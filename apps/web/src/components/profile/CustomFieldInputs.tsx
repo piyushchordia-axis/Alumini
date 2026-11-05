@@ -88,7 +88,7 @@ export function CustomFieldInputs({
                       type="button"
                       aria-pressed={on}
                       onClick={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])}
-                      className={clsx("rounded-full border px-3 py-1 text-sm transition", on ? "border-primary bg-primary text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400")}
+                      className={clsx("rounded-full border px-3 py-1 text-sm transition", on ? "border-primary bg-primary text-on-primary" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400")}
                     >
                       {o.label}
                     </button>

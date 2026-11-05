@@ -1,12 +1,13 @@
 import { MAX_POST_IMAGES, REACTION_TYPES, type PostDto, type ReactionType } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import clsx from "clsx";
 import { useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { MemberLink } from "@/components/common/MemberLink";
 import { PollView } from "@/components/feed/PollView";
-import { IconAnnounce, IconCelebrate, IconComment, IconInsight, IconLike, IconLove, IconPin } from "@/components/icons";
+import { IconAnnounce, IconCelebrate, IconComment, IconInsight, IconLike, IconLove, IconPin, type IconProps } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
 import { Badge, Button, Card, Textarea } from "@/components/ui";
@@ -15,7 +16,7 @@ import { timeAgo } from "@/lib/format";
 import { toast } from "@/stores/uiStore";
 
 const REACTION_LABEL: Record<ReactionType, string> = { LIKE: "Like", LOVE: "Love", CELEBRATE: "Celebrate", INSIGHTFUL: "Insightful" };
-const REACTION_ICON: Record<ReactionType, ComponentType<{ size?: number; className?: string }>> = {
+const REACTION_ICON: Record<ReactionType, ComponentType<IconProps>> = {
   LIKE: IconLike,
   LOVE: IconLove,
   CELEBRATE: IconCelebrate,
@@ -109,7 +110,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-sm text-slate-500">
-        <div className="flex items-center gap-1 rounded-full bg-slate-50 p-0.5 ring-1 ring-slate-200/80">
+        <div className="flex items-center gap-0.5 rounded-full bg-slate-100/70 p-0.5 ring-1 ring-slate-200">
           {REACTION_TYPES.map((t) => {
             const Icon = REACTION_ICON[t];
             const active = post.myReaction === t;
@@ -119,17 +120,23 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
                 type="button"
                 disabled={post.moderationStatus !== "APPROVED"}
                 onClick={() => react.mutate(active ? null : t)}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-white hover:text-slate-800 disabled:opacity-40 ${active ? "bg-white text-primary shadow-sm" : "text-slate-500"}`}
+                // Hover lives only on the unchosen chips: on a chosen one it outranked the brand ink and left the
+                // pointer resting on a near-black icon after the click. The wash and ring are brandTones', as on the
+                // phone: a pale brand's own tint (bg-primary/14) vanished into the tray.
+                className={clsx(
+                  "inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 motion-safe:active:scale-90 pointer-coarse:h-10 pointer-coarse:w-10",
+                  active ? "bg-primary-wash text-primary-ink ring-1 ring-primary-ring ring-inset" : "text-slate-500 enabled:hover:bg-white enabled:hover:text-slate-700 enabled:hover:shadow-sm",
+                )}
                 aria-label={REACTION_LABEL[t]}
                 aria-pressed={active}
                 title={REACTION_LABEL[t]}
               >
-                <Icon size={16} />
+                <Icon size={18} fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.22 : undefined} strokeWidth={active ? 2 : 1.75} />
               </button>
             );
           })}
         </div>
-        <span className="tabular-nums text-xs text-slate-500">{post.reactionCount}</span>
+        <span className={clsx("tabular-nums text-xs", post.myReaction ? "font-semibold text-primary-ink" : "text-slate-500")}>{post.reactionCount}</span>
         <div className="mx-1 hidden h-4 w-px bg-slate-200 sm:block" aria-hidden />
         {detail || removed ? (
           <span className="inline-flex items-center gap-1.5 text-xs">

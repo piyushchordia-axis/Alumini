@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { bigPhoto, dropFrames, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -206,6 +206,19 @@ try {
     await card.waitFor();
     await card.locator('button[aria-label="Celebrate"]').click();
     await card.getByText("1", { exact: true }).waitFor({ timeout: 10000 });
+    // Chosen, the chip is a brand tint with its icon filled in the brand's ink, and the pointer still resting on it
+    // after the click doesn't repaint it. Demo University's tones are pinned in color.test.ts; read from the page's
+    // inline style, they were written by applyTenantTheme, not the stylesheet's defaults (which are the same blue).
+    const tones = { "--c-primary-ink": "29 78 216", "--c-primary-wash": "223 230 250", "--c-primary-ring": "153 175 237", "--c-on-primary": "255 255 255" };
+    const written = await page.evaluate((names) => Object.fromEntries(names.map((n) => [n, document.documentElement.style.getPropertyValue(n).trim()])), Object.keys(tones));
+    if (JSON.stringify(written) !== JSON.stringify(tones)) throw new Error(`the theme wrote ${JSON.stringify(written)}, not Demo University's tones ${JSON.stringify(tones)}`);
+    const chosen = card.locator('button[aria-label="Celebrate"][aria-pressed="true"]');
+    await chosen.hover();
+    const look = await expectChosenChip(chosen, "the chosen Celebrate chip");
+    if (look.icon.join(" ") !== tones["--c-primary-ink"]) throw new Error(`the chosen icon is rgb ${look.icon.join(" ")}, not the brand's ink`);
+    if (look.chip.join(" ") !== tones["--c-primary-wash"]) throw new Error(`the chosen chip is rgb ${look.chip.join(" ")}, not the brand's wash`);
+    const count = await card.getByText("1", { exact: true }).evaluate((el) => getComputedStyle(el).color);
+    if (count !== "rgb(29, 78, 216)") throw new Error(`the count of a post you reacted to is ${count}, not the brand's ink`);
     await card.locator("a", { hasText: "comments" }).click();
     await page.waitForURL(/\/app\/feed\/[0-9a-f-]+$/);
     await page.waitForSelector('h2:has-text("Comments")');

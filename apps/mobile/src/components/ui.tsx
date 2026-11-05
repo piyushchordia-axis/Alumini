@@ -85,7 +85,7 @@ export function Button({
 }) {
   const theme = useTheme();
   const bg = variant === "primary" ? theme.primary : variant === "danger" ? colors.danger : "transparent";
-  const fg = variant === "primary" || variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.primary;
+  const fg = variant === "primary" ? theme.onPrimary : variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.primaryInk;
   return (
     <Pressable
       ref={ref}
@@ -241,7 +241,7 @@ export function Chip({ label, active, onPress, color, tall = false, onLayout }: 
   const c = color ?? theme.primary;
   return (
     <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, tall ? styles.chipTall : null, active ? { backgroundColor: c, borderColor: c } : null]}>
-      <Text style={[styles.chipText, active ? { color: "#fff" } : null]}>{label}</Text>
+      <Text style={[styles.chipText, active ? { color: theme.onPrimary } : null]}>{label}</Text>
     </Pressable>
   );
 }
@@ -379,7 +379,7 @@ export function Badge({ label, tone = "neutral" }: { label: string; tone?: "neut
     warning: { bg: "#fef3c7", fg: "#92400e" },
     danger: { bg: "#fee2e2", fg: "#991b1b" },
     info: { bg: "#e0f2fe", fg: "#075985" },
-    primary: { bg: theme.primarySoft, fg: theme.primary },
+    primary: { bg: theme.primarySoft, fg: theme.primaryInk },
   }[tone];
   return (
     <View style={[styles.badge, { backgroundColor: map.bg }]}>

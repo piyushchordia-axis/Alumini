@@ -217,6 +217,54 @@ export async function expectSvgNoEmoji(locator, where) {
   if (!(await locator.locator("svg").count())) throw new Error(`${where} draws no SVG icon`);
 }
 
+/**
+ * Fails unless `chip`, a chosen toggle in a tray (a reaction), looks chosen once any transition ends: laid over its tray
+ * on the white card, it visibly differs from the tray alone and from the white card, and its icon is filled, in a
+ * colour that isn't near-black (no seeded institution's colour is) and reads on the chip (3:1, WCAG 1.4.11). A chosen
+ * reaction was a white chip on a near-white tray, told apart only by its stroke, which hover repainted slate-800. Gives
+ * the colours, each [r, g, b], of the icon and of the chip as painted over its tray.
+ */
+export async function expectChosenChip(chip, where) {
+  const look = await chip.evaluate(async (el) => {
+    await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+    const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    // Paints the colours over white, in order, and reads the pixel back: computed colours come as rgb(), oklab() or
+    // color(), some see-through, and painting turns them all into what the eye gets.
+    const paint = (...colours) => {
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, 1, 1);
+      for (const c of colours) {
+        g.fillStyle = "#010203";
+        g.fillStyle = c;
+        if (g.fillStyle === "#010203") throw new Error(`the canvas can't read the colour ${c}`);
+        g.fillRect(0, 0, 1, 1);
+      }
+      return [...g.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    };
+    const tray = getComputedStyle(el.parentElement).backgroundColor;
+    const path = getComputedStyle(el.querySelector("svg path"));
+    return { tray: paint(tray), chip: paint(tray, getComputedStyle(el).backgroundColor), icon: paint(path.stroke), fill: path.fill };
+  });
+  const apart = Math.max(...look.chip.map((c, i) => Math.abs(c - look.tray[i])));
+  if (apart < 10) throw new Error(`${where} (rgb ${look.chip.join(" ")}) hardly differs from its tray (rgb ${look.tray.join(" ")})`);
+  // A white chip is only 10 (web) to 14 (phone) apart from the near-white trays, so it has to differ from white too:
+  // the seeded brands' washes are 32 to 35 apart from it.
+  if (Math.max(...look.chip.map((c) => 255 - c)) < 20) throw new Error(`${where} (rgb ${look.chip.join(" ")}) is all but white`);
+  if (look.fill === "none") throw new Error(`${where} has an unfilled icon`);
+  // WCAG relative luminance. Slate-700 is 0.051 and slate-800 0.022: below 0.04 a 16-18px icon reads as black.
+  const linear = (c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
+  const luminance = (rgb) => {
+    const [r, g, b] = rgb.map(linear);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const icon = luminance(look.icon);
+  if (icon < 0.04) throw new Error(`${where} draws its icon near-black (rgb ${look.icon.join(" ")})`);
+  const chipLuminance = luminance(look.chip);
+  const contrast = (Math.max(icon, chipLuminance) + 0.05) / (Math.min(icon, chipLuminance) + 0.05);
+  if (contrast < 3) throw new Error(`${where}'s icon (rgb ${look.icon.join(" ")}) is ${contrast.toFixed(2)}:1 on the chip (rgb ${look.chip.join(" ")}), under 3:1`);
+  return { icon: look.icon, chip: look.chip };
+}
+
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const isUpload = (request) => request.method() === "POST" && /\/uploads(\?|$)/.test(request.url());
 

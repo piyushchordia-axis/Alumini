@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, bigPhoto, dropFrames, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, apiSession, bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -212,6 +212,28 @@ try {
     await tap("Save changes");
     await page.getByText(`Edited on mobile ${unique}`).first().waitFor();
     await shot("m04b-post-edited");
+  });
+
+  await step("a chosen reaction is a brand tint with a filled icon, and choosing it again takes it back", async () => {
+    // Saving the edit closes its screen; until it has, the feed underneath is hidden and its card can't be found.
+    await page.getByText(`Edited on mobile ${unique}`, { exact: true }).locator("visible=true").first().waitFor();
+    // The innermost box holding both the post's text and its reactions is its card.
+    const card = page
+      .locator("div")
+      .filter({ has: page.getByText(`Edited on mobile ${unique}`, { exact: true }) })
+      .filter({ has: page.locator('[aria-label="Like"]') })
+      .locator("visible=true")
+      .last();
+    await card.locator('[aria-label="Like"][aria-pressed="false"]').click();
+    const chosen = card.locator('[aria-label="Like"][aria-pressed="true"]');
+    await chosen.waitFor();
+    // Demo University's ink and wash, as brandTones gives them (pinned in color.test.ts) and the web app draws them.
+    const look = await expectChosenChip(chosen, "the chosen Like chip");
+    if (look.icon.join(" ") !== "29 78 216") throw new Error(`the chosen icon is rgb ${look.icon.join(" ")}, not the brand's ink`);
+    if (look.chip.join(" ") !== "223 230 250") throw new Error(`the chosen chip is rgb ${look.chip.join(" ")}, not the brand's wash`);
+    await shot("m04b2-reaction-chosen");
+    await chosen.click();
+    await card.locator('[aria-label="Like"][aria-pressed="false"]').waitFor();
   });
 
   await step("celebrations card and a poll vote on the feed", async () => {

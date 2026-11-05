@@ -1,4 +1,4 @@
-import type { TenantPublicDto } from "@illuminize/shared";
+import { brandTones, parseHex, type TenantPublicDto } from "@illuminize/shared";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 export const colors = {
@@ -42,20 +42,41 @@ export interface Theme {
   primary: string;
   secondary: string;
   primarySoft: string;
+  /** The brand as text or a chosen icon, darkened if it's too light to read on white, the page or `primarySoft` (`brandTones`). */
+  primaryInk: string;
+  /** A light tint of the ink behind something chosen, such as the member's reaction. */
+  primaryWash: string;
+  /** The thin ring around `primaryWash`. */
+  primaryRing: string;
+  /** Text on the brand colour: white, or near-black on a light brand. */
+  onPrimary: string;
 }
 
-const DEFAULT: Theme = { primary: "#1d4ed8", secondary: "#0f172a", primarySoft: "rgba(29,78,216,0.12)" };
+const DEFAULT_PRIMARY = "#1d4ed8";
 
 function soft(hex: string): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return DEFAULT.primarySoft;
-  const n = parseInt(m[1]!, 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.12)`;
+  const c = parseHex(hex) ?? parseHex(DEFAULT_PRIMARY)!;
+  return `rgba(${c.r},${c.g},${c.b},0.12)`;
 }
+
+function build(primary: string, secondary: string): Theme {
+  const tones = brandTones(primary);
+  return {
+    primary,
+    secondary,
+    primarySoft: soft(primary),
+    primaryInk: tones.ink,
+    primaryWash: tones.wash,
+    primaryRing: tones.ring,
+    onPrimary: tones.onPrimary,
+  };
+}
+
+const DEFAULT: Theme = build(DEFAULT_PRIMARY, "#0f172a");
 
 export function themeFor(tenant?: Pick<TenantPublicDto, "primaryColor" | "secondaryColor"> | null): Theme {
   if (!tenant) return DEFAULT;
-  return { primary: tenant.primaryColor, secondary: tenant.secondaryColor, primarySoft: soft(tenant.primaryColor) };
+  return build(tenant.primaryColor, tenant.secondaryColor);
 }
 
 const ThemeContext = createContext<Theme>(DEFAULT);

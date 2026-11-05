@@ -51,7 +51,9 @@ Covers:
   arriving with the profile;
 - the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
-- post, react, comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
+- post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
+  white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
+  and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
   announcement and a poll vote; a poll with several choices, its drawn boxes saying which are chosen (`aria-pressed`)
   before the vote; the celebrations card and wishes; the weekly digest (run through the platform job endpoint, see
   `lib.mjs`);
@@ -160,7 +162,8 @@ Covers:
 - the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
-- a post with a photo, editing it, the celebrations card and a poll vote; a poll with several choices, its drawn boxes
+- a post with a photo, editing it, a Like on it (the chosen chip Demo University's wash, apart from its tray and from
+  white, with a filled icon in their ink at 3:1 or more on it) and taking it back, the celebrations card and a poll vote; a poll with several choices, its drawn boxes
   saying which are chosen (`aria-checked`) before the vote;
 - Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
   nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
@@ -368,6 +371,10 @@ second copy of a screen, or back to the page the button was on.
 
 **Businesses and shared screens**
 
+- [ ] On the feed, press and hold a reaction on a post: the chip shrinks a little while held. Once chosen it is a light
+      brand tint with a thin ring and a filled icon, and the count beside it turns the brand colour; Like again takes it
+      back. Check it at Demo University (blue), and at Shri Gujarati Samaj (orange) as Hetal (`+91 91000 00031`).
+- [ ] TalkBack or VoiceOver reads the chosen reaction as selected and the other three as not.
 - [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
       picker and shows the logo once it's uploaded.
 - [ ] Tab labels on screens with tabs (My posts, Jobs, Mentors, Groups) aren't clipped.

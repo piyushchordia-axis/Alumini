@@ -2,6 +2,12 @@
 
 :root {
   --c-primary: 29 78 216;
+  /* From brandTones (lib/theme.ts): the primary as text or a chosen icon, the wash and ring of something chosen, and
+     text on the primary. */
+  --c-primary-ink: 29 78 216;
+  --c-primary-wash: 223 230 250;
+  --c-primary-ring: 153 175 237;
+  --c-on-primary: 255 255 255;
   --c-secondary: 15 23 42;
 
   /* Surfaces */
@@ -29,6 +35,10 @@
 
 @theme inline {
   --color-primary: rgb(var(--c-primary));
+  --color-primary-ink: rgb(var(--c-primary-ink));
+  --color-primary-wash: rgb(var(--c-primary-wash));
+  --color-primary-ring: rgb(var(--c-primary-ring));
+  --color-on-primary: rgb(var(--c-on-primary));
   --color-secondary: rgb(var(--c-secondary));
   --font-sans: var(--font-body);
   --font-family-display: "Manrope", ui-sans-serif, system-ui, sans-serif;

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import type { ComponentType } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
-import { IconAnnounce, IconCelebrate, IconComment, IconInsight, IconLike, IconLove, IconPin } from "@/components/icons";
+import { IconAnnounce, IconCelebrate, IconComment, IconInsight, IconLike, IconLove, IconPin, type IconProps } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { PollView } from "@/components/PollView";
@@ -15,7 +15,7 @@ import { timeAgo } from "@/lib/format";
 import { colors, useTheme } from "@/theme";
 
 const LABEL: Record<ReactionType, string> = { LIKE: "Like", LOVE: "Love", CELEBRATE: "Celebrate", INSIGHTFUL: "Insightful" };
-const ICONS: Record<ReactionType, ComponentType<{ size?: number; color?: string }>> = {
+const ICONS: Record<ReactionType, ComponentType<IconProps>> = {
   LIKE: IconLike,
   LOVE: IconLove,
   CELEBRATE: IconCelebrate,
@@ -76,7 +76,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
       )}
       <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
         <Row gap={6}>
-          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#f8fafc", borderRadius: 999, borderWidth: 1, borderColor: colors.border, padding: 2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: colors.bg, borderRadius: 999, borderWidth: 1, borderColor: colors.border, padding: 2 }}>
             {REACTION_TYPES.map((t) => {
               const Icon = ICONS[t];
               const active = post.myReaction === t;
@@ -90,14 +90,18 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
                   {...toggleState(active)}
                   aria-disabled={post.moderationStatus !== "APPROVED"}
                   hitSlop={4}
-                  style={{ width: 36, height: 36, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: active ? "#fff" : "transparent" }}
+                  style={({ pressed }) => [
+                    { width: 36, height: 36, borderRadius: 999, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+                    active ? { backgroundColor: theme.primaryWash, borderColor: theme.primaryRing } : { backgroundColor: pressed ? colors.card : "transparent", borderColor: "transparent" },
+                    pressed ? { transform: [{ scale: 0.92 }] } : null,
+                  ]}
                 >
-                  <Icon size={16} color={active ? theme.primary : colors.muted} />
+                  <Icon size={18} color={active ? theme.primaryInk : colors.muted} fill={active ? theme.primaryInk : undefined} fillOpacity={active ? 0.22 : undefined} />
                 </Pressable>
               );
             })}
           </View>
-          <Muted size={13}>{post.reactionCount}</Muted>
+          <Text style={{ fontSize: 13, color: post.myReaction ? theme.primaryInk : colors.muted, fontWeight: post.myReaction ? "600" : "400" }}>{post.reactionCount}</Text>
           <Pressable onPress={() => canOpen && router.push(`/t/${slug}/feed/${post.id}`)} disabled={!canOpen} style={{ marginLeft: 6, flexDirection: "row", alignItems: "center", gap: 4 }} accessibilityRole="button" accessibilityLabel={`${post.commentCount} comments`}>
             <IconComment size={14} color={colors.muted} />
             <Muted size={13}>{post.commentCount}</Muted>

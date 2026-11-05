@@ -9,7 +9,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg";
 
 const variantClass: Record<Variant, string> = {
-  primary: "bg-primary text-white hover:opacity-90 shadow-sm",
+  primary: "bg-primary text-on-primary hover:opacity-90 shadow-sm",
   secondary: "bg-slate-900 text-white hover:bg-slate-800",
   outline: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
   ghost: "text-slate-700 hover:bg-slate-100",
@@ -189,7 +189,7 @@ const toneClass: Record<Tone, string> = {
   warning: "bg-amber-100 text-amber-800",
   danger: "bg-red-100 text-red-800",
   info: "bg-sky-100 text-sky-800",
-  primary: "bg-primary/10 text-primary",
+  primary: "bg-primary/10 text-primary-ink",
 };
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", toneClass[tone], className)}>{children}</span>;

@@ -318,7 +318,7 @@ export function ProfileAboutSection({ form: f }: { form: ProfileFormController }
                           onClick={() => field.onChange(on ? chosen.filter((x) => x !== o) : [...chosen, o])}
                           className={clsx(
                             "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                            on ? "border-primary bg-primary text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400",
+                            on ? "border-primary bg-primary text-on-primary" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400",
                           )}
                         >
                           {on && <IconCheck size={16} />}
