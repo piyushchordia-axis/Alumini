@@ -774,6 +774,14 @@ export interface AdminChatReportViewDto extends AdminChatReportDto {
   messages: AdminChatReportMessageDto[];
 }
 
+/** Who a new-member notice is about, as things stand now. Name and status are null once the membership is gone (the applicant deleted their account). */
+export interface NotificationSubjectDto {
+  kind: "membership";
+  membershipId: string;
+  fullName: string | null;
+  status: MembershipStatus | null;
+}
+
 export interface NotificationDto {
   id: string;
   type: NotificationType;
@@ -782,6 +790,8 @@ export interface NotificationDto {
   data: Record<string, unknown>;
   readAt: string | null;
   createdAt: string;
+  /** Only on a list an admin reads (never in a realtime event or push), and only for NEW_MEMBER_PENDING: read it with memberRequestOf. */
+  subject?: NotificationSubjectDto;
 }
 
 export interface AuditDto {

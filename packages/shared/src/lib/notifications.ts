@@ -1,4 +1,5 @@
 import type { MentorshipBox, NotificationType, ReferralBox, TenantFeatures } from "../constants";
+import type { NotificationDto, NotificationSubjectDto } from "../types/dto";
 import { chatAvailable, connectionsAvailable } from "./features";
 
 /**
@@ -235,4 +236,12 @@ const TARGETS: Record<NotificationType | ChatPushKind, TargetFor> = {
 export function notificationTarget(type: NotificationType | ChatPushKind | string, data: unknown): NotificationTarget | null {
   const d = (data && typeof data === "object" ? data : {}) as NotificationData;
   return Object.hasOwn(TARGETS, type) ? TARGETS[type as NotificationType | ChatPushKind](d) : null;
+}
+
+/**
+ * The request a new-member notice is about, with its status now, so an admin's row can offer Approve and Reject while it
+ * still waits. Null for any other notice, and for anyone the API didn't send it to (only admins get it).
+ */
+export function memberRequestOf(n: Pick<NotificationDto, "type" | "subject">): NotificationSubjectDto | null {
+  return n.type === "NEW_MEMBER_PENDING" && n.subject?.kind === "membership" ? n.subject : null;
 }

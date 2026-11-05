@@ -28,8 +28,8 @@ export class AppError extends Error {
   static conflict(message: string, code: ErrorCode = "CONFLICT", details?: unknown) {
     return new AppError(409, code, message, details);
   }
-  static invalidTransition(message: string) {
-    return new AppError(409, "INVALID_TRANSITION", message);
+  static invalidTransition(message: string, details?: unknown) {
+    return new AppError(409, "INVALID_TRANSITION", message, details);
   }
   static rateLimited(retryAfterSec: number, message = "Too many requests") {
     return new AppError(429, "RATE_LIMITED", message, { retryAfterSec });

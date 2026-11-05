@@ -1,4 +1,4 @@
-import { adminMembersQuerySchema, memberReasonSchema, memberRoleSchema, membershipIdParamsSchema, membershipProfileUpdateSchema, type AdminMemberDetailDto } from "@illuminize/shared";
+import { adminMembersQuerySchema, memberApproveSchema, memberReasonSchema, memberRejectSchema, memberRoleSchema, membershipIdParamsSchema, membershipProfileUpdateSchema, type AdminMemberDetailDto } from "@illuminize/shared";
 import { Router } from "express";
 import type { AppContext } from "../../../context";
 import { toAuditDto } from "../../../dto/membership.dto";
@@ -54,8 +54,8 @@ export function memberRoutes(ctx: AppContext): Router {
   // or rejected.
   router.post(
     "/members/:membershipId/approve",
-    route({ params: membershipIdParamsSchema }, async ({ req, res, params }) => {
-      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "approve"));
+    route({ params: membershipIdParamsSchema, body: memberApproveSchema }, async ({ req, res, params, body }) => {
+      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "approve", undefined, body.expectedStatus));
     }),
   );
 
@@ -70,8 +70,8 @@ export function memberRoutes(ctx: AppContext): Router {
 
   router.post(
     "/members/:membershipId/reject",
-    route({ params: membershipIdParamsSchema, body: memberReasonSchema }, async ({ req, res, params, body }) => {
-      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "reject", body.reason));
+    route({ params: membershipIdParamsSchema, body: memberRejectSchema }, async ({ req, res, params, body }) => {
+      ok(res, await adminTransition(ctx, req.tenantCtx!, actor(req), params.membershipId, "reject", body.reason, body.expectedStatus));
     }),
   );
 

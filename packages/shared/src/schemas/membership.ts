@@ -156,6 +156,16 @@ export type MembershipProfileUpdate = z.infer<typeof membershipProfileUpdateSche
 export const memberReasonSchema = z.object({ reason: trimmedString(500, 3) });
 export type MemberReasonInput = z.infer<typeof memberReasonSchema>;
 
+/**
+ * Approving or rejecting can carry the status the admin acted on (a new-member notice sends PENDING): the API then refuses
+ * it (409, with the status now) once the membership has moved on, so an approval can't overturn another admin's
+ * rejection. Without it, approving someone rejected stays possible, as the members list offers on purpose.
+ */
+export const memberApproveSchema = z.object({ expectedStatus: z.enum(MEMBERSHIP_STATUSES).optional() });
+export type MemberApproveInput = z.infer<typeof memberApproveSchema>;
+export const memberRejectSchema = memberReasonSchema.extend(memberApproveSchema.shape);
+export type MemberRejectInput = z.infer<typeof memberRejectSchema>;
+
 export const memberRoleSchema = z.object({ role: z.enum(MEMBERSHIP_ROLES) });
 export type MemberRoleInput = z.infer<typeof memberRoleSchema>;
 

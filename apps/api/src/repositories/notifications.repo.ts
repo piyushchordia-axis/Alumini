@@ -1,5 +1,5 @@
-import type { NotificationPrefs } from "@illuminize/shared";
-import { and, desc, eq, getTableColumns, inArray, isNull, sql } from "drizzle-orm";
+import type { NotificationPrefs, NotificationType } from "@illuminize/shared";
+import { and, desc, eq, getTableColumns, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { DbClient } from "../db/client";
 import { notificationPrefs, notifications } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
@@ -99,11 +99,38 @@ export async function markRead(db: DbClient, recipientMembershipId: string, id: 
   return rows.length > 0;
 }
 
-export async function markAllRead(db: DbClient, recipientMembershipId: string): Promise<void> {
-  await db
+/**
+ * Marks read the notifications `where` picks, locking them first in id order. Every statement that marks several of a
+ * member's notifications read goes through this, so two can't deadlock (a transaction marking other admins' copies of a
+ * handled request, say, and an admin's own Mark all read). `where` applies outside too, so the update can use an index.
+ */
+function markReadInIdOrder(db: DbClient, where: SQL | undefined) {
+  const locked = db.select({ id: notifications.id }).from(notifications).where(where).orderBy(notifications.id).for("no key update");
+  return db
     .update(notifications)
     .set({ readAt: new Date() })
-    .where(and(eq(notifications.recipientMembershipId, recipientMembershipId), isNull(notifications.readAt)));
+    .where(and(where, inArray(notifications.id, locked)));
+}
+
+/**
+ * Marks read the unread notifications of `type` these members hold whose data[key] is one of `values`, and returns whose
+ * were marked, once per row. By recipient, not by tenant, so it uses the unread index (notifications has no tenant index).
+ * One statement however many values (they go as one array), so its locks are taken in one pass.
+ */
+export async function markUnreadReadByData(db: DbClient, recipientIds: string[], type: NotificationType, key: string, values: string[]): Promise<string[]> {
+  if (recipientIds.length === 0 || values.length === 0) return [];
+  const picked = and(
+    inArray(notifications.recipientMembershipId, recipientIds),
+    isNull(notifications.readAt),
+    eq(notifications.type, type),
+    sql`${notifications.data} ->> ${key}::text = any(${sql.param(values)}::text[])`,
+  );
+  const rows = await markReadInIdOrder(db, picked).returning({ recipientMembershipId: notifications.recipientMembershipId });
+  return rows.map((r) => r.recipientMembershipId);
+}
+
+export async function markAllRead(db: DbClient, recipientMembershipId: string): Promise<void> {
+  await markReadInIdOrder(db, and(eq(notifications.recipientMembershipId, recipientMembershipId), isNull(notifications.readAt)));
 }
 
 /** Rows by id within one tenant (background delivery reloads what the request stored). */

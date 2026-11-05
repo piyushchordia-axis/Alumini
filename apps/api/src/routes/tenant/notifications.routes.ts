@@ -2,10 +2,10 @@ import { idParamsSchema, notificationPrefsUpdateSchema, notificationsQuerySchema
 import { Router, type Request } from "express";
 import { rooms } from "../../realtime/rooms";
 import type { AppContext } from "../../context";
-import { toNotificationDto } from "../../dto/membership.dto";
-import { requireAnyMembership } from "../../middleware/tenant";
+import { isTenantAdmin, requireAnyMembership } from "../../middleware/tenant";
 import { noContent, ok, route } from "../../middleware/validate";
-import { countUnread, listNotifications, markAllRead, markRead } from "../../repositories/notifications.repo";
+import { countUnread, markAllRead, markRead } from "../../repositories/notifications.repo";
+import { listNotificationsForViewer } from "../../services/notifications/notification.service";
 import { getNotificationPrefs, updateNotificationPrefs } from "../../services/notifications/prefs.service";
 
 export function notificationRoutes(ctx: AppContext): Router {
@@ -36,8 +36,9 @@ export function notificationRoutes(ctx: AppContext): Router {
   router.get(
     "/notifications",
     route({ query: notificationsQuerySchema }, async ({ req, res, query }) => {
-      const page = await listNotifications(ctx.db, req.membership!.id, query);
-      res.json({ data: page.data.map(toNotificationDto), nextCursor: page.nextCursor });
+      // A demoted admin is no longer one, so their old new-member notices come without the request.
+      const viewer = { tenantId: req.tenantCtx!.tenant.id, membershipId: req.membership!.id, isAdmin: isTenantAdmin(req) };
+      res.json(await listNotificationsForViewer(ctx, viewer, query));
     }),
   );
 

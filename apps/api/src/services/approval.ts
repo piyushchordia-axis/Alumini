@@ -1,4 +1,4 @@
-import { MEMBERSHIP_TRANSITIONS, memberActionsFor, type ApprovalMode, type MembershipAction, type MembershipStatus } from "@illuminize/shared";
+import { MEMBERSHIP_TRANSITIONS, memberActionsFor, type ApprovalMode, type MemberAdminAction, type MembershipAction, type MembershipStatus } from "@illuminize/shared";
 import { AppError } from "../lib/errors";
 
 // The table lives in the shared package, so the apps' buttons offer exactly what this allows.
@@ -26,6 +26,25 @@ export function transitionMembership(from: MembershipStatus, action: MembershipA
     return initialMembershipStatus(mode);
   }
   return target;
+}
+
+/** Why an admin can't act on a membership in this status, worded for an admin who acted on a list or notice that was out of date. */
+const REFUSED_BECAUSE: Record<MembershipStatus, string> = {
+  APPROVED: "This member has already been approved",
+  REJECTED: "This request has already been rejected",
+  SUSPENDED: "This member is suspended",
+  PENDING: "This request is still waiting for approval",
+};
+
+/**
+ * Refuses an admin's action the membership's status doesn't allow, with the status in details so the apps can show it.
+ * `expected` is the status the admin acted on, when their screen sent it: a status that has changed since is refused too,
+ * even where the action would still be allowed, so an approval from a notice can't overturn another admin's rejection.
+ */
+export function assertAdminTransition(from: MembershipStatus, action: MemberAdminAction, expected?: MembershipStatus): void {
+  if ((expected !== undefined && expected !== from) || !canTransitionMembership(from, action)) {
+    throw AppError.invalidTransition(REFUSED_BECAUSE[from], { status: from });
+  }
 }
 
 /** Actions an admin may take on a membership in the given status (for UI affordances). */

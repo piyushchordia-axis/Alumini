@@ -8,6 +8,7 @@ import {
   type MembershipProfileInput,
   type MembershipProfileUpdate,
   type MembershipRole,
+  type MembershipStatus,
   type PortableProfileDto,
 } from "@illuminize/shared";
 import type { AppContext } from "../context";
@@ -19,9 +20,11 @@ import {
   approveAllPending as approveAllPendingRepo,
   findLatestMembershipElsewhere,
   findMembership,
+  findMembershipById,
   findMembershipWithUser,
   insertMembership,
   listMembersForAdmin,
+  lockMembership,
   setProfileNudgeDismissedAt,
   updateMembership,
 } from "../repositories/memberships.repo";
@@ -31,11 +34,11 @@ import { claimInvitation, findOpenInvitationByPhone } from "../repositories/invi
 import { runInTransaction } from "../lib/transaction";
 import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "./profileFields.service";
 import type { AuthContext, MembershipRow, TenantContext, TenantRow } from "../types/request";
-import { initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
+import { assertAdminTransition, initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
 import { heldSuspensionColumns, restoreHeldSanctions, takeHeldSanctions } from "./deletedAccounts.service";
-import { notify, notifyTenantAdmins } from "./notifications/notification.service";
+import { markAdminNoticesHandled, notify, notifyTenantAdmins } from "./notifications/notification.service";
 import { applyAvatarChange } from "./uploads.service";
 
 /** An admin acting on a member, or Illuminize staff. */
@@ -124,7 +127,11 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
   const approveNow = !!invite && settings.inviteAutoApprove;
   const status = approveNow ? "APPROVED" : initialMembershipStatus(settings.memberApprovalMode);
   const row = await runInTransaction(ctx, async (tx) => {
-    const existing = await findMembership(tx, tenant.id, actor.userId);
+    // Held from this read to the change, as an admin acting on it holds it, so an approval landing meanwhile is seen, not
+    // overwritten. The membership row before the user row, as everywhere.
+    const found = await findMembership(tx, tenant.id, actor.userId);
+    if (found) await lockMembership(tx, tenant.id, found.id);
+    const existing = found && (await findMembershipById(tx, tenant.id, found.id));
     let row: MembershipRow;
     let action: "membership.create" | "membership.reapply";
 
@@ -326,6 +333,8 @@ export async function adminTransition(
   membershipId: string,
   action: Exclude<MembershipAction, "reapply">,
   reason?: string,
+  /** The status the admin acted on, if their screen sent it: see assertAdminTransition. */
+  expectedStatus?: MembershipStatus,
 ): Promise<AdminMemberDto> {
   const { tenant } = tenantCtx;
   const { target, user, next, row } = await recordingRefusal(ctx, tenant.id, actor, `membership.${action}`, membershipId, () =>
@@ -333,8 +342,12 @@ export async function adminTransition(
       // Taken whichever check below applies, because the actor's report-subject lock comes before the target's row.
       await lockReportsAboutActor(tx, tenant.id, actor);
       if (action === "suspend") await assertNoOpenReportAboutActor(tx, tenant.id, actor);
+      // Then the target's row: a second admin acting on the same member (every admin has the notice) waits here, then
+      // sees what the first did.
+      await lockMembership(tx, tenant.id, membershipId);
       const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
       if (target.userId === actor.userId) throw AppError.forbidden("You cannot change your own membership");
+      assertAdminTransition(target.status, action, expectedStatus);
       const next = transitionMembership(target.status, action);
       // The role survives a suspension, so this gives back admin access just as a role change would.
       if (next === "APPROVED" && target.role === "TENANT_ADMIN") await assertNoOpenReportAboutActor(tx, tenant.id, actor);
@@ -355,6 +368,9 @@ export async function adminTransition(
         metadata: { from: target.status, to: next, reason: reason ?? null },
         ip: actor.ip,
       });
+      if (action === "approve" || action === "reject") {
+        await markAdminNoticesHandled(ctx, tx, { tenantId: tenant.id, tenantSlug: tenant.slug, type: "NEW_MEMBER_PENDING", ids: [target.id] });
+      }
       return { target, user, next, row };
     }),
   );
@@ -373,22 +389,29 @@ export async function adminTransition(
 }
 
 export async function approveAllPending(ctx: AppContext, tenantCtx: TenantContext, actor: Actor): Promise<{ approved: number }> {
-  const rows = await approveAllPendingRepo(ctx.db, tenantCtx.tenant.id, actor.userId);
-  if (rows.length === 0) return { approved: 0 };
-  await recordAudit(ctx, {
-    tenantId: tenantCtx.tenant.id,
-    actorUserId: actor.userId,
-    actorMembershipId: actor.membershipId ?? null,
-    action: "membership.approve_all",
-    metadata: { count: rows.length, membershipIds: rows.map((r) => r.id) },
-    ip: actor.ip,
+  const { tenant } = tenantCtx;
+  const rows = await runInTransaction(ctx, async (tx) => {
+    const rows = await approveAllPendingRepo(tx, tenant.id, actor.userId);
+    if (rows.length === 0) return rows;
+    const ids = rows.map((r) => r.id);
+    await recordAuditStrict(tx, {
+      tenantId: tenant.id,
+      actorUserId: actor.userId,
+      actorMembershipId: actor.membershipId ?? null,
+      action: "membership.approve_all",
+      metadata: { count: rows.length, membershipIds: ids },
+      ip: actor.ip,
+    });
+    await markAdminNoticesHandled(ctx, tx, { tenantId: tenant.id, tenantSlug: tenant.slug, type: "NEW_MEMBER_PENDING", ids });
+    return rows;
   });
+  if (rows.length === 0) return { approved: 0 };
   await notify(ctx, {
-    tenantId: tenantCtx.tenant.id,
+    tenantId: tenant.id,
     recipientMembershipIds: rows.map((r) => r.id),
     type: "MEMBERSHIP_APPROVED",
     title: "You're in!",
-    body: `Your membership of ${tenantCtx.tenant.name} has been approved.`,
+    body: `Your membership of ${tenant.name} has been approved.`,
   });
   return { approved: rows.length };
 }

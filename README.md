@@ -899,7 +899,8 @@ expires (the shared client in `packages/shared/src/realtime` refreshes and recon
 
 - Events only go from server to client; every write is a REST call. Each one about an institution carries its
   `tenantSlug`.
-  - `notification:new` (with the new unread count), `notification:unread` (another device read some) and
+  - `notification:new` (with the new unread count), `notification:unread` (another device read some, or another admin
+    approved or rejected a request to join, which marks every current admin's notice of it read) and
     `notification:bulk` (an announcement reached many members at once).
   - `chat:message` (a new message, to everyone who may see it and to the sender's other devices), `chat:read` (the
     member read a thread on another device; only ever to their own devices, as there are no read receipts),
@@ -1220,6 +1221,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     the draft with it.
   - Nothing tests the "Join the network" label at an institution that approves members automatically but has invite
     auto-approve off: no seeded institution is set up that way.
+  - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
+    suspended admin's copy stays unread, still saying the request waits, until they read it.
 - Screens and navigation:
   - The admin Members status tabs can still overflow sideways on narrow phones (member rows reflow; tabs don't wrap).
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

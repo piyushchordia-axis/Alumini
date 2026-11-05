@@ -9,6 +9,7 @@ import {
   type MemberProfileDto,
   type MembershipDto,
   type NotificationDto,
+  type NotificationSubjectDto,
   type PortableProfileDto,
   type ProfileFieldAnswerDto,
   type ProfileLinkKey,
@@ -185,7 +186,7 @@ export function toAdminMemberDto(m: MembershipRow, user: UserRow, fields: Profil
   };
 }
 
-export function toNotificationDto(n: NotificationRow): NotificationDto {
+export function toNotificationDto(n: NotificationRow, subject?: NotificationSubjectDto): NotificationDto {
   return {
     id: n.id,
     type: n.type,
@@ -194,6 +195,7 @@ export function toNotificationDto(n: NotificationRow): NotificationDto {
     data: n.data,
     readAt: iso(n.readAt),
     createdAt: n.createdAt.toISOString(),
+    ...(subject ? { subject } : {}),
   };
 }
 

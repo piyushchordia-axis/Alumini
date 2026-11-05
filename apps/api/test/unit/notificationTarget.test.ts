@@ -1,4 +1,4 @@
-import { CHAT_PUSH_KINDS, CONFIGURABLE_CATEGORIES, NOTIFICATION_CATEGORY, NOTIFICATION_CATEGORY_INFO, NOTIFICATION_TYPES, TENANT_FEATURES, notificationLevelFor, notificationTarget, resolveNotificationPrefs, visibleNotificationCategories, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
+import { CHAT_PUSH_KINDS, CONFIGURABLE_CATEGORIES, NOTIFICATION_CATEGORY, NOTIFICATION_CATEGORY_INFO, NOTIFICATION_TYPES, TENANT_FEATURES, memberRequestOf, notificationLevelFor, notificationTarget, resolveNotificationPrefs, visibleNotificationCategories, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("notificationTarget", () => {
@@ -208,5 +208,18 @@ describe("notification preferences", () => {
     expect(notificationLevelFor("MEMBERSHIP_SUSPENDED", { categories: { ACTIVITY: "OFF" } })).toBe("IN_APP_PUSH");
     expect(notificationLevelFor("ANNOUNCEMENT", { categories: { ANNOUNCEMENTS: "OFF" } })).toBe("IN_APP");
     expect(resolveNotificationPrefs({ digestEmail: false })).toMatchObject({ digestEmail: false, announcementMessages: true, celebrationsNoticeSeenAt: null });
+  });
+});
+
+describe("memberRequestOf", () => {
+  const subject = { kind: "membership", membershipId: "8a8f8e44-0c3e-4a4b-9a1e-2a7c3f1b5d10", fullName: "Asha Rao", status: "PENDING" } as const;
+
+  it("gives the request a new-member notice carries, and nothing for any other notice or one sent without it", () => {
+    expect(memberRequestOf({ type: "NEW_MEMBER_PENDING", subject })).toBe(subject);
+    expect(memberRequestOf({ type: "NEW_MEMBER_PENDING", subject: { ...subject, fullName: null, status: null } })).toEqual({ ...subject, fullName: null, status: null });
+    // A member's list and every realtime event come without one.
+    expect(memberRequestOf({ type: "NEW_MEMBER_PENDING" })).toBeNull();
+    for (const type of NOTIFICATION_TYPES.filter((t) => t !== "NEW_MEMBER_PENDING")) expect(memberRequestOf({ type, subject }), type).toBeNull();
+    expect(memberRequestOf({ type: "NEW_MEMBER_PENDING", subject: { ...subject, kind: "post" } as never })).toBeNull();
   });
 });

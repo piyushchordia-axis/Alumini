@@ -16,7 +16,7 @@ import type {
   TenantBrandingUpdate,
   TenantSettingsUpdate,
 } from "../..";
-import type { ContentType, ModerationStatus } from "../../constants";
+import type { ContentType, MembershipStatus, ModerationStatus } from "../../constants";
 import type { ContentAction } from "../../lib/admin";
 import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDetailDto, AdminMemberDto, AdminReportDto, MentorProfileDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
 import type { ApiCore, QueryParams } from "../core";
@@ -40,9 +40,12 @@ export function adminEndpoints(core: ApiCore) {
     members: {
       list: (slug: string, query?: Partial<AdminMembersQuery>) => core.request<Page<AdminMemberDto>>({ ...p(slug, "/members"), query: q(query) }),
       get: (slug: string, id: string) => core.data<AdminMemberDetailDto>(p(slug, `/members/${id}`)),
-      approve: (slug: string, id: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/approve`) }),
+      /** `expectedStatus`, the status the admin acted on, makes the API refuse (409) once the member has moved on: see memberApproveSchema. */
+      approve: (slug: string, id: string, expectedStatus?: MembershipStatus) =>
+        core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/approve`), ...(expectedStatus ? { body: { expectedStatus } } : {}) }),
       reinstate: (slug: string, id: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/reinstate`) }),
-      reject: (slug: string, id: string, reason: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/reject`), body: { reason } }),
+      reject: (slug: string, id: string, reason: string, expectedStatus?: MembershipStatus) =>
+        core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/reject`), body: { reason, ...(expectedStatus ? { expectedStatus } : {}) } }),
       suspend: (slug: string, id: string, reason: string) => core.data<AdminMemberDto>({ method: "POST", ...p(slug, `/members/${id}/suspend`), body: { reason } }),
       approveAllPending: (slug: string) => core.data<{ approved: number }>({ method: "POST", ...p(slug, "/members/approve-all-pending") }),
       setRole: (slug: string, id: string, role: MembershipRole) => core.data<AdminMemberDto>({ method: "PATCH", ...p(slug, `/members/${id}/role`), body: { role } }),

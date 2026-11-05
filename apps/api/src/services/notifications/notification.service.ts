@@ -1,9 +1,21 @@
-import { NOTIFICATION_CATEGORY, notificationLevelFor, type NotificationType } from "@illuminize/shared";
+import { NOTIFICATION_CATEGORY, notificationLevelFor, uuidSchema, type NotificationDto, type NotificationSubjectDto, type NotificationType, type NotificationsQuery } from "@illuminize/shared";
 import type { AppContext } from "../../context";
-import type { DbClient } from "../../db/client";
+import type { DbClient, Tx } from "../../db/client";
+import { toNotificationDto } from "../../dto/membership.dto";
+import type { CursorPage } from "../../lib/pagination";
 import { afterCommit } from "../../lib/transaction";
-import { listTenantAdmins } from "../../repositories/memberships.repo";
-import { findNotificationPrefsByMemberships, insertNotifications, upsertMergedNotifications, type NotificationInsert } from "../../repositories/notifications.repo";
+import { rooms } from "../../realtime/rooms";
+import { findMembershipsByIds, listTenantAdmins } from "../../repositories/memberships.repo";
+import {
+  countUnreadByMemberships,
+  findNotificationPrefsByMemberships,
+  insertNotifications,
+  listNotifications,
+  markUnreadReadByData,
+  upsertMergedNotifications,
+  type NotificationInsert,
+  type NotificationRow,
+} from "../../repositories/notifications.repo";
 
 export interface NotifyInput {
   tenantId: string;
@@ -76,4 +88,53 @@ export async function notifyTenantAdmins(
   const excluded = new Set([input.excludeMembershipId, ...(input.excludeMembershipIds ?? [])]);
   const recipientMembershipIds = admins.map((a) => a.id).filter((id) => !excluded.has(id));
   await notify(ctx, { ...input, recipientMembershipIds }, db);
+}
+
+/** Who reads a notification list: admins also get each new-member notice's request as it stands now. */
+export interface NotificationViewer {
+  tenantId: string;
+  membershipId: string;
+  isAdmin: boolean;
+}
+
+/** The viewer's notifications, newest first. */
+export async function listNotificationsForViewer(ctx: AppContext, viewer: NotificationViewer, query: NotificationsQuery): Promise<CursorPage<NotificationDto>> {
+  const page = await listNotifications(ctx.db, viewer.membershipId, query);
+  const subjects = viewer.isAdmin ? await memberRequestSubjects(ctx, viewer.tenantId, page.data) : new Map<string, NotificationSubjectDto>();
+  return { data: page.data.map((row) => toNotificationDto(row, subjects.get(row.id))), nextCursor: page.nextCursor };
+}
+
+/** The membership each NEW_MEMBER_PENDING row asks about, by notification id, read in one query for the page. */
+async function memberRequestSubjects(ctx: AppContext, tenantId: string, rows: NotificationRow[]): Promise<Map<string, NotificationSubjectDto>> {
+  const asked = new Map<string, string>();
+  for (const row of rows) {
+    const id = row.type === "NEW_MEMBER_PENDING" ? uuidSchema.safeParse(row.data.membershipId) : null;
+    if (id?.success) asked.set(row.id, id.data);
+  }
+  if (asked.size === 0) return new Map();
+  const found = new Map((await findMembershipsByIds(ctx.db, tenantId, [...new Set(asked.values())])).map((m) => [m.id, m]));
+  return new Map(
+    [...asked].map(([notificationId, membershipId]) => {
+      const m = found.get(membershipId);
+      return [notificationId, { kind: "membership", membershipId, fullName: m?.fullName ?? null, status: m?.status ?? null }];
+    }),
+  );
+}
+
+/**
+ * Marks read every current admin's copy of the `type` notices about these memberships, staff holding the admin role
+ * included (they get NEW_MEMBER_PENDING too), once one admin has dealt with them, so nobody else is asked to. Inside the
+ * transaction of the change, in one statement however many there are (approving everyone waiting can handle thousands);
+ * open apps get the new unread counts once it commits.
+ */
+export async function markAdminNoticesHandled(ctx: AppContext, tx: Tx, input: { tenantId: string; tenantSlug: string; type: NotificationType; ids: string[] }): Promise<void> {
+  if (input.ids.length === 0) return;
+  const admins = await listTenantAdmins(tx, input.tenantId);
+  const marked = new Set(await markUnreadReadByData(tx, admins.map((a) => a.id), input.type, "membershipId", input.ids));
+  const affected = admins.filter((a) => marked.has(a.id));
+  if (affected.length === 0) return;
+  await afterCommit(ctx, tx, async () => {
+    const unread = await countUnreadByMemberships(ctx.db, affected.map((a) => a.id));
+    for (const a of affected) ctx.realtime.emit(rooms.user(a.userId), "notification:unread", { tenantSlug: input.tenantSlug, membershipId: a.id, count: unread.get(a.id) ?? 0 });
+  });
 }
