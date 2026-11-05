@@ -16,6 +16,7 @@ import {
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useMemo, useState } from "react";
 import { DateTimeField } from "@/components/DateTimeField";
+import { IconImage } from "@/components/icons";
 import { Button, ChipSelect, ErrorText, Input, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 
@@ -100,7 +101,8 @@ export function EventForm({
       <Input label="Details *" value={description} onChangeText={setDescription} multiline placeholder="What's the plan? Who should come?" hint={RICH_TEXT_HINT} error={errors.description} />
       <Row>
         <Button
-          title={coverImageUrl ? "Change cover image" : "📷 Cover image"}
+          title={coverImageUrl ? "Change cover image" : "Cover image"}
+          icon={(c) => <IconImage size={18} color={c} />}
           variant="outline"
           loading={upload.busy}
           onPress={async () => {

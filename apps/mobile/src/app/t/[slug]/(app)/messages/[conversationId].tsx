@@ -12,6 +12,7 @@ import { ChatHeader, ChatNotice, ChatOff, ChatScreen, iconButton, StatusLine, us
 import { ConversationOptionsSheet, ReportMessageSheet } from "@/components/chat/ChatSheets";
 import { DayRow, MessageRow, type MessageActions } from "@/components/chat/MessageRow";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { IconAlert, IconGroups, IconLock, IconMessages } from "@/components/icons";
 import { Button, ErrorText, Spinner } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
@@ -322,7 +323,7 @@ function Thread({ id }: { id: string }) {
         {messages.isLoading ? (
           <Spinner label="Loading messages…" />
         ) : firstLoadFailed ? (
-          <ChatNotice title="Messages couldn't be loaded" text={errorMessage(messages.error)}>
+          <ChatNotice icon={<IconAlert size={32} color={colors.faint} />} title="Messages couldn't be loaded" text={errorMessage(messages.error)}>
             <Button title="Retry loading" variant="outline" onPress={() => void messages.refetch()} />
           </ChatNotice>
         ) : (
@@ -465,10 +466,12 @@ function ThreadUnavailable({ id, error, onRetry }: { id: string; error: unknown;
   const about = group ? groupUnavailable(group) : null;
   const title = about?.title ?? (off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened");
   const text = about?.text ?? (off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.");
+  const iconProps = { size: 32, color: colors.faint };
+  const icon = about ? <IconGroups {...iconProps} /> : off ? <IconLock {...iconProps} /> : <IconMessages {...iconProps} />;
   return (
     <ChatScreen>
       <ChatHeader title={about && group ? group.name : "Conversation"} />
-      <ChatNotice icon={about ? "👥" : "💬"} title={title} text={text}>
+      <ChatNotice icon={icon} title={title} text={text}>
         {!answered && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         {group?.myState !== "INVITED" && group?.canJoin && <Button title="Join group" loading={join.isPending} onPress={() => join.mutate()} />}
         {/* Down into the tabs under this screen, rather than a second set of tabs on top of it. */}

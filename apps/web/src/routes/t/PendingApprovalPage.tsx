@@ -2,6 +2,7 @@ import { isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { IconAlert, IconClock, IconLock } from "@/components/icons";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Button, ErrorBox, LinkButton, Loading } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
@@ -38,15 +39,17 @@ export function PendingApprovalPage() {
   if (m.status === "APPROVED") return <Navigate to={`/t/${slug}/app`} replace />;
 
   const copy = {
-    PENDING: { title: "Awaiting approval", body: `Thanks ${m.fullName.split(" ")[0]}! The ${tenant.data.shortName ?? tenant.data.name} alumni office reviews every request. You'll be notified when it's approved.`, icon: "⏳" },
-    REJECTED: { title: "Request not approved", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Your request was not approved. You can update your details and re-apply.", icon: "✋" },
-    SUSPENDED: { title: "Membership suspended", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Please contact the alumni office.", icon: "⛔" },
+    PENDING: { title: "Awaiting approval", body: `Thanks ${m.fullName.split(" ")[0]}! The ${tenant.data.shortName ?? tenant.data.name} alumni office reviews every request. You'll be notified when it's approved.`, Icon: IconClock },
+    REJECTED: { title: "Request not approved", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Your request was not approved. You can update your details and re-apply.", Icon: IconAlert },
+    SUSPENDED: { title: "Membership suspended", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Please contact the alumni office.", Icon: IconLock },
   }[m.status as "PENDING" | "REJECTED" | "SUSPENDED"];
 
   return (
     <AuthShell tenant={tenant.data} title={copy.title}>
       <div className="text-center">
-        <div className="text-5xl">{copy.icon}</div>
+        <div aria-hidden className="mx-auto flex h-18 w-18 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <copy.Icon size={36} />
+        </div>
         <p className="mt-4 text-sm text-slate-600">{copy.body}</p>
         <div className="mt-6 space-y-2">
           {m.status === "REJECTED" && (

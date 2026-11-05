@@ -33,10 +33,10 @@ export function ConfirmDialog({
       title={title}
       footer={
         <>
-          <Button variant="ghost" onClick={cancel} disabled={busy} data-autofocus>
+          <Button variant="ghost" className="min-h-11" onClick={cancel} disabled={busy} data-autofocus>
             Cancel
           </Button>
-          <Button variant={destructive ? "danger" : "primary"} onClick={onConfirm} loading={busy}>
+          <Button variant={destructive ? "danger" : "primary"} className="min-h-11" onClick={onConfirm} loading={busy}>
             {confirmLabel}
           </Button>
         </>

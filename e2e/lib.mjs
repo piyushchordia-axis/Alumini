@@ -205,3 +205,14 @@ export async function dropFrames(page, text) {
     dropped: () => dropped > 0,
   };
 }
+
+/**
+ * Fails unless `locator` (one element) draws an SVG icon and its text holds no emoji: for chrome where an emoji stood in
+ * for an icon. Not for anything holding member text, which may have emoji of its own.
+ */
+export async function expectSvgNoEmoji(locator, where) {
+  const text = await locator.innerText();
+  const emoji = text.match(/\p{Extended_Pictographic}/u);
+  if (emoji) throw new Error(`${where} shows the emoji ${emoji[0]}: "${text}"`);
+  if (!(await locator.locator("svg").count())) throw new Error(`${where} draws no SVG icon`);
+}

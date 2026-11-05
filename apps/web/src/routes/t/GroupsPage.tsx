@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ListBody } from "@/components/common/ListBody";
 import { GroupCard, InvitationCard } from "@/components/groups/GroupCards";
+import { IconGroups, IconMail, IconSearch } from "@/components/icons";
 import { EmptyState, Input, LinkButton, PageHeader, Tabs } from "@/components/ui";
 import { useChatBadge } from "@/hooks/useChat";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -30,9 +31,9 @@ function Discover({ slug }: { slug: string }) {
         list={{ ...list, hasNextPage: !!list.hasNextPage }}
         empty={
           search ? (
-            <EmptyState icon="🔎" title="No groups match" description="Try another name, or create the group yourself." />
+            <EmptyState icon={<IconSearch size={32} className="text-slate-400" />} title="No groups match" description="Try another name, or create the group yourself." />
           ) : (
-            <EmptyState icon="👥" title="No open groups yet" description="Create one, and any member here can find and join it." action={<LinkButton to={`/t/${slug}/app/groups/new`}>Create group</LinkButton>} />
+            <EmptyState icon={<IconGroups size={32} className="text-slate-400" />} title="No open groups yet" description="Create one, and any member here can find and join it." action={<LinkButton to={`/t/${slug}/app/groups/new`}>Create group</LinkButton>} />
           )
         }
       >
@@ -45,7 +46,7 @@ function Discover({ slug }: { slug: string }) {
 function MyGroups({ slug }: { slug: string }) {
   const list = useInfiniteList(chatKeys.groupList(slug, "MINE"), (cursor) => api.chat.groups.list(slug, { scope: "MINE", cursor, limit: PAGE }));
   return (
-    <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<EmptyState icon="👥" title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />}>
+    <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<EmptyState icon={<IconGroups size={32} className="text-slate-400" />} title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />}>
       {(items) => items.map((g) => <GroupCard key={g.id} slug={slug} group={g} />)}
     </ListBody>
   );
@@ -77,7 +78,7 @@ function Invitations({ slug }: { slug: string }) {
   });
   return (
     <>
-      <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<EmptyState icon="📨" title="No invitations" description="When someone invites you to a group, the invitation waits here for you to accept or decline." />}>
+      <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No invitations" description="When someone invites you to a group, the invitation waits here for you to accept or decline." />}>
         {(items) =>
           items.map((invite) => (
             <InvitationCard

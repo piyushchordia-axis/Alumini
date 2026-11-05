@@ -7,11 +7,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BlockConfirmDialog, BlockMemberButton } from "@/components/chat/BlockMemberButton";
 import { ChatComposer } from "@/components/chat/ChatComposer";
-import { ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
+import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
 import { ConversationOptions } from "@/components/chat/ConversationOptions";
 import { MessageList, type MessageActions } from "@/components/chat/MessageList";
 import { ReportMessageDialog } from "@/components/chat/ReportMessageDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { IconGroups, IconLock, IconMessages } from "@/components/icons";
 import { Button, Loading } from "@/components/ui";
 import { useDocumentVisible, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
@@ -382,43 +383,37 @@ function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slu
   const title = about?.title ?? (off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened");
   const text = about?.text ?? (off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.");
   const action = "inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  const Icon = about ? IconGroups : off ? IconLock : IconMessages;
   return (
     <ChatPane>
       {() => (
         <>
           <ChatPaneHeader backTo={backTo} title={about && group ? group.name : "Conversation"} />
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-            <div className="text-3xl" aria-hidden>
-              💬
-            </div>
-            <p className="text-base font-semibold text-slate-800">{title}</p>
-            <p className="max-w-sm text-sm text-slate-500">{text}</p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {!answered && (
-                <Button variant="outline" className="min-h-11" onClick={onRetry}>
-                  Retry loading
-                </Button>
-              )}
-              {group?.myState !== "INVITED" && group?.canJoin && (
-                <Button className="min-h-11" onClick={() => join.mutate()} loading={join.isPending}>
-                  Join group
-                </Button>
-              )}
-              {group?.myState === "INVITED" && (
-                <Link to={groupsPath(slug, "invitations")} className={clsx(action, "bg-primary text-white hover:opacity-90")}>
-                  See invitation
-                </Link>
-              )}
-              {group && about && (
-                <Link to={groupPath(slug, id)} className={clsx(action, "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}>
-                  Group details
-                </Link>
-              )}
-              <Link to={backTo} className={clsx(action, about ? "text-slate-600 hover:bg-slate-100" : "bg-primary text-white hover:opacity-90")}>
-                Back to messages
+          <ChatNotice icon={<Icon size={32} />} title={title} text={text}>
+            {!answered && (
+              <Button variant="outline" className="min-h-11" onClick={onRetry}>
+                Retry loading
+              </Button>
+            )}
+            {group?.myState !== "INVITED" && group?.canJoin && (
+              <Button className="min-h-11" onClick={() => join.mutate()} loading={join.isPending}>
+                Join group
+              </Button>
+            )}
+            {group?.myState === "INVITED" && (
+              <Link to={groupsPath(slug, "invitations")} className={clsx(action, "bg-primary text-white hover:opacity-90")}>
+                See invitation
               </Link>
-            </div>
-          </div>
+            )}
+            {group && about && (
+              <Link to={groupPath(slug, id)} className={clsx(action, "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}>
+                Group details
+              </Link>
+            )}
+            <Link to={backTo} className={clsx(action, about ? "text-slate-600 hover:bg-slate-100" : "bg-primary text-white hover:opacity-90")}>
+              Back to messages
+            </Link>
+          </ChatNotice>
         </>
       )}
     </ChatPane>

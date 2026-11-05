@@ -2,6 +2,7 @@ import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, plainExcerpt, type Busin
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
+import { IconBusinesses } from "@/components/icons";
 import { ModerationBadge } from "@/components/ModerationBadge";
 import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -65,7 +66,7 @@ export default function BusinessesScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon="🏪" title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />
+            <EmptyState icon={<IconBusinesses size={32} color={colors.faint} />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />
           </ListEmpty>
         }
         renderItem={({ item }) => <BusinessCard slug={slug} item={item} />}

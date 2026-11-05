@@ -109,8 +109,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
   full glassmorphism. Prefer opaque high-contrast content; soft blur only on sticky chrome (header / tab bar).
   - **Icons.** Chrome uses the shared SVG stroke set (`components/icons.tsx` on web and mobile). Do not use emoji as
-    nav, empty-state, badge or feature icons. Reactions may keep emoji *inside* labeled SVG-framed hit targets only.
-    Section maps store icon *names* (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`), not emoji.
+    nav, empty-state, badge or feature icons: `EmptyState` and `ChatNotice` take an SVG element only, and ESLint
+    (`packages/config/eslint/no-emoji-icons.cjs`) rejects emoji in web, mobile and shared source (CI doesn't lint
+    mobile, so the API unit test `noEmojiIcons.test.ts` runs the guard over all three). Reactions may keep emoji
+    *inside* labeled SVG-framed hit targets only, on a commented `eslint-disable-next-line`. Notification and push
+    titles (the API's 📣, 🎂, 🎉) are message text, not icons, and keep theirs. Section maps store icon *names*
+    (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`), not emoji.
   - **Elevation.** Page background (`--surface-page` / `colors.bg`) is quieter than content. Level 1: posts and list
     modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write surfaces
     (`elevation={2}`). Do not flatten feed cards into the page.
@@ -219,10 +223,7 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - uploads: only a profile photo must be the member's own upload (job and business logos, post images and event covers
     take any http(s) address), only profile photos are ever deleted, and a CDN may serve a deleted one until it expires;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-    emoji still used as icons outside the profile, member, directory, job and notification screens (most empty states,
-    the lock on the Messages, Groups and Mentors "aren't available" screens, the digest banner, contact buttons, the
-    platform console's nav: README → Known gaps lists them); admin Members status tabs can still overflow on narrow
-    phones (list rows were reflowed);
+    admin Members status tabs can still overflow on narrow phones (list rows were reflowed);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

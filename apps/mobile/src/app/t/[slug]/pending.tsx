@@ -2,17 +2,19 @@ import { isApiClientError } from "@illuminize/shared/client";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
+import { IconAlert, IconClock, IconLock } from "@/components/icons";
 import { Button, LoadError, Screen, Spinner, Title } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
 import { homeHref } from "@/lib/sections";
 import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
-import { colors } from "@/theme";
+import { colors, useTheme } from "@/theme";
 
 export default function PendingScreen() {
   const { slug = "" } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const theme = useTheme();
   const hydrated = useAuthStore((s) => s.hydrated);
   const authed = useAuthStore((s) => s.isAuthenticated);
   const tenant = useTenant(slug);
@@ -36,16 +38,16 @@ export default function PendingScreen() {
   if (!m) return <Spinner />;
   if (m.status === "APPROVED") return <Redirect href={homeHref(slug, tenant.data.settings.features)} />;
   const copy = {
-    PENDING: { title: "Awaiting approval", icon: "⏳", body: `Thanks ${m.fullName.split(" ")[0]}! The ${tenant.data.shortName ?? tenant.data.name} alumni office reviews every request. You'll be notified when it's approved.` },
-    REJECTED: { title: "Request not approved", icon: "✋", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Your request was not approved. You can update your details and re-apply." },
-    SUSPENDED: { title: "Membership suspended", icon: "⛔", body: m.statusReason ? `Reason given: ${m.statusReason}` : "Please contact the alumni office." },
+    PENDING: { title: "Awaiting approval", Icon: IconClock, body: `Thanks ${m.fullName.split(" ")[0]}! The ${tenant.data.shortName ?? tenant.data.name} alumni office reviews every request. You'll be notified when it's approved.` },
+    REJECTED: { title: "Request not approved", Icon: IconAlert, body: m.statusReason ? `Reason given: ${m.statusReason}` : "Your request was not approved. You can update your details and re-apply." },
+    SUSPENDED: { title: "Membership suspended", Icon: IconLock, body: m.statusReason ? `Reason given: ${m.statusReason}` : "Please contact the alumni office." },
   }[m.status];
   return (
     <Screen topInset>
       <View style={{ alignItems: "center", gap: 12, paddingVertical: 32 }}>
-        <Text style={{ fontSize: 56 }} accessible={false}>
-          {copy.icon}
-        </Text>
+        <View aria-hidden style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
+          <copy.Icon size={36} color={theme.primary} />
+        </View>
         <Title>{copy.title}</Title>
         <Text style={{ color: colors.muted, textAlign: "center", lineHeight: 20 }}>{copy.body}</Text>
       </View>

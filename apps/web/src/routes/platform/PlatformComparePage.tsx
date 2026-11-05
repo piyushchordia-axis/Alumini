@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChartCard, HBarChart, plural, type Unit } from "@/components/charts";
+import { IconDownload } from "@/components/icons";
 import { Avatar, Button, ErrorBox, FormField, Input, Loading, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
@@ -79,8 +80,9 @@ export function PlatformComparePage() {
         title="Compare institutions"
         subtitle={d ? `${formatDate(d.periodStart)} – ${formatDate(d.periodEnd)} · days in ${d.timeZone} (the billing time zone)` : "Size, activity and estimated charges per institution"}
         actions={
-          <Button variant="outline" size="sm" loading={csv.isPending} disabled={!d} onClick={() => csv.mutate()}>
-            ⬇ Download CSV
+          <Button variant="outline" size="sm" className="gap-1.5" loading={csv.isPending} disabled={!d} onClick={() => csv.mutate()}>
+            <IconDownload size={16} />
+            Download CSV
           </Button>
         }
       />

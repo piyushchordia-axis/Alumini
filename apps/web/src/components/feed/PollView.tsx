@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState } from "react";
+import { IconCheck } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -63,10 +64,15 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
             aria-pressed={poll.allowsMultiple ? on : undefined}
             disabled={vote.isPending}
             onClick={() => (poll.allowsMultiple ? setPicked((p) => (on ? p.filter((x) => x !== o.id) : [...p, o.id])) : vote.mutate([o.id]))}
-            className={clsx("block w-full rounded-lg border px-3 py-2 text-left text-sm transition", on ? "border-primary bg-primary/10" : "border-slate-300 hover:border-primary hover:bg-primary/5")}
+            className={clsx("flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition", on ? "border-primary bg-primary/10" : "border-slate-300 hover:border-primary hover:bg-primary/5")}
           >
-            {poll.allowsMultiple && <span className="mr-2">{on ? "☑" : "☐"}</span>}
-            {o.label}
+            {/* Only for the eye: aria-pressed says whether it's chosen. */}
+            {poll.allowsMultiple && (
+              <span aria-hidden className={clsx("flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border-2", on ? "border-primary bg-primary text-white" : "border-slate-400 bg-white")}>
+                {on && <IconCheck size={12} strokeWidth={3} />}
+              </span>
+            )}
+            <span className="min-w-0">{o.label}</span>
           </button>
         );
       })}

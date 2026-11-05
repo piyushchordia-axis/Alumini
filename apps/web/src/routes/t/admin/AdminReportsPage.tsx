@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { IconCheck } from "@/components/icons";
 import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
@@ -93,7 +94,7 @@ export function AdminReportsPage() {
       <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={REPORT_STATUSES.map((s) => ({ value: s, label: s.charAt(0) + s.slice(1).toLowerCase() }))} className="w-fit" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon="🎉" title={`No ${status.toLowerCase()} reports`} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={`No ${status.toLowerCase()} reports`} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((r) => (
           <ReportRow key={r.id} slug={slug} report={r} />

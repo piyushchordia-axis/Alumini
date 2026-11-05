@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
@@ -208,10 +208,15 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-export function EmptyState({ title, description, action, icon }: { title: ReactNode; description?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
+/** `icon` is an SVG from `components/icons.tsx`, drawn in slate-400 and hidden from screen readers. */
+export function EmptyState({ title, description, action, icon }: { title: ReactNode; description?: ReactNode; action?: ReactNode; icon?: ReactElement }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-      {icon && <div className="mb-3 text-3xl">{icon}</div>}
+      {icon && (
+        <div aria-hidden className="mb-3 text-slate-400">
+          {icon}
+        </div>
+      )}
       <h3 className="text-base font-semibold text-slate-800">{title}</h3>
       {description && <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -304,11 +309,12 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <h2 id={titleId} className="text-lg font-semibold text-slate-900">
             {title}
           </h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close">
+          {/* A 44px target; the negative margins keep the header as tall as its title. */}
+          <button type="button" onClick={onClose} className="-my-2 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary" aria-label="Close">
             ✕
           </button>
         </div>

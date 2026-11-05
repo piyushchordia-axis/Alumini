@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatHeader, ChatNotice, ChatOff, ChatScreen, useLeaveChatScreen } from "@/components/chat/ChatFrame";
+import { IconMessages } from "@/components/icons";
 import { Button, Spinner } from "@/components/ui";
 import { useChatEnabled } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
@@ -65,7 +66,7 @@ function NewConversation({ to }: { to: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="New message" />
-        <ChatNotice title="You can't message this member" text="They can't be contacted here at the moment.">
+        <ChatNotice icon={<IconMessages size={32} color={colors.faint} />} title="You can't message this member" text="They can't be contacted here at the moment.">
           <Button title="Go back" onPress={leave} />
         </ChatNotice>
       </ChatScreen>

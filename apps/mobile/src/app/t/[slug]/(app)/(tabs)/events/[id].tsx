@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
+import { IconMapPin } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
@@ -58,10 +59,15 @@ export default function EventDetailScreen() {
             {formatDateTime(e.startAt, e.timezone)}
             {e.endAt ? ` – ${formatDateTime(e.endAt, e.timezone)}` : ""} ({e.timezone})
           </Muted>
-          <Muted size={14}>
-            📍 {e.city}
-            {e.venueName ? ` · ${e.venueName}` : ""}
-          </Muted>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View aria-hidden>
+              <IconMapPin size={16} color={colors.faint} />
+            </View>
+            <Text style={{ flex: 1, color: colors.muted, fontSize: 14 }}>
+              {e.city}
+              {e.venueName ? ` · ${e.venueName}` : ""}
+            </Text>
+          </View>
           {e.address && <Muted>{e.address}</Muted>}
           <Row>
             <Badge label={EVENT_KIND_LABELS[e.kind]} tone="info" />

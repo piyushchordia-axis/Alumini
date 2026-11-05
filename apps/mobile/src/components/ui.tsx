@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactNode, type Ref } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StackHeader } from "@/components/StackHeader";
@@ -431,11 +431,11 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
-/** `icon` is an SVG icon from `components/icons.tsx`; a string is drawn as text, as older screens still pass emoji. */
-export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
+/** `icon` is an SVG from `components/icons.tsx`, such as `<IconMail size={32} color={colors.faint} />`; screen readers skip it. */
+export function EmptyState({ icon, title, description }: { icon?: ReactElement; title: string; description?: string }) {
   return (
     <View style={styles.empty}>
-      {typeof icon === "string" ? <Text style={{ fontSize: 32 }}>{icon}</Text> : icon}
+      {icon ? <View aria-hidden>{icon}</View> : null}
       <Text style={styles.emptyTitle}>{title}</Text>
       {description && <Text style={styles.hint}>{description}</Text>}
     </View>

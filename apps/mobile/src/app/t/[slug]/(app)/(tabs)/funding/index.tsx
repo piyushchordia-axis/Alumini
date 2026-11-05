@@ -2,6 +2,7 @@ import { FUNDING_STAGE_LABELS, plainExcerpt, type FundingDto } from "@illuminize
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
+import { IconFunding } from "@/components/icons";
 import { ModerationBadge } from "@/components/ModerationBadge";
 import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -59,7 +60,7 @@ export default function FundingScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon="🚀" title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
+            <EmptyState icon={<IconFunding size={32} color={colors.faint} />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
           </ListEmpty>
         }
         renderItem={({ item }) => <FundingCard slug={slug} item={item} />}

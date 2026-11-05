@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { expectSvgNoEmoji } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -130,10 +131,22 @@ try {
     await row.locator('button:has-text("View full content")').click();
     await row.locator("text=service@joshiautomation.example").waitFor();
     await row.locator('a:has-text("Open in app")').waitFor();
+    await expectSvgNoEmoji(row.locator('a:has-text("Open in app")'), "Open in app");
     await row.locator('button:has-text("Approve")').click();
     await page.waitForSelector("text=Business listing approved");
     await row.waitFor({ state: "detached" });
     await shot("a03b-moderation-business");
+  });
+
+  await step("an approved post's Pin and Unpin draw their icon, named by the word alone", async () => {
+    // The seeded notice is pinned and the spam post (removed in the next step) isn't. Rows hold member text, so only the
+    // buttons are checked for emoji.
+    await page.goto(`${BASE}/t/demo-college/admin/moderation?status=APPROVED&type=POST`);
+    for (const name of ["Pin", "Unpin"]) {
+      const button = page.getByRole("button", { name, exact: true }).first();
+      await button.waitFor();
+      await expectSvgNoEmoji(button, `the moderation queue's ${name} button`);
+    }
   });
 
   await step("resolve the spam report by removing content", async () => {
@@ -222,6 +235,7 @@ try {
   await step("import an invitation from CSV, copy its link, and join through it", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/invitations`);
     await page.waitForSelector("text=Import a list");
+    await expectSvgNoEmoji(page.getByRole("button", { name: "Template", exact: true }), "the Template button");
     await page.setInputFiles('input[aria-label="CSV file"]', { name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(`Phone,Name,Batch\r\n+91${invitePhone},Kavita Invitee,2015\r\n`) });
     await page.click('button:has-text("Import 1 row")');
     await page.waitForSelector("text=1 new");
@@ -386,6 +400,7 @@ try {
     await page.waitForSelector("svg[aria-label^='Activity per week']");
     await page.waitForSelector("text=Who your members are");
     await shot("a09-analytics");
+    await expectSvgNoEmoji(page.locator('button:has-text("Members CSV")'), "the Members CSV button");
     const csv = await download(() => page.click('button:has-text("Members CSV")'));
     if (!/^demo-university-members-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
     if (!csv.text.startsWith("\uFEFFName,Phone,Email,")) throw new Error("members CSV is missing its BOM or header");
@@ -406,6 +421,15 @@ try {
     await page.waitForURL(/\/platform\/tenants$/);
     await page.waitForSelector("text=Demo University");
     await page.waitForSelector("text=Demo International School");
+    // The console's nav draws SVG icons, as the admin console's does, each link named by its label alone and 40px tall.
+    const nav = page.locator('nav[aria-label="Platform sections"]');
+    await expectSvgNoEmoji(nav, "the platform console's nav");
+    for (const label of ["Institutions", "Users", "Stats", "Compare", "Chat reports", "Audit log"]) {
+      const link = nav.getByRole("link", { name: label, exact: true });
+      if ((await link.locator("svg").count()) !== 1) throw new Error(`the platform nav's ${label} link has no icon`);
+      const box = await link.boundingBox();
+      if (!box || box.height < 40) throw new Error(`the platform nav's ${label} link is ${box?.height}px tall, under 40px`);
+    }
     await shot("p01-tenants");
   });
 
@@ -418,6 +442,7 @@ try {
     await page.click('button:has-text("Onboard institution")');
     await page.waitForURL(/\/platform\/tenants\/[0-9a-f-]+$/);
     await page.waitForSelector(`text=Smoke Institute ${unique}`);
+    await expectSvgNoEmoji(page.locator(`a[href="/t/smoke-institute-${unique}"]`), "the link to the institution's app");
     await page.click("text=Admins");
     await page.waitForSelector("text=Smoke Admin");
     await shot("p02-tenant-detail");
@@ -461,6 +486,7 @@ try {
     await page.click('th button:has-text("Approved")');
     await page.waitForSelector("h2:has-text('Approved members')");
     await shot("p05-compare");
+    await expectSvgNoEmoji(page.locator('button:has-text("Download CSV")'), "the Download CSV button");
     const csv = await download(() => page.click('button:has-text("Download CSV")'));
     if (!/^institutions-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
     if (!csv.text.includes("Demo University,demo-university,ACTIVE")) throw new Error("comparison CSV is missing Demo University");

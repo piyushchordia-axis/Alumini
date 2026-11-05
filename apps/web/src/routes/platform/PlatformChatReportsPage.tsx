@@ -2,6 +2,7 @@ import { CHAT_REPORT_TARGET_KIND_LABELS, DELETED_MEMBER_NAME, REPORT_REASON_LABE
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { IconCheck } from "@/components/icons";
 import { Badge, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -26,7 +27,7 @@ export function PlatformChatReportsPage() {
       />
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
-      {q.data && q.data.data.length === 0 && <EmptyState icon="🎉" title={`No ${status.toLowerCase()} escalated reports`} />}
+      {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={`No ${status.toLowerCase()} escalated reports`} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {q.data?.data.map((r) => (
           <li key={r.id} className="px-4 py-3">

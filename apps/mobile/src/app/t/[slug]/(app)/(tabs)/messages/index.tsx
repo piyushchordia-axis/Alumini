@@ -2,6 +2,7 @@ import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize
 import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMuted } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
+import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
 import { Avatar, Button, EmptyState, ListEmpty, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -28,10 +29,8 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
       <View>
         <Avatar name={name} src={c.peer?.avatarUrl} size={44} />
         {c.group && (
-          <View style={{ position: "absolute", right: -3, bottom: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
-            <Text accessible={false} style={{ fontSize: 11 }}>
-              👥
-            </Text>
+          <View aria-hidden style={{ position: "absolute", right: -3, bottom: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+            <IconGroups size={13} color={colors.muted} />
           </View>
         )}
       </View>
@@ -51,7 +50,11 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
               <Text style={{ fontSize: 11, color: colors.muted }}>Archived</Text>
             </View>
           )}
-          {muted && <Text style={{ fontSize: 12 }}>🔕</Text>}
+          {muted && (
+            <View aria-hidden>
+              <IconBellOff size={14} color={colors.faint} />
+            </View>
+          )}
           {unread && (
             <View style={{ minWidth: 20, height: 20, borderRadius: radius.full, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
               <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{c.unread > 99 ? "99+" : c.unread}</Text>
@@ -124,11 +127,11 @@ export default function MessagesScreen() {
             <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
               {inbox === "MAIN" ? (
                 <View style={{ gap: spacing.md }}>
-                  <EmptyState icon="✉️" title="No conversations yet" description={emptyChatsHint(features)} />
+                  <EmptyState icon={<IconMessages size={32} color={colors.faint} />} title="No conversations yet" description={emptyChatsHint(features)} />
                   {features.groups && <Button title="Find a group" variant="outline" accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups`)} />}
                 </View>
               ) : (
-                <EmptyState icon="📨" title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
+                <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
               )}
             </ListEmpty>
           }

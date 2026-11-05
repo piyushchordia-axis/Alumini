@@ -1,9 +1,7 @@
 import { applicationsClosed, applicationsLine, type JobDto } from "@illuminize/shared";
 import clsx from "clsx";
-import { EXTERNAL_REL } from "@/components/common/RichText";
+import { ContactLink } from "@/components/common/ContactLink";
 import { IconEvents, IconExternalLink, IconMail, IconPhone } from "@/components/icons";
-
-const action = "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition [overflow-wrap:anywhere]";
 
 /**
  * How to apply for a job: Apply (its link), its email and its phone. Once the job stops taking applications they go, for
@@ -54,26 +52,12 @@ export function JobApplyArea({ job, now, plain = false, className }: { job: JobD
   return (
     <div className={clsx("flex flex-wrap gap-2", className)}>
       {job.applyUrl && (
-        <a href={job.applyUrl} target="_blank" rel={EXTERNAL_REL} className={clsx(action, "bg-primary text-white shadow-sm hover:opacity-90")}>
+        <ContactLink kind="website" address={job.applyUrl} primary Icon={IconExternalLink} iconAfter>
           Apply
-          <IconExternalLink size={16} />
-          <span className="sr-only"> (opens in a new tab)</span>
-        </a>
+        </ContactLink>
       )}
-      {job.contactEmail && (
-        <a href={`mailto:${job.contactEmail}`} className={clsx(action, "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}>
-          <IconMail size={16} className="text-slate-500" />
-          <span className="sr-only">Email </span>
-          {job.contactEmail}
-        </a>
-      )}
-      {job.contactPhone && (
-        <a href={`tel:${job.contactPhone}`} className={clsx(action, "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}>
-          <IconPhone size={16} className="text-slate-500" />
-          <span className="sr-only">Call </span>
-          {job.contactPhone}
-        </a>
-      )}
+      {job.contactEmail && <ContactLink kind="email" address={job.contactEmail} />}
+      {job.contactPhone && <ContactLink kind="phone" address={job.contactPhone} />}
     </div>
   );
 }

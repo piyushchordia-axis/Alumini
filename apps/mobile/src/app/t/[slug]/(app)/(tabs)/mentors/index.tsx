@@ -24,6 +24,7 @@ import { useState } from "react";
 import { FlatList, Platform, ScrollView, Text, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { IconLock, IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCards";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
@@ -106,17 +107,17 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             {filtered ? (
               <View style={{ gap: spacing.md }}>
-                <EmptyState icon="🔎" title="No mentors match" description="Try another name, area or availability." />
+                <EmptyState icon={<IconSearch size={32} color={colors.faint} />} title="No mentors match" description="Try another name, area or availability." />
                 <Button title="Clear filters" variant="outline" onPress={clear} />
               </View>
             ) : listed ? (
               <View style={{ gap: spacing.md }}>
-                <EmptyState icon="🧭" title="You're the only mentor so far" description="Members find you here, and other mentors will be listed here too when they offer to mentor." />
+                <EmptyState icon={<IconMentors size={32} color={colors.faint} />} title="You're the only mentor so far" description="Members find you here, and other mentors will be listed here too when they offer to mentor." />
                 <Button title="See your mentor profile" variant="outline" onPress={onOffer} />
               </View>
             ) : (
               <View style={{ gap: spacing.md }}>
-                <EmptyState icon="🧭" title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." />
+                <EmptyState icon={<IconMentors size={32} color={colors.faint} />} title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." />
                 <Button title="Offer to mentor" onPress={onOffer} />
               </View>
             )}
@@ -292,7 +293,7 @@ function MentorsWayOut({ slug }: { slug: string }) {
     return (
       <SectionScreen>
         <View style={{ padding: spacing.lg, gap: spacing.md }}>
-          <EmptyState icon="🔒" title="Mentors aren't available" description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`} />
+          <EmptyState icon={<IconLock size={32} color={colors.faint} />} title="Mentors aren't available" description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`} />
           <Button title="Go to the app" accessibilityRole="link" onPress={() => router.replace(homeHref(slug, tenant.settings.features))} />
         </View>
       </SectionScreen>

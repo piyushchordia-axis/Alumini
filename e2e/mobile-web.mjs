@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, apiSession, dropFrames, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
+import { API, apiSession, dropFrames, expectSvgNoEmoji, reconnect,scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -93,6 +93,7 @@ try {
   await step("tenant picker renders from the API", async () => {
     await page.goto(BASE + "/");
     await page.getByText("Demo University", { exact: true }).waitFor();
+    await expectSvgNoEmoji(page.getByText("Illuminize", { exact: true }).first().locator("xpath=.."), "the institution picker's hero");
     await shot("m01-picker");
     await tap("Demo University");
   });
@@ -194,8 +195,9 @@ try {
     await page.locator("textarea").first().fill(`Hello from the mobile smoke ${unique}`);
     // A real 1×1 PNG through the browser's file chooser: the upload must send a File, not { uri, name, type }.
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    for (const name of ["Add image", "Add a poll"]) await expectSvgNoEmoji(page.getByRole("button", { name, exact: true }).locator("visible=true").last(), `the post form's ${name} button`);
     const chooser = page.waitForEvent("filechooser");
-    await tap("📷 Add image");
+    await tap("Add image");
     await (await chooser).setFiles({ name: "smoke.png", mimeType: "image/png", buffer: png });
     await page.locator('img[src*="/uploads/"]').first().waitFor();
     await tap("Post");
@@ -228,6 +230,37 @@ try {
     await page.getByRole("button", { name: "Canary Wharf" }).locator("visible=true").first().click();
     await page.locator('[aria-label^="Canary Wharf"][aria-label*="your vote"]').first().waitFor();
     await shot("m04d-poll");
+  });
+
+  await step("a poll with several choices draws its boxes, says which are chosen, and takes the vote", async () => {
+    const question = `Which smoke checks ran? ${unique}`;
+    // From the top of the feed, where the new post lands.
+    await page.goto(BASE + "/t/demo-university/feed");
+    await page.getByRole("button", { name: "New post" }).click();
+    await page.getByLabel("Post text", { exact: true }).locator("visible=true").last().fill(question);
+    await tap("Add a poll");
+    await page.getByLabel("Option 1", { exact: true }).locator("visible=true").last().fill("Web");
+    await page.getByLabel("Option 2", { exact: true }).locator("visible=true").last().fill("Phone");
+    // "Allow several choices", the form's only switch.
+    await page.getByRole("switch").locator("visible=true").last().click();
+    await tap("Post");
+    await page.getByText(question, { exact: true }).locator("visible=true").first().waitFor();
+    // The seeded poll takes one choice, so this is the only one that says "choose several", before the vote and after.
+    const poll = page.locator('[aria-label="Poll"]', { hasText: "choose several" }).locator("visible=true").first();
+    const option = (name) => poll.getByRole("checkbox", { name, exact: true });
+    await poll.getByText("choose several", { exact: false }).waitFor();
+    await option("Web").click();
+    const checked = [await option("Web").getAttribute("aria-checked"), await option("Phone").getAttribute("aria-checked")];
+    if (checked.join() !== "true,false") throw new Error(`the options report aria-checked ${checked.join(", ")}, expected true, false`);
+    // The box is drawn, with a tick only in the chosen one, and no ballot-box symbol is left in either option's text.
+    await expectSvgNoEmoji(option("Web"), "a chosen poll option");
+    if (await option("Phone").locator("svg").count()) throw new Error("an option that isn't chosen shows a tick");
+    for (const name of ["Web", "Phone"]) if (/[☐☑]/.test(await option(name).innerText())) throw new Error(`the "${name}" option still draws a ballot-box symbol`);
+    await option("Phone").click();
+    await poll.getByRole("button", { name: "Vote", exact: true }).click();
+    await poll.locator('[aria-label^="Web,"][aria-label*="your vote"]').waitFor();
+    await poll.locator('[aria-label^="Phone,"][aria-label*="your vote"]').waitFor();
+    await shot("m04e-poll-several");
   });
 
   // After the post with a photo, whose wait for its image would also find this one on the app bar.
@@ -539,6 +572,7 @@ try {
     const mail = page.getByRole("link", { name: "meetups@demou.example", exact: true }).locator("visible=true").first();
     if ((await mail.getAttribute("href")) !== "mailto:meetups@demou.example" || (await mail.getAttribute("target")) !== null || !(await mail.getAttribute("rel"))?.includes("nofollow"))
       throw new Error("a member's email link should be a mail link that opens in place, with nofollow");
+    await expectSvgNoEmoji(page.getByText("Mumbai · Blue Tokai, Bandra West", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the event's city line");
     const before = Number((await page.locator("text=/^\\d+$/").first().textContent()).trim());
     await tap("I'm going");
     // The feed's tab, with this member's post, stays mounted but hidden: the attendee is the visible match.
@@ -635,6 +669,13 @@ try {
     await page.waitForURL(/\/t\/demo-university\/businesses\/[0-9a-f-]+$/);
     await visible(page.getByText("hello@zylolabs.example", { exact: false })).waitFor();
     await visible(page.getByText("5550 0101", { exact: false })).waitFor();
+    // Each way to get in touch is named for what it does, with an SVG icon where an emoji was, and a 44-point target.
+    for (const name of ["Website", "Email hello@zylolabs.example", "Call +91 22 5550 0101"]) {
+      const contact = visible(page.getByRole("button", { name, exact: true }));
+      await expectSvgNoEmoji(contact, `the "${name}" button`);
+      const box = await contact.boundingBox();
+      if (!box || box.height < 44) throw new Error(`the "${name}" button is ${box?.height}px tall, under 44px`);
+    }
     await visible(page.getByRole("button", { name: "Report this content" })).waitFor();
     // The description is rich text: its three bullets are one list, and its address an anchor that opens in a new tab.
     const bullets = visible(page.getByRole("list").filter({ hasText: "Credit decisions in under a day" })).getByRole("listitem");
@@ -666,8 +707,9 @@ try {
     await field("City").fill("Mumbai");
     await field("Description *").fill("Sourdough baked for the smoke tests every morning.");
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    await expectSvgNoEmoji(visible(page.getByRole("button", { name: "Add logo", exact: true })), "the business form's Add logo button");
     const chooser = page.waitForEvent("filechooser");
-    await visible(page.getByRole("button", { name: "📷 Add logo" })).click();
+    await visible(page.getByRole("button", { name: "Add logo", exact: true })).click();
     await (await chooser).setFiles({ name: "logo.png", mimeType: "image/png", buffer: png });
     await visible(page.getByRole("button", { name: "Change logo" })).waitFor();
     await visible(page.getByRole("button", { name: "Remove logo", exact: true })).waitFor();
@@ -1874,17 +1916,22 @@ try {
     await pupil.waitForURL("**/t/demo-school/feed");
     await pupil.goto(`${BASE}/t/demo-school/groups`);
     await pupil.waitForURL("**/t/demo-school/feed");
+    // Each says so under a lock drawn in SVG, not an emoji.
+    const unavailable = (title) => expectSvgNoEmoji(pupil.getByText(title, { exact: true }).locator("visible=true").first().locator("xpath=.."), `"${title}" on ${pupil.url()}`);
     await pupil.goto(`${BASE}/t/demo-school/messages/00000000-0000-4000-8000-000000000001`);
     await pupil.getByText("Messages aren't available").locator("visible=true").first().waitFor();
+    await unavailable("Messages aren't available");
     await pupil.screenshot({ path: `${SHOTS}/m10d-chat-pupil.png` });
     for (const path of ["groups/00000000-0000-4000-8000-000000000001", "groups/new"]) {
       await pupil.goto(`${BASE}/t/demo-school/${path}`);
       await pupil.getByText("Groups aren't available").locator("visible=true").first().waitFor();
+      await unavailable("Groups aren't available");
     }
     // With nothing of theirs to leave there, Mentors says it isn't open to them, and so do a mentor's page and the request form.
     for (const path of ["mentors", "mentors/00000000-0000-4000-8000-000000000001", "mentors/request/00000000-0000-4000-8000-000000000001"]) {
       await pupil.goto(`${BASE}/t/demo-school/${path}`);
       await pupil.getByText("Mentors aren't available").locator("visible=true").first().waitFor();
+      await unavailable("Mentors aren't available");
       if (!pupil.url().endsWith(`/t/demo-school/${path}`)) throw new Error(`${path} redirected a pupil to ${pupil.url()}`);
     }
     if (await pupil.getByRole("tab", { name: "Find mentors" }).locator("visible=true").count()) throw new Error("a pupil is offered Find mentors");
@@ -2140,6 +2187,12 @@ try {
       },
     });
     await page.getByText("Awaiting approval").waitFor();
+    // The title sits in its own View, under the icon's tile.
+    const pending = page.getByText("Awaiting approval", { exact: true }).locator("visible=true").first().locator("xpath=../..");
+    await expectSvgNoEmoji(pending, "the pending screen");
+    // The same tile as the web app's: the hidden box around the icon.
+    const tile = await pending.locator("svg").first().evaluate((svg) => svg.parentElement.closest('[aria-hidden="true"]').getBoundingClientRect().toJSON());
+    if (Math.round(tile.width) !== 72 || Math.round(tile.height) !== 72) throw new Error(`the pending screen's icon tile is ${tile.width}×${tile.height}, not 72×72 as on the web app`);
     await shot("m08-pending");
   });
 

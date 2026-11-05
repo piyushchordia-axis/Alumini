@@ -1,5 +1,6 @@
 import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, RICH_TEXT_HINT, businessCreateSchema, type BusinessCategory, type BusinessCreateInput, type BusinessDto } from "@illuminize/shared";
 import { useState } from "react";
+import { IconImage } from "@/components/icons";
 import { Avatar, Button, ChipSelect, ErrorText, Input, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 import { useFormErrors } from "./useFormErrors";
@@ -37,7 +38,8 @@ export function BusinessForm({ slug, initial, submitLabel, onSubmit }: { slug: s
       <Row>
         {logoUrl && <Avatar name={name} src={logoUrl} size={56} />}
         <Button
-          title={logoUrl ? "Change logo" : "📷 Add logo"}
+          title={logoUrl ? "Change logo" : "Add logo"}
+          icon={(c) => <IconImage size={18} color={c} />}
           variant="outline"
           loading={upload.busy}
           onPress={async () => {

@@ -2,6 +2,7 @@ import { chatAvailable } from "@illuminize/shared";
 import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { Link } from "react-router-dom";
 import { BlockMemberButton } from "@/components/chat/BlockMemberButton";
+import { IconShield } from "@/components/icons";
 import { Avatar, Button, EmptyState, ErrorBox, LoadMore, Loading } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -38,7 +39,7 @@ export function BlockedMembersPage() {
             </Button>
           </div>
         ) : list.items.length === 0 ? (
-          <EmptyState icon="🛡️" title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
+          <EmptyState icon={<IconShield size={32} className="text-slate-400" />} title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
         ) : (
           <>
             <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">

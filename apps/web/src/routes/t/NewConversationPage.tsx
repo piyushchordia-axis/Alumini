@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ChatComposer } from "@/components/chat/ChatComposer";
-import { ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
+import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
+import { IconLock, IconMessages } from "@/components/icons";
 import { Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -58,13 +59,15 @@ export function NewConversationPage() {
         {() => (
           <>
             <ChatPaneHeader backTo={inbox} title="New message" />
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-              <p className="text-base font-semibold text-slate-800">{directOff ? "Private messages aren't available" : "You can't message this member"}</p>
-              <p className="max-w-sm text-sm text-slate-500">{directOff ? `${tenant.shortName ?? tenant.name} has switched private messages off.` : "They can't be contacted here at the moment."}</p>
-              <Link to={inbox} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            <ChatNotice
+              icon={directOff ? <IconLock size={32} /> : <IconMessages size={32} />}
+              title={directOff ? "Private messages aren't available" : "You can't message this member"}
+              text={directOff ? `${tenant.shortName ?? tenant.name} has switched private messages off.` : "They can't be contacted here at the moment."}
+            >
+              <Link to={inbox} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 Back to messages
               </Link>
-            </div>
+            </ChatNotice>
           </>
         )}
       </ChatPane>

@@ -52,8 +52,9 @@ Covers:
 - the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react, comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
-  announcement and a poll vote; the celebrations card and wishes; the weekly digest (run through the platform job
-  endpoint, see `lib.mjs`);
+  announcement and a poll vote; a poll with several choices, its drawn boxes saying which are chosen (`aria-pressed`)
+  before the vote; the celebrations card and wishes; the weekly digest (run through the platform job endpoint, see
+  `lib.mjs`);
 - jobs: seeded cards with pay, experience and "+1 more" skills; the Work mode and experience filters behind More
   filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend Engineer page offering
   a member with no skills "Add your skills to see which you match" in place of a count, its link landing on My
@@ -157,7 +158,8 @@ Covers:
 - the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
-- a post with a photo, editing it, the celebrations card and a poll vote;
+- a post with a photo, editing it, the celebrations card and a poll vote; a poll with several choices, its drawn boxes
+  saying which are chosen (`aria-checked`) before the vote;
 - Edit profile: a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
   row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
@@ -364,6 +366,13 @@ second copy of a screen, or back to the page the button was on.
 - [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
       picker and shows the picked image.
 - [ ] Tab labels on screens with tabs (My posts, Jobs, Mentors, Groups) aren't clipped.
+- [ ] TalkBack or VoiceOver, on Zylo Labs in Businesses: the contact buttons read "Website" (with a hint that it opens
+      in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
+      his Zylo Labs listing in Funding to add an email address and a phone number: its buttons read "Website", "Get in
+      touch" and "Call …" the same way.
+- [ ] TalkBack or VoiceOver, on the waiting screen: sign one phone out, join Demo College with a number that isn't in
+      the demo data, and submit for approval. The screen reads "Awaiting approval" and its text, with nothing read for
+      the icon above them. Sign Rahul back in afterwards.
 
 **Profiles and registration**
 

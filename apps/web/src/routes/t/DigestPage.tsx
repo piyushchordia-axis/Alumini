@@ -1,6 +1,7 @@
 import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { IconDirectory, IconFeed } from "@/components/icons";
 import { Card, EmptyState, ErrorBox, Loading, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -20,7 +21,7 @@ export function DigestPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title={`This week at ${tenant.shortName ?? tenant.name}`} subtitle={d ? `Week of ${formatDate(d.weekStart)}` : undefined} />
       {!d ? (
-        <EmptyState icon="📰" title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
+        <EmptyState icon={<IconFeed size={32} className="text-slate-400" />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
       ) : (
         <>
           {d.posts.length > 0 && (
@@ -73,9 +74,12 @@ export function DigestPage() {
             </Card>
           )}
           {d.newMembers > 0 && (
-            <p className="text-sm text-slate-600">
-              👋 {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week. <Link to={`${base}/directory`} className="text-primary underline">See the directory</Link>
-            </p>
+            <div className="flex items-start gap-2 text-sm text-slate-600">
+              <IconDirectory size={16} className="mt-0.5 text-slate-400" />
+              <p>
+                {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week. <Link to={`${base}/directory`} className="text-primary underline">See the directory</Link>
+              </p>
+            </div>
           )}
           <p className="text-xs text-slate-500">
             Get this by email every Monday: add your email on <Link to={`${base}/profile`} className="underline">your profile</Link> and keep the digest on in{" "}

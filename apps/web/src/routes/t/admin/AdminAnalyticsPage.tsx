@@ -3,6 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { ChartCard, ColumnChart, formatWeek, HBarChart, LineChart, plural, SERIES, type LineSeries } from "@/components/charts";
+import { IconDownload } from "@/components/icons";
 
 const MEMBERS = plural("member", "members");
 import { Button, Card, ErrorBox, Loading, PageHeader, Select } from "@/components/ui";
@@ -61,8 +62,9 @@ function ExportButton({ label, run }: { label: string; run: () => Promise<{ blob
     onError: (e) => toast.error(errorMessage(e, "The export failed. Try again.")),
   });
   return (
-    <Button variant="outline" size="sm" loading={m.isPending} onClick={() => m.mutate()}>
-      ⬇ {label}
+    <Button variant="outline" size="sm" className="gap-1.5" loading={m.isPending} onClick={() => m.mutate()}>
+      <IconDownload size={16} />
+      {label}
     </Button>
   );
 }

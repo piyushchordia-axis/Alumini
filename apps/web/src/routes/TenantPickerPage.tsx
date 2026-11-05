@@ -1,6 +1,7 @@
 import { countryName } from "@illuminize/shared";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { IconSpark } from "@/components/icons";
 import { Avatar, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
 import { useTenantList } from "@/hooks/useTenant";
 import { resetTheme } from "@/lib/theme";
@@ -24,7 +25,7 @@ export function TenantPickerPage() {
     <div className="min-h-full bg-slate-50">
       <div className="bg-gradient-to-br from-primary to-secondary px-4 py-14 text-white">
         <div className="mx-auto max-w-2xl text-center">
-          <div className="text-4xl">✨</div>
+          <IconSpark size={40} className="mx-auto block" />
           <h1 className="mt-3 text-3xl font-semibold">Illuminize</h1>
           <p className="mt-2 text-white/80">Your alumni network. Pick your university, college or school to get started.</p>
         </div>

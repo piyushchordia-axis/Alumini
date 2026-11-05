@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { ChatReportDialog } from "@/components/chat/ReportMessageDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ListBody } from "@/components/common/ListBody";
+import { IconMail, IconMentors } from "@/components/icons";
 import { MentorshipRow } from "@/components/mentors/MentorshipRow";
 import { Button, EmptyState, LinkButton, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -120,10 +121,10 @@ export function MentorshipRequests({ slug, box, onBoxChange, limited = false }: 
 
   const empty =
     box === "received" ? (
-      <EmptyState icon="📨" title="No requests yet" description="When members ask you to be their mentor, their requests wait here for your answer." />
+      <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No requests yet" description="When members ask you to be their mentor, their requests wait here for your answer." />
     ) : (
       <EmptyState
-        icon="🧭"
+        icon={<IconMentors size={32} className="text-slate-400" />}
         title="You haven't asked anyone yet"
         description="When you ask a mentor, your request and their answer show here."
         action={limited ? undefined : <LinkButton to={mentorsPath(slug)} className="min-h-11">Find mentors</LinkButton>}

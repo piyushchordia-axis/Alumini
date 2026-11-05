@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ContactLink } from "@/components/common/ContactLink";
 import { MemberLink } from "@/components/common/MemberLink";
 import { RichText } from "@/components/common/RichText";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
@@ -55,21 +56,9 @@ export function BusinessDetailPage() {
         </div>
         <RichText text={b.description} className="mt-4" />
         <div className="mt-5 flex flex-wrap gap-2">
-          {b.websiteUrl && (
-            <a href={b.websiteUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm">
-              🌐 Website
-            </a>
-          )}
-          {b.contactEmail && (
-            <a href={`mailto:${b.contactEmail}`} className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm">
-              ✉️ {b.contactEmail}
-            </a>
-          )}
-          {b.contactPhone && (
-            <a href={`tel:${b.contactPhone}`} className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-sm">
-              📞 {b.contactPhone}
-            </a>
-          )}
+          {b.websiteUrl && <ContactLink kind="website" address={b.websiteUrl} />}
+          {b.contactEmail && <ContactLink kind="email" address={b.contactEmail} />}
+          {b.contactPhone && <ContactLink kind="phone" address={b.contactPhone} />}
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <MemberLink slug={slug} member={b.author} meta={`Listed ${formatDate(b.createdAt)}`} />

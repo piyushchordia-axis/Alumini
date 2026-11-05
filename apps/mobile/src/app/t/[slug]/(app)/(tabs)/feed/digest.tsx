@@ -2,11 +2,12 @@ import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
+import { IconDirectory, IconFeed } from "@/components/icons";
 import { Card, EmptyState, LoadError, Muted, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
-import { colors } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 function Item({ title, meta, onPress }: { title: string; meta: string; onPress: () => void }) {
   return (
@@ -39,7 +40,7 @@ export default function DigestScreen() {
   if (!d) {
     return (
       <Screen title="This week">
-        <EmptyState icon="📰" title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
+        <EmptyState icon={<IconFeed size={32} color={colors.faint} />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
       </Screen>
     );
   }
@@ -72,9 +73,12 @@ export default function DigestScreen() {
         </Card>
       )}
       {d.newMembers > 0 && (
-        <View>
-          <Text style={{ color: colors.text }}>
-            👋 {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week.
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <View aria-hidden>
+            <IconDirectory size={16} color={colors.faint} />
+          </View>
+          <Text style={{ flex: 1, color: colors.text }}>
+            {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week.
           </Text>
         </View>
       )}

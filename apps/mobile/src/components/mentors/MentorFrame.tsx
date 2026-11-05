@@ -2,9 +2,11 @@ import { mentorshipAvailable } from "@illuminize/shared";
 import { errorMessage, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useRouter } from "expo-router";
 import { ChatHeader, ChatNotice, ChatScreen, useLeaveChatScreen } from "@/components/chat/ChatFrame";
+import { IconLock, IconMentors } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { mentorsHref } from "@/lib/mentors";
+import { colors } from "@/theme";
 
 /** Mentorship is switched on here, with messaging, and this member isn't a current pupil. */
 export function useMentorsEnabled(): boolean {
@@ -22,7 +24,7 @@ export function MentorsOff({ title = "Mentors" }: { title?: string }) {
   return (
     <ChatScreen>
       <ChatHeader title={title} />
-      <ChatNotice icon="🔒" title="Mentors aren't available" text={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Mentors aren't available" text={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         <Button title="Go back" onPress={leave} />
       </ChatNotice>
     </ChatScreen>
@@ -50,7 +52,7 @@ export function MentorUnavailable({ header, error, title, text, onRetry }: { hea
   return (
     <ChatScreen>
       <ChatHeader title={header} />
-      <ChatNotice icon="🧭" title={heading} text={body}>
+      <ChatNotice icon={<IconMentors size={32} color={colors.faint} />} title={heading} text={body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         {/* Down to the Mentors tab under this screen, rather than a second copy of it on top. */}
         <Button title="Back to mentors" accessibilityRole="link" onPress={() => router.dismissTo(mentorsHref(tenant.slug))} />

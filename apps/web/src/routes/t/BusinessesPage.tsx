@@ -1,6 +1,7 @@
 import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, type BusinessCategory } from "@illuminize/shared";
 import { useState } from "react";
 import { BusinessCard } from "@/components/businesses/BusinessCard";
+import { IconBusinesses } from "@/components/icons";
 import { EmptyState, ErrorBox, Input, LinkButton, LoadMore, Loading, PageHeader, Select } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -40,7 +41,7 @@ export function BusinessesPage() {
           <BusinessCard key={b.id} slug={slug} item={b} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon="🏪" title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />}
+      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon={<IconBusinesses size={32} className="text-slate-400" />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

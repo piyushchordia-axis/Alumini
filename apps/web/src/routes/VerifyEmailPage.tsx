@@ -1,6 +1,7 @@
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
+import { IconMail } from "@/components/icons";
 import { Button, Card } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -23,9 +24,7 @@ export function VerifyEmailPage() {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md p-6 text-center">
-        <div className="text-4xl" aria-hidden>
-          ✉️
-        </div>
+        <IconMail size={40} className="mx-auto block text-primary" />
         {confirm.isSuccess ? (
           <>
             <h1 className="mt-3 text-xl font-semibold text-slate-900">Email confirmed</h1>

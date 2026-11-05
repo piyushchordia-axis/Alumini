@@ -7,6 +7,7 @@ import { FlatList, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ChatReportSheet } from "@/components/chat/ChatSheets";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { IconMail, IconMentors } from "@/components/icons";
 import { MentorshipRow } from "@/components/mentors/MentorCards";
 import { Button, EmptyState, ListEmpty, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -14,7 +15,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useStatus, type RowStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { chatHref, refreshMentorship, refreshMentorshipAndChat } from "@/lib/mentors";
-import { spacing } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 const PAGE = 20;
 
@@ -146,10 +147,10 @@ export function MentorshipRequests({
 
   const empty =
     box === "received" ? (
-      <EmptyState icon="📨" title="No requests yet" description="When members ask you to be their mentor, their requests wait here for your answer." />
+      <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No requests yet" description="When members ask you to be their mentor, their requests wait here for your answer." />
     ) : (
       <View style={{ gap: spacing.md }}>
-        <EmptyState icon="🧭" title="You haven't asked anyone yet" description="When you ask a mentor, your request and their answer show here." />
+        <EmptyState icon={<IconMentors size={32} color={colors.faint} />} title="You haven't asked anyone yet" description="When you ask a mentor, your request and their answer show here." />
         {onFind && <Button title="Find mentors" variant="outline" onPress={onFind} />}
       </View>
     );

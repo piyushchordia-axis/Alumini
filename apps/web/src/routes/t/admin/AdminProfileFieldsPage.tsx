@@ -10,6 +10,7 @@ import {
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { IconFields } from "@/components/icons";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
@@ -231,7 +232,7 @@ export function AdminProfileFieldsPage() {
       {tenant.type !== "SCHOOL" && <p className="text-sm text-slate-600">Degree and field of study are now built into every profile, so they don't need a question here.</p>}
       <Checkbox label="Show archived fields" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
       {fields.length === 0 ? (
-        <EmptyState icon="🧩" title="No profile fields yet" description="Add questions members answer when they join and on their profile." />
+        <EmptyState icon={<IconFields size={32} className="text-slate-400" />} title="No profile fields yet" description="Add questions members answer when they join and on their profile." />
       ) : (
         <Card>
           <ul className="divide-y divide-slate-100">

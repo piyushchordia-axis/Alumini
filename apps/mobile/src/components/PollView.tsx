@@ -3,9 +3,10 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
+import { IconCheck } from "@/components/icons";
 import { Button, Muted, Row } from "@/components/ui";
 import { api } from "@/lib/api";
-import { colors, useTheme } from "@/theme";
+import { colors, spacing, useTheme } from "@/theme";
 
 /** A post's poll: choose (one, or several when allowed); after voting or once closed, result bars. */
 export function PollView({ slug, postId, poll, canVote }: { slug: string; postId: string; poll: PollDto; canVote: boolean }) {
@@ -61,10 +62,18 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
             onPress={() => (poll.allowsMultiple ? setPicked((p) => (on ? p.filter((x) => x !== o.id) : [...p, o.id])) : vote.mutate([o.id]))}
             style={{ borderWidth: 1, borderColor: on ? theme.primary : colors.border, backgroundColor: on ? `${theme.primary}1a` : "#fff", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }}
           >
-            <Text style={{ color: colors.text }}>
-              {poll.allowsMultiple ? (on ? "☑ " : "☐ ") : ""}
-              {o.label}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+              {/* Only for the eye: aria-checked says whether it's chosen. */}
+              {poll.allowsMultiple && (
+                <View
+                  aria-hidden
+                  style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: on ? theme.primary : colors.faint, backgroundColor: on ? theme.primary : colors.card, alignItems: "center", justifyContent: "center" }}
+                >
+                  {on && <IconCheck size={12} color="#fff" strokeWidth={3} />}
+                </View>
+              )}
+              <Text style={{ flex: 1, color: colors.text }}>{o.label}</Text>
+            </View>
           </Pressable>
         );
       })}

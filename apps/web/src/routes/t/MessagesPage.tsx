@@ -1,7 +1,9 @@
 import { chatAvailable, type ChatInbox } from "@illuminize/shared";
 import clsx from "clsx";
 import { Outlet, useMatch, useSearchParams } from "react-router-dom";
+import { ChatNotice } from "@/components/chat/ChatPane";
 import { ConversationList } from "@/components/chat/ConversationList";
+import { IconMessages } from "@/components/icons";
 import { useMembership } from "@/hooks/useMembership";
 import { inboxFromParams } from "@/lib/chat";
 
@@ -42,13 +44,5 @@ export function MessagesPage() {
 
 /** The right-hand pane with nothing open. Phones never show it. */
 export function NoConversationPane() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-      <div className="mb-3 text-4xl" aria-hidden>
-        💬
-      </div>
-      <p className="text-base font-semibold text-slate-800">Choose a conversation</p>
-      <p className="mt-1 max-w-sm text-balance text-sm text-slate-500">Messages are private to the people in each conversation. Admins only ever see a message that someone reports, with a few around it.</p>
-    </div>
-  );
+  return <ChatNotice icon={<IconMessages size={32} />} title="Choose a conversation" text="Messages are private to the people in each conversation. Admins only ever see a message that someone reports, with a few around it." />;
 }

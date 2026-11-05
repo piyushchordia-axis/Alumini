@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { IconAnnounce, IconCheck, IconExternalLink, IconFlag, IconPin } from "@/components/icons";
 import { JobApplyArea } from "@/components/jobs/JobApplyArea";
 import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
@@ -174,8 +175,18 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
         <div className="min-w-0 flex-1 max-sm:basis-full">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="info">{CONTENT_TYPE_LABELS[item.contentType]}</Badge>
-            {item.kind === "ANNOUNCEMENT" && <Badge tone="primary">📣 Announcement</Badge>}
-            {item.reportCount > 0 && <Badge tone="danger">🚩 {item.reportCount} report(s)</Badge>}
+            {item.kind === "ANNOUNCEMENT" && (
+              <Badge tone="primary" className="gap-1">
+                <IconAnnounce size={12} />
+                Announcement
+              </Badge>
+            )}
+            {item.reportCount > 0 && (
+              <Badge tone="danger" className="gap-1">
+                <IconFlag size={12} />
+                {item.reportCount} report(s)
+              </Badge>
+            )}
             <span className="text-xs text-slate-500">
               {item.author ? `by ${item.author.fullName} (batch of ${item.author.batchYear})` : "by a deleted member"} · {timeAgo(item.createdAt)}
             </span>
@@ -186,8 +197,10 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
               {expanded ? "Hide" : "View full content"}
             </button>
             {link && (
-              <Link to={link} className="text-slate-500 underline" target="_blank">
-                Open in app ↗
+              <Link to={link} className="inline-flex items-center gap-1 text-slate-500 underline" target="_blank">
+                Open in app
+                <IconExternalLink size={14} />
+                <span className="sr-only"> (opens in a new tab)</span>
               </Link>
             )}
           </div>
@@ -220,8 +233,9 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
             </Button>
           )}
           {s === "APPROVED" && item.contentType === "POST" && (
-            <Button size="sm" variant="ghost" onClick={() => pin.mutate(!isPinned)} loading={pin.isPending}>
-              {isPinned ? "Unpin" : "📌 Pin"}
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => pin.mutate(!isPinned)} loading={pin.isPending}>
+              <IconPin size={14} />
+              {isPinned ? "Unpin" : "Pin"}
             </Button>
           )}
         </div>
@@ -264,7 +278,7 @@ export function AdminModerationPage() {
       </div>
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon="✅" title="Nothing to review" description={`No ${MODERATION_STATUS_LABELS[status].toLowerCase()} content.`} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title="Nothing to review" description={`No ${MODERATION_STATUS_LABELS[status].toLowerCase()} content.`} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((item) => (
           <ModerationRow key={`${item.contentType}:${item.id}`} slug={slug} item={item} />

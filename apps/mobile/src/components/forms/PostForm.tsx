@@ -1,6 +1,7 @@
 import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, postCreateSchema, type PostCreateInput, type PostDto } from "@illuminize/shared";
 import { useState } from "react";
 import { Image, Pressable, Switch, Text, View } from "react-native";
+import { IconImage, IconPoll } from "@/components/icons";
 import { Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 import { colors } from "@/theme";
@@ -45,7 +46,8 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
         ))}
         {images.length < MAX_POST_IMAGES && (
           <Button
-            title="📷 Add image"
+            title="Add image"
+            icon={(c) => <IconImage size={18} color={c} />}
             variant="outline"
             loading={upload.busy}
             onPress={async () => {
@@ -56,7 +58,7 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
         )}
       </Row>
       <ErrorText error={upload.error} />
-      {!initial && !poll && <Button title="📊 Add a poll" variant="ghost" onPress={() => setPoll({ options: ["", ""], allowsMultiple: false, closesInDays: "" })} />}
+      {!initial && !poll && <Button title="Add a poll" icon={(c) => <IconPoll size={18} color={c} />} variant="ghost" onPress={() => setPoll({ options: ["", ""], allowsMultiple: false, closesInDays: "" })} />}
       {poll && (
         <View style={{ gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10 }}>
           <Text style={{ fontWeight: "700", color: colors.text }}>Poll options</Text>

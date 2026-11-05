@@ -2,12 +2,14 @@ import { BUSINESS_CATEGORY_LABELS } from "@illuminize/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Linking, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { ContactButton } from "@/components/ContactButton";
+import { IconGlobe, IconMail, IconPhone } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { RichText } from "@/components/RichText";
+import { openLink, RichText } from "@/components/RichText";
 import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -52,9 +54,9 @@ export default function BusinessDetailScreen() {
         </Row>
         <ModerationNote status={b.moderationStatus} note={b.moderationNote} />
         <RichText text={b.description} />
-        {b.websiteUrl && <Button title="🌐 Website" variant="outline" onPress={() => void Linking.openURL(b.websiteUrl!)} />}
-        {b.contactEmail && <Button title={`✉️ ${b.contactEmail}`} variant="outline" onPress={() => void Linking.openURL(`mailto:${b.contactEmail}`)} />}
-        {b.contactPhone && <Button title={`📞 ${b.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${b.contactPhone}`)} />}
+        {b.websiteUrl && <ContactButton label="Website" text="Website" Icon={IconGlobe} hint="Opens in your browser" onPress={() => openLink(b.websiteUrl!)} />}
+        {b.contactEmail && <ContactButton label={`Email ${b.contactEmail}`} text={b.contactEmail} Icon={IconMail} onPress={() => openLink(`mailto:${b.contactEmail}`)} />}
+        {b.contactPhone && <ContactButton label={`Call ${b.contactPhone}`} text={b.contactPhone} Icon={IconPhone} onPress={() => openLink(`tel:${b.contactPhone}`)} />}
         <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
           <MemberRow slug={slug} member={b.author} meta={`Listed ${formatDate(b.createdAt)}`} />
           {!b.isMine && <ReportButton slug={slug} contentType="BUSINESS" contentId={b.id} />}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { EventCard } from "@/components/events/EventCard";
+import { IconEvents } from "@/components/icons";
 import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -22,7 +23,7 @@ export function EventsPage() {
           <EventCard key={e.id} slug={slug} event={e} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon="📅" title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconEvents size={32} className="text-slate-400" />} title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

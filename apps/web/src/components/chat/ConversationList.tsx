@@ -2,6 +2,7 @@ import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize
 import { chatKeys, conversationPreview, conversationTitle } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
+import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
 import { Avatar, Button, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
@@ -24,8 +25,8 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
         <span className="relative shrink-0">
           <Avatar name={name} src={c.peer?.avatarUrl} size="md" />
           {c.group && (
-            <span aria-hidden className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] shadow ring-1 ring-slate-200">
-              👥
+            <span aria-hidden className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-500 shadow ring-1 ring-slate-200">
+              <IconGroups size={12} />
             </span>
           )}
         </span>
@@ -42,8 +43,8 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
             <span className="ml-auto flex shrink-0 items-center gap-1">
               {c.group?.archived && <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">Archived</span>}
               {muted && (
-                <span className="text-xs text-slate-400" title="Muted">
-                  <span aria-hidden>🔕</span>
+                <span className="flex text-slate-400" title="Muted">
+                  <IconBellOff size={14} />
                   <span className="sr-only">Muted</span>
                 </span>
               )}
@@ -115,7 +116,7 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
           <div className="p-4">
             {inbox === "MAIN" ? (
               <EmptyState
-                icon="✉️"
+                icon={<IconMessages size={32} className="text-slate-400" />}
                 title="No conversations yet"
                 description={emptyChatsHint(features)}
                 action={
@@ -127,7 +128,7 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
                 }
               />
             ) : (
-              <EmptyState icon="📨" title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
+              <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
             )}
           </div>
         ) : (

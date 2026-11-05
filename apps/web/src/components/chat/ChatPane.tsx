@@ -1,6 +1,6 @@
 import type { ChatMemberDto } from "@illuminize/shared";
 import clsx from "clsx";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Avatar } from "@/components/ui";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
@@ -18,6 +18,25 @@ export function ChatPane({ children }: { children: (keyboardOpen: boolean) => Re
       style={style}
     >
       {children(!!viewport?.keyboardOpen)}
+    </div>
+  );
+}
+
+/**
+ * In place of a thread that can't be shown: says why and offers a way on, as the phone app's ChatNotice does. `icon` is an
+ * SVG from `components/icons.tsx`, drawn in slate-400 and hidden from screen readers; `children` are the ways on.
+ */
+export function ChatNotice({ icon, title, text, children }: { icon?: ReactElement; title: string; text?: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+      {icon && (
+        <div aria-hidden className="mb-1 text-slate-400">
+          {icon}
+        </div>
+      )}
+      <p className="text-base font-semibold text-slate-800">{title}</p>
+      {text && <p className="max-w-sm text-balance text-sm text-slate-500">{text}</p>}
+      {children && <div className="mt-3 flex flex-wrap justify-center gap-2">{children}</div>}
     </div>
   );
 }

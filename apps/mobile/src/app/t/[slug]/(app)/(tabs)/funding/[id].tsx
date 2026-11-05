@@ -2,11 +2,13 @@ import { FUNDING_STAGE_LABELS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Alert, Linking, Text } from "react-native";
+import { Alert, Text } from "react-native";
+import { ContactButton } from "@/components/ContactButton";
+import { IconGlobe, IconMail, IconPhone } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { RichText } from "@/components/RichText";
+import { openLink, RichText } from "@/components/RichText";
 import { Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -41,9 +43,9 @@ export default function FundingDetailScreen() {
         <ModerationNote status={f.moderationStatus} note={f.moderationNote} />
         <RichText text={f.pitch} />
         {f.sectors.length > 0 && <Muted>{f.sectors.map((s) => `#${s}`).join("  ")}</Muted>}
-        {f.websiteUrl && <Button title="🌐 Website" variant="outline" onPress={() => void Linking.openURL(f.websiteUrl!)} />}
-        {f.contactEmail && <Button title="✉️ Get in touch" onPress={() => void Linking.openURL(`mailto:${f.contactEmail}`)} />}
-        {f.contactPhone && <Button title={`📞 ${f.contactPhone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${f.contactPhone}`)} />}
+        {f.websiteUrl && <ContactButton label="Website" text="Website" Icon={IconGlobe} hint="Opens in your browser" onPress={() => openLink(f.websiteUrl!)} />}
+        {f.contactEmail && <ContactButton primary label="Get in touch" text="Get in touch" Icon={IconMail} onPress={() => openLink(`mailto:${f.contactEmail}`)} />}
+        {f.contactPhone && <ContactButton label={`Call ${f.contactPhone}`} text={f.contactPhone} Icon={IconPhone} onPress={() => openLink(`tel:${f.contactPhone}`)} />}
         <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
           <MemberRow slug={slug} member={f.author} meta={`Listed ${formatDate(f.createdAt)}`} />
           {!f.isMine && <ReportButton slug={slug} contentType="FUNDING" contentId={f.id} />}

@@ -1,2 +1,3 @@
 import { baseConfig } from "@illuminize/config/eslint/base.js";
-export default baseConfig;
+import noEmojiIcons from "@illuminize/config/eslint/no-emoji-icons.cjs";
+export default [...baseConfig, noEmojiIcons];

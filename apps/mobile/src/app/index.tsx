@@ -3,6 +3,7 @@ import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { IconSpark } from "@/components/icons";
 import { Avatar, EmptyState, ErrorText, Input, Spinner } from "@/components/ui";
 import { useTenantList } from "@/hooks/useTenant";
 import { useAuthStore } from "@/stores/authStore";
@@ -24,7 +25,9 @@ export default function TenantPickerScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ padding: spacing.xl, gap: 6, backgroundColor: "#1d4ed8" }}>
-        <Text style={{ fontSize: 30 }}>✨</Text>
+        <View aria-hidden>
+          <IconSpark size={32} color="#fff" />
+        </View>
         <Text style={{ color: "#fff", fontSize: 26, fontWeight: "700" }}>Illuminize</Text>
         <Text style={{ color: "rgba(255,255,255,0.85)" }}>Your alumni network. Which institution are you from?</Text>
       </View>

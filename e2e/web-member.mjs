@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { dropFrames, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { dropFrames, expectSvgNoEmoji, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -84,6 +84,7 @@ try {
     await page.goto(BASE + "/");
     await page.waitForSelector("text=Demo University");
     await page.waitForSelector("text=Demo College of Engineering");
+    await expectSvgNoEmoji(page.locator("h1", { hasText: "Illuminize" }).locator("xpath=.."), "the institution picker's hero");
     await shot("01-picker");
   });
 
@@ -263,6 +264,31 @@ try {
     await shot("04b-announcement-poll");
   });
 
+  await step("a poll with several choices draws its boxes, says which are chosen, and takes the vote", async () => {
+    const question = `Which smoke checks ran? ${unique}`;
+    await page.getByRole("button", { name: "Poll", exact: true }).click();
+    await page.getByLabel("New post", { exact: true }).fill(question);
+    await page.getByLabel("Option 1", { exact: true }).fill("Web");
+    await page.getByLabel("Option 2", { exact: true }).fill("Phone");
+    await page.getByLabel("Allow several choices").check();
+    await page.getByRole("button", { name: "Post", exact: true }).click();
+    const poll = page.locator("article", { hasText: question }).first().locator('[aria-label="Poll"]');
+    const option = (name) => poll.getByRole("button", { name, exact: true });
+    await poll.getByText("choose several", { exact: false }).waitFor();
+    await option("Web").click();
+    const pressed = [await option("Web").getAttribute("aria-pressed"), await option("Phone").getAttribute("aria-pressed")];
+    if (pressed.join() !== "true,false") throw new Error(`the options report aria-pressed ${pressed.join(", ")}, expected true, false`);
+    // The box is drawn, with a tick only in the chosen one, and no ballot-box symbol is left in either option's text.
+    await expectSvgNoEmoji(option("Web"), "a chosen poll option");
+    if (await option("Phone").locator("svg").count()) throw new Error("an option that isn't chosen shows a tick");
+    for (const name of ["Web", "Phone"]) if (/[☐☑]/.test(await option(name).innerText())) throw new Error(`the "${name}" option still draws a ballot-box symbol`);
+    await option("Phone").click();
+    await poll.getByRole("button", { name: "Vote", exact: true }).click();
+    await poll.getByText("Web ✓", { exact: true }).waitFor();
+    await poll.getByText("Phone ✓", { exact: true }).waitFor();
+    await shot("04b-poll-several");
+  });
+
   await step("celebrations card: send birthday wishes", async () => {
     const card = page.locator("section", { hasText: "Celebrating today" }).first();
     await card.waitFor();
@@ -285,6 +311,8 @@ try {
     await shot("04c-digest");
     await page.goto(BASE + "/t/demo-university/app/feed");
     await page.waitForSelector("text=This week");
+    // The banner only: the digest's seeded posts may hold emoji of their own.
+    await expectSvgNoEmoji(page.locator('a[href$="/app/digest"]').first(), "the feed's digest banner");
   });
 
   await step("create a job and view it", async () => {
@@ -471,6 +499,7 @@ try {
     const mail = page.locator('a[href="mailto:meetups@demou.example"]', { hasText: "meetups@demou.example" });
     await mail.waitFor();
     if ((await mail.getAttribute("target")) !== null || !(await mail.getAttribute("rel")).includes("nofollow")) throw new Error("a member's email link should open in place, with nofollow");
+    await expectSvgNoEmoji(page.getByText("Mumbai · Blue Tokai, Bandra West", { exact: true }).locator("xpath=.."), "the event's city line");
     await shot("07-event");
   });
 
@@ -556,6 +585,13 @@ try {
     await page.waitForSelector("h1:has-text('Zylo Labs')");
     await page.waitForSelector('a[href="mailto:hello@zylolabs.example"]');
     await page.waitForSelector('a[href^="tel:"]:has-text("5550 0101")');
+    // Each way to get in touch is a 44px link named for what it does, with an SVG icon where an emoji was.
+    for (const name of ["Website (opens in a new tab)", "Email hello@zylolabs.example", "Call +91 22 5550 0101"]) {
+      const contact = page.getByRole("link", { name, exact: true });
+      await expectSvgNoEmoji(contact, `the "${name}" link`);
+      const box = await contact.boundingBox();
+      if (!box || box.height < 44) throw new Error(`the "${name}" link is ${box?.height}px tall, under 44px`);
+    }
     await page.waitForSelector('button:has-text("Report")');
     // The description is rich text: its three bullets are one list, with no dash left over, and its address is a link.
     const bullets = page.locator("ul:has(> li:text-is('Credit decisions in under a day')) > li");
@@ -1382,13 +1418,18 @@ try {
     await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
     for (const section of ["Messages", "Groups", "Mentors"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);
     await pupil.keyboard.press("Escape");
+    // Each says so under a lock drawn in SVG, not an emoji.
+    const unavailable = (title) => expectSvgNoEmoji(pupil.locator(`div:has(> h3:text-is("${title}"))`), `"${title}"`);
     await pupil.goto(`${BASE}/t/demo-school/app/messages`);
     await pupil.waitForSelector("text=Messages aren't available");
+    await unavailable("Messages aren't available");
     await pupil.goto(`${BASE}/t/demo-school/app/groups`);
     await pupil.waitForSelector("text=Groups aren't available");
+    await unavailable("Groups aren't available");
     // With nothing to leave there, a link to Mentors says the same, and a mentor's page too.
     await pupil.goto(`${BASE}/t/demo-school/app/mentors`);
     await pupil.waitForSelector("text=Mentors aren't available");
+    await unavailable("Mentors aren't available");
     await pupil.goto(`${BASE}/t/demo-school/app/mentors/00000000-0000-4000-8000-000000000001/request`);
     await pupil.waitForSelector("text=Mentors aren't available");
     await pupil.goto(`${BASE}/t/demo-school/app/my-content`);
@@ -2004,6 +2045,11 @@ try {
     await finishRegistration(page, "Submit for approval", { hint: "will review your profile before you can join" });
     await page.waitForURL(/\/pending$/);
     await page.waitForSelector("text=Awaiting approval");
+    const pending = page.getByText("alumni office reviews every request", { exact: false }).locator("xpath=..");
+    await expectSvgNoEmoji(pending, "the pending screen");
+    // The same tile as the phone app's: the hidden box around the (also hidden) icon.
+    const tile = await pending.locator("svg").first().evaluate((svg) => svg.parentElement.closest('[aria-hidden="true"]').getBoundingClientRect().toJSON());
+    if (Math.round(tile.width) !== 72 || Math.round(tile.height) !== 72) throw new Error(`the pending screen's icon tile is ${tile.width}×${tile.height}, not 72×72 as on the phone app`);
     await shot("09-pending");
   });
 

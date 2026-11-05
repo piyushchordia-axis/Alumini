@@ -3,6 +3,7 @@ import { FlatList, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlockMemberButton } from "@/components/chat/BlockMember";
 import { ChatHeader, ChatOff, ChatScreen } from "@/components/chat/ChatFrame";
+import { IconShield } from "@/components/icons";
 import { Avatar, EmptyState, ListEmpty } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -38,7 +39,7 @@ function BlockedMembers() {
         ListHeaderComponent={<Text style={{ fontSize: 13, color: colors.muted, marginBottom: spacing.sm }}>{BLOCKED_LIST_EXPLAINED}</Text>}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon="🛡️" title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
+            <EmptyState icon={<IconShield size={32} color={colors.faint} />} title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
           </ListEmpty>
         }
         renderItem={({ item: b }) => (

@@ -1,8 +1,9 @@
 import type { ChatMemberDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { IconLock } from "@/components/icons";
 import { Avatar, Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { homeHref } from "@/lib/sections";
@@ -65,18 +66,14 @@ export function ChatHeader({ title, member, subtitle, actions }: { title: string
 /** Round, 44 points, for an icon in a title bar. */
 export const iconButton = { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" } as const;
 
-/** In place of a chat screen that can't be shown: says why and offers a way on. It never leaves the member on a blank screen. */
-/** `icon` is an SVG icon from `components/icons.tsx`; a string is drawn as text, as older screens still pass emoji. */
-export function ChatNotice({ icon = "💬", title, text, children }: { icon?: ReactNode; title: string; text?: string; children?: ReactNode }) {
+/**
+ * In place of a chat screen that can't be shown: says why and offers a way on. It never leaves the member on a blank screen.
+ * `icon` is an SVG from `components/icons.tsx`, such as `<IconLock size={32} color={colors.faint} />`; screen readers skip it.
+ */
+export function ChatNotice({ icon, title, text, children }: { icon?: ReactElement; title: string; text?: string; children?: ReactNode }) {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.sm }}>
-      {typeof icon === "string" ? (
-        <Text style={{ fontSize: 32 }} accessible={false}>
-          {icon}
-        </Text>
-      ) : (
-        <View aria-hidden>{icon}</View>
-      )}
+      {icon ? <View aria-hidden>{icon}</View> : null}
       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" }}>{title}</Text>
       {text ? <Text style={{ fontSize: 14, color: colors.muted, textAlign: "center", maxWidth: 320 }}>{text}</Text> : null}
       {children ? <View style={{ marginTop: spacing.md, gap: spacing.sm, width: "100%", maxWidth: 320 }}>{children}</View> : null}
@@ -94,7 +91,7 @@ export function ChatOff() {
   return (
     <ChatScreen>
       <ChatHeader title="Messages" />
-      <ChatNotice icon="🔒" title="Messages aren't available" text={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Messages aren't available" text={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         <Button title="Go back" onPress={leave} />
       </ChatNotice>
     </ChatScreen>

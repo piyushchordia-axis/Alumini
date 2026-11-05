@@ -13,6 +13,7 @@ import {
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { IconDownload, IconMail } from "@/components/icons";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Stat, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
@@ -140,8 +141,9 @@ function ImportCard({ fields, channels, onDone }: { fields: ProfileFieldDto[]; c
           <h2 className="font-semibold text-slate-900">Import a list</h2>
           <p className="text-sm text-slate-500">A CSV with a phone column, and optionally name, batch, email and your profile field keys. Numbers without a country code use your institution&apos;s country.</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => downloadTemplate(fields)}>
-          ⬇ Template
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => downloadTemplate(fields)}>
+          <IconDownload size={16} />
+          Template
         </Button>
       </div>
       <input
@@ -330,7 +332,7 @@ export function AdminInvitationsPage() {
       ) : list.error || !list.data ? (
         <ErrorBox error={list.error ?? "Failed"} />
       ) : list.data.data.length === 0 ? (
-        <EmptyState icon="✉️" title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
+        <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

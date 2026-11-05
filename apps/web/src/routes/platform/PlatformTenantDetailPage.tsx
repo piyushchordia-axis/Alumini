@@ -17,6 +17,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
+import { IconExternalLink } from "@/components/icons";
 import { Avatar, Badge, Button, Card, Checkbox, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
@@ -61,8 +62,10 @@ export function PlatformTenantDetailPage() {
         }
         subtitle={
           <>
-            <a href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer" className="text-primary underline">
-              /t/{tenant.slug} ↗
+            <a href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline">
+              /t/{tenant.slug}
+              <IconExternalLink size={14} />
+              <span className="sr-only"> (opens in a new tab)</span>
             </a>{" "}
             · onboarded {formatDate(tenant.createdAt)}
           </>

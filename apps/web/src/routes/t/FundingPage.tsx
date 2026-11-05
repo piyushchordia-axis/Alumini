@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FundingCard } from "@/components/funding/FundingCard";
+import { IconFunding } from "@/components/icons";
 import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -33,7 +34,7 @@ export function FundingPage() {
           <FundingCard key={f.id} slug={slug} item={f} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon="🚀" title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconFunding size={32} className="text-slate-400" />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

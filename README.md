@@ -1164,20 +1164,13 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
 - Screens and navigation:
   - The admin Members status tabs can still overflow sideways on narrow phones (member rows reflow; tabs don't wrap).
-  - The web app's shared Modal close and ConfirmDialog buttons are under 44px tall.
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
   - UI follow-ups: deeper tenant theming / branding preview in admin, and skeleton loaders and purposeful motion.
-  - Emoji still stand in for icons in places. The profile, member, directory, job and notification screens use the
-    shared SVG set, but on both apps emoji remain on most other empty states (messages, groups, mentors, events,
-    funding, businesses, the digest, blocked members), the lock on the Messages, Groups and Mentors "aren't available"
-    screens, the chat list's group and muted marks, the feed's digest banner and the digest's new-members line,
-    business and funding contact buttons, an event's city, the pending-approval screen and the tenant picker; on the
-    phone app's Add image, Add a poll, a business's Add logo and an event's Cover image buttons; and on the web, the
-    admin and platform consoles' empty states, the moderation badges and Pin button, the page-not-found, error and
-    email confirmation pages, and the platform console's nav.
+  - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls on both
+    apps and in the consoles (close, back, send, checkmarks, the analytics arrows) rather than the shared SVG set.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

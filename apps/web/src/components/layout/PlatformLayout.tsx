@@ -1,11 +1,14 @@
 import { formatPhone } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { IconAnalytics, IconAudit, IconBuilding, IconMessages, IconProfile, IconScale, IconSpark, type IconProps } from "@/components/icons";
 import { api } from "@/lib/api";
 import { resetTheme } from "@/lib/theme";
 import { useAuthStore } from "@/stores/authStore";
+
+type PlatformIcon = ComponentType<IconProps>;
 
 export function PlatformLayout() {
   const navigate = useNavigate();
@@ -15,21 +18,24 @@ export function PlatformLayout() {
   useEffect(() => {
     resetTheme();
   }, []);
-  const items = [
-    { to: "/platform/tenants", label: "Institutions", icon: "🏛️" },
-    { to: "/platform/users", label: "Users", icon: "👤" },
-    { to: "/platform/stats", label: "Stats", icon: "📈" },
-    { to: "/platform/compare", label: "Compare", icon: "⚖️" },
-    { to: "/platform/chat-reports", label: "Chat reports", icon: "💬" },
-    { to: "/platform/audit", label: "Audit log", icon: "📜" },
+  const items: { to: string; label: string; icon: PlatformIcon }[] = [
+    { to: "/platform/tenants", label: "Institutions", icon: IconBuilding },
+    { to: "/platform/users", label: "Users", icon: IconProfile },
+    { to: "/platform/stats", label: "Stats", icon: IconAnalytics },
+    { to: "/platform/compare", label: "Compare", icon: IconScale },
+    { to: "/platform/chat-reports", label: "Chat reports", icon: IconMessages },
+    { to: "/platform/audit", label: "Audit log", icon: IconAudit },
   ];
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    clsx("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition", isActive ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white");
+    clsx(
+      "flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition",
+      isActive ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white",
+    );
   return (
     <div className="min-h-full bg-slate-50">
       <header className="sticky top-0 z-40 bg-slate-900 text-white">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
-          <span className="text-xl">✨</span>
+          <IconSpark size={20} />
           <span className="font-semibold">Illuminize</span>
           <span className="hidden rounded-full bg-white/15 px-2 py-0.5 text-xs sm:inline">Platform console</span>
           <span className="ml-auto hidden text-sm text-slate-300 sm:inline">{formatPhone(user?.phone)}</span>
@@ -53,7 +59,7 @@ export function PlatformLayout() {
           <nav aria-label="Platform sections" className="flex gap-1 overflow-x-auto rounded-xl bg-slate-800 p-2 md:flex-col">
             {items.map((i) => (
               <NavLink key={i.to} to={i.to} className={linkClass}>
-                <span>{i.icon}</span>
+                <i.icon size={16} />
                 <span className="whitespace-nowrap">{i.label}</span>
               </NavLink>
             ))}
