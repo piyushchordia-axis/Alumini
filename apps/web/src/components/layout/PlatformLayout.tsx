@@ -1,3 +1,4 @@
+import { formatPhone } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect } from "react";
@@ -31,7 +32,7 @@ export function PlatformLayout() {
           <span className="text-xl">✨</span>
           <span className="font-semibold">Illuminize</span>
           <span className="hidden rounded-full bg-white/15 px-2 py-0.5 text-xs sm:inline">Platform console</span>
-          <span className="ml-auto hidden text-sm text-slate-300 sm:inline">{user?.phone}</span>
+          <span className="ml-auto hidden text-sm text-slate-300 sm:inline">{formatPhone(user?.phone)}</span>
           <button
             className="ml-auto text-sm text-slate-300 hover:text-white sm:ml-0"
             onClick={async () => {

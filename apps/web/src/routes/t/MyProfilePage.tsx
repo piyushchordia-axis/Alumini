@@ -1,4 +1,4 @@
-import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, profileStrength, type ProfileSection } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength, type ProfileSection } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -42,7 +42,7 @@ export function MyProfilePage() {
   }, [formReady, hash]);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="My profile" subtitle={`Signed in as ${user?.phone ?? ""}`} />
+      <PageHeader title="My profile" subtitle={`Signed in as ${formatPhone(user?.phone)}`} />
       {/* What's saved, laid out as on the member's own page. A current pupil sees their links here; nobody else does. */}
       <Card className="p-5">
         <ProfileSummary profile={summary} nameAs="h2" nameExtras={membership.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>} />

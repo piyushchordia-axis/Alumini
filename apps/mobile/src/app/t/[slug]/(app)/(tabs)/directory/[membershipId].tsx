@@ -1,3 +1,4 @@
+import { formatPhone } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Text, View } from "react-native";
@@ -35,7 +36,7 @@ export default function MemberProfileScreen() {
         <View style={[{ gap: spacing.sm }, divider]}>
           {m.phone && (
             <Row>
-              <Button title={`Call ${m.phone}`} variant="outline" onPress={() => void Linking.openURL(`tel:${m.phone}`)} style={{ flex: 1 }} />
+              <Button title={`Call ${formatPhone(m.phone)}`} variant="outline" onPress={() => void Linking.openURL(`tel:${m.phone}`)} style={{ flex: 1 }} />
               <Button title="WhatsApp" onPress={() => void Linking.openURL(`https://wa.me/${m.phone!.replace(/\D/g, "")}`)} />
             </Row>
           )}

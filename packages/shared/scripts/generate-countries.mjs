@@ -1,7 +1,8 @@
 // Regenerates src/data/countries.ts: every region libphonenumber-js can dial, with English names from ICU.
 // Run from the repo root: node packages/shared/scripts/generate-countries.mjs
-// The output is committed so the apps need neither libphonenumber metadata nor Intl.DisplayNames at runtime
-// (Hermes on iOS/Android does not ship Intl.DisplayNames).
+// The output is committed so the apps need no Intl.DisplayNames at runtime (Hermes on iOS/Android does not ship it), and
+// it holds the product's length caps (maxNationalDigits). The apps do read numbers with libphonenumber-js/min at runtime:
+// readPhoneEntry in src/lib/phone.ts takes calling codes, international and trunk prefixes from it, so keep that dependency.
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 

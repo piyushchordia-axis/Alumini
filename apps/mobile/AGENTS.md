@@ -55,7 +55,7 @@ Member UI follows the same craft rules as web (see root `CLAUDE.md` → **UI / U
 - Theme tokens and elevation live in `src/theme`. Cards should read above the page background; landing is brand-first (full-bleed cover + institution hero).
 - Feature parity: every member-facing visual change ships on web and mobile in the same change.
 - After `expo install` of a native module, restart Metro; a server started before the install will fail to resolve it.
-- OTP phone fields: clamp with `clampNationalNumber(country, raw)` from `@illuminize/shared` (India max 10).
+- OTP phone fields: hold one `{ country, number }` entry, read every change to the box with `readPhoneEntry(country, raw, entry)` and every country picked with `readPhoneEntry(country, entry.held ?? entry.number)` from `@illuminize/shared` (`clampNationalNumber`, India max 10, is its last step), and send `phoneEntryToE164`. Show a stored number with `formatPhone`.
 
 ## Rules
 

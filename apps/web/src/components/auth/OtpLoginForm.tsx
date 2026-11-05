@@ -1,15 +1,15 @@
-import type { AuthSessionDto } from "@illuminize/shared";
+import { formatPhone, nationalDigits, phoneEntryToE164, type AuthSessionDto, type PhoneEntry } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useEffect, useState } from "react";
 import { Button, ErrorBox, FormField } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { OtpInput } from "./OtpInput";
-import { PhoneInput, toE164, type PhoneValue } from "./PhoneInput";
+import { PhoneInput } from "./PhoneInput";
 
 /** Two-step phone → OTP login shared by the tenant and platform login pages. */
 export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDto) => void }) {
-  const [phone, setPhone] = useState<PhoneValue>({ country: "IN", number: "" });
+  const [phone, setPhone] = useState<PhoneEntry>({ country: "IN", number: "" });
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [code, setCode] = useState("");
   const [channel, setChannel] = useState<string>("");
@@ -25,7 +25,7 @@ export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDt
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const e164 = toE164(phone);
+  const e164 = phoneEntryToE164(phone);
 
   const request = async () => {
     setBusy(true);
@@ -74,7 +74,7 @@ export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDt
           <PhoneInput value={phone} onChange={setPhone} autoFocus />
         </FormField>
         {error ? <ErrorBox error={error} /> : null}
-        <Button type="submit" block loading={busy} disabled={phone.number.replace(/\D/g, "").length < 6}>
+        <Button type="submit" block loading={busy} disabled={nationalDigits(phone).length < 6}>
           Send code
         </Button>
       </form>
@@ -90,7 +90,7 @@ export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDt
       }}
     >
       <p className="text-sm text-slate-600">
-        Enter the code sent to <span className="font-medium text-slate-900">{e164}</span>
+        Enter the code sent to <span className="font-medium text-slate-900">{formatPhone(e164)}</span>
         {channel === "whatsapp" ? " on WhatsApp" : channel === "sms" ? " by SMS" : ""}.{" "}
         <button type="button" className="text-primary underline" onClick={() => setStep("phone")}>
           Change number

@@ -329,6 +329,9 @@ importers:
 
   packages/shared:
     dependencies:
+      libphonenumber-js:
+        specifier: ^1.12.0
+        version: 1.13.15
       socket.io-client:
         specifier: ^4.8.4
         version: 4.8.4

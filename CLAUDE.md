@@ -17,7 +17,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React; `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections;
-  `src/data/countries.ts` (generated) includes `maxNationalDigits` and `src/lib/phone.ts` clamps national numbers.
+  `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
+  (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
+  numbers (`formatPhone`).
   `src/lib/profile.ts` holds the profile's sections and registration steps, strength, hidden inputs and "Use details
   from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser.
@@ -120,9 +122,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     index. Pushed details/modals: `Screen title="…"` or `StackScreen` / `StackHeader`, stacks with
     `screenOptions={{ headerShown: false }}` (keep `presentation: "modal"` where needed). Chat overlays: `ChatHeader`.
     Auth screens without a bar: `Screen topInset`.
-  - **Phone national length.** OTP fields clamp with `clampNationalNumber(country, raw)` (India max 10). API
-    `normalizePhone` rejects over-length nationals. Regenerate countries via
-    `node packages/shared/scripts/generate-countries.mjs` after changing length rules.
+  - **Phone entry.** OTP fields hold one `{ country, number }` entry. They read every change to the box with
+    `readPhoneEntry(country, raw, entry)` and every country picked with `readPhoneEntry(country, entry.held ??
+    entry.number)` (libphonenumber-js/min: a pasted "+44…" moves the country, a trunk "0" isn't counted;
+    `clampNationalNumber`, India max 10, is its last step), and send `phoneEntryToE164`; Send code needs 6
+    `nationalDigits`. Show a stored number with `formatPhone`. API `normalizePhone` rejects over-length nationals but
+    takes 9-digit Indian ones (the seed has them).
+    Regenerate countries via `node packages/shared/scripts/generate-countries.mjs` after changing length rules.
   - **Composer.** Avatar top-aligned to the textarea; Add image / Poll / Post live in one footer tray inside the card.
   - **Directory and Jobs.** Search plus a filter or two in view (web directory: batch; Jobs on both apps: type and Can
     refer; the mobile directory shows search alone); the rest behind More filters (web) / Filters (mobile), not a

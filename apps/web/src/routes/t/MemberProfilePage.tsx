@@ -1,3 +1,4 @@
+import { formatPhone } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
@@ -46,7 +47,7 @@ export function MemberProfilePage() {
               <dt className="text-slate-500">Phone</dt>
               <dd>
                 <a href={`tel:${m.phone}`} className="text-primary">
-                  {m.phone}
+                  {formatPhone(m.phone)}
                 </a>{" "}
                 <a href={`https://wa.me/${m.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-emerald-600">
                   WhatsApp

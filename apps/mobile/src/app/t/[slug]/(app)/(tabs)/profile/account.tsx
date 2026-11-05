@@ -1,4 +1,4 @@
-import type { EmailStatusDto } from "@illuminize/shared";
+import { formatPhone, type EmailStatusDto } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -107,7 +107,7 @@ export default function AccountScreen() {
       </Card>
       <Card>
         <Text style={{ fontWeight: "700", color: colors.text }}>Phone</Text>
-        <Muted size={13}>{user?.phone} · used to sign in</Muted>
+        <Muted size={13}>{formatPhone(user?.phone)} · used to sign in</Muted>
       </Card>
     </Screen>
   );

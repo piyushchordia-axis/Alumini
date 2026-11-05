@@ -33,10 +33,25 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.setDefaultTimeout(15000);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
 
-async function loginWithPhone(number, p = page) {
+/** Fails unless the phone field's box shows `box` and its country picker has `country` selected. */
+async function expectPhoneField(p, { box, country }) {
+  const shown = await p.inputValue('input[type="tel"]');
+  if (box !== undefined && shown !== box) throw new Error(`the number box shows "${shown}", expected "${box}"`);
+  if (country === undefined) return;
+  const picked = await p.inputValue('select[aria-label^="Country code"]');
+  if (picked !== country) throw new Error(`the country picker shows ${picked}, expected ${country}`);
+}
+
+/**
+ * `box` and `country` are what the number box and the picker must show once `number` is in it, and `codeSentTo` the
+ * number the code step names.
+ */
+async function loginWithPhone(number, p = page, { box, country, codeSentTo } = {}) {
   await p.fill('input[type="tel"]', number);
+  await expectPhoneField(p, { box, country });
   await p.click('button:has-text("Send code")');
   await p.waitForSelector("text=Development mode");
+  if (codeSentTo) await p.getByText(codeSentTo, { exact: true }).waitFor();
   const code = (await p.textContent("span.font-mono")).trim();
   await p.fill('input[inputmode="numeric"]', code);
   await p.click('button:has-text("Verify and continue")');
@@ -77,7 +92,13 @@ try {
     await page.waitForSelector("text=Sign in / Join");
     await shot("02-landing");
     await page.click("text=Sign in / Join");
-    await loginWithPhone(PHONE_A);
+    // Autofill and paste bring the calling code along. A foreign number moves the picker to its country, which a screen
+    // reader is told; the box keeps the national part, not "+91 91…", and the code step names the number as it was read.
+    if ((await page.getAttribute('input[type="tel"]', "autocomplete")) !== "tel") throw new Error("the number box doesn't ask the browser for the full number");
+    await page.fill('input[type="tel"]', "+44 7700 900123");
+    await expectPhoneField(page, { box: "7700 900123", country: "GB" });
+    await page.getByRole("status").filter({ hasText: "Country code set to United Kingdom +44" }).waitFor({ state: "attached" });
+    await loginWithPhone(`+91${PHONE_A}`, page, { box: PHONE_A, country: "IN", codeSentTo: `+91 ${PHONE_A.slice(0, 5)} ${PHONE_A.slice(5)}` });
     await page.waitForURL(/\/register$/);
     const heading = (name) => page.getByRole("heading", { name, exact: true });
     const focused = () => page.evaluate(() => document.activeElement?.textContent ?? "");

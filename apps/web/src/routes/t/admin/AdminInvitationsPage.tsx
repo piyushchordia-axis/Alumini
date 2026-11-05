@@ -1,6 +1,7 @@
 import {
   MAX_INVITE_IMPORT_ROWS,
   csvLine,
+  formatPhone,
   parseCsv,
   type InvitationDto,
   type InvitationImportResultDto,
@@ -350,7 +351,7 @@ export function AdminInvitationsPage() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{inv.fullName ?? "—"}</div>
                         <div className="font-mono text-xs text-slate-500">
-                          {inv.phone}
+                          {formatPhone(inv.phone)}
                           {inv.batchYear ? ` · ${inv.batchYear}` : ""}
                           {inv.email ? ` · ${inv.email}` : ""}
                         </div>
@@ -397,7 +398,7 @@ export function AdminInvitationsPage() {
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                if (confirm(`Revoke the invitation for ${inv.fullName ?? inv.phone}? The link stops working.`)) revoke.mutate(inv.id);
+                                if (confirm(`Revoke the invitation for ${inv.fullName ?? formatPhone(inv.phone)}? The link stops working.`)) revoke.mutate(inv.id);
                               }}
                             >
                               Revoke

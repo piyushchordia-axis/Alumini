@@ -1,4 +1,4 @@
-import { MARITAL_STATUS_LABELS, MENTOR_AREA_LABELS, PROFESSION_TYPE_LABELS, countryName, mentorAvailabilityText, type MentorProfileDto } from "@illuminize/shared";
+import { MARITAL_STATUS_LABELS, MENTOR_AREA_LABELS, PROFESSION_TYPE_LABELS, countryName, formatPhone, mentorAvailabilityText, type MentorProfileDto } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -28,7 +28,7 @@ export function AdminMemberDetailPage() {
   const isSelf = m.id === me?.id;
   // The work, studies, links and bio are in ProfileDetails below; these are the facts it doesn't show.
   const fields: Array<[string, string | number | null | undefined]> = [
-    ["Phone", m.phone],
+    ["Phone", formatPhone(m.phone)],
     ["Batch", m.batchYear],
     ["Profession", PROFESSION_TYPE_LABELS[m.professionType]],
     ["City", [m.city, countryName(m.country)].filter(Boolean).join(", ")],

@@ -1,13 +1,12 @@
-import { clampNationalNumber, countryByCode, defaultFeaturesFor } from "@illuminize/shared";
+import { countryByCode, defaultFeaturesFor, formatPhone, nationalDigits, phoneCountryNote, phoneEntryToE164, readPhoneEntry, type PhoneEntry } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
 import { CountryPicker } from "@/components/CountryPicker";
 import { Button, ErrorText, Input, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useTenant } from "@/hooks/useTenant";
-import { toE164 } from "@/lib/format";
 import { homeHref } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, useTheme } from "@/theme";
@@ -18,9 +17,8 @@ export default function LoginScreen() {
   const theme = useTheme();
   const setSession = useAuthStore((s) => s.setSession);
   const tenant = useTenant(slug);
-  const [country, setCountry] = useState("IN");
-  const dial = countryByCode(country)?.dial ?? "+91";
-  const [number, setNumber] = useState("");
+  const [entry, setEntry] = useState<PhoneEntry>({ country: "IN", number: "" });
+  const dial = countryByCode(entry.country)?.dial ?? "+91";
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | undefined>();
@@ -28,7 +26,14 @@ export default function LoginScreen() {
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const phone = toE164(dial, number);
+  const phone = phoneEntryToE164(entry);
+
+  // A pasted or autofilled "+44…" moves the picker; say so, since focus stays in the box.
+  const changeNumber = (raw: string) => {
+    const next = readPhoneEntry(entry.country, raw, entry);
+    if (next.country !== entry.country && Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(phoneCountryNote(next.country));
+    setEntry(next);
+  };
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -83,21 +88,17 @@ export default function LoginScreen() {
           <CountryPicker
             label="Country code"
             variant="dial"
-            value={country}
-            onChange={(c) => {
-              const next = c ?? "IN";
-              setCountry(next);
-              setNumber((n) => clampNationalNumber(next, n));
-            }}
+            value={entry.country}
+            onChange={(c) => setEntry((e) => readPhoneEntry(c ?? "IN", e.held ?? e.number))}
           />
-          <Input label={`Mobile number (${dial})`} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" value={number} onChangeText={(v) => setNumber(clampNationalNumber(country, v))} placeholder="98765 43210" autoFocus />
+          <Input label={`Mobile number (${dial})`} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber" value={entry.number} onChangeText={changeNumber} placeholder="98765 43210" autoFocus />
           <ErrorText error={error ? errorMessage(error) : null} />
-          <Button title="Send code" onPress={() => void request()} loading={busy} disabled={number.replace(/\D/g, "").length < 6} />
+          <Button title="Send code" onPress={() => void request()} loading={busy} disabled={nationalDigits(entry).length < 6} />
         </View>
       ) : (
         <View style={{ gap: 12 }}>
           <Text style={{ color: colors.muted }}>
-            Enter the code sent to <Text style={{ fontWeight: "600", color: colors.text }}>{phone}</Text>
+            Enter the code sent to <Text style={{ fontWeight: "600", color: colors.text }}>{formatPhone(phone)}</Text>
             {channel === "whatsapp" ? " on WhatsApp" : channel === "sms" ? " by SMS" : ""}.
           </Text>
           {devCode && (

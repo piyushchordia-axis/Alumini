@@ -1,3 +1,4 @@
+import { formatPhone } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -36,7 +37,7 @@ export function PlatformUsersPage() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-slate-900">{u.displayName ?? "—"}</span>
-                <span className="text-slate-500">{u.phone}</span>
+                <span className="text-slate-500">{formatPhone(u.phone)}</span>
                 {u.isPlatformAdmin && <Badge tone="primary">Platform admin</Badge>}
               </div>
               <div className="text-xs text-slate-500">

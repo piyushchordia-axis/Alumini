@@ -83,8 +83,3 @@ export function initials(name: string): string {
       .join("")
   );
 }
-
-/** Builds an E.164 number from a dial code and a national number. */
-export function toE164(dial: string, national: string): string {
-  return `${dial}${national.replace(/\D/g, "")}`;
-}

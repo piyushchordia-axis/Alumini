@@ -1,4 +1,4 @@
-import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, profileStrength } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -62,7 +62,7 @@ export default function MyProfileScreen() {
       {/* What's saved, laid out as on the member's own page. A current pupil sees their links here; nobody else does. */}
       <Card style={{ gap: spacing.md }}>
         <ProfileSummary profile={summary} nameExtras={membership.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />}>
-          <Muted>Signed in as {user?.phone}</Muted>
+          <Muted>Signed in as {formatPhone(user?.phone)}</Muted>
         </ProfileSummary>
         <Button title="Edit profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`)} />
         <Row gap={6}>

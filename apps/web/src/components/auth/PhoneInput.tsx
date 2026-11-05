@@ -1,21 +1,18 @@
-import { COUNTRIES, POPULAR_COUNTRY_CODES, clampNationalNumber, countryByCode, flagEmoji } from "@illuminize/shared";
+import { COUNTRIES, POPULAR_COUNTRY_CODES, countryByCode, flagEmoji, phoneCountryNote, readPhoneEntry, type PhoneEntry } from "@illuminize/shared";
+import { useState } from "react";
 import { Input } from "@/components/ui";
-
-export interface PhoneValue {
-  /** ISO country code; the calling code comes from it (US and CA both dial +1 but stay distinct). */
-  country: string;
-  number: string;
-}
 
 const popular = POPULAR_COUNTRY_CODES.map((c) => countryByCode(c)!).filter(Boolean);
 
 /**
  * Country code + national number. The native <select> lists every country by name (type-ahead works), while the
- * closed control shows just the flag and calling code so it stays narrow on phones. National digits are capped per
- * country (India: 10).
+ * closed control shows just the flag and calling code so it stays narrow on phones. Every change goes through
+ * readPhoneEntry, so a pasted or autofilled "+44…" moves the country and the box keeps the national number.
  */
-export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; onChange: (v: PhoneValue) => void; autoFocus?: boolean }) {
+export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneEntry; onChange: (v: PhoneEntry) => void; autoFocus?: boolean }) {
   const selected = countryByCode(value.country) ?? COUNTRIES[0]!;
+  // Said when the box, not the picker, moves the country: the picker's own change is already announced.
+  const [note, setNote] = useState("");
   return (
     <div className="flex gap-2">
       <div className="relative w-28 shrink-0">
@@ -29,8 +26,8 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; 
           aria-label={`Country code, ${selected.name} ${selected.dial}`}
           value={selected.code}
           onChange={(e) => {
-            const country = e.target.value;
-            onChange({ country, number: clampNationalNumber(country, value.number) });
+            setNote("");
+            onChange(readPhoneEntry(e.target.value, value.held ?? value.number));
           }}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         >
@@ -53,18 +50,21 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneValue; 
       <Input
         type="tel"
         inputMode="tel"
-        autoComplete="tel-national"
+        name="phone"
+        autoComplete="tel"
         placeholder="Mobile number"
         aria-label="Mobile number"
         value={value.number}
         autoFocus={autoFocus}
-        onChange={(e) => onChange({ ...value, number: clampNationalNumber(value.country, e.target.value) })}
+        onChange={(e) => {
+          const next = readPhoneEntry(value.country, e.target.value, value);
+          if (next.country !== value.country) setNote(phoneCountryNote(next.country));
+          onChange(next);
+        }}
       />
+      <span className="sr-only" role="status" aria-live="polite">
+        {note}
+      </span>
     </div>
   );
-}
-
-export function toE164(v: PhoneValue): string {
-  const dial = countryByCode(v.country)?.dial ?? "+91";
-  return `${dial}${v.number.replace(/\D/g, "")}`;
 }

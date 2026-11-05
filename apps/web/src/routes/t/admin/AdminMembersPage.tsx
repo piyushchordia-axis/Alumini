@@ -1,4 +1,4 @@
-import { MEMBERSHIP_STATUSES, type AdminMemberDto, type MembershipStatus } from "@illuminize/shared";
+import { MEMBERSHIP_STATUSES, formatPhone, type AdminMemberDto, type MembershipStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -151,7 +151,7 @@ export function AdminMembersPage() {
                 </div>
                 <div className="mt-0.5 break-words text-xs text-slate-500">
                   Batch of {m.batchYear}
-                  {m.phone ? ` · ${m.phone}` : ""}
+                  {m.phone ? ` · ${formatPhone(m.phone)}` : ""}
                   {[m.companyName, m.city].filter(Boolean).length ? ` · ${[m.companyName, m.city].filter(Boolean).join(", ")}` : ""}
                   {` · requested ${formatDate(m.createdAt)}`}
                 </div>
