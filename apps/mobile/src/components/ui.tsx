@@ -10,7 +10,8 @@ import { colors, radius, spacing, useTheme } from "@/theme";
  * Standard screen container. Pass `topInset` on screens without a navigation header so content clears the status bar
  * and notch. Pass `title` on pushed stack screens (profile, settings) to draw an in-tree back bar instead of a native
  * header that can float over content, and `actions` for buttons at its end. The content moves up with the keyboard on
- * iOS (Android resizes the window itself). `scrollRef` reaches the scroll view, to bring part of a long form into view.
+ * both platforms: edge to edge, Android no longer resizes the window for it, and where it still does the overlap
+ * measures 0 (as in ChatScreen). `scrollRef` reaches the scroll view, to bring part of a long form into view.
  */
 export function Screen({
   children,
@@ -36,7 +37,7 @@ export function Screen({
   return (
     <SafeAreaView style={styles.screen} edges={edges}>
       {title != null && <StackHeader title={title} actions={actions} />}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
         {scroll ? (
           <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: spacing.xl }}>
             {content}
