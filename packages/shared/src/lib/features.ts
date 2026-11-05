@@ -1,4 +1,4 @@
-import { TENANT_FEATURES, type ChatGroupVisibility, type TenantFeature, type TenantFeatures, type TenantType } from "../constants";
+import { TENANT_FEATURE_LABELS, TENANT_FEATURES, type ChatGroupVisibility, type TenantFeature, type TenantFeatures, type TenantType } from "../constants";
 import { wallPartsInZone } from "./time";
 
 /** Keys that start off for schools and that retyping an institution to SCHOOL forces off. Its admin can turn them on. */
@@ -103,6 +103,53 @@ export function retypeToSchool(fromType: TenantType, stored: Partial<TenantFeatu
 /** The keys `edited` changes from `saved`. A settings form sends only these, so a stale tab can't undo another admin's change. */
 export function changedFeatures(saved: TenantFeatures, edited: TenantFeatures): Partial<TenantFeatures> {
   return Object.fromEntries(TENANT_FEATURES.filter((f) => edited[f] !== saved[f]).map((f) => [f, edited[f]]));
+}
+
+/**
+ * A settings form's switch pressed. Turning a key off turns off whatever needs it, as the API does in the same save, so
+ * the form never shows a combination that can't be stored. Turning it back on leaves those off, as the API does.
+ */
+export function toggleFeature(features: TenantFeatures, key: TenantFeature, on: boolean): TenantFeatures {
+  const next = { ...features, [key]: on };
+  if (!on) for (const f of TENANT_FEATURES) if (FEATURE_PREREQUISITES[f] === key) next[f] = false;
+  return next;
+}
+
+/** What a key waits for while it can't be turned on (Messaging, for Mentorship while Messaging is off), or null. */
+export function featureBlockedBy(features: TenantFeatures, key: TenantFeature): TenantFeature | null {
+  const needs = FEATURE_PREREQUISITES[key];
+  return needs && !features[needs] ? needs : null;
+}
+
+/** The line under a switch that can't be turned on yet, "Needs Messaging", or null. */
+export function featureBlockedText(features: TenantFeatures, key: TenantFeature): string | null {
+  const needs = featureBlockedBy(features, key);
+  return needs ? `Needs ${TENANT_FEATURE_LABELS[needs]}` : null;
+}
+
+/** What the settings form says under the switches, at every institution. */
+export const FEATURE_HELP: readonly string[] = [
+  "Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.",
+  "Mentorship needs Messaging, because accepting a mentee opens a private chat. Turning Messaging off turns Mentorship off too.",
+  "Referral requests in Jobs need Messaging too, because accepting one opens a private chat. They have no switch of their own: members can ask for and give referrals while Jobs and Messaging are both on.",
+];
+
+/** "Messaging, Groups and Mentorship". By hand, as Hermes may lack Intl.ListFormat. */
+export function joinList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** The settings form's paragraphs under the switches: FEATURE_HELP, and for a school why some start off. */
+export function featureHelpText(type: TenantType): string[] {
+  if (type !== "SCHOOL") return [...FEATURE_HELP];
+  const one = SCHOOL_OFF_FEATURES.length === 1;
+  const them = one ? "it" : "them";
+  const school =
+    `${joinList(SCHOOL_OFF_FEATURES.map((f) => TENANT_FEATURE_LABELS[f]))} ${one ? "starts" : "start"} off for schools because members can contact each other privately there. ` +
+    `If you turn ${them} on, current pupils still can't use ${them}.` +
+    (SCHOOL_OFF_FEATURES.includes("messaging") ? " Turning Messaging on also opens referral requests in Jobs, which current pupils can't use either." : "");
+  return [...FEATURE_HELP, school];
 }
 
 /**

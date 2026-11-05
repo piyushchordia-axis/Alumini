@@ -1,4 +1,4 @@
-import type { ProfileFieldType, ProfileFieldVisibility } from "../constants";
+import { MAX_PROFILE_FIELDS, PROFILE_FIELD_TYPE_LABELS, type ProfileFieldType, type ProfileFieldVisibility } from "../constants";
 import { isValidCalendarDate } from "./time";
 
 /** A stored answer: text, number, date ("YYYY-MM-DD"), choice value(s) or yes/no. */
@@ -110,6 +110,132 @@ export function validateProfileFieldValues(
 }
 
 const hasOwn = (o: Record<string, unknown>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
+/** The types whose answers are picked from options. */
+export const CHOICE_TYPES: readonly ProfileFieldType[] = ["SELECT", "MULTI_SELECT"];
+/** The types a directory filter can offer: choices and yes/no. */
+export const FILTERABLE_TYPES: readonly ProfileFieldType[] = ["SELECT", "MULTI_SELECT", "BOOLEAN"];
+
+/** Whether a field can be a directory filter: a choice or yes/no that members can see (the directory ignores the rest). */
+export function fieldCanFilter(type: ProfileFieldType, visibility: ProfileFieldVisibility): boolean {
+  return FILTERABLE_TYPES.includes(type) && visibility === "MEMBERS";
+}
+
+/** Said beside the directory-filter switch while the field can't be one. */
+export const FIELD_FILTER_HINT = "Only choice and yes/no questions that members can see can be filters";
+
+/** The "Who can see answers" choices. */
+export const FIELD_VISIBILITY_OPTIONS: readonly { value: ProfileFieldVisibility; label: string }[] = [
+  { value: "MEMBERS", label: "Members, on profiles" },
+  { value: "ADMINS", label: "Only admins (and the member)" },
+];
+
+/** A label as a field key or option value: "Blood group" → "blood_group", "2nd year" → "f_2nd_year". At most 40 characters; "" when nothing is left. */
+export function slugifyKey(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/^(?=[^a-z])/, "f_")
+    .slice(0, 40);
+}
+
+/** The value for a new option labelled `label`: its slug, made different from the values already there. */
+export function uniqueOptionValue(options: readonly ProfileFieldOption[], label: string): string {
+  let value = slugifyKey(label) || "option";
+  while (options.some((o) => o.value === value)) value = `${value}_`;
+  return value;
+}
+
+/** What a field editor holds: everything a field is made of, the key included (which only a new field can set). */
+export interface ProfileFieldDraft {
+  key: string;
+  label: string;
+  helpText: string | null;
+  type: ProfileFieldType;
+  options: ProfileFieldOption[];
+  required: boolean;
+  visibility: ProfileFieldVisibility;
+  memberEditable: boolean;
+  filterable: boolean;
+}
+
+/** The editor's starting point: the field being edited, or a new short-text question members answer. */
+export function emptyFieldDraft(field?: ProfileFieldDraft | null): ProfileFieldDraft {
+  return {
+    key: field?.key ?? "",
+    label: field?.label ?? "",
+    helpText: field?.helpText ?? null,
+    type: field?.type ?? "TEXT",
+    options: field?.options ?? [],
+    required: field?.required ?? false,
+    visibility: field?.visibility ?? "MEMBERS",
+    memberEditable: field?.memberEditable ?? true,
+    filterable: field?.filterable ?? false,
+  };
+}
+
+/**
+ * What an editor sends: options only for a choice, a directory filter only where one can be (a type changed away, or
+ * answers made admin-only, leave the box ticked underneath), and no help text rather than a blank one.
+ */
+export function normalizeFieldBody(draft: ProfileFieldDraft): ProfileFieldDraft {
+  return {
+    ...draft,
+    helpText: draft.helpText?.trim() ? draft.helpText : null,
+    options: CHOICE_TYPES.includes(draft.type) ? draft.options : [],
+    filterable: fieldCanFilter(draft.type, draft.visibility) && draft.filterable,
+  };
+}
+
+/** `ids` with the one at `index` moved `delta` places (-1 up, 1 down); unchanged when that would leave the list. */
+export function moveId(ids: readonly string[], index: number, delta: number): string[] {
+  const next = [...ids];
+  const to = index + delta;
+  if (index < 0 || index >= next.length || to < 0 || to >= next.length) return next;
+  const [id] = next.splice(index, 1);
+  next.splice(to, 0, id!);
+  return next;
+}
+
+/**
+ * A console list as the API stores a reorder of `ids`, to show it at once: the listed fields first, in that order, then
+ * the rest (archived ones, or one added meanwhile) in the order they had.
+ */
+export function inFieldOrder<T extends { id: string }>(rows: readonly T[], ids: readonly string[]): T[] {
+  const at = new Map(ids.map((id, i) => [id, i]));
+  const place = (row: T) => at.get(row.id) ?? ids.length;
+  // A stable sort: the unlisted keep their order.
+  return [...rows].sort((a, b) => place(a) - place(b));
+}
+
+export type FieldBadgeTone = "neutral" | "warning" | "info" | "success" | "danger";
+
+/** The badges on a field's row in the console, in order: its type, then what's special about it. */
+export function fieldBadges(field: Pick<ProfileFieldDraft, "type" | "required" | "visibility" | "memberEditable" | "filterable"> & { archivedAt: string | null }): { label: string; tone: FieldBadgeTone }[] {
+  const badges: { label: string; tone: FieldBadgeTone }[] = [{ label: PROFILE_FIELD_TYPE_LABELS[field.type], tone: "neutral" }];
+  if (field.required) badges.push({ label: "Required", tone: "warning" });
+  if (field.visibility === "ADMINS") badges.push({ label: "Admins only", tone: "info" });
+  if (!field.memberEditable) badges.push({ label: "Set by admins", tone: "info" });
+  // Only where it filters: an admin-only field may still have the flag stored from before.
+  if (field.filterable && fieldCanFilter(field.type, field.visibility)) badges.push({ label: "Directory filter", tone: "success" });
+  if (field.archivedAt) badges.push({ label: "Archived", tone: "danger" });
+  return badges;
+}
+
+/** The profile-fields page's line under its title, with how many of the allowed questions are in use. */
+export function profileFieldsSubtitle(activeCount: number): string {
+  return `Your own questions on member profiles, such as house, roll number or hostel (${activeCount} of ${MAX_PROFILE_FIELDS}).`;
+}
+
+/** What the console asks before archiving a field. */
+export function archiveFieldConfirm(label: string): { title: string; body: string; confirmLabel: string } {
+  return {
+    title: `Archive “${label}”?`,
+    body: "Members stop seeing it on profiles and forms, and it stops being a directory filter. Their answers are kept, and you can restore it from Show archived fields.",
+    confirmLabel: "Archive",
+  };
+}
 
 /** How an answer reads on a profile: option labels, "Yes"/"No", dates as given. */
 export function formatProfileFieldValue(def: Pick<ProfileFieldDef, "type" | "options">, value: ProfileFieldValue | null | undefined): string {

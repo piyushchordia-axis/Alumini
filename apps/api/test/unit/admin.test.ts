@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ADMIN_SECTIONS,
+  APPROVAL_MODES,
+  APPROVAL_MODE_OPTIONS,
   CHAT_PUSH_KINDS,
   CONTENT_TYPES,
   MEMBERSHIP_STATUSES,
@@ -26,14 +28,17 @@ import {
   approvalSummary,
   approveAllCopy,
   approveAllDoneText,
+  batchYearIssues,
   canPin,
   channelName,
   dashboardTiles,
   dedupeById,
+  defaultFeaturesFor,
   fieldErrorsFrom,
   formatCalendarDate,
   formatCount,
   isAdminNotification,
+  latestBatchYearAllowed,
   memberActionDoneText,
   memberActionErrorText,
   memberActionLabel,
@@ -46,13 +51,18 @@ import {
   onlySearchChanged,
   pagedNext,
   parseMemberStatus,
+  planChannelsSentence,
+  settingsDraftOf,
+  settingsSave,
   statusTabs,
   tenantKeyPredicate,
+  tenantSettingsUpdateSchema,
   type AdminSection,
   type AdminSectionPath,
   type DashboardDto,
   type MemberAdminAction,
   type ContentAction,
+  type TenantSettingsDto,
 } from "@illuminize/shared";
 import { ApiClientError, isOutOfDate, unlessOutOfDate } from "@illuminize/shared/client";
 import { QueryClient } from "@tanstack/query-core";
@@ -730,6 +740,72 @@ describe("parseMemberStatus", () => {
   });
 });
 
+describe("APPROVAL_MODE_OPTIONS", () => {
+  it("offer each approval mode once for members and for content, under the web console's names", () => {
+    for (const which of ["member", "content"] as const) {
+      expect(APPROVAL_MODE_OPTIONS[which].options.map((o) => o.value), which).toEqual([...APPROVAL_MODES]);
+    }
+    expect(APPROVAL_MODE_OPTIONS.member.label).toBe("New member approval");
+    expect(APPROVAL_MODE_OPTIONS.member.options.map((o) => o.label)).toEqual(["Auto-approve members", "Admin must approve members"]);
+    expect(APPROVAL_MODE_OPTIONS.content.label).toBe("Content moderation");
+    expect(APPROVAL_MODE_OPTIONS.content.options.map((o) => o.label)).toEqual(["Publish immediately", "Admin must approve before publishing"]);
+  });
+});
+
+describe("planChannelsSentence", () => {
+  const said = (channels: Parameters<typeof planChannelsSentence>[0]) => {
+    const { sentence, note } = planChannelsSentence(channels);
+    return { text: sentence.map((p) => (p.strong ? `**${p.text}**` : p.text)).join(""), note };
+  };
+
+  it("says what the plan sends, and that messages are billed", () => {
+    expect(said(["WHATSAPP", "SMS", "EMAIL"])).toEqual({
+      text: "**Your plan includes: **in-app notifications and push, plus WhatsApp, SMS, email for invites and announcements.",
+      note: "Messages are billed per delivery.",
+    });
+    expect(said(["EMAIL"]).text).toBe("**Your plan includes: **in-app notifications and push, plus email for invites and announcements.");
+  });
+
+  it("says how to get messaging when the plan has none", () => {
+    expect(said([])).toEqual({ text: "**Your plan includes: **in-app notifications and push.", note: "Ask the Illuminize team to add WhatsApp, SMS or email messaging." });
+  });
+});
+
+describe("batchYearIssues", () => {
+  const now = new Date("2026-06-01T00:00:00Z");
+  const range = "Enter a year from 1950 to 2036";
+
+  it("takes a range of real years, the earliest not after the latest", () => {
+    expect(latestBatchYearAllowed(now)).toBe(2036);
+    expect(batchYearIssues("1990", "2032", now)).toEqual({});
+    expect(batchYearIssues("1950", "2036", now)).toEqual({});
+    expect(batchYearIssues(" 2000 ", "2000", now)).toEqual({});
+  });
+
+  it("refuses a blank, partial or out-of-range year in words, each under its own box", () => {
+    expect(batchYearIssues("", "2032", now)).toEqual({ minBatchYear: range });
+    expect(batchYearIssues("1990", "", now)).toEqual({ maxBatchYear: range });
+    expect(batchYearIssues("199", "20x2", now)).toEqual({ minBatchYear: range, maxBatchYear: range });
+    expect(batchYearIssues("1949", "2037", now)).toEqual({ minBatchYear: range, maxBatchYear: range });
+    expect(batchYearIssues("2030", "2020", now)).toEqual({ minBatchYear: "The earliest year can't be after the latest" });
+  });
+
+  it("agrees with the API's schema on which years it takes", () => {
+    const thisYear = new Date();
+    const latest = latestBatchYearAllowed(thisYear);
+    for (const [min, max] of [
+      [1949, 2000],
+      [1950, 2000],
+      [2000, latest],
+      [2000, latest + 1],
+      [2001, 2000],
+    ]) {
+      const ours = Object.keys(batchYearIssues(String(min), String(max), thisYear)).length === 0;
+      expect(tenantSettingsUpdateSchema.safeParse({ minBatchYear: min, maxBatchYear: max }).success, `${min}-${max}`).toBe(ours);
+    }
+  });
+});
+
 describe("memberListMeta", () => {
   const formatDate = (iso: string) => `on ${iso.slice(0, 10)}`;
   const member = { batchYear: 2018, phone: "+919100000037", companyName: "Infosys", city: "Pune", createdAt: "2026-11-03T10:00:00.000Z" };
@@ -752,5 +828,37 @@ describe("memberEmptyTitle", () => {
     expect(memberEmptyTitle("APPROVED", "  ")).toBe("No approved members");
     expect(memberEmptyTitle("APPROVED", " Nisha ")).toBe("No approved members match “Nisha”");
     expect(MEMBER_SEARCH_HINT).toBe("Search looks at names, companies and phone numbers.");
+  });
+});
+
+describe("settingsSave", () => {
+  const initial: TenantSettingsDto = {
+    memberApprovalMode: "ADMIN_APPROVAL",
+    contentModerationMode: "AUTO_APPROVE",
+    allowSelfRegistration: true,
+    minBatchYear: 1990,
+    maxBatchYear: 2030,
+    features: defaultFeaturesFor("OTHER"),
+    inviteAutoApprove: false,
+    updatedAt: "2026-06-01T00:00:00.000Z",
+  };
+
+  const { updatedAt: _updatedAt, features, ...plain } = initial;
+
+  it("starts the form from the settings, with the years as text", () => {
+    expect(settingsDraftOf(initial)).toStrictEqual({ ...plain, features, minBatchYear: "1990", maxBatchYear: "2030" });
+  });
+
+  it("sends the settings with the years as numbers, and only the features that changed, if any", () => {
+    const draft = settingsDraftOf(initial);
+    expect(settingsSave(initial, draft)).toStrictEqual({ input: plain });
+    expect(settingsSave(initial, { ...draft, features: { ...features, funding: false } })).toStrictEqual({ input: { ...plain, features: { funding: false } } });
+    expect(settingsSave(initial, { ...draft, minBatchYear: " 1985 " }).input?.minBatchYear).toBe(1985);
+  });
+
+  it("sends nothing while a year is wrong, saying why under it", () => {
+    // A blank box would have gone as 0, which the API refuses in words of its own.
+    expect(settingsSave(initial, { ...settingsDraftOf(initial), minBatchYear: "" })).toStrictEqual({ errors: { minBatchYear: `Enter a year from 1950 to ${latestBatchYearAllowed()}` } });
+    expect(settingsSave(initial, { ...settingsDraftOf(initial), minBatchYear: "2031" }).errors).toEqual({ minBatchYear: "The earliest year can't be after the latest" });
   });
 });

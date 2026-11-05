@@ -1315,10 +1315,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
   - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: member detail,
-    moderation, reports, chat reports, invitations, profile fields, settings, branding, analytics and the audit log.
-    Until each lands, its tile on the console's home (moderation and both kinds of report have one) opens nothing, and
-    its admin notices open the console's home. A new-member notice opens the members waiting, not the member, until
-    member detail lands.
+    moderation, reports, chat reports, invitations, branding (Settings says so where it would link to it), analytics
+    and the audit log. Until each lands, its tile on the console's home (moderation and both kinds of report have one)
+    opens nothing, and its admin notices open the console's home. A new-member notice opens the members waiting, not
+    the member, until member detail lands.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

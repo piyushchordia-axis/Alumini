@@ -41,5 +41,9 @@ export default function AdminLayout() {
     }, [qc, slug]),
   );
   if (!isTenantAdmin) return <LeaveConsole href={homeHref(slug, tenant.settings.features)} />;
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="profile-fields/edit" options={{ presentation: "modal" }} />
+    </Stack>
+  );
 }

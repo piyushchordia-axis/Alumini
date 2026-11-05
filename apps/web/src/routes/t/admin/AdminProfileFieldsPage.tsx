@@ -1,42 +1,44 @@
 import {
+  archiveFieldConfirm,
+  CHOICE_TYPES,
+  emptyFieldDraft,
+  FIELD_FILTER_HINT,
+  FIELD_VISIBILITY_OPTIONS,
+  fieldBadges,
+  fieldCanFilter,
+  inFieldOrder,
   MAX_PROFILE_FIELDS,
+  moveId,
+  normalizeFieldBody,
   PROFILE_FIELD_TYPES,
   PROFILE_FIELD_TYPE_LABELS,
-  type ProfileFieldCreateInput,
+  profileFieldFormErrors,
+  profileFieldsSubtitle,
+  slugifyKey,
+  uniqueOptionValue,
+  type ProfileFieldDraft,
   type ProfileFieldDto,
   type ProfileFieldOption,
   type ProfileFieldType,
+  type ProfileFieldVisibility,
 } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { IconFields } from "@/components/icons";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useId, useState } from "react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { IconChevronDown, IconChevronUp, IconClose, IconFields, IconPlus } from "@/components/icons";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-const CHOICE: ProfileFieldType[] = ["SELECT", "MULTI_SELECT"];
-const FILTERABLE: ProfileFieldType[] = ["SELECT", "MULTI_SELECT", "BOOLEAN"];
-
-/** "Blood group" → "blood_group" (a valid field key / option value). */
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/^(?=[^a-z])/, "f_")
-    .slice(0, 40);
-
 function OptionsEditor({ options, onChange }: { options: ProfileFieldOption[]; onChange: (o: ProfileFieldOption[]) => void }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     const label = draft.trim();
     if (!label) return;
-    let value = slugify(label) || "option";
-    while (options.some((o) => o.value === value)) value = `${value}_`;
-    onChange([...options, { value, label }]);
+    onChange([...options, { value: uniqueOptionValue(options, label), label }]);
     setDraft("");
   };
   return (
@@ -44,8 +46,8 @@ function OptionsEditor({ options, onChange }: { options: ProfileFieldOption[]; o
       {options.map((o, i) => (
         <div key={o.value} className="flex gap-2">
           <Input aria-label={`Option ${i + 1}`} value={o.label} onChange={(e) => onChange(options.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-          <Button type="button" variant="ghost" aria-label={`Remove option ${o.label}`} onClick={() => onChange(options.filter((_, j) => j !== i))}>
-            ✕
+          <Button type="button" variant="ghost" className="min-h-10 min-w-10 px-2" aria-label={`Remove option ${o.label}`} onClick={() => onChange(options.filter((_, j) => j !== i))}>
+            <IconClose size={16} />
           </Button>
         </div>
       ))}
@@ -71,43 +73,57 @@ function OptionsEditor({ options, onChange }: { options: ProfileFieldOption[]; o
   );
 }
 
+/**
+ * After a question is added, changed, moved, archived or restored: the console's lists, the member forms' questions, and
+ * the directory's filters. Settles once they're refetched.
+ */
+function useRefreshFields(slug: string) {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: qk.admin.profileFields(slug) }),
+      qc.invalidateQueries({ queryKey: qk.profileFields(slug) }),
+      qc.invalidateQueries({ queryKey: qk.directoryFilters(slug) }),
+    ]);
+}
+
 function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose: () => void }) {
   const { tenant } = useAdminTenant();
   const slug = tenant.slug;
-  const qc = useQueryClient();
+  const refresh = useRefreshFields(slug);
+  const filterHintId = useId();
   const isNew = !field;
-  const [v, setV] = useState<ProfileFieldCreateInput>({
-    key: field?.key ?? "",
-    label: field?.label ?? "",
-    helpText: field?.helpText ?? null,
-    type: field?.type ?? "TEXT",
-    options: field?.options ?? [],
-    required: field?.required ?? false,
-    visibility: field?.visibility ?? "MEMBERS",
-    memberEditable: field?.memberEditable ?? true,
-    filterable: field?.filterable ?? false,
-  });
+  const [v, setV] = useState<ProfileFieldDraft>(() => emptyFieldDraft(field));
   const [keyTouched, setKeyTouched] = useState(!isNew);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const set = <K extends keyof ProfileFieldCreateInput>(k: K, value: ProfileFieldCreateInput[K]) => setV((s) => ({ ...s, [k]: value }));
+  const set = <K extends keyof ProfileFieldDraft>(k: K, value: ProfileFieldDraft[K]) => setV((s) => ({ ...s, [k]: value }));
+  const canFilter = fieldCanFilter(v.type, v.visibility);
   const save = useMutation({
-    mutationFn: () => {
-      const body = { ...v, options: CHOICE.includes(v.type) ? v.options : [], filterable: FILTERABLE.includes(v.type) && v.filterable };
+    mutationFn: (body: ProfileFieldDraft) => {
       if (isNew) return api.admin.profileFields.create(slug, body);
       const { key: _key, ...rest } = body;
       return api.admin.profileFields.update(slug, field.id, rest);
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.admin.profileFields(slug) });
-      void qc.invalidateQueries({ queryKey: qk.profileFields(slug) });
+      void refresh();
       toast.success(isNew ? "Field added" : "Field saved");
       onClose();
     },
     onError: (e) => {
-      if (isApiClientError(e) && Object.keys(e.fieldErrors).length) setErrors(e.fieldErrors);
-      else toast.error(errorMessage(e));
+      if (isApiClientError(e) && Object.keys(e.fieldErrors).length) {
+        // By the input each is about: "options.2.label" is the options' error.
+        const next: Record<string, string> = {};
+        for (const [path, message] of Object.entries(e.fieldErrors)) next[path.split(".")[0]!] ??= message;
+        setErrors(next);
+      } else toast.error(errorMessage(e));
     },
   });
+  const submit = () => {
+    const body = normalizeFieldBody(v);
+    const problems = profileFieldFormErrors(body, isNew);
+    setErrors(problems);
+    if (Object.keys(problems).length === 0) save.mutate(body);
+  };
   return (
     <Modal
       open
@@ -118,7 +134,7 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!v.label.trim() || !v.key}>
+          <Button onClick={submit} loading={save.isPending} disabled={!v.label.trim() || !v.key}>
             {isNew ? "Add field" : "Save"}
           </Button>
         </>
@@ -131,8 +147,8 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
             maxLength={80}
             placeholder="e.g. House, Roll number, Hostel"
             onChange={(e) => {
-              set("label", e.target.value);
-              if (!keyTouched) set("key", slugify(e.target.value));
+              const label = e.target.value;
+              setV((s) => ({ ...s, label, ...(keyTouched ? {} : { key: slugifyKey(label) }) }));
             }}
           />
         </FormField>
@@ -156,10 +172,13 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
             ))}
           </Select>
         </FormField>
-        <FormField label="Who can see answers">
-          <Select value={v.visibility} onChange={(e) => set("visibility", e.target.value as ProfileFieldCreateInput["visibility"])}>
-            <option value="MEMBERS">Members, on profiles</option>
-            <option value="ADMINS">Only admins (and the member)</option>
+        <FormField label="Who can see answers" error={errors.visibility}>
+          <Select value={v.visibility} onChange={(e) => set("visibility", e.target.value as ProfileFieldVisibility)}>
+            {FIELD_VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </Select>
         </FormField>
         <div className="sm:col-span-2">
@@ -167,7 +186,7 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
             <Input value={v.helpText ?? ""} maxLength={200} onChange={(e) => set("helpText", e.target.value || null)} placeholder="Shown under the question" />
           </FormField>
         </div>
-        {CHOICE.includes(v.type) && (
+        {CHOICE_TYPES.includes(v.type) && (
           <div className="sm:col-span-2">
             <FormField label="Options" required error={errors.options} group>
               <OptionsEditor options={v.options} onChange={(o) => set("options", o)} />
@@ -177,9 +196,21 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
         <div className="space-y-2 sm:col-span-2">
           <Checkbox label="Required when joining" checked={v.required} onChange={(e) => set("required", e.target.checked)} />
           <Checkbox label="Only admins fill this in (members can't change it)" checked={!v.memberEditable} onChange={(e) => set("memberEditable", !e.target.checked)} />
-          {FILTERABLE.includes(v.type) && v.visibility === "MEMBERS" && (
-            <Checkbox label="Members can filter the directory by it" checked={v.filterable} onChange={(e) => set("filterable", e.target.checked)} />
-          )}
+          <div>
+            <Checkbox
+              label="Members can filter the directory by it"
+              checked={canFilter && v.filterable}
+              disabled={!canFilter}
+              aria-describedby={canFilter ? undefined : filterHintId}
+              className={canFilter ? undefined : "opacity-60"}
+              onChange={(e) => set("filterable", e.target.checked)}
+            />
+            {!canFilter && (
+              <p id={filterHintId} className="ml-6 text-xs text-slate-500">
+                {FIELD_FILTER_HINT}
+              </p>
+            )}
+          </div>
           {errors.filterable && <p className="text-xs text-red-600">{errors.filterable}</p>}
         </div>
       </div>
@@ -191,40 +222,56 @@ export function AdminProfileFieldsPage() {
   const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const qc = useQueryClient();
+  const refresh = useRefreshFields(slug);
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<ProfileFieldDto | "new" | null>(null);
-  const list = useQuery({ queryKey: [...qk.admin.profileFields(slug), { showArchived }], queryFn: () => api.admin.profileFields.list(slug, showArchived) });
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: qk.admin.profileFields(slug) });
-    void qc.invalidateQueries({ queryKey: qk.profileFields(slug) });
-  };
-  const reorder = useMutation({ mutationFn: (ids: string[]) => api.admin.profileFields.reorder(slug, ids), onSuccess: refresh, onError: (e) => toast.error(errorMessage(e)) });
+  const [archiving, setArchiving] = useState<ProfileFieldDto | null>(null);
+  const listKey = [...qk.admin.profileFields(slug), { showArchived }];
+  // The other toggle's list stays on the page while this one loads, rather than a spinner in its place.
+  const list = useQuery({ queryKey: listKey, queryFn: () => api.admin.profileFields.list(slug, showArchived), placeholderData: keepPreviousData });
+  // Shown at once and put back if refused, as on the phone. The arrows wait until the stored order is back, so the next
+  // move starts from it.
+  const reorder = useMutation({
+    mutationFn: (ids: string[]) => api.admin.profileFields.reorder(slug, ids),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: listKey });
+      const before = qc.getQueryData<ProfileFieldDto[]>(listKey);
+      if (before) qc.setQueryData(listKey, inFieldOrder(before, ids));
+      return { before, key: listKey };
+    },
+    onError: (e, _ids, context) => {
+      if (context?.before) qc.setQueryData(context.key, context.before);
+      toast.error(`Couldn't move it: ${errorMessage(e)}`);
+    },
+    onSettled: () => refresh(),
+  });
   const archive = useMutation({
     mutationFn: (f: ProfileFieldDto) => (f.archivedAt ? api.admin.profileFields.restore(slug, f.id) : api.admin.profileFields.archive(slug, f.id)),
     onSuccess: (f) => {
-      refresh();
+      void refresh();
+      setArchiving(null);
       toast.success(f.archivedAt ? "Field archived; answers are kept" : "Field restored");
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      setArchiving(null);
+      toast.error(errorMessage(e));
+    },
   });
   if (list.isLoading) return <Loading />;
   if (list.error || !list.data) return <ErrorBox error={list.error ?? "Failed"} />;
   const fields = list.data;
   const active = fields.filter((f) => !f.archivedAt);
-  const move = (index: number, delta: number) => {
-    const ids = active.map((f) => f.id);
-    const [id] = ids.splice(index, 1);
-    ids.splice(index + delta, 0, id!);
-    reorder.mutate(ids);
-  };
+  const move = (index: number, delta: number) => reorder.mutate(moveId(active.map((f) => f.id), index, delta));
+  const confirm = archiving ? archiveFieldConfirm(archiving.label) : null;
   return (
     <div className="space-y-4">
       <PageHeader
         title="Profile fields"
-        subtitle={`Your own questions on member profiles, such as house, roll number or hostel (${active.length} of ${MAX_PROFILE_FIELDS}).`}
+        subtitle={profileFieldsSubtitle(active.length)}
         actions={
           <Button onClick={() => setEditing("new")} disabled={active.length >= MAX_PROFILE_FIELDS}>
-            + Add field
+            <IconPlus size={16} />
+            Add field
           </Button>
         }
       />
@@ -244,32 +291,37 @@ export function AdminProfileFieldsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-slate-900">{f.label}</span>
                       <code className="rounded bg-slate-100 px-1.5 text-xs text-slate-600">{f.key}</code>
-                      <Badge>{PROFILE_FIELD_TYPE_LABELS[f.type]}</Badge>
-                      {f.required && <Badge tone="warning">Required</Badge>}
-                      {f.visibility === "ADMINS" && <Badge tone="info">Admins only</Badge>}
-                      {!f.memberEditable && <Badge tone="info">Set by admins</Badge>}
-                      {f.filterable && <Badge tone="success">Directory filter</Badge>}
-                      {f.archivedAt && <Badge tone="danger">Archived</Badge>}
+                      {fieldBadges(f).map((b) => (
+                        <Badge key={b.label} tone={b.tone}>
+                          {b.label}
+                        </Badge>
+                      ))}
                     </div>
                     {f.options.length > 0 && <p className="mt-1 truncate text-xs text-slate-500">{f.options.map((o) => o.label).join(" · ")}</p>}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {!f.archivedAt && (
                       <>
-                        <Button size="sm" variant="ghost" aria-label={`Move ${f.label} up`} disabled={i <= 0 || reorder.isPending} onClick={() => move(i, -1)}>
-                          ↑
+                        <Button size="sm" variant="ghost" className="min-h-10 min-w-10 px-2" aria-label={`Move ${f.label} up`} disabled={i <= 0 || reorder.isPending} onClick={() => move(i, -1)}>
+                          <IconChevronUp size={18} />
                         </Button>
-                        <Button size="sm" variant="ghost" aria-label={`Move ${f.label} down`} disabled={i === active.length - 1 || reorder.isPending} onClick={() => move(i, 1)}>
-                          ↓
+                        <Button size="sm" variant="ghost" className="min-h-10 min-w-10 px-2" aria-label={`Move ${f.label} down`} disabled={i === active.length - 1 || reorder.isPending} onClick={() => move(i, 1)}>
+                          <IconChevronDown size={18} />
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditing(f)}>
+                        <Button size="sm" variant="outline" aria-label={`Edit ${f.label}`} onClick={() => setEditing(f)}>
                           Edit
                         </Button>
                       </>
                     )}
-                    <Button size="sm" variant="ghost" loading={archive.isPending && archive.variables?.id === f.id} onClick={() => archive.mutate(f)}>
-                      {f.archivedAt ? "Restore" : "Archive"}
-                    </Button>
+                    {f.archivedAt ? (
+                      <Button size="sm" variant="ghost" aria-label={`Restore ${f.label}`} loading={archive.isPending && archive.variables?.id === f.id} onClick={() => archive.mutate(f)}>
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="ghost" aria-label={`Archive ${f.label}`} onClick={() => setArchiving(f)}>
+                        Archive
+                      </Button>
+                    )}
                   </div>
                 </li>
               );
@@ -278,6 +330,16 @@ export function AdminProfileFieldsPage() {
         </Card>
       )}
       {editing && <FieldModal field={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+      <ConfirmDialog
+        open={!!archiving}
+        title={confirm?.title ?? ""}
+        body={confirm?.body}
+        confirmLabel={confirm?.confirmLabel ?? "Archive"}
+        destructive
+        busy={archive.isPending}
+        onConfirm={() => archiving && archive.mutate(archiving)}
+        onCancel={() => setArchiving(null)}
+      />
     </div>
   );
 }

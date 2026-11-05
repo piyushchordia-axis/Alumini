@@ -1,4 +1,4 @@
-import { channelName } from "@illuminize/shared";
+import { planChannelsSentence } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { BrandingForm } from "@/components/admin/BrandingForm";
@@ -18,18 +18,26 @@ export function AdminSettingsPage() {
     void qc.invalidateQueries({ queryKey: qk.admin.settings(slug) });
     void qc.invalidateQueries({ queryKey: qk.tenant(slug) });
     void qc.invalidateQueries({ queryKey: qk.tenants });
+    // The dashboard's approval sentence.
+    void qc.invalidateQueries({ queryKey: qk.admin.dashboard(slug) });
   };
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error ?? "Failed"} />;
+  const plan = planChannelsSentence(q.data.outboundChannels);
   return (
     <div className="space-y-4">
       <PageHeader title="Settings" subtitle="Approval rules, features and how your institution looks" />
       <Card className="p-4 text-sm text-slate-700">
-        <span className="font-medium text-slate-900">Your plan includes: </span>
-        in-app notifications and push
-        {q.data.outboundChannels.length > 0 && `, plus ${q.data.outboundChannels.map(channelName).join(", ")} for invites and announcements`}
-        .{" "}
-        <span className="text-slate-500">{q.data.outboundChannels.length === 0 ? "Ask the Illuminize team to add WhatsApp, SMS or email messaging." : "Messages are billed per delivery."}</span>
+        {plan.sentence.map((part, i) =>
+          part.strong ? (
+            <span key={i} className="font-medium text-slate-900">
+              {part.text}
+            </span>
+          ) : (
+            <span key={i}>{part.text}</span>
+          ),
+        )}{" "}
+        <span className="text-slate-500">{plan.note}</span>
       </Card>
       <Tabs value={tab} onChange={setTab} tabs={[{ value: "settings", label: "Approvals & features" }, { value: "branding", label: "Branding" }]} className="w-fit" />
       <Card className="p-5">

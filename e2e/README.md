@@ -143,7 +143,10 @@ Covers:
   nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
   spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
-- the Profile fields page saying degree and field of study are built in, and adding a profile question; importing an
+- the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
+  the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in
+  its new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
+  confirm dialog (Cancel first); importing an
   invitation CSV and joining through its link in a second browser, with the name filled in and the three steps; an
   announcement that also goes by email;
 - the reported business listing in Demo University's reports;
@@ -249,9 +252,18 @@ Covers:
   with Back returning to the list; Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
   tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
   darker, and the feed after a reload with its post cards painting their own white, the console's home staying on the
-  plain page, and Plain putting the page and its grey text back; and, with the role taken away (answered by the
-  script), the console leaving for the feed with one set of tabs, More dropping its row, and the console opened cold
-  doing the same;
+  plain page, and Plain putting the page and its grey text back; the console's Settings, reached from the approval
+  sentence's 44px Settings link (and
+  later from the section's row), saying the plan has no messaging, a blank batch year refused under its box with
+  nothing sent, a save refused while another admin's change comes back (both answered by the script) starting the form
+  again from the stored settings and still saying "Couldn't save: …", Messaging off clearing Mentorship and holding it
+  with "Needs Messaging", and Funding saved off (sending only that switch) with More dropping it at once, then back on;
+  Profile fields, adding "Seva team …" in the modal editor (the key following the question, options added by Return
+  and by Add, the directory filter box disabled for short text and for admin-only answers), moving it up (in its new
+  place, said, with the arrows waiting, while the script holds the move) and down, a move the script refuses put back
+  with "Couldn't move it" while the list's refetch is held, archiving it after the confirm sheet (Cancel first), and
+  Show archived listing it to restore, after a reload too; and, with the role taken away (answered by the script), the
+  console leaving for the feed with one set of tabs, More dropping its row, and the console opened cold doing the same;
 - the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi and Diya
   Raval with their details line and 44px actions named for them, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
@@ -570,6 +582,22 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] TalkBack or VoiceOver on the members list: the status tabs are read as tabs with their counts, and each row's
       buttons with the member's name ("Approve Parth Joshi", "Reject Parth Joshi"), so one row's can't be mistaken for
       the next's. The admin's own row (search Jignesh under Approved) says "You" and has no buttons.
+- [ ] Settings: tap "Earliest batch year". The number pad comes up with the box still in view above it, on the iPhone
+      and on Android, and only digits go in (four at most). Scroll down with the keyboard up: Save settings can be
+      reached. TalkBack or VoiceOver reads Mentorship, with Messaging off, as a dimmed (disabled) checkbox and then
+      "Needs Messaging".
+- [ ] Settings: switch Funding off and save. With VoiceOver on, "Settings saved" is read out once (not again when the
+      form starts over from the saved settings). Back to More: Funding has gone without a pull to refresh. Switch it back
+      on. (Signed in as the demo-school admin, `+91 90000 00003`, the last paragraph under the switches reads
+      "Messaging, Groups and Mentorship start off for schools…" on the phone as on the web.)
+- [ ] Profile fields → Add field: the editor opens as a modal sheet (swiping it down, on the iPhone, closes it and
+      keeps nothing). Type a question: the box stays above the keyboard and the key fills in. Choose "Choose one" in
+      Answer type (its list opens over the sheet). In "Add an option…", type an option and press Return: it's added,
+      the box stays focused and the keyboard stays up; add a second the same way, then remove it with its cross.
+      Scroll to Add field with the keyboard up and save.
+- [ ] Profile fields, TalkBack or VoiceOver: the arrows are read as "Move … up" and "Move … down", the first field's up
+      and the last's down as dimmed; after a move the new place is read out ("… moved up: 2 of 3"), and focus stays
+      on the arrow pressed.
 
 **Appearance**
 

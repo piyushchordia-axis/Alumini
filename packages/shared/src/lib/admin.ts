@@ -1,5 +1,18 @@
-import { MEMBERSHIP_STATUSES, type ContentType, type MembershipStatus, type ModerationStatus, type NotificationType } from "../constants";
-import type { AdminMemberDto, DashboardDto, TenantPublicSettings } from "../types/dto";
+import {
+  MEMBERSHIP_STATUSES,
+  MIN_BATCH_YEAR,
+  channelName,
+  type ApprovalMode,
+  type ContentType,
+  type MembershipStatus,
+  type MessageChannel,
+  type ModerationStatus,
+  type NotificationType,
+  type TenantFeatures,
+} from "../constants";
+import { tenantSettingsUpdateSchema, type TenantSettingsUpdate } from "../schemas/tenant";
+import type { AdminMemberDto, DashboardDto, TenantPublicSettings, TenantSettingsDto } from "../types/dto";
+import { changedFeatures } from "./features";
 import { MONTHS } from "./jobs";
 import { NOTIFICATION_CATEGORY } from "./notifications";
 import { formatPhone } from "./phone";
@@ -89,7 +102,7 @@ export type AdminSectionKey = AdminSection["key"];
  * The sections the phone app's console has so far (its Dashboard is the console's home). It lists the others as on the
  * web console, and README → Known gaps names them, until every page is in the phone app.
  */
-export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members"];
+export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members", "profileFields", "settings"];
 
 /** A figure on the console's home, which both apps draw as a tile. */
 export interface DashboardTile {
@@ -144,6 +157,118 @@ export function approvalSummary(settings: Pick<TenantPublicSettings, "memberAppr
     { text: settings.memberApprovalMode === "ADMIN_APPROVAL" ? "held for approval" : "auto-approved", strong: true },
     { text: ". Content follows your moderation settings." },
   ];
+}
+
+/** One of a setting's choices, with what it's called. */
+export interface ApprovalModeOption {
+  value: ApprovalMode;
+  label: string;
+}
+
+/** The two approval settings, as both apps' settings forms name and explain them. */
+export const APPROVAL_MODE_OPTIONS: Readonly<Record<"member" | "content", { label: string; hint: string; options: readonly ApprovalModeOption[] }>> = {
+  member: {
+    label: "New member approval",
+    hint: "Who can get in: everyone instantly, or only after an admin approves.",
+    options: [
+      { value: "AUTO_APPROVE", label: "Auto-approve members" },
+      { value: "ADMIN_APPROVAL", label: "Admin must approve members" },
+    ],
+  },
+  content: {
+    label: "Content moderation",
+    hint: "Applies to posts, jobs, funding, events, businesses, and groups' names and descriptions. Comments and messages are never held.",
+    options: [
+      { value: "AUTO_APPROVE", label: "Publish immediately" },
+      { value: "ADMIN_APPROVAL", label: "Admin must approve before publishing" },
+    ],
+  },
+};
+
+/**
+ * What the institution's plan lets it send, as the settings page says it: the sentence, its opening in bold, and a note
+ * on billing or on how to get messaging.
+ */
+export function planChannelsSentence(channels: readonly MessageChannel[]): { sentence: TextSegment[]; note: string } {
+  const extra = channels.length > 0 ? `, plus ${channels.map(channelName).join(", ")} for invites and announcements` : "";
+  return {
+    sentence: [{ text: "Your plan includes: ", strong: true }, { text: `in-app notifications and push${extra}.` }],
+    note: channels.length === 0 ? "Ask the Illuminize team to add WhatsApp, SMS or email messaging." : "Messages are billed per delivery.",
+  };
+}
+
+/** The latest batch year an institution may allow, as tenantSettingsUpdateSchema has it: ten years ahead. */
+export function latestBatchYearAllowed(now: Date = new Date()): number {
+  return now.getFullYear() + 10;
+}
+
+/**
+ * The settings form's batch years, as typed, checked before anything is sent: a year from 1950 to ten years ahead in
+ * each box, the earliest not after the latest. The problems by the setting each is about, or {}.
+ */
+export function batchYearIssues(min: string, max: string, now: Date = new Date()): Partial<Record<"minBatchYear" | "maxBatchYear", string>> {
+  const latest = latestBatchYearAllowed(now);
+  const read = (text: string) => {
+    const trimmed = text.trim();
+    const year = /^\d{4}$/.test(trimmed) ? Number(trimmed) : NaN;
+    return year >= MIN_BATCH_YEAR && year <= latest ? year : null;
+  };
+  const range = `Enter a year from ${MIN_BATCH_YEAR} to ${latest}`;
+  const issues: Partial<Record<"minBatchYear" | "maxBatchYear", string>> = {};
+  const from = read(min);
+  const to = read(max);
+  if (from === null) issues.minBatchYear = range;
+  if (to === null) issues.maxBatchYear = range;
+  if (from !== null && to !== null && from > to) issues.minBatchYear = "The earliest year can't be after the latest";
+  return issues;
+}
+
+/** What the settings form holds: the settings, with the batch years as typed. */
+export interface SettingsDraft {
+  memberApprovalMode: ApprovalMode;
+  contentModerationMode: ApprovalMode;
+  allowSelfRegistration: boolean;
+  minBatchYear: string;
+  maxBatchYear: string;
+  features: TenantFeatures;
+  inviteAutoApprove: boolean;
+}
+
+export function settingsDraftOf(s: TenantSettingsDto): SettingsDraft {
+  return {
+    memberApprovalMode: s.memberApprovalMode,
+    contentModerationMode: s.contentModerationMode,
+    allowSelfRegistration: s.allowSelfRegistration,
+    minBatchYear: String(s.minBatchYear),
+    maxBatchYear: String(s.maxBatchYear),
+    features: s.features,
+    inviteAutoApprove: s.inviteAutoApprove,
+  };
+}
+
+/**
+ * The save a settings form sends, or the problems that keep it from sending, by the setting each is about
+ * ("minBatchYear", "features.mentorship"): the batch years in words a person reads, then the API's own schema. Features
+ * go only when some changed, and then only those, so a stale form can't undo another admin's change.
+ */
+export function settingsSave(initial: TenantSettingsDto, draft: SettingsDraft, now: Date = new Date()): { input: TenantSettingsUpdate; errors?: undefined } | { input?: undefined; errors: Record<string, string> } {
+  const issues = batchYearIssues(draft.minBatchYear, draft.maxBatchYear, now);
+  if (Object.keys(issues).length > 0) return { errors: issues };
+  const changed = changedFeatures(initial.features, draft.features);
+  const input: TenantSettingsUpdate = {
+    memberApprovalMode: draft.memberApprovalMode,
+    contentModerationMode: draft.contentModerationMode,
+    allowSelfRegistration: draft.allowSelfRegistration,
+    minBatchYear: Number(draft.minBatchYear.trim()),
+    maxBatchYear: Number(draft.maxBatchYear.trim()),
+    ...(Object.keys(changed).length > 0 ? { features: changed } : {}),
+    inviteAutoApprove: draft.inviteAutoApprove,
+  };
+  const parsed = tenantSettingsUpdateSchema.safeParse(input);
+  if (parsed.success) return { input };
+  const errors: Record<string, string> = {};
+  for (const i of parsed.error.issues) errors[i.path.map(String).join(".") || "form"] ??= i.message;
+  return { errors };
 }
 
 /** What can happen to a membership. An admin does all but reapply, which is the member's own. */

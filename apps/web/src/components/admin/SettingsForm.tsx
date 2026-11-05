@@ -1,62 +1,90 @@
-import type { APPROVAL_MODES } from "@illuminize/shared";
-import { changedFeatures, FEATURE_PREREQUISITES, SCHOOL_OFF_FEATURES, TENANT_FEATURE_LABELS as FEATURE_LABELS, TENANT_FEATURES, type TenantFeature, type TenantFeatures, type TenantSettingsDto, type TenantSettingsUpdate, type TenantType } from "@illuminize/shared";
+import {
+  APPROVAL_MODE_OPTIONS,
+  featureBlockedText,
+  featureHelpText,
+  fieldErrorsFrom,
+  settingsDraftOf,
+  settingsSave,
+  TENANT_FEATURE_LABELS as FEATURE_LABELS,
+  TENANT_FEATURES,
+  toggleFeature,
+  type ApprovalMode,
+  type SettingsDraft,
+  type TenantFeature,
+  type TenantFeatures,
+  type TenantSettingsDto,
+  type TenantSettingsUpdate,
+  type TenantType,
+} from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useId, useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
-/** Turning a key off turns off whatever needs it, as the API does in the same save, so the form never shows a combination that can't be stored. */
-function toggled(features: TenantFeatures, key: TenantFeature, on: boolean): TenantFeatures {
-  const next = { ...features, [key]: on };
-  if (!on) for (const f of TENANT_FEATURES) if (FEATURE_PREREQUISITES[f] === key) next[f] = false;
-  return next;
-}
-
 /** One switch. A key whose prerequisite is off can't be turned on, and says what it needs outside its label, so the label stays its name alone. */
-function FeatureCheckbox({ feature, features, onChange }: { feature: TenantFeature; features: TenantFeatures; onChange: (next: TenantFeatures) => void }) {
+function FeatureCheckbox({ feature, features, error, onChange }: { feature: TenantFeature; features: TenantFeatures; error?: string; onChange: (next: TenantFeatures) => void }) {
   const hintId = useId();
-  const needs = FEATURE_PREREQUISITES[feature];
-  const blocked = !!needs && !features[needs];
+  const blocked = featureBlockedText(features, feature);
   return (
     <div>
-      <Checkbox checked={features[feature]} disabled={blocked} aria-describedby={blocked ? hintId : undefined} onChange={(e) => onChange(toggled(features, feature, e.target.checked))} label={FEATURE_LABELS[feature]} className={blocked ? "opacity-60" : undefined} />
-      {blocked && (
-        <p id={hintId} className="ml-6 text-xs text-slate-500">
-          Needs {FEATURE_LABELS[needs]}
+      <Checkbox
+        checked={features[feature]}
+        disabled={!!blocked}
+        aria-describedby={blocked || error ? hintId : undefined}
+        aria-invalid={error ? true : undefined}
+        onChange={(e) => onChange(toggleFeature(features, feature, e.target.checked))}
+        label={FEATURE_LABELS[feature]}
+        className={blocked ? "opacity-60" : undefined}
+      />
+      {(blocked || error) && (
+        <p id={hintId} className={error ? "ml-6 text-xs text-red-600" : "ml-6 text-xs text-slate-500"} role={error ? "alert" : undefined}>
+          {error ?? blocked}
         </p>
       )}
     </div>
   );
 }
 
+function ModeSelect({ which, value, onChange }: { which: keyof typeof APPROVAL_MODE_OPTIONS; value: ApprovalMode; onChange: (mode: ApprovalMode) => void }) {
+  const { label, hint, options } = APPROVAL_MODE_OPTIONS[which];
+  return (
+    <FormField label={label} hint={hint}>
+      <Select value={value} onChange={(e) => onChange(e.target.value as ApprovalMode)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </Select>
+    </FormField>
+  );
+}
+
 export function SettingsForm({ initial, tenantType, onSubmit }: { initial: TenantSettingsDto; tenantType: TenantType; onSubmit: (input: TenantSettingsUpdate) => Promise<unknown> }) {
-  const [memberApprovalMode, setMemberApprovalMode] = useState(initial.memberApprovalMode);
-  const [contentModerationMode, setContentModerationMode] = useState(initial.contentModerationMode);
-  const [allowSelfRegistration, setAllowSelfRegistration] = useState(initial.allowSelfRegistration);
-  const [minBatchYear, setMinBatchYear] = useState(String(initial.minBatchYear));
-  const [maxBatchYear, setMaxBatchYear] = useState(String(initial.maxBatchYear));
-  const [features, setFeatures] = useState(initial.features);
-  const [inviteAutoApprove, setInviteAutoApprove] = useState(initial.inviteAutoApprove);
+  const [draft, setDraft] = useState<SettingsDraft>(() => settingsDraftOf(initial));
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const set = <K extends keyof SettingsDraft>(key: K, value: SettingsDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   return (
     <form
       className="space-y-5"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
+        // Checked before sending: a blank year would otherwise go as 0.
+        const result = settingsSave(initial, draft);
+        if (result.errors) {
+          setErrors(result.errors);
+          return;
+        }
+        setErrors({});
         setBusy(true);
         try {
-          const changed = changedFeatures(initial.features, features);
-          await onSubmit({
-            memberApprovalMode,
-            contentModerationMode,
-            allowSelfRegistration,
-            minBatchYear: Number(minBatchYear),
-            maxBatchYear: Number(maxBatchYear),
-            ...(Object.keys(changed).length > 0 ? { features: changed } : {}),
-            inviteAutoApprove,
-          });
+          await onSubmit(result.input);
           toast.success("Settings saved");
         } catch (err) {
+          // By the whole path, so a refused switch's error ("features.mentorship") shows under that switch.
+          setErrors(fieldErrorsFrom(err));
           toast.error(errorMessage(err));
         } finally {
           setBusy(false);
@@ -64,49 +92,33 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="New member approval" hint="Who can get in: everyone instantly, or only after an admin approves.">
-          <Select value={memberApprovalMode} onChange={(e) => setMemberApprovalMode(e.target.value as (typeof APPROVAL_MODES)[number])}>
-            <option value="AUTO_APPROVE">Auto-approve members</option>
-            <option value="ADMIN_APPROVAL">Admin must approve members</option>
-          </Select>
+        <ModeSelect which="member" value={draft.memberApprovalMode} onChange={(v) => set("memberApprovalMode", v)} />
+        <ModeSelect which="content" value={draft.contentModerationMode} onChange={(v) => set("contentModerationMode", v)} />
+        <FormField label="Earliest batch year" error={errors.minBatchYear}>
+          <Input type="number" inputMode="numeric" value={draft.minBatchYear} invalid={!!errors.minBatchYear} onChange={(e) => set("minBatchYear", e.target.value)} />
         </FormField>
-        <FormField label="Content moderation" hint="Applies to posts, jobs, funding, events, businesses, and groups' names and descriptions. Comments and messages are never held.">
-          <Select value={contentModerationMode} onChange={(e) => setContentModerationMode(e.target.value as (typeof APPROVAL_MODES)[number])}>
-            <option value="AUTO_APPROVE">Publish immediately</option>
-            <option value="ADMIN_APPROVAL">Admin must approve before publishing</option>
-          </Select>
-        </FormField>
-        <FormField label="Earliest batch year">
-          <Input type="number" value={minBatchYear} onChange={(e) => setMinBatchYear(e.target.value)} />
-        </FormField>
-        <FormField label="Latest batch year">
-          <Input type="number" value={maxBatchYear} onChange={(e) => setMaxBatchYear(e.target.value)} />
+        <FormField label="Latest batch year" error={errors.maxBatchYear}>
+          <Input type="number" inputMode="numeric" value={draft.maxBatchYear} invalid={!!errors.maxBatchYear} onChange={(e) => set("maxBatchYear", e.target.value)} />
         </FormField>
       </div>
-      <Checkbox checked={allowSelfRegistration} onChange={(e) => setAllowSelfRegistration(e.target.checked)} label="Allow alumni to register themselves (turn off to onboard members manually only)" />
+      <Checkbox checked={draft.allowSelfRegistration} onChange={(e) => set("allowSelfRegistration", e.target.checked)} label="Allow alumni to register themselves (turn off to onboard members manually only)" />
       <Checkbox
-        checked={inviteAutoApprove}
-        onChange={(e) => setInviteAutoApprove(e.target.checked)}
+        checked={draft.inviteAutoApprove}
+        onChange={(e) => set("inviteAutoApprove", e.target.checked)}
         label="Approve invited alumni straight away (they sign in with the phone number you invited, even when self-registration is off)"
       />
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-slate-700">Enabled features</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {TENANT_FEATURES.map((f) => (
-            <FeatureCheckbox key={f} feature={f} features={features} onChange={setFeatures} />
+            <FeatureCheckbox key={f} feature={f} features={draft.features} error={errors[`features.${f}`]} onChange={(next) => set("features", next)} />
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-500">Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.</p>
-        <p className="mt-2 text-xs text-slate-500">Mentorship needs Messaging, because accepting a mentee opens a private chat. Turning Messaging off turns Mentorship off too.</p>
-        <p className="mt-2 text-xs text-slate-500">
-          Referral requests in Jobs need Messaging too, because accepting one opens a private chat. They have no switch of their own: members can ask for and give referrals while Jobs and Messaging are both on.
-        </p>
-        {tenantType === "SCHOOL" && (
-          <p className="mt-2 text-xs text-slate-500">
-            {new Intl.ListFormat("en-GB").format(SCHOOL_OFF_FEATURES.map((f) => FEATURE_LABELS[f]))} {SCHOOL_OFF_FEATURES.length === 1 ? "starts" : "start"} off for schools because members can contact each other privately there. If you turn {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"} on, current pupils still can't use {SCHOOL_OFF_FEATURES.length === 1 ? "it" : "them"}.
-            {SCHOOL_OFF_FEATURES.includes("messaging") && " Turning Messaging on also opens referral requests in Jobs, which current pupils can't use either."}
+        {featureHelpText(tenantType).map((text) => (
+          <p key={text} className="mt-2 text-xs text-slate-500">
+            {text}
           </p>
-        )}
+        ))}
       </fieldset>
       <Button type="submit" loading={busy}>
         Save settings

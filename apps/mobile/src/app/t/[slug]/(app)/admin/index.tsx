@@ -3,11 +3,11 @@ import { fatalQueryError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { StatGrid, StatTile } from "@/components/admin/StatTile";
 import { HubRow } from "@/components/HubRow";
-import { NavIcon } from "@/components/icons";
+import { IconChevronRight, NavIcon } from "@/components/icons";
 import { Button, Card, ErrorText, Muted, Spinner, headingRole } from "@/components/ui";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { useMembership } from "@/hooks/useMembership";
@@ -43,6 +43,7 @@ export default function AdminHomeScreen() {
   const sections = ADMIN_SECTIONS.filter((s) => s.key !== "dashboard");
   const onPhone = sections.filter((s) => MOBILE_ADMIN_SECTIONS.includes(s.key));
   const onWeb = sections.filter((s) => !MOBILE_ADMIN_SECTIONS.includes(s.key));
+  const settingsHref = adminSectionHref(slug, "settings");
   return (
     <AdminScreen title={tenant.shortName ?? tenant.name} home refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primary} colors={[theme.primary]} />}>
       <Muted size={13}>Admin console for {tenant.name}</Muted>
@@ -73,6 +74,13 @@ export default function AdminHomeScreen() {
             </Text>
           ))}
         </Text>
+        {/* Where the approval modes change, as the web Dashboard's card links. */}
+        {settingsHref && (
+          <Pressable onPress={() => router.push(settingsHref)} accessibilityRole="link" accessibilityLabel="Settings" style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}>
+            <Text style={[styles.linkText, { color: theme.primaryInk }]}>Settings</Text>
+            <IconChevronRight size={16} color={theme.primaryInk} />
+          </Pressable>
+        )}
       </Card>
       <Text {...headingRole(2)} style={styles.heading}>
         Sections
@@ -109,6 +117,8 @@ const styles = StyleSheet.create({
   heading: { fontSize: 15, fontWeight: "700", color: colors.text, marginTop: spacing.xs },
   sentence: { fontSize: 14, lineHeight: 20, color: colors.muted },
   strong: { fontWeight: "700", color: colors.text },
+  link: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 4, minHeight: 44 },
+  linkText: { fontSize: 14, fontWeight: "600" },
   webRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 32 },
   webLabel: { fontSize: 14, color: colors.muted },
 });

@@ -5,7 +5,12 @@ import {
   connectionsAvailable,
   defaultFeaturesFor,
   enabledGroupVisibilities,
+  FEATURE_HELP,
   FEATURE_PREREQUISITES,
+  featureBlockedBy,
+  featureBlockedText,
+  featureHelpText,
+  joinList,
   mentorshipAvailable,
   referralsAvailable,
   referralsEnabled,
@@ -14,6 +19,7 @@ import {
   SCHOOL_OFF_FEATURES,
   TENANT_FEATURES,
   TENANT_TYPES,
+  toggleFeature,
   type TenantFeature,
 } from "@illuminize/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -319,5 +325,68 @@ describe("changedFeatures", () => {
     expect(changedFeatures(saved, saved)).toEqual({});
     expect(changedFeatures(saved, { ...saved, jobs: false })).toEqual({ jobs: false });
     expect(changedFeatures({ ...saved, jobs: false }, { ...saved, jobs: true, funding: false })).toEqual({ jobs: true, funding: false });
+  });
+});
+
+describe("toggleFeature", () => {
+  it("turns off what needs a key with it, and leaves it off when the key comes back, as the API does", () => {
+    const on = defaultFeaturesFor("COLLEGE");
+    const off = toggleFeature(on, "messaging", false);
+    expect(off).toEqual({ ...on, messaging: false, mentorship: false });
+    expect(toggleFeature(off, "messaging", true)).toEqual({ ...on, mentorship: false });
+    // The same map the API stores for that change.
+    expect(off).toEqual(applyFeatureChange("COLLEGE", on, { messaging: false }).features);
+  });
+
+  it("changes only the key pressed when nothing needs it, and never the map it was given", () => {
+    const on = defaultFeaturesFor("COLLEGE");
+    const before = { ...on };
+    expect(toggleFeature(on, "funding", false)).toEqual({ ...on, funding: false });
+    expect(toggleFeature(on, "mentorship", false)).toEqual({ ...on, mentorship: false });
+    expect(on).toEqual(before);
+  });
+});
+
+describe("featureBlockedBy", () => {
+  it("names what a key waits for only while that is off", () => {
+    const on = defaultFeaturesFor("COLLEGE");
+    for (const f of TENANT_FEATURES) expect(featureBlockedBy(on, f), f).toBeNull();
+    const off = { ...on, messaging: false };
+    expect(featureBlockedBy(off, "mentorship")).toBe("messaging");
+    expect(featureBlockedText(off, "mentorship")).toBe("Needs Messaging");
+    expect(featureBlockedText(on, "mentorship")).toBeNull();
+    for (const f of TENANT_FEATURES.filter((f) => f !== "mentorship")) expect(featureBlockedBy(off, f), f).toBeNull();
+  });
+
+  it("agrees with the API: a blocked key turned on is the one conflict", () => {
+    const off = { ...defaultFeaturesFor("COLLEGE"), messaging: false, mentorship: false };
+    for (const f of TENANT_FEATURES) {
+      const blocked = featureBlockedBy(off, f) !== null;
+      expect(applyFeatureChange("COLLEGE", off, { [f]: true }).conflict !== null, f).toBe(blocked);
+    }
+  });
+});
+
+describe("joinList", () => {
+  it("joins the last two with and, by hand", () => {
+    expect(joinList([])).toBe("");
+    expect(joinList(["Messaging"])).toBe("Messaging");
+    expect(joinList(["Messaging", "Groups"])).toBe("Messaging and Groups");
+    expect(joinList(["Messaging", "Groups", "Mentorship"])).toBe("Messaging, Groups and Mentorship");
+  });
+});
+
+describe("featureHelpText", () => {
+  it("explains the prerequisites at every institution", () => {
+    for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(featureHelpText(type)).toEqual([...FEATURE_HELP]);
+    expect(FEATURE_HELP).toHaveLength(3);
+  });
+
+  it("adds why the school-off switches start off at a school, in the words the web console used", () => {
+    const text = featureHelpText("SCHOOL");
+    expect(text.slice(0, 3)).toEqual([...FEATURE_HELP]);
+    expect(text[3]).toBe(
+      "Messaging, Groups and Mentorship start off for schools because members can contact each other privately there. If you turn them on, current pupils still can't use them. Turning Messaging on also opens referral requests in Jobs, which current pupils can't use either.",
+    );
   });
 });

@@ -1,3 +1,4 @@
+import { inFieldOrder, moveId, type ProfileFieldDto } from "@illuminize/shared";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { memberships } from "../../src/db/schema";
@@ -63,6 +64,23 @@ describe.skipIf(!dbAvailable)("custom profile fields", () => {
     const all = await api().get(`${base}/admin/profile-fields?includeArchived=true`).set(admin.headers);
     expect(all.body.data.map((x: { key: string }) => x.key)).toContain("sports");
     expect((await api().post(`${base}/admin/profile-fields/${f.sports.id}/restore`).set(admin.headers)).body.data.archivedAt).toBeNull();
+  });
+
+  it("stores a move in the order the consoles show at once (inFieldOrder), archived fields included", async () => {
+    const { base, admin, create } = await setup();
+    const f = await standardFields(create);
+    expect((await api().post(`${base}/admin/profile-fields/${f.sports.id}/archive`).set(admin.headers)).status).toBe(200);
+    const listAll = async () => (await api().get(`${base}/admin/profile-fields?includeArchived=true`).set(admin.headers)).body.data as ProfileFieldDto[];
+    const before = await listAll();
+    const active = before.filter((x) => !x.archivedAt).map((x) => x.id);
+    // Hostel, the last active field, up one place, as the arrows send it.
+    const ids = moveId(active, active.length - 1, -1);
+    const shown = inFieldOrder(before, ids).map((x) => x.key);
+    expect(shown).toEqual(["house", "roll_no", "hostel", "verified", "sports"]);
+    const stored = await api().post(`${base}/admin/profile-fields/reorder`).set(admin.headers).send({ ids });
+    expect(stored.status).toBe(200);
+    expect(stored.body.data.map((x: ProfileFieldDto) => x.key)).toEqual(shown);
+    expect((await listAll()).map((x) => x.key)).toEqual(shown);
   });
 
   it("caps active fields at 30", async () => {

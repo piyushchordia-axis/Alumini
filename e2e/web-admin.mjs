@@ -323,12 +323,75 @@ try {
   await step("add a profile question", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/profile-fields`);
     await page.waitForSelector("text=Degree and field of study are now built into every profile");
-    await page.click('button:has-text("+ Add field")');
+    const add = page.getByRole("button", { name: "Add field", exact: true });
+    await expectSvgNoEmoji(add, "the Add field button");
+    await add.click();
     const modal = page.locator('[role="dialog"]');
     await modal.locator('label:has-text("Question") input').fill(`Hostel block ${unique}`);
+    // A short-text question can't be a directory filter: the box shows, disabled, saying why.
+    const filter = modal.getByRole("checkbox", { name: "Members can filter the directory by it" });
+    if (!(await filter.isDisabled())) throw new Error("the directory filter box is enabled for a short-text question");
+    await modal.getByText("Only choice and yes/no questions that members can see can be filters", { exact: true }).waitFor();
     await modal.locator('button:has-text("Add field")').click();
     await page.waitForSelector(`text=Hostel block ${unique}`);
+    // The arrows are drawn icons, named by the field, and the first can't move up.
+    const label = `Hostel block ${unique}`;
+    const up = page.getByRole("button", { name: `Move ${label} up`, exact: true });
+    await expectSvgNoEmoji(up, "the Move up button");
+    await expectSvgNoEmoji(page.getByRole("button", { name: `Move ${label} down`, exact: true }), "the Move down button");
+    if (!(await page.getByRole("button", { name: /^Move .+ up$/ }).first().isDisabled())) throw new Error("the first field can be moved up");
     await shot("a06-profile-fields");
+
+    // Moved at once, before the API answers (the script holds the move until the order has been read), with the arrows
+    // waiting until the stored order is back, so a second move can't start from the old one.
+    const order = () => page.getByRole("button", { name: /^Edit / }).evaluateAll((buttons) => buttons.map((b) => b.getAttribute("aria-label").slice(5)));
+    const expectOrder = async (expected, when) => {
+      for (let i = 0; i < 20 && (await order()).join() !== expected.join(); i++) await page.waitForTimeout(100);
+      if ((await order()).join() !== expected.join()) throw new Error(`${when}, the fields read ${(await order()).join(", ")}, expected ${expected.join(", ")}`);
+    };
+    const before = await order();
+    if (before.length < 2 || before.at(-1) !== label) throw new Error(`the new question isn't last: ${before.join(", ")}`);
+    const moved = [...before.slice(0, -2), label, before.at(-2)];
+    const reorderUrl = "**/api/v1/t/demo-college/admin/profile-fields/reorder";
+    let release = () => {};
+    let reached = () => {};
+    const gate = new Promise((resolve) => (release = resolve));
+    const held = new Promise((resolve) => (reached = resolve));
+    await page.route(reorderUrl, async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      reached();
+      await gate;
+      return route.fallback();
+    });
+    // Once moved up it isn't last, so only a move being saved holds its down arrow.
+    const down = page.getByRole("button", { name: `Move ${label} down`, exact: true });
+    try {
+      await up.click();
+      await held;
+      await expectOrder(moved, "before the API answered a move");
+      if (!(await down.isDisabled())) throw new Error("the arrows didn't wait for a move to be saved");
+      const answered = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/admin/profile-fields/reorder"));
+      release();
+      const response = await answered;
+      if (!response.ok()) throw new Error(`moving the question up failed: ${response.status()}`);
+      for (let i = 0; i < 50 && (await down.isDisabled()); i++) await page.waitForTimeout(100);
+      if (await down.isDisabled()) throw new Error("the arrows stayed disabled after the move was saved");
+      await expectOrder(moved, "once the move was saved");
+    } finally {
+      release();
+      await page.unroute(reorderUrl);
+    }
+
+    // Archived after asking: Cancel keeps it, Archive takes it off the list.
+    const archive = page.getByRole("button", { name: `Archive ${label}`, exact: true });
+    const dialog = page.getByRole("dialog", { name: `Archive “${label}”?` });
+    await archive.click();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    await archive.click();
+    await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && /\/admin\/profile-fields\/[^/]+\/archive$/.test(r.url())), dialog.getByRole("button", { name: "Archive", exact: true }).click()]);
+    await page.getByText("Field archived; answers are kept", { exact: true }).waitFor();
+    await page.getByRole("button", { name: `Edit ${label}`, exact: true }).waitFor({ state: "detached" });
   });
 
   const invitePhone = `76${unique}11`;

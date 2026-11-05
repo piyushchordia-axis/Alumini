@@ -2405,7 +2405,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations", "Profile fields", "Settings", "Audit log"];
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations", "Audit log"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2451,7 +2451,8 @@ try {
     if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
-    // Until a section is in the phone app, the home lists it as on the web console. Members is, so its tile and row link.
+    // Until a section is in the phone app, the home lists it as on the web console. Members is, so its tile and row link
+    // (as do Profile fields' and Settings' rows, which the steps after this use).
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
     const listed = (await page.getByRole("list").filter({ hasText: "Audit log" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
@@ -2551,6 +2552,289 @@ try {
     await choose("Plain");
     if ((await pageColours(group)).page !== PAGE_COLOURS.plain) throw new Error("Plain didn't put the plain page back");
     if ((await textColour(greyLine)) !== GREY_TEXT.plain) throw new Error("Plain didn't put the plain page's grey text back");
+  });
+
+  // The console's checkboxes and radios, by name. Screens below the one in front stay in the page, hence the last.
+  const choice = (role, name) => page.getByRole(role, { name, exact: true }).locator("visible=true").last();
+  const expectChoice = async (box, where, { checked, disabled }) => {
+    if (checked !== undefined && (await box.getAttribute("aria-checked")) !== String(checked)) throw new Error(`${where} should be ${checked ? "ticked" : "clear"}`);
+    if (disabled !== undefined && ((await box.getAttribute("aria-disabled")) === "true") !== disabled) throw new Error(`${where} should be ${disabled ? "disabled" : "enabled"}`);
+  };
+  const isSettingsSave = (r) => r.request().method() === "PATCH" && r.url().endsWith("/admin/settings");
+  // A pressable that is waiting on a request is aria-disabled until it's answered.
+  const whenEnabled = async (target) => {
+    for (let i = 0; i < 100 && (await target.getAttribute("aria-disabled")) === "true"; i++) await page.waitForTimeout(100);
+    return target;
+  };
+
+  await step("the console's settings: Funding off and on again with More following at once, Mentorship held by Messaging, a blank year sending nothing, and a refusal said after the form starts again", async () => {
+    await page.goto(SAMAJ + "/more");
+    await hubRow("Funding").waitFor();
+    await consoleRow().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    // The approval sentence links to Settings, as the web Dashboard's does, ahead of the section's own row.
+    const settingsLinks = () => page.getByRole("link", { name: "Settings", exact: true }).locator("visible=true");
+    await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
+    if ((await settingsLinks().count()) !== 2) throw new Error(`the console's home has ${await settingsLinks().count()} Settings links, expected the approval sentence's and the section's`);
+    const sentenceLink = settingsLinks().first();
+    await expectSvgNoEmoji(sentenceLink, "the approval sentence's Settings link");
+    const linkBox = await sentenceLink.boundingBox();
+    if (!linkBox || linkBox.height < 44) throw new Error(`the approval sentence's Settings link is ${linkBox?.height}px tall, under 44px`);
+    await sentenceLink.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings");
+    // Samaj's plan sends nothing but in-app notices and pushes.
+    await page.getByText("Ask the Illuminize team to add WhatsApp, SMS or email messaging.", { exact: true }).waitFor();
+    await page.getByText(/^Name, colours, logo and cover: on the web console for now\.$/).locator("visible=true").first().waitFor();
+    await expectChoice(choice("radio", "Admin must approve members"), "Admin must approve members", { checked: true });
+    const funding = choice("checkbox", "Funding");
+    await expectChoice(funding, "the Funding switch", { checked: true });
+    await fitsPhone("the console's settings", funding);
+
+    // A blank year is refused in words under its box, and nothing is sent.
+    const saves = [];
+    const counted = (request) => {
+      if (request.method() === "PATCH" && request.url().endsWith("/admin/settings")) saves.push(request);
+    };
+    page.on("request", counted);
+    const earliest = page.getByLabel("Earliest batch year", { exact: true }).locator("visible=true").last();
+    const year = await earliest.inputValue();
+    await earliest.fill("");
+    await page.getByRole("button", { name: "Save settings", exact: true }).locator("visible=true").last().click();
+    await page.getByText(/^Enter a year from 1950 to \d{4}$/).locator("visible=true").first().waitFor();
+    page.off("request", counted);
+    if (saves.length) throw new Error("a blank batch year was sent to the API");
+    await earliest.fill(year);
+
+    // A save refused because another admin changed the settings meanwhile (answered by the script): the settings come
+    // back changed, so the form starts again from them, and the refusal is still said under Save.
+    const settingsUrl = "**/api/v1/t/shri-gujarati-samaj/admin/settings";
+    const refusal = "Mentorship needs Messaging. Turn on Messaging first.";
+    await page.route(settingsUrl, async (route) => {
+      const method = route.request().method();
+      if (method === "PATCH") {
+        return route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          headers: { "Access-Control-Allow-Origin": "*" },
+          body: JSON.stringify({ error: { code: "VALIDATION_ERROR", message: refusal, details: [{ path: "features.mentorship", message: refusal }] } }),
+        });
+      }
+      if (method !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const json = await response.json();
+      return route.fulfill({ response, json: { ...json, data: { ...json.data, settings: { ...json.data.settings, updatedAt: new Date().toISOString() } } } });
+    });
+    try {
+      await choice("radio", "Auto-approve members").click();
+      await expectChoice(choice("radio", "Auto-approve members"), "Auto-approve members once chosen", { checked: true });
+      await page.getByRole("button", { name: "Save settings", exact: true }).locator("visible=true").last().click();
+      // Started again: the choice made here is gone, as the stored settings say.
+      for (let i = 0; i < 50 && (await choice("radio", "Admin must approve members").getAttribute("aria-checked")) !== "true"; i++) await page.waitForTimeout(100);
+      await expectChoice(choice("radio", "Admin must approve members"), "Admin must approve members after the refused save", { checked: true });
+      await page.getByText(`Couldn't save: ${refusal}`, { exact: true }).locator("visible=true").first().waitFor();
+    } finally {
+      await page.unroute(settingsUrl);
+    }
+
+    // Messaging off clears Mentorship and holds it, saying why; back on, Mentorship is free but stays off until ticked.
+    const mentorship = choice("checkbox", "Mentorship");
+    await choice("checkbox", "Messaging").click();
+    await expectChoice(mentorship, "Mentorship with Messaging off", { checked: false, disabled: true });
+    await page.getByText("Needs Messaging", { exact: true }).locator("visible=true").first().waitFor();
+    await choice("checkbox", "Messaging").click();
+    await expectChoice(mentorship, "Mentorship with Messaging back on", { checked: false, disabled: false });
+    await mentorship.click();
+
+    // Funding off: only it is sent, as the rest ended as it began.
+    await funding.click();
+    const [off] = await Promise.all([page.waitForResponse(isSettingsSave), page.getByRole("button", { name: "Save settings", exact: true }).locator("visible=true").last().click()]);
+    if (!off.ok()) throw new Error(`saving the settings failed: ${off.status()}`);
+    if (JSON.stringify(off.request().postDataJSON().features) !== JSON.stringify({ funding: false })) throw new Error(`the save sent features ${JSON.stringify(off.request().postDataJSON().features)}, expected only Funding off`);
+    await page.getByText("Settings saved", { exact: true }).locator("visible=true").first().waitFor();
+    await shot("m11-admin-settings");
+
+    // More, under the console, has already dropped Funding: no reload, and no pull to refresh.
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/more");
+    await hubRow("My profile").waitFor();
+    if (await page.getByRole("link", { name: "Funding", exact: true }).locator("visible=true").count()) throw new Error("More still lists Funding after the console switched it off");
+
+    // And back on, as Samaj started, for the steps after: this time by the section's row.
+    await consoleRow().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await settingsLinks().last().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings");
+    await expectChoice(choice("checkbox", "Funding"), "the Funding switch after saving it off", { checked: false });
+    await choice("checkbox", "Funding").click();
+    const [on] = await Promise.all([page.waitForResponse(isSettingsSave), page.getByRole("button", { name: "Save settings", exact: true }).locator("visible=true").last().click()]);
+    if (JSON.stringify(on.request().postDataJSON().features) !== JSON.stringify({ funding: true })) throw new Error(`the save sent features ${JSON.stringify(on.request().postDataJSON().features)}, expected only Funding on`);
+    await page.getByText("Settings saved", { exact: true }).locator("visible=true").first().waitFor();
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/more");
+    await hubRow("Funding").waitFor();
+  });
+
+  await step("the console's profile fields: a question added in the modal editor, moved up and down, archived after asking, and listed under Show archived", async () => {
+    const label = `Seva team ${unique}`;
+    await consoleRow().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await hubRow("Profile fields").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/profile-fields");
+    await page.getByText(/^Degree and field of study are now built into every profile/).locator("visible=true").first().waitFor();
+    for (const name of ["Chapter", "Community interests"]) await page.getByRole("button", { name: `Edit ${name}`, exact: true }).locator("visible=true").first().waitFor();
+    await fitsPhone("the console's profile fields", page.getByRole("button", { name: "Edit Chapter", exact: true }).locator("visible=true").first());
+
+    // The editor: the key follows the question, a choice takes options by Return and by Add, and only a choice members
+    // can see may be a directory filter.
+    const add = page.getByRole("button", { name: "Add field", exact: true }).locator("visible=true").first();
+    await expectSvgNoEmoji(add, "the profile fields' Add field button");
+    await add.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/profile-fields/edit");
+    await page.getByLabel("Question *", { exact: true }).locator("visible=true").last().fill(label);
+    const key = await page.getByLabel("Key *", { exact: true }).locator("visible=true").last().inputValue();
+    if (key !== `seva_team_${unique}`) throw new Error(`the key reads "${key}", expected seva_team_${unique}`);
+    const filter = choice("checkbox", "Members can filter the directory by it");
+    await expectChoice(filter, "the directory filter box for short text", { disabled: true });
+    await page.getByRole("button", { name: "Answer type, Short text", exact: true }).locator("visible=true").last().click();
+    const chooseOne = page.getByRole("button", { name: "Choose one", exact: true });
+    await chooseOne.locator("visible=true").last().click();
+    // The list slides away before the form can be typed in, as the job form's industry does.
+    await chooseOne.last().waitFor({ state: "hidden" });
+    await page.getByRole("button", { name: "Answer type, Choose one", exact: true }).locator("visible=true").last().waitFor();
+    const option = page.getByLabel("New option", { exact: true }).locator("visible=true").last();
+    await option.fill("Kitchen");
+    await option.press("Enter");
+    await option.fill("Stage");
+    await page.getByRole("button", { name: "Add", exact: true }).locator("visible=true").last().click();
+    if ((await page.getByLabel("Option 1", { exact: true }).locator("visible=true").last().inputValue()) !== "Kitchen") throw new Error("Return didn't add the option typed");
+    if ((await page.getByLabel("Option 2", { exact: true }).locator("visible=true").last().inputValue()) !== "Stage") throw new Error("Add didn't add the option typed");
+    await expectSvgNoEmoji(page.getByRole("button", { name: "Remove option Stage", exact: true }).locator("visible=true").last(), "the Remove option button");
+    await expectChoice(filter, "the directory filter box for a choice", { disabled: false });
+    await choice("radio", "Only admins (and the member)").click();
+    await expectChoice(filter, "the directory filter box for admin-only answers", { disabled: true, checked: false });
+    await page.getByText("Only choice and yes/no questions that members can see can be filters", { exact: true }).locator("visible=true").first().waitFor();
+    await choice("radio", "Members, on profiles").click();
+    await fitsPhone("the profile field editor", option);
+    const [created] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/admin/profile-fields")),
+      page.getByRole("button", { name: "Add field", exact: true }).locator("visible=true").last().click(),
+    ]);
+    if (!created.ok()) throw new Error(`adding the question failed: ${created.status()}`);
+    const sent = created.request().postDataJSON();
+    if (sent.type !== "SELECT" || sent.options.map((o) => o.label).join() !== "Kitchen,Stage") throw new Error(`the editor sent ${JSON.stringify(sent)}`);
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/profile-fields");
+    await page.getByText("Field added", { exact: true }).locator("visible=true").first().waitFor();
+    await page.getByRole("button", { name: `Edit ${label}`, exact: true }).locator("visible=true").first().waitFor();
+
+    // Moved at once, before the API answers (the script holds the move until the order has been read), and saved: last,
+    // then above Community interests; a move the API refuses (answered by the script) is put back, saying so; then last
+    // again.
+    const fields = ["Chapter", "Community interests", label];
+    const order = () =>
+      page
+        .getByRole("button", { name: /^Edit / })
+        .locator("visible=true")
+        .evaluateAll((buttons, names) => buttons.map((b) => b.getAttribute("aria-label").slice(5)).filter((name) => names.includes(name)), fields);
+    const expectOrder = async (expected) => {
+      for (let i = 0; i < 20 && (await order()).join() !== expected.join(); i++) await page.waitForTimeout(100);
+      if ((await order()).join() !== expected.join()) throw new Error(`the fields read ${(await order()).join(", ")}, expected ${expected.join(", ")}`);
+    };
+    await expectOrder(["Chapter", "Community interests", label]);
+    const moveUp = page.getByRole("button", { name: `Move ${label} up`, exact: true }).locator("visible=true").first();
+    const moveDown = page.getByRole("button", { name: `Move ${label} down`, exact: true }).locator("visible=true").first();
+    await expectChoice(moveDown, "Move down on the last field", { disabled: true });
+    const isReorder = (r) => r.request().method() === "POST" && r.url().endsWith("/admin/profile-fields/reorder");
+    // The script holds a move (`gate`) or refuses it (`refuse`), and can hold the list's refetch (`listGate`).
+    const listPath = "/api/v1/t/shri-gujarati-samaj/admin/profile-fields";
+    const reorderPath = `${listPath}/reorder`;
+    const fieldsRoute = (url) => url.pathname === listPath || url.pathname === reorderPath;
+    let gate = null;
+    let release = () => {};
+    let listGate = null;
+    let openList = () => {};
+    let reached = () => {};
+    let refuse = false;
+    await page.route(fieldsRoute, async (route) => {
+      const method = route.request().method();
+      if (new URL(route.request().url()).pathname === listPath) {
+        if (method === "GET" && listGate) await listGate;
+        return route.fallback();
+      }
+      if (method !== "POST") return route.fallback();
+      if (refuse) {
+        return route.fulfill({ status: 500, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ error: { code: "INTERNAL", message: "e2e INTERNAL" } }) });
+      }
+      reached();
+      if (gate) await gate;
+      return route.fallback();
+    });
+    try {
+      gate = new Promise((resolve) => (release = resolve));
+      const held = new Promise((resolve) => (reached = resolve));
+      await moveUp.click();
+      await held;
+      // The API hasn't answered: the rows have moved, the move is said, and the arrows wait for the answer.
+      await expectOrder(["Chapter", label, "Community interests"]);
+      await page.getByText(`${label} moved up: 2 of 3`, { exact: true }).locator("visible=true").first().waitFor();
+      await expectChoice(moveDown, "Move down while a move is being saved", { disabled: true });
+      const answered = page.waitForResponse(isReorder);
+      gate = null;
+      release();
+      const up = await answered;
+      if (!up.ok()) throw new Error(`moving the question up failed: ${up.status()}`);
+      await whenEnabled(moveDown);
+      await expectOrder(["Chapter", label, "Community interests"]);
+      await expectSvgNoEmoji(moveDown, "the Move down button");
+
+      // Refused: put back where it was, with a warning. The list's refetch is held meanwhile, so the refusal itself put
+      // it back.
+      refuse = true;
+      listGate = new Promise((resolve) => (openList = resolve));
+      await moveDown.click();
+      await page.getByText(/^Couldn't move it: /).locator("visible=true").first().waitFor();
+      await expectOrder(["Chapter", label, "Community interests"]);
+      refuse = false;
+      listGate = null;
+      openList();
+
+      await whenEnabled(moveDown);
+      const [down] = await Promise.all([page.waitForResponse(isReorder), moveDown.click()]);
+      if (!down.ok()) throw new Error(`moving the question down failed: ${down.status()}`);
+      await expectOrder(["Chapter", "Community interests", label]);
+    } finally {
+      // Nothing left held.
+      gate = null;
+      listGate = null;
+      release();
+      openList();
+      await page.unroute(fieldsRoute);
+    }
+
+    // Archived after asking: Cancel keeps it, Archive takes it off the list.
+    await page.getByRole("button", { name: `Archive ${label}`, exact: true }).locator("visible=true").first().click();
+    const sheet = page.getByRole("alertdialog", { name: `Archive “${label}”?` });
+    await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+    await sheet.waitFor({ state: "detached" });
+    await page.getByRole("button", { name: `Archive ${label}`, exact: true }).locator("visible=true").first().click();
+    await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && /\/admin\/profile-fields\/[^/]+\/archive$/.test(r.url())), sheet.getByRole("button", { name: "Archive", exact: true }).click()]);
+    await page.getByText("Field archived; answers are kept", { exact: true }).locator("visible=true").first().waitFor();
+    await expectOrder(["Chapter", "Community interests"]);
+
+    // Show archived lists it again, to restore, and a reload keeps the choice.
+    const showArchived = choice("checkbox", "Show archived fields");
+    await showArchived.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/profile-fields?archived=1");
+    await expectChoice(showArchived, "Show archived fields", { checked: true });
+    const restore = page.getByRole("button", { name: `Restore ${label}`, exact: true }).locator("visible=true").first();
+    await restore.waitFor();
+    await page.reload();
+    await restore.waitFor();
+    await expectChoice(choice("checkbox", "Show archived fields"), "Show archived fields after a reload", { checked: true });
+    await shot("m12-admin-profile-fields");
   });
 
   await step("an admin who loses the role is taken out of the console, and More drops its row", async () => {
