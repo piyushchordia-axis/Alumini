@@ -15,7 +15,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx`. Chrome:
   `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen` (pushed screens), `ChatHeader` (chat
   overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
-  to the console's home). Do not use native stack headers for member chrome (see Gotchas).
+  to the console's home). Do not use native stack headers for member chrome (see Gotchas). Files the console picks or
+  saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet).
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React; `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections;
@@ -27,7 +28,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
   of an institution colour (`brandTones`); `lib/appearance.ts` a member's background (`resolveAppearance`,
   `pageBackdrop` and the tiles both apps offer); `lib/branding.ts` the console's Branding form (`brandingSave`,
-  `BRAND_SWATCHES`, `brandContrastWarnings`) and the time zones a picker offers (`timeZoneOptions`).
+  `BRAND_SWATCHES`, `brandContrastWarnings`) and the time zones a picker offers (`timeZoneOptions`);
+  `lib/invitations.ts` the console's invitations: an imported CSV read (`readInvitationCsv`), the template, the import
+  in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`.
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -226,6 +229,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `aria-pressed`, because `aria-selected` isn't valid on `role="button"` in a browser.
 - `Alert.alert` does nothing on the web export and e2e dismisses `window.confirm`: new flows use `ConfirmSheet` (mobile)
   and `ConfirmDialog` (web).
+- On the web export, expo-document-picker clicks a hidden file input of its own and `Linking.openURL` opens a new tab:
+  e2e drives them with `page.waitForEvent("filechooser")` and `context.waitForEvent("page")`. A CSV read through
+  `Response.text()` has lost its byte order mark, so the phone's `saveFile` puts it back (`withBom`).
 - In development, OTP requests are rate-limited per phone and IP; `pnpm db:reset` clears them. A full e2e run makes 20
   code requests, the whole per-IP hour (refused ones count), so `e2e/lib.mjs` signs each phone in once per run: reuse
   `apiSession`, don't add logins. mobile-web's admin journey signs in the Samaj admin (`+919000000004`) as the forced
@@ -282,8 +288,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-  - admin pages not yet in the phone app, which show there as on the web console for now: invitations and analytics
-    (README → Known gaps lists them too);
+  - admin pages not yet in the phone app, which show there as on the web console for now: analytics (README → Known
+    gaps lists it too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

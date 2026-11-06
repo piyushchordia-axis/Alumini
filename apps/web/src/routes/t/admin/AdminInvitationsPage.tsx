@@ -1,179 +1,159 @@
 import {
-  MAX_INVITE_IMPORT_ROWS,
-  channelName,
-  csvLine,
-  formatPhone,
-  parseCsv,
+  INVITATION_CSV_HINT,
+  INVITATION_REVOKED_TEXT,
+  INVITATION_TABS,
+  INVITATION_TEMPLATE_FILE,
+  channelsSentence,
+  deliveryText,
+  formatCount,
+  importDoneText,
+  importIgnoredText,
+  importInChunks,
+  importProblems,
+  importProgressText,
+  importResultText,
+  importSummaryText,
+  invitationActionLabel,
+  invitationActionText,
+  invitationActions,
+  invitationMeta,
+  invitationName,
+  invitationStatusFilter,
+  invitationStatusView,
+  invitationTemplateCsv,
+  inviteShareText,
+  partialImportText,
+  readInvitationCsv,
+  revokeInvitationCopy,
+  rowCountText,
+  sendCountText,
+  sendNowLabel,
+  sendPendingCopy,
+  sendPendingDoneText,
+  sentText,
+  whatsappUrl,
+  withBom,
+  type ChunkedImportOutcome,
   type InvitationDto,
-  type InvitationImportResultDto,
   type InvitationImportRow,
-  type InvitationsQuery,
+  type InvitationTab,
+  type InviteImportMapping,
   type MessageChannel,
   type ProfileFieldDto,
 } from "@illuminize/shared";
-import { errorMessage } from "@illuminize/shared/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { errorMessage, isApiClientError, isOutOfDate } from "@illuminize/shared/client";
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
-import { IconDownload, IconMail } from "@/components/icons";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { IconCopy, IconDownload, IconExternalLink, IconMail, IconSearch } from "@/components/icons";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Stat, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
+import { saveBlob } from "@/lib/download";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-const PHONE_HEADERS = ["phone", "mobile", "phone_number", "mobile_number", "whatsapp"];
-const NAME_HEADERS = ["name", "full_name", "fullname"];
-const BATCH_HEADERS = ["batch", "batch_year", "year", "graduation_year"];
-const EMAIL_HEADERS = ["email", "email_address", "e_mail"];
-
-type Status = NonNullable<InvitationsQuery["status"]> | "ALL";
-
-/** Turns parsed CSV rows into import rows: known columns by common names, other columns that match a field key. */
-function toImportRows(rows: Record<string, string>[], headers: string[], fields: ProfileFieldDto[]) {
-  const pick = (names: string[]) => headers.find((h) => names.includes(h));
-  const phoneCol = pick(PHONE_HEADERS);
-  const nameCol = pick(NAME_HEADERS);
-  const batchCol = pick(BATCH_HEADERS);
-  const emailCol = pick(EMAIL_HEADERS);
-  const fieldCols = fields.filter((f) => headers.includes(f.key));
-  const used = new Set([phoneCol, nameCol, batchCol, emailCol, ...fieldCols.map((f) => f.key)]);
-  const ignored = headers.filter((h) => h && !used.has(h));
-  const out: InvitationImportRow[] = rows.map((r) => ({
-    phone: phoneCol ? r[phoneCol]! : "",
-    name: nameCol ? r[nameCol] || null : null,
-    batchYear: batchCol ? r[batchCol] || null : null,
-    email: emailCol ? r[emailCol] || null : null,
-    fields: Object.fromEntries(
-      fieldCols
-        .map((f) => {
-          const raw = r[f.key] ?? "";
-          if (!raw) return [f.key, null] as const;
-          // Several choices are written "a; b" in one cell; yes/no as yes/no/true/false/1/0.
-          if (f.type === "MULTI_SELECT") return [f.key, raw.split(/[;|]/).map((s) => s.trim()).filter(Boolean)] as const;
-          if (f.type === "BOOLEAN") return [f.key, /^(y|yes|true|1)$/i.test(raw) ? true : /^(n|no|false|0)$/i.test(raw) ? false : raw] as const;
-          if (f.type === "NUMBER" && raw.trim() !== "" && Number.isFinite(Number(raw))) return [f.key, Number(raw)] as const;
-          return [f.key, raw] as const;
-        })
-        .filter(([, v]) => v !== null),
-    ),
-  }));
-  return { rows: out, phoneCol, columns: { name: nameCol, batch: batchCol, email: emailCol, fields: fieldCols.map((f) => f.label) }, ignored };
-}
-
-function downloadTemplate(fields: ProfileFieldDto[]) {
-  const headers = ["phone", "name", "batch", "email", ...fields.map((f) => f.key)];
-  const example = ["+919876543210", "Asha Rao", "2012", "asha@example.com", ...fields.map((f) => (f.options[0]?.value ?? ""))];
-  const blob = new Blob(["\uFEFF" + csvLine(headers) + csvLine(example).replace(/^'/, "")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement("a"), { href: url, download: "invitations-template.csv" });
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function statusBadge(inv: InvitationDto) {
-  if (inv.expired) return <Badge tone="neutral">Expired</Badge>;
-  switch (inv.status) {
-    case "PENDING":
-      return <Badge tone="warning">Not sent</Badge>;
-    case "SENT":
-      return <Badge tone="info">Sent</Badge>;
-    case "ACCEPTED":
-      return <Badge tone="success">Joined</Badge>;
-    case "REVOKED":
-      return <Badge tone="danger">Revoked</Badge>;
-  }
-}
-
-function deliveryText(inv: InvitationDto) {
-  const d = inv.delivery;
-  if (!d) return inv.sendCount ? "" : "—";
-  const via = d.channel ? ` by ${channelName(d.channel)}` : "";
-  switch (d.status) {
-    case "QUEUED":
-    case "SENDING":
-      return "Sending…";
-    case "SENT":
-    case "DELIVERED":
-    case "READ":
-      return `${d.status === "READ" ? "Read" : d.status === "DELIVERED" ? "Delivered" : "Sent"}${via} · ${timeAgo(d.at)}`;
-    case "FAILED":
-      return `Failed${via}${d.lastError ? `: ${d.lastError}` : ""}`;
-    case "CANCELLED":
-      return "Not sent (closed before sending)";
-  }
-}
-
-function ImportCard({ fields, channels, onDone }: { fields: ProfileFieldDto[]; channels: MessageChannel[]; onDone: () => void }) {
+/**
+ * The import: a CSV read in the browser, its first rows and the columns used, then sent in requests of 500 rows. It waits
+ * for the institution's questions, as their keys are columns too, so a file picked first can't lose them; if they
+ * couldn't be loaded, it says so and offers to try again, as the phone's import does.
+ */
+function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryResult<ProfileFieldDto[]>; channels: MessageChannel[]; onDone: () => void }) {
   const { tenant } = useAdminTenant();
   const slug = tenant.slug;
-  const [parsed, setParsed] = useState<ReturnType<typeof toImportRows> & { fileName: string } | null>(null);
-  const [send, setSend] = useState(channels.length > 0);
-  const [result, setResult] = useState<InvitationImportResultDto | null>(null);
+  const fields = fieldsQuery.data;
+  const [parsed, setParsed] = useState<{ fileName: string; mapping: InviteImportMapping } | null>(null);
+  // Untouched, sending follows the plan once the summary is in: on when it sends.
+  const [sendChoice, setSendChoice] = useState<boolean | null>(null);
+  const sendNow = (sendChoice ?? channels.length > 0) && channels.length > 0;
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [outcome, setOutcome] = useState<ChunkedImportOutcome | null>(null);
   const run = useMutation({
-    mutationFn: async () => {
-      const rows = parsed!.rows;
-      const total: InvitationImportResultDto = { created: 0, updated: 0, skipped: 0, queued: 0, results: [] };
-      for (let i = 0; i < rows.length; i += MAX_INVITE_IMPORT_ROWS) {
-        // Data rows start on line 2 of the file (line 1 is the header).
-        const r = await api.admin.invitations.import(slug, { rows: rows.slice(i, i + MAX_INVITE_IMPORT_ROWS), send: send && channels.length > 0, rowOffset: i + 1 });
-        total.created += r.created;
-        total.updated += r.updated;
-        total.skipped += r.skipped;
-        total.queued += r.queued;
-        total.results.push(...r.results);
+    mutationFn: ({ rows, send }: { rows: InvitationImportRow[]; send: boolean }) =>
+      importInChunks(rows, (chunk) => api.admin.invitations.import(slug, { rows: chunk.rows, send, rowOffset: chunk.rowOffset }), { fields, onProgress: (done, total) => setProgress({ done, total }) }),
+    onMutate: ({ rows }) => {
+      setOutcome(null);
+      setProgress({ done: 0, total: rows.length });
+    },
+    onSuccess: (o) => {
+      setOutcome(o);
+      if (o.error) {
+        toast.error(errorMessage(o.error));
+        return;
       }
-      return total;
-    },
-    onSuccess: (r) => {
-      setResult(r);
       setParsed(null);
-      onDone();
-      toast.success(`${r.created} invited, ${r.updated} updated${r.queued ? `, ${r.queued} sending` : ""}`);
+      toast.success(importDoneText(o.result));
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    // A request that failed after others went still changed the list.
+    onSettled: () => {
+      setProgress(null);
+      onDone();
+    },
   });
-  const problems = result?.results.filter((r) => r.status === "invalid" || r.status === "member") ?? [];
+  const problems = outcome ? importProblems(outcome.result) : [];
+  const ignored = parsed ? importIgnoredText(parsed.mapping) : null;
+  const partial = outcome?.error ? partialImportText(outcome.imported, outcome.error) : null;
   return (
     <Card className="space-y-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-slate-900">Import a list</h2>
           <p className="text-sm text-slate-500">A CSV with a phone column, and optionally name, batch, email and your profile field keys. Numbers without a country code use your institution&apos;s country.</p>
+          <p className="mt-1 text-sm text-slate-500">{INVITATION_CSV_HINT}</p>
         </div>
-        <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => downloadTemplate(fields)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5"
+          disabled={!fields}
+          onClick={() => fields && saveBlob(new Blob([withBom(invitationTemplateCsv(fields))], { type: "text/csv;charset=utf-8" }), INVITATION_TEMPLATE_FILE)}
+        >
           <IconDownload size={16} />
           Template
         </Button>
       </div>
+      {fieldsQuery.error && !fields && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ErrorBox error={`Couldn't load your profile questions: ${errorMessage(fieldsQuery.error)}`} className="flex-1" />
+          <Button variant="outline" size="sm" loading={fieldsQuery.isFetching} onClick={() => void fieldsQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
       <input
         type="file"
         accept=".csv,text/csv"
         aria-label="CSV file"
-        className="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary"
+        disabled={!fields || run.isPending}
+        className="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary disabled:opacity-60"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (!file) return;
-          setResult(null);
-          const csv = parseCsv(await file.text());
-          const mapped = toImportRows(csv.rows, csv.headers, fields);
-          if (!mapped.phoneCol) {
-            toast.error("No phone column found. Name a column \"phone\" (see the template).");
+          if (!file || !fields) return;
+          setOutcome(null);
+          let text: string;
+          try {
+            text = await file.text();
+          } catch {
+            toast.error("Couldn't read that file. Save it as CSV and try again.");
             return;
           }
-          setParsed({ ...mapped, fileName: file.name });
+          const read = readInvitationCsv(text, fields);
+          if (!read.mapping) {
+            setParsed(null);
+            toast.error(read.problem);
+            return;
+          }
+          setParsed({ fileName: file.name, mapping: read.mapping });
         }}
       />
       {parsed && (
         <div className="space-y-3 rounded-lg bg-slate-50 p-4 text-sm">
           <p>
-            <span className="font-medium">{parsed.fileName}</span>: {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"}. Using phone
-            {parsed.columns.name ? ", name" : ""}
-            {parsed.columns.batch ? ", batch" : ""}
-            {parsed.columns.email ? ", email" : ""}
-            {parsed.columns.fields.length ? `, ${parsed.columns.fields.join(", ")}` : ""}.
-            {parsed.ignored.length > 0 && <span className="text-slate-500"> Ignoring: {parsed.ignored.join(", ")}.</span>}
+            <span className="font-medium">{parsed.fileName}</span>: {importSummaryText(parsed.mapping)}
+            {ignored && <span className="text-slate-500"> {ignored}</span>}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -186,7 +166,7 @@ function ImportCard({ fields, channels, onDone }: { fields: ProfileFieldDto[]; c
                 </tr>
               </thead>
               <tbody>
-                {parsed.rows.slice(0, 5).map((r, i) => (
+                {parsed.mapping.rows.slice(0, 5).map((r, i) => (
                   <tr key={i} className="border-t border-slate-200">
                     <td className="py-1 pr-3 font-mono">{r.phone}</td>
                     <td className="py-1 pr-3">{r.name}</td>
@@ -196,30 +176,28 @@ function ImportCard({ fields, channels, onDone }: { fields: ProfileFieldDto[]; c
                 ))}
               </tbody>
             </table>
-            {parsed.rows.length > 5 && <p className="mt-1 text-xs text-slate-500">…and {parsed.rows.length - 5} more</p>}
+            {parsed.mapping.rows.length > 5 && <p className="mt-1 text-xs text-slate-500">…and {formatCount(parsed.mapping.rows.length - 5)} more</p>}
           </div>
-          <Checkbox
-            checked={send && channels.length > 0}
-            disabled={channels.length === 0}
-            onChange={(e) => setSend(e.target.checked)}
-            label={channels.length ? `Send the invitations now (by ${channels.map(channelName).join(", then ")})` : "Sending isn't included in your plan; you'll share the links yourself"}
-          />
-          <div className="flex gap-2">
-            <Button onClick={() => run.mutate()} loading={run.isPending}>
-              Import {parsed.rows.length} row{parsed.rows.length === 1 ? "" : "s"}
+          <Checkbox checked={sendNow} disabled={channels.length === 0 || run.isPending} onChange={(e) => setSendChoice(e.target.checked)} label={sendNowLabel(channels)} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => run.mutate({ rows: parsed.mapping.rows, send: sendNow })} loading={run.isPending}>
+              {progress ? importProgressText(progress.done, progress.total) : `Import ${rowCountText(parsed.mapping.rows.length)}`}
             </Button>
-            <Button variant="ghost" onClick={() => setParsed(null)}>
+            <Button variant="ghost" disabled={run.isPending} onClick={() => setParsed(null)}>
               Cancel
             </Button>
           </div>
         </div>
       )}
-      {result && (
+      {outcome && (
         <div className="space-y-2 text-sm" role="status">
-          <p>
-            <span className="font-medium text-slate-900">{result.created} new</span>, {result.updated} updated, {result.skipped} skipped
-            {result.queued ? `, ${result.queued} being sent` : ""}.
-          </p>
+          {outcome.error ? (
+            <p className="text-red-700">
+              {errorMessage(outcome.error)}
+              {partial ? ` ${partial}` : ""}
+            </p>
+          ) : null}
+          {(!outcome.error || outcome.imported > 0) && <p className="font-medium text-slate-900">{importResultText(outcome.result)}</p>}
           {problems.length > 0 && (
             <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-3 text-xs">
               {problems.map((p) => (
@@ -239,46 +217,100 @@ export function AdminInvitationsPage() {
   const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const qc = useQueryClient();
-  const [status, setStatus] = useState<Status>("ALL");
+  const [status, setStatus] = useState<InvitationTab>("ALL");
   const [q, setQ] = useState("");
+  const search = useDebounced(q.trim());
   const [page, setPage] = useState(1);
-  const filters = { status: status === "ALL" ? undefined : status, q: q || undefined, page, pageSize: 25 };
+  const filters = { status: invitationStatusFilter(status), q: search || undefined, page, pageSize: 25 };
   const summary = useQuery({ queryKey: qk.admin.invitationSummary(slug), queryFn: () => api.admin.invitations.summary(slug) });
   const list = useQuery({ queryKey: qk.admin.invitations(slug, filters), queryFn: () => api.admin.invitations.list(slug, filters) });
   const fields = useQuery({ queryKey: qk.admin.profileFields(slug), queryFn: () => api.admin.profileFields.list(slug) });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin", slug, "invitations"] });
+
+  const [confirmingPending, setConfirmingPending] = useState(false);
   const sendPending = useMutation({
     mutationFn: () => api.admin.invitations.sendPending(slug),
     onSuccess: (r) => {
-      refresh();
-      toast.success(r.queued ? `Sending ${r.queued} invitation${r.queued === 1 ? "" : "s"}` : "Nothing to send");
+      setConfirmingPending(false);
+      toast.success(sendPendingDoneText(r.queued));
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    // The plan stopped sending since the page was loaded (a 409): the question no longer stands, so the dialog closes
+    // and says why. Anything else stays in the dialog, to try again.
+    onError: (e) => {
+      if (isOutOfDate(e)) {
+        setConfirmingPending(false);
+        toast.error(errorMessage(e));
+      }
+    },
+    // A refusal means the figures are out of date too.
+    onSettled: refresh,
   });
   const resend = useMutation({
-    mutationFn: (id: string) => api.admin.invitations.send(slug, [id]),
-    onSuccess: (r) => {
-      refresh();
-      toast[r.queued ? "success" : "info"](r.queued ? "Invitation sent again" : "Sent less than a day ago; try again later");
-    },
+    mutationFn: (inv: InvitationDto) => api.admin.invitations.send(slug, [inv.id]),
+    onSuccess: (r, inv) => toast[r.queued ? "success" : "info"](sentText(r.queued, inv.sendCount > 0)),
     onError: (e) => toast.error(errorMessage(e)),
+    onSettled: refresh,
   });
-  const revoke = useMutation({ mutationFn: (id: string) => api.admin.invitations.revoke(slug, id), onSuccess: refresh, onError: (e) => toast.error(errorMessage(e)) });
+  const [revoking, setRevoking] = useState<InvitationDto | null>(null);
+  const revoke = useMutation({
+    mutationFn: (inv: InvitationDto) => api.admin.invitations.revoke(slug, inv.id),
+    onSuccess: () => {
+      setRevoking(null);
+      toast.success(INVITATION_REVOKED_TEXT);
+    },
+    // Accepted since the list was loaded: the question no longer stands, so the dialog closes and says why.
+    onError: (e) => {
+      if (isApiClientError(e) && e.status === 409) {
+        setRevoking(null);
+        toast.error(errorMessage(e));
+      }
+    },
+    onSettled: refresh,
+  });
   const s = summary.data;
   const channels = s?.channels ?? [];
-  const shareText = (inv: InvitationDto) => `You're invited to join the ${tenant.name} alumni network on Illuminize: ${inv.link}`;
+  const pendingCopy = s ? sendPendingCopy(s.pending, channels, s.sendableToday) : null;
+  const revokeCopy = revoking ? revokeInvitationCopy(revoking) : null;
   return (
     <div className="space-y-4">
       <PageHeader
         title="Invitations"
         subtitle="Invite alumni by phone. They sign in with that number and join, even when self-registration is closed."
         actions={
-          channels.length > 0 && s && s.pending > 0 ? (
-            <Button onClick={() => sendPending.mutate()} loading={sendPending.isPending}>
-              Send {s.pending} pending
+          channels.length > 0 && s && s.pending > 0 && pendingCopy ? (
+            <Button
+              onClick={() => {
+                sendPending.reset();
+                setConfirmingPending(true);
+              }}
+            >
+              {pendingCopy.label}
             </Button>
           ) : undefined
         }
+      />
+      {pendingCopy && (
+        <ConfirmDialog
+          open={confirmingPending}
+          title={pendingCopy.title}
+          body={pendingCopy.body}
+          confirmLabel={pendingCopy.confirm}
+          busy={sendPending.isPending}
+          error={sendPending.error}
+          onConfirm={() => sendPending.mutate()}
+          onCancel={() => setConfirmingPending(false)}
+        />
+      )}
+      <ConfirmDialog
+        open={!!revoking}
+        title={revokeCopy?.title ?? ""}
+        body={revokeCopy?.body}
+        confirmLabel={revokeCopy?.confirm ?? "Revoke"}
+        destructive
+        busy={revoke.isPending}
+        error={revoke.error}
+        onConfirm={() => revoking && revoke.mutate(revoking)}
+        onCancel={() => setRevoking(null)}
       />
       {s && (
         <>
@@ -289,37 +321,25 @@ export function AdminInvitationsPage() {
             <Stat label="Expired" value={s.expired} />
             <Stat label="Can send today" value={channels.length ? s.sendableToday : "—"} />
           </div>
-          <p className="text-sm text-slate-600">
-            {channels.length ? (
-              <>Your plan sends invitations by {channels.map(channelName).join(", then ")}. Each invitation can be resent once a day.</>
-            ) : (
-              <>Your plan doesn&apos;t include WhatsApp, SMS or email messages: copy an invitation&apos;s link or share it on WhatsApp from your own phone.</>
-            )}
-          </p>
+          <p className="text-sm text-slate-600">{channelsSentence(channels)}</p>
         </>
       )}
-      <ImportCard fields={fields.data ?? []} channels={channels} onDone={refresh} />
+      <ImportCard fieldsQuery={fields} channels={channels} onDone={refresh} />
       <div className="flex flex-wrap items-center gap-3">
-        <Tabs<Status>
+        <Tabs<InvitationTab>
           value={status}
           onChange={(v) => {
             setStatus(v);
             setPage(1);
           }}
-          tabs={[
-            { value: "ALL", label: "All" },
-            { value: "PENDING", label: "Not sent" },
-            { value: "SENT", label: "Sent" },
-            { value: "ACCEPTED", label: "Joined" },
-            { value: "EXPIRED", label: "Expired" },
-            { value: "REVOKED", label: "Revoked" },
-          ]}
+          tabs={[...INVITATION_TABS]}
           className="w-fit"
         />
         <Input
           aria-label="Search invitations"
           placeholder="Name, phone or email"
           value={q}
+          maxLength={80}
           onChange={(e) => {
             setQ(e.target.value);
             setPage(1);
@@ -332,7 +352,11 @@ export function AdminInvitationsPage() {
       ) : list.error || !list.data ? (
         <ErrorBox error={list.error ?? "Failed"} />
       ) : list.data.data.length === 0 ? (
-        <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
+        search ? (
+          <EmptyState icon={<IconSearch size={32} className="text-slate-400" />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
+        ) : (
+          <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
+        )
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -347,63 +371,72 @@ export function AdminInvitationsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {list.data.data.map((inv) => {
-                  const open = (inv.status === "PENDING" || inv.status === "SENT") && !inv.expired;
+                  const can = invitationActions(inv, channels);
+                  const view = invitationStatusView(inv);
+                  const times = sendCountText(inv);
                   return (
                     <tr key={inv.id}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{inv.fullName ?? "—"}</div>
-                        <div className="font-mono text-xs text-slate-500">
-                          {formatPhone(inv.phone)}
-                          {inv.batchYear ? ` · ${inv.batchYear}` : ""}
-                          {inv.email ? ` · ${inv.email}` : ""}
-                        </div>
+                        <div className="font-medium text-slate-900">{invitationName(inv)}</div>
+                        <div className="font-mono text-xs text-slate-500">{invitationMeta(inv)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        {statusBadge(inv)}
+                        <Badge tone={view.tone}>{view.label}</Badge>
                         {inv.acceptedAt && <div className="mt-1 text-xs text-slate-500">{formatDateTime(inv.acceptedAt)}</div>}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">
-                        {deliveryText(inv)}
-                        {inv.sendCount > 1 && <div className="text-slate-400">sent {inv.sendCount} times</div>}
+                        {deliveryText(inv, timeAgo)}
+                        {times && <div className="text-slate-400">{times}</div>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap justify-end gap-1">
-                          {open && inv.link && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  await navigator.clipboard.writeText(inv.link!);
-                                  toast.success("Link copied");
-                                }}
-                              >
-                                Copy link
-                              </Button>
-                              <a
-                                className="inline-flex h-8 items-center rounded-lg px-3 text-sm text-emerald-700 hover:bg-emerald-50"
-                                href={`https://wa.me/${inv.phone.replace(/\D/g, "")}?text=${encodeURIComponent(shareText(inv))}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                WhatsApp
-                              </a>
-                            </>
-                          )}
-                          {open && channels.length > 0 && (
-                            <Button size="sm" variant="outline" loading={resend.isPending && resend.variables === inv.id} onClick={() => resend.mutate(inv.id)}>
-                              {inv.sendCount ? "Resend" : "Send"}
-                            </Button>
-                          )}
-                          {inv.status !== "ACCEPTED" && inv.status !== "REVOKED" && (
+                          {can.copy && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => {
-                                if (confirm(`Revoke the invitation for ${inv.fullName ?? formatPhone(inv.phone)}? The link stops working.`)) revoke.mutate(inv.id);
+                              className="gap-1.5"
+                              aria-label={invitationActionLabel("copy", inv)}
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(inv.link!);
+                                  toast.success("Link copied");
+                                } catch {
+                                  toast.error("Couldn't copy the link");
+                                }
                               }}
                             >
-                              Revoke
+                              <IconCopy size={16} />
+                              {invitationActionText("copy", inv)}
+                            </Button>
+                          )}
+                          {can.whatsapp && (
+                            <a
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm text-emerald-700 hover:bg-emerald-50"
+                              href={whatsappUrl(inv.phone, inviteShareText(tenant.name, inv.link!))}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={invitationActionLabel("whatsapp", inv)}
+                            >
+                              <IconExternalLink size={16} />
+                              {invitationActionText("whatsapp", inv)}
+                            </a>
+                          )}
+                          {can.send && (
+                            <Button size="sm" variant="outline" aria-label={invitationActionLabel("send", inv)} loading={resend.isPending && resend.variables?.id === inv.id} onClick={() => resend.mutate(inv)}>
+                              {invitationActionText("send", inv)}
+                            </Button>
+                          )}
+                          {can.revoke && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={invitationActionLabel("revoke", inv)}
+                              onClick={() => {
+                                revoke.reset();
+                                setRevoking(inv);
+                              }}
+                            >
+                              {invitationActionText("revoke", inv)}
                             </Button>
                           )}
                         </div>

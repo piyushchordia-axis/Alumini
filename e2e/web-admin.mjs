@@ -576,6 +576,8 @@ try {
     await page.goto(`${BASE}/t/demo-college/admin/invitations`);
     await page.waitForSelector("text=Import a list");
     await expectSvgNoEmoji(page.getByRole("button", { name: "Template", exact: true }), "the Template button");
+    // The file input waits for the profile questions, whose keys are columns too.
+    await page.locator('input[aria-label="CSV file"]:enabled').waitFor({ state: "attached" });
     await page.setInputFiles('input[aria-label="CSV file"]', { name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(`Phone,Name,Batch\r\n+91${invitePhone},Kavita Invitee,2015\r\n`) });
     await page.click('button:has-text("Import 1 row")');
     await page.waitForSelector("text=1 new");
@@ -603,6 +605,37 @@ try {
     }
     await page.reload();
     await page.locator("tr", { hasText: "Kavita Invitee" }).first().locator("text=Joined").waitFor();
+  });
+
+  await step("revoking an invitation asks first in a dialog, and Cancel keeps it", async () => {
+    await page.goto(`${BASE}/t/demo-college/admin/invitations`);
+    const input = page.locator('input[aria-label="CSV file"]:enabled');
+    await input.waitFor({ state: "attached" });
+    await input.setInputFiles({ name: "revoke.csv", mimeType: "text/csv", buffer: Buffer.from(`phone,name\r\n+9176${unique}12,Ravi Revoked\r\n`) });
+    await page.click('button:has-text("Import 1 row")');
+    await page.waitForSelector("text=1 new");
+    const row = page.locator("tr", { hasText: "Ravi Revoked" }).first();
+    const revoke = row.getByRole("button", { name: "Revoke the invitation for Ravi Revoked", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Revoke the invitation for Ravi Revoked?" });
+    const sent = [];
+    const onRequest = (r) => r.method() === "POST" && /\/admin\/invitations\/[^/]+\/revoke$/.test(r.url()) && sent.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await revoke.click();
+      await dialog.getByText("The link stops working.", { exact: true }).waitFor();
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      if (sent.length) throw new Error(`Cancel still revoked: ${sent.join(", ")}`);
+      await row.getByText("Not sent", { exact: true }).waitFor();
+      await revoke.click();
+      await dialog.getByRole("button", { name: "Revoke", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      await page.getByText("Invitation revoked", { exact: true }).waitFor();
+      await row.getByText("Revoked", { exact: true }).waitFor();
+      if (sent.length !== 1) throw new Error(`Revoke sent ${sent.length} requests`);
+    } finally {
+      page.off("request", onRequest);
+    }
   });
 
   await step("post an announcement that also goes by email", async () => {
@@ -642,6 +675,41 @@ try {
     await asking.waitFor({ state: "detached" });
     await page.locator("article", { hasText: text }).first().getByText("Announcement", { exact: true }).waitFor();
     await shot("a08-announcement");
+  });
+
+  await step("Send pending asks first, saying it's billed: Cancel sends nothing, and a plan that stopped sending closes the dialog and says so", async () => {
+    await page.goto(`${BASE}/t/demo-university/admin/invitations`);
+    const button = page.getByRole("button", { name: /^Send \d+ pending$/ });
+    await button.waitFor();
+    const pending = Number(/^Send (\d+) pending$/.exec((await button.innerText()).trim())?.[1]);
+    const dialog = page.getByRole("dialog", { name: pending === 1 ? "Send 1 invitation?" : `Send ${pending} invitations?` });
+    const refused = "Your plan doesn't include WhatsApp, SMS or email messages. Copy or share the invite links instead.";
+    // Answered by the script, so nothing is billed: refused first, as for a plan that stopped sending, then queued.
+    const sent = [];
+    const sendPendingUrl = "**/api/v1/t/demo-university/admin/invitations/send-pending";
+    await page.route(sendPendingUrl, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      sent.push(route.request().url());
+      return sent.length === 1 ? route.fulfill({ status: 409, json: { error: { code: "CONFLICT", message: refused } } }) : route.fulfill({ status: 200, json: { data: { queued: pending, skipped: 0 } } });
+    });
+    try {
+      await button.click();
+      await dialog.getByText(/^By .+\. Messages are billed per delivery; up to [\d,]+ more can go today\.$/).waitFor();
+      await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      if (sent.length) throw new Error(`Cancel still sent: ${sent.join(", ")}`);
+      await button.click();
+      await dialog.getByRole("button", { name: "Send", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      await page.getByText(refused, { exact: true }).first().waitFor();
+      await button.click();
+      await dialog.getByRole("button", { name: "Send", exact: true }).click();
+      await dialog.waitFor({ state: "detached" });
+      await page.getByText(`Sending ${pending} invitation${pending === 1 ? "" : "s"}`, { exact: true }).waitFor();
+      if (sent.length !== 2) throw new Error(`Send pending sent ${sent.length} requests`);
+    } finally {
+      await page.unroute(sendPendingUrl);
+    }
   });
 
   await step("the reported business listing is in the university's reports", async () => {

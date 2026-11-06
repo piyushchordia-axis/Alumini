@@ -39,6 +39,7 @@ export * from "./lib/referrals";
 export * from "./lib/chatReports";
 export * from "./lib/profileFields";
 export * from "./lib/csv";
+export * from "./lib/invitations";
 export * from "./lib/admin";
 export * from "./lib/announcements";
 export * from "./lib/audit";

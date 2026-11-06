@@ -112,6 +112,7 @@ export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = [
   "moderation",
   "reports",
   "chatReports",
+  "invitations",
   "profileFields",
   "settings",
   "audit",

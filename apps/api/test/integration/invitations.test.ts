@@ -1,4 +1,4 @@
-import type { MessageChannel } from "@illuminize/shared";
+import { importInChunks, importProblems, type InvitationImportResultDto, type InvitationImportRow, type MessageChannel } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -95,6 +95,29 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     const again = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+447700900123", name: "Asha R." }] });
     expect(again.body.data).toMatchObject({ created: 0, updated: 1 });
     expect((await ctx.db.select().from(invitations).where(eq(invitations.phoneE164, "+447700900123")))[0]!.fullName).toBe("Asha R.");
+  });
+
+  it("leaves out a row with a cell too long for the request on its own line, through the apps' chunked import", async () => {
+    const { base, admin } = await setup();
+    const rows: InvitationImportRow[] = [
+      { phone: "+917600000101", name: "Asha Rao", batchYear: "2012" },
+      { phone: "+917600000102", name: "Ravi Shah", batchYear: "Class of 2012" },
+      { phone: "+917600000103", name: "Mina Patel" },
+    ];
+    // Sent as it is, the long batch fails the whole request, with no line to find it by.
+    const whole = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows, rowOffset: 1 });
+    expect(whole.status).toBe(400);
+
+    const outcome = await importInChunks(rows, async (chunk) => {
+      const res = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: chunk.rows, rowOffset: chunk.rowOffset });
+      expect(res.status).toBe(200);
+      return res.body.data as InvitationImportResultDto;
+    });
+    expect(outcome.error).toBeUndefined();
+    expect(outcome.result).toMatchObject({ created: 2, updated: 0, skipped: 1 });
+    // The header is line 1, so the second data row is line 3.
+    expect(importProblems(outcome.result)).toEqual([{ row: 3, phone: "+917600000102", status: "invalid", message: "Batch is too long to be a year" }]);
+    expect((await ctx.db.select().from(invitations)).map((r) => r.fullName).sort()).toEqual(["Asha Rao", "Mina Patel"]);
   });
 
   it("sends only over the plan's channels, rate-limits resends and the daily total, and shows delivery", async () => {

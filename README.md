@@ -186,24 +186,26 @@ before showing the demo.
   reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
   profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
   the member's page, content waiting on the moderation queue with that item open, a report on the open reports, and a
-  chat report on the open chat reports, scrolled to it but never opened. Its pages are coming to the phone one at a time
-  (see Known gaps); the members list,
-  moderation and reports are there, with the same status tabs and counts, search and filters, Approve all and row
-  actions as the web's, scrolling on through the pages, and so is a member's page: their facts and profile, their
-  answers to the institution's questions (which admins can edit), their mentor profile (Remove as mentor), Make admin or
-  Remove admin role (asked first on both apps), and their recent activity, naming who acted. So is the audit log,
-  filtered by a family of actions (Members, Content, Reports and so on) or any prefix typed, kept in the address; its
-  rows link to the member they're about and show their details as readable lines, never a private key such as a deleted
-  account's phone hash, nor a phone number (a new institution's first admin is recorded by number). Moderation previews
-  each item as the web console does (a job in full, its contacts as text), approves a group in two presses (the first
-  opens its name and description to check), and its "Open in app" leaves the console for the member app's own page, down
-  to the tabs rather than a second set of them. On both apps an admin's notice of a request to join carries Approve and
-  Reject while the request waits (the phone asks before approving), and otherwise says where it stands; a refetch that
-  shows it decided elsewhere closes an open Reject and says so. The notice and the list send the status they showed, so
-  a screen left open can't overturn another admin's decision: the API refuses (409) and the apps say where the member
-  stands now. A reason sheet in the queues closes the same way when another admin got there first, saying so, and the
-  list refreshes. Chat reports are in the phone app too, as on the web (see "Chat reports and admin access"), with the
-  phone's own care for the text a view shows.
+  chat report on the open chat reports, scrolled to it but never opened. Its pages are coming to the phone one at a
+  time, and only analytics is still to come (see Known gaps); the members list, moderation and reports are there, with
+  the same status tabs and counts, search and filters, Approve all and row actions as the web's, scrolling on through
+  the pages, and so is a member's page: their facts and profile, their answers to the institution's questions (which
+  admins can edit), their mentor profile (Remove as mentor), Make admin or Remove admin role (asked first on both apps),
+  and their recent activity, naming who acted. So is the audit log, filtered by a family of actions (Members, Content,
+  Reports and so on) or any prefix typed, kept in the address; its rows link to the member they're about and show their
+  details as readable lines, never a private key such as a deleted account's phone hash, nor a phone number (a new
+  institution's first admin is recorded by number). So are the invitations (see **Invitations**): their figures, Send
+  pending and Revoke (each asked first on both apps), the status tabs and a search kept in the address, and each row's
+  Copy link, WhatsApp and Send or Resend; on the phone the import is a modal of its own, which holds the screen while it
+  runs, and the template opens the share sheet. Moderation previews each item as the web console does (a job in full,
+  its contacts as text), approves a group in two presses (the first opens its name and description to check), and its
+  "Open in app" leaves the console for the member app's own page, down to the tabs rather than a second set of them. On
+  both apps an admin's notice of a request to join carries Approve and Reject while the request waits (the phone asks
+  before approving), and otherwise says where it stands; a refetch that shows it decided elsewhere closes an open Reject
+  and says so. The notice and the list send the status they showed, so a screen left open can't overturn another admin's
+  decision: the API refuses (409) and the apps say where the member stands now. A reason sheet in the queues closes the
+  same way when another admin got there first, saying so, and the list refreshes. Chat reports are in the phone app too,
+  as on the web (see "Chat reports and admin access"), with the phone's own care for the text a view shows.
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
@@ -616,8 +618,17 @@ per member, address, IP and globally (`EMAIL_VERIFY_GLOBAL_DAILY_CAP`). Links in
 ### Invitations
 
 Admins import a CSV (phone, and optionally name, batch, email and any profile-question key) from **Admin →
-Invitations**; the browser parses it and sends it in chunks of 500, and each row comes back as new, updated, already a
-member or invalid with a reason. Phones without a country code use the institution's country.
+Invitations** on the web or the phone; the app parses it (`packages/shared/src/lib/invitations.ts`) and sends it in
+chunks of 500, and each row comes back as new, updated, already a member or invalid with a reason, by its line in the
+file. Phones without a country code use the institution's country. A chunk that fails stops the import, which says how
+many rows went: importing the file again updates those rather than adding them twice, and it says to do so only when the
+failure may pass (the network, a limit, a server error). A row with a cell longer than the API takes at all ("Class of
+2012" as a batch) would fail its whole chunk, so the apps send it as a blank row, which the API leaves out on the same
+line, and show their own reason for it (`importRowTooLong`). The phone picks the file with the document picker (Files,
+iCloud Drive, Google Drive) and saves the template through the share sheet (`apps/mobile/src/lib/files.ts`). The
+template carries a byte order mark so Excel reads names in any script; a list saved from Excel should be "CSV UTF-8", as
+a plain CSV loses them, and its phone column formatted as Text, as Excel and Google Sheets read a typed +919876543210 as
+a number (Excel then saves it as 9.19876E+11, which the API refuses).
 
 - Sending uses the plan's channels (WhatsApp, SMS, email), at most `INVITES_DAILY_LIMIT` per institution per day and
   one resend per invitation per day. Without paid channels the admin copies the link or shares it from their own
@@ -1351,8 +1362,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
-  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: invitations and
-    analytics. Neither has a tile on the console's home or an admin notice.
+  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: analytics. It
+    has no tile on the console's home and no admin notice.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

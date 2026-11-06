@@ -44,6 +44,7 @@ export default function AdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="profile-fields/edit" options={{ presentation: "modal" }} />
+      <Stack.Screen name="invitations/import" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

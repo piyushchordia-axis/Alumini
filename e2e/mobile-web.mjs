@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { API, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
@@ -2406,7 +2406,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Invitations"];
+  const ON_THE_WEB_CONSOLE = ["Analytics"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2453,15 +2453,16 @@ try {
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
     // Until a section is in the phone app, the home lists it as on the web console. Members, Moderation, Reports and Chat
-    // reports are, so their tiles and rows link (as do the rows of Profile fields, Settings and the Audit log, which the
-    // steps after this use).
+    // reports are, so their tiles and rows link (as do the rows of Invitations, Profile fields, Settings and the Audit
+    // log, which the steps after this use). Analytics, the one left, is in no other list on the screen, which finds this
+    // one by it.
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
-    const listed = (await page.getByRole("list").filter({ hasText: "Invitations" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
+    const listed = (await page.getByRole("list").filter({ hasText: "Analytics" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
     await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
     await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
     await page.getByRole("link", { name: "Content to review, 0", exact: true }).waitFor();
-    for (const section of ["Moderation", "Reports", "Chat reports", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
+    for (const section of ["Moderation", "Reports", "Chat reports", "Invitations", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
     await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
@@ -4500,6 +4501,180 @@ try {
     const card = feedCard(ANNOUNCEMENT);
     await card.getByText("Announcement", { exact: true }).waitFor();
     if (await card.getByText("Pinned", { exact: true }).count()) throw new Error("the announcement still shows as pinned after Unpin");
+  });
+
+  // Invitations, as the Samaj admin: the Samaj has none and its plan sends nothing, so anything sent is answered by the
+  // script and nothing is billed.
+  const invitePhones = [`76${unique.slice(0, 6)}21`, `76${unique.slice(0, 6)}22`];
+  const invitationRow = (name) => shown(page.getByRole("article").filter({ hasText: name }));
+
+  await step("the console's invitations: the template with its BOM, a CSV imported through the file chooser, a link copied, WhatsApp, a search, and Revoke after asking", async () => {
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+    await page.goto(SAMAJ + "/admin");
+    await shown(page.getByRole("link", { name: "Invitations", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/invitations");
+    await shown(page.getByText("No invitations here", { exact: true })).waitFor();
+    // Nothing to send by: no figure for today, no Send pending, and the links are shared by hand.
+    await shown(page.getByLabel("Can send today, none", { exact: true })).waitFor();
+    await shown(page.getByText("Your plan doesn't include WhatsApp, SMS or email messages: copy an invitation's link or share it on WhatsApp from your own phone.", { exact: true })).waitFor();
+    if (await page.getByRole("button", { name: /^Send \d+ pending$/ }).locator("visible=true").count()) throw new Error("Send pending shows on a plan that sends nothing");
+    await fitsPhone("the invitations list", shown(page.getByText("No invitations here", { exact: true })));
+
+    // The import, a modal above the list. Its buttons wait for the profile questions, whose keys are columns too.
+    await shown(page.getByRole("link", { name: "Import a list", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/invitations/import");
+    const template = memberButton("Template");
+    await expectSvgNoEmoji(template, "the import's Template button");
+    const [saved] = await Promise.all([page.waitForEvent("download"), template.click()]);
+    if (saved.suggestedFilename() !== "invitations-template.csv") throw new Error(`the template downloads as ${saved.suggestedFilename()}`);
+    const templateText = readFileSync(await saved.path(), "utf8");
+    if (templateText.charCodeAt(0) !== 0xfeff) throw new Error("the template has no byte order mark, so Excel would garble names");
+    if (!templateText.slice(1).startsWith("phone,name,batch,email,chapter,interests")) throw new Error(`the template starts "${templateText.slice(1, 60)}"`);
+    if (!templateText.includes("\r\n+919876543210,")) throw new Error("the template's example phone is guarded as a formula");
+
+    const csv = `Phone,Name,Batch,Chapter,Notes\r\n+91${invitePhones[0]},Mitesh Shah,2015,surat,met at Garba\r\n+91${invitePhones[1]},Komal Desai,2016,surat,\r\n`;
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), memberButton("Choose CSV file").click()]);
+    await chooser.setFiles({ name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await shown(page.getByText("invites.csv: 2 rows. Using phone, name, batch, Chapter.", { exact: true })).waitFor();
+    await shown(page.getByText("Ignoring: notes.", { exact: true })).waitFor();
+    await shown(page.getByText("Mitesh Shah · 2015", { exact: true })).waitFor();
+    const sendNow = shown(page.getByRole("checkbox", { name: "Sending isn't included in your plan; you'll share the links yourself", exact: true }));
+    if ((await sendNow.getAttribute("aria-disabled")) !== "true") throw new Error("Send now can be chosen on a plan that sends nothing");
+    // While the import runs (the script holds its request), it counts up and Back leaves the screen where it is.
+    const importUrl = "**/api/v1/t/shri-gujarati-samaj/admin/invitations/import";
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(importUrl, async (route) => {
+      if (route.request().method() === "POST") await held;
+      await route.fallback();
+    });
+    try {
+      await memberButton("Import 2 rows").click();
+      await memberButton("Importing 0 of 2…").waitFor();
+      await shown(page.getByText("Keep this screen open until the import finishes.", { exact: true })).waitFor();
+      await backButton().click();
+      // Give a Back that went through the time to leave.
+      await page.waitForTimeout(500);
+      if (!new URL(page.url()).pathname.endsWith("/admin/invitations/import")) throw new Error(`Back left the import while it ran, for ${page.url()}`);
+      await shown(page.getByText("Keep this screen open until the import finishes.", { exact: true })).waitFor();
+    } finally {
+      release();
+    }
+    await statusSays("2 new, 0 updated, 0 skipped.").waitFor();
+    // Only once the request is answered: a handler still waiting would find its route gone.
+    await page.unroute(importUrl);
+    await fitsPhone("the import", shown(page.getByText("2 new, 0 updated, 0 skipped.", { exact: true })));
+    await shot("m19a-invitations-import");
+    await memberButton("Done").click();
+    await page.waitForURL((url) => url.pathname.endsWith("/t/shri-gujarati-samaj/admin/invitations"));
+    await statusSays("2 invited, 0 updated").waitFor();
+    for (const name of ["Mitesh Shah", "Komal Desai"]) await invitationRow(name).getByText("Not sent", { exact: true }).waitFor();
+
+    // Copy link, read back from the clipboard.
+    await memberButton("Copy link for Mitesh Shah").click();
+    await invitationRow("Mitesh Shah").getByText("Link copied", { exact: true }).waitFor();
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    if (!/\/i\/[\w-]+$/.test(link)) throw new Error(`the copied invite link is "${link}"`);
+
+    // WhatsApp opens its chat with the number and the message, in a new tab on the web build (answered by the script).
+    const context = page.context();
+    await context.route("https://wa.me/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>WhatsApp</title>" }));
+    try {
+      const [chat] = await Promise.all([context.waitForEvent("page"), memberButton("Share on WhatsApp with Mitesh Shah").click()]);
+      await chat.waitForURL(/^https:\/\/wa\.me\//);
+      const url = chat.url();
+      await chat.close();
+      if (!url.startsWith(`https://wa.me/91${invitePhones[0]}?text=`) || !url.includes("Shri%20Gujarati%20Samaj") || !url.includes(encodeURIComponent(link))) throw new Error(`WhatsApp opened ${url}`);
+    } finally {
+      await context.unroute("https://wa.me/**");
+    }
+    await shot("m19b-invitations");
+
+    // The search, kept in the address.
+    const search = shown(page.getByLabel("Search invitations", { exact: true }));
+    await search.fill("Mitesh");
+    await page.waitForURL(/[?&]q=Mitesh/);
+    await page.waitForFunction(() => [...document.querySelectorAll('[role="button"][aria-label^="Revoke the invitation for "]')].filter((b) => b.getBoundingClientRect().height > 0).length === 1);
+    await memberButton("Revoke the invitation for Mitesh Shah").waitFor();
+    await memberButton("Clear search").click();
+    await memberButton("Revoke the invitation for Komal Desai").waitFor();
+
+    // Revoke asks first; Cancel keeps it.
+    const revoke = memberButton("Revoke the invitation for Komal Desai");
+    const sheet = shown(page.getByRole("alertdialog", { name: "Revoke the invitation for Komal Desai?", exact: true }));
+    await revoke.click();
+    await sheet.getByText("The link stops working.", { exact: true }).waitFor();
+    await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+    await sheet.waitFor({ state: "hidden" });
+    await invitationRow("Komal Desai").getByText("Not sent", { exact: true }).waitFor();
+    await revoke.click();
+    await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && /\/admin\/invitations\/[^/]+\/revoke$/.test(r.url())), sheet.getByRole("button", { name: "Revoke", exact: true }).click()]);
+    await sheet.waitFor({ state: "hidden" });
+    await invitationRow("Komal Desai").getByText("Invitation revoked", { exact: true }).waitFor();
+    await invitationRow("Komal Desai").getByText("Revoked", { exact: true }).waitFor();
+
+    // The Revoked tab lists it, and a reload keeps the tab.
+    await memberTab("Revoked").click();
+    await page.waitForURL(/[?&]status=REVOKED/);
+    await invitationRow("Komal Desai").waitFor();
+    await page.reload();
+    await page.waitForURL(/[?&]status=REVOKED/);
+    if ((await memberTab("Revoked").getAttribute("aria-selected")) !== "true") throw new Error("a reload lost the Revoked tab");
+    await invitationRow("Komal Desai").getByText("Revoked", { exact: true }).waitFor();
+    if (await page.getByText("Mitesh Shah", { exact: true }).locator("visible=true").count()) throw new Error("the Revoked tab lists an invitation that isn't revoked");
+  });
+
+  await step("on a plan that sends (answered by the script), Send pending asks first, saying it's billed, and a row's Send says it went", async () => {
+    const summaryUrl = "**/api/v1/t/shri-gujarati-samaj/admin/invitations/summary";
+    const sendUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/invitations\/(send|send-pending)$/;
+    let over = false;
+    await page.route(summaryUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      try {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { data: { ...(await response.json()).data, channels: ["WHATSAPP"] } } });
+      } catch (err) {
+        // A refetch the last Send started can still be on its way when the step ends and unroutes it: Playwright has
+        // passed it on by then, and nothing is left to answer.
+        if (!over) throw err;
+      }
+    });
+    // The first Send pending is refused, as for a plan that stopped sending since the list was loaded.
+    const refused = "Your plan doesn't include WhatsApp, SMS or email messages. Copy or share the invite links instead.";
+    const sent = [];
+    await page.route(sendUrl, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const what = new URL(route.request().url()).pathname.split("/").pop();
+      sent.push(what);
+      if (what === "send-pending" && sent.length === 1) return answer(route, 409, { error: { code: "CONFLICT", message: refused } });
+      return answer(route, 200, { data: { queued: 1, skipped: 0 } });
+    });
+    try {
+      await page.goto(SAMAJ + "/admin/invitations");
+      await shown(page.getByText("Your plan sends invitations by WhatsApp. Each invitation can be resent once a day.", { exact: true })).waitFor();
+      await memberButton("Send 1 pending").click();
+      const sheet = shown(page.getByRole("alertdialog", { name: "Send 1 invitation?", exact: true }));
+      await sheet.getByText(/^By WhatsApp\. Messages are billed per delivery; up to [\d,]+ more can go today\.$/).waitFor();
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      if (sent.length) throw new Error(`Cancel still sent ${sent.join(", ")}`);
+      // Refused: the question no longer stands, so the sheet closes and the list says why.
+      await memberButton("Send 1 pending").click();
+      await sheet.getByRole("button", { name: "Send", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays(refused).waitFor();
+      await memberButton("Send 1 pending").click();
+      await sheet.getByRole("button", { name: "Send", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays("Sending 1 invitation").waitFor();
+      await memberButton("Send to Mitesh Shah").click();
+      await invitationRow("Mitesh Shah").getByText("Invitation sent", { exact: true }).waitFor();
+      if (sent.join() !== "send-pending,send-pending,send") throw new Error(`sent ${sent.join(", ")}`);
+    } finally {
+      over = true;
+      await page.unroute(summaryUrl);
+      await page.unroute(sendUrl);
+    }
   });
 
   console.log(results.join("\n"));

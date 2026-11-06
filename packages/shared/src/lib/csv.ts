@@ -103,3 +103,9 @@ export function csvCell(value: unknown): string {
 }
 
 export const csvLine = (cells: unknown[]) => cells.map(csvCell).join(",") + "\r\n";
+
+/**
+ * CSV text with the UTF-8 byte order mark in front, once, so Excel reads names in any script. A file read with
+ * Response.text() has lost the one the server wrote, so a phone saving an export puts it back.
+ */
+export const withBom = (text: string) => (text.charCodeAt(0) === 0xfeff ? text : `\uFEFF${text}`);

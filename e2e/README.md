@@ -155,9 +155,13 @@ Covers:
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
-  confirm dialog (Cancel first); importing an invitation CSV and joining through its link in a second browser, with the
-  name filled in and the three steps; an announcement that also goes by email, asked first in the app's dialog with
-  the email box's count and the billing line, Cancel posting nothing, then Post and send;
+  confirm dialog (Cancel first); importing an invitation CSV (once the profile questions are in) and joining through
+  its link in a second browser, with the name filled in and the three steps; another invitation revoked through its
+  confirm dialog (Cancel first sends nothing); an announcement that also goes by email, asked first in the app's dialog
+  with the email box's count and the billing line, Cancel posting nothing, then Post and send; Demo University's Send
+  pending asking first in a dialog that says it's billed (Cancel sends nothing), a refusal (answered by the script, as
+  for a plan that stopped sending) closing the dialog and saying why, then a send (answered by the script, so nothing
+  is billed);
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
   Open tab counting the open report (1, then 0 once it's resolved), a note typed and cancelled gone from the next
@@ -360,7 +364,19 @@ Covers:
   your institution.", Cancel sending nothing and keeping the text, then both asking "by WhatsApp or email?" with one
   message each to every member, by email only when WhatsApp can't be sent, and Post and send sending it pinned with both
   channels and going back to the feed; then the console's queue listing the real one with both badges, and Unpin there
-  leaving it an announcement on the feed, no longer pinned.
+  leaving it an announcement on the feed, no longer pinned;
+- the console's invitations, as the Samaj admin: none yet, Can send today read as none and no Send pending on a plan
+  that sends nothing, no sideways scrolling; the import modal's Template downloading invitations-template.csv with its
+  byte order mark, the questions' keys as columns and the example phone unguarded; a two-row CSV picked through the file
+  chooser (the document picker's web input), previewed with the columns used and ignored, Send now disabled, imported
+  ("2 new, 0 updated, 0 skipped.") after the script has held the request long enough to see "Importing 0 of 2…" and
+  "Keep this screen open…" and the bar's Back leave the screen where it is, and Done saying "2 invited, 0 updated" on
+  the list; Copy link read back from the clipboard; WhatsApp opening a new tab at wa.me with the number and the Samaj's
+  message (answered by the script); a search kept in the address; Revoke through its sheet (Cancel first), the row then
+  Revoked, listed under the Revoked tab, which a reload keeps; and, with the plan said to send by WhatsApp (answered by
+  the script, so nothing is billed), Send 1 pending asking first and saying it's billed (Cancel sends nothing), a
+  refusal (as for a plan that stopped sending) closing the sheet and saying why on the list, then "Sending 1
+  invitation", and a row's Send saying "Invitation sent".
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -744,6 +760,26 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] From an open report, open "…'s member page", then go back (iPhone swipe back, Android back button): the report
       is closed, with no words. Remove message: with the keyboard up, the note box and Remove stay above it on both
       phones; on Android the back button closes the sheet. Cancel, and Hide.
+- [ ] Invitations → Import a list → Choose CSV file: on the iPhone pick a CSV from Files (On My iPhone, then iCloud
+      Drive), on Android from Downloads and then from Google Drive. Each shows its first rows and the columns used. A
+      CSV that Excel saved with ";" between the columns reads the same, and one saved as "CSV UTF-8" with Gujarati
+      names shows them correctly in the preview and, once imported, on the list.
+- [ ] Import's Template opens the share sheet with invitations-template.csv (not .csv.csv). Save it to Files (iPhone) or
+      Drive or Downloads (Android). Opened in a text editor (Files' preview, or Notes), the example row's phone reads
+      +919876543210 with no ' in front, and the Samaj's question keys are columns. Opened in Excel or Google Sheets, the
+      header row reads the same, but the example phone shows as a number (9.19876E+11 in Excel, 919876543210 in
+      Sheets), as both read a leading + as a sign: so the import's hint says to format the phone column as Text before
+      typing numbers. Do that in Excel, type +919876543210, save as CSV UTF-8 and import it: the row is new, not refused
+      as scientific notation.
+- [ ] Import a long list (a few thousand rows): while "Importing … of …" counts up, the bar's Back, the iPhone's swipe
+      down and Android's back button leave the screen where it is, and "Keep this screen open until the import
+      finishes." shows (VoiceOver or TalkBack says it on a blocked Back). Done then returns to the list, which says how
+      many were invited.
+- [ ] Copy link on a row, then paste it into WhatsApp or Notes: the whole link. WhatsApp on a row opens WhatsApp at
+      that number with the invitation written in; with WhatsApp not installed, the wa.me page in the browser.
+- [ ] TalkBack or VoiceOver on Invitations: each tile is read as its label and count, Can send today as "none" on a plan
+      that sends nothing; each row's buttons with the person ("Copy link for …", "Revoke the invitation for …"); Revoke
+      asks in a sheet, which Android's back button closes, changing nothing.
 
 **Appearance**
 
