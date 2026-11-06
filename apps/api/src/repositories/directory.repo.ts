@@ -60,7 +60,8 @@ export async function directoryFacets(
   const base = and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"));
   const field = sql`trim(${memberships.fieldOfStudy})`;
   const [years, cities, countries, companies, industries, skills, fields] = await Promise.all([
-    db.selectDistinct({ v: memberships.batchYear }).from(memberships).where(base).orderBy(sql`${memberships.batchYear} desc`),
+    // A community member who still belongs has no end year to offer.
+    db.selectDistinct({ v: memberships.batchYear }).from(memberships).where(and(base, isNotNull(memberships.batchYear))).orderBy(sql`${memberships.batchYear} desc`),
     db
       .select({ v: memberships.city, n: sql<number>`count(*)::int` })
       .from(memberships)
@@ -96,7 +97,7 @@ export async function directoryFacets(
   ]);
   const present = new Set(industries.map((r) => r.v));
   return {
-    batchYears: years.map((r) => r.v),
+    batchYears: years.flatMap((r) => (r.v === null ? [] : [r.v])),
     cities: cities.map((r) => r.v!).filter(Boolean),
     countries: countries.map((r) => r.v!).filter(Boolean),
     companies: companies.map((r) => r.v!).filter(Boolean),

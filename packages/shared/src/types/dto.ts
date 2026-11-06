@@ -176,7 +176,9 @@ export interface MembershipSummaryDto {
   status: MembershipStatus;
   statusReason: string | null;
   fullName: string;
-  batchYear: number;
+  /** See MembershipDto. */
+  startYear: number;
+  batchYear: number | null;
   avatarUrl: string | null;
 }
 
@@ -297,7 +299,10 @@ export interface MembershipDto {
   statusReason: string | null;
   statusChangedAt: string | null;
   fullName: string;
-  batchYear: number;
+  /** The year they joined the institution. Shown with the end year through memberYearsLabel. */
+  startYear: number;
+  /** The year they left or will leave. Null only at a community (type OTHER), for someone who still belongs. */
+  batchYear: number | null;
   dateOfBirth: string | null;
   professionType: ProfessionType;
   companyName: string | null;
@@ -406,7 +411,9 @@ export interface PortableProfileDto
 export interface MemberCardDto {
   id: string;
   fullName: string;
-  batchYear: number;
+  /** See MembershipDto. */
+  startYear: number;
+  batchYear: number | null;
   professionType: ProfessionType;
   companyName: string | null;
   designation: string | null;
@@ -1155,7 +1162,9 @@ export interface CelebrationDto {
   membershipId: string;
   fullName: string;
   avatarUrl: string | null;
-  batchYear: number;
+  /** See MembershipDto. */
+  startYear: number;
+  batchYear: number | null;
   kind: CelebrationKind;
   /** Anniversaries: whole years since joining. */
   years: number | null;

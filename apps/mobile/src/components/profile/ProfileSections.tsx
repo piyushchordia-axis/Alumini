@@ -12,6 +12,9 @@ import {
   PROFILE_MAX_SKILLS,
   RICH_TEXT_HINT,
   SKILL_MAX_LENGTH,
+  memberEndYearOptions,
+  memberStartYearOptions,
+  memberYearFields,
   mentorshipAvailable,
   mentorshipKeys,
   socialUrlFromInput,
@@ -48,15 +51,38 @@ function SubHeading({ children, hint }: { children: ReactNode; hint?: string }) 
   );
 }
 
-/** Photo, name, batch, what they do, date of birth, where they live, and every question registration requires. */
+/** The years a year box takes, as its hint: "1930 – 2026", from a picker's list, newest first. */
+const yearRange = (years: number[]) => (years.length ? `${years[years.length - 1]} – ${years[0]}` : undefined);
+
+/** Photo, name, years here, what they do, date of birth, where they live, and every question registration requires. */
 export function ProfileBasicsSection({ form: f }: { form: ProfileDraftController }) {
   const { draft: d, set, errors } = f;
-  const { minBatchYear, maxBatchYear } = f.tenant.settings;
+  const years = memberYearFields(f.tenant.type);
   return (
     <View style={styles.stack}>
       <AvatarPicker slug={f.tenant.slug} name={d.fullName} value={d.avatarUrl} error={errors.avatarUrl} onBusyChange={f.setPhotoBusy} onChange={f.setAvatar} />
       <Input label="Full name *" value={d.fullName} onChangeText={(v) => set("fullName", v)} error={errors.fullName} autoComplete="name" />
-      <Input label="Batch (year of passing out) *" value={d.batchYear} onChangeText={(v) => set("batchYear", yearDigits(v))} keyboardType="number-pad" error={errors.batchYear} hint={`${minBatchYear} – ${maxBatchYear}`} />
+      <Input
+        label={`${years.start.label} *`}
+        value={d.startYear}
+        onChangeText={(v) => set("startYear", yearDigits(v))}
+        keyboardType="number-pad"
+        maxLength={4}
+        placeholder="Year"
+        error={errors.startYear}
+        hint={yearRange(memberStartYearOptions())}
+      />
+      {/* Marked required only where it is: a community's blank "Until" means they still belong. */}
+      <Input
+        label={years.end.required ? `${years.end.label} *` : years.end.label}
+        value={d.batchYear}
+        onChangeText={(v) => set("batchYear", yearDigits(v))}
+        keyboardType="number-pad"
+        maxLength={4}
+        placeholder="Year"
+        error={errors.batchYear}
+        hint={yearRange(memberEndYearOptions(f.tenant))}
+      />
       <ChipSelect label="What do you do? *" options={PROFESSION_TYPES.map((p) => ({ value: p, label: PROFESSION_TYPE_LABELS[p] }))} value={d.professionType} onChange={(v) => v && set("professionType", v)} tall />
       <DateTimeField
         label="Date of birth"

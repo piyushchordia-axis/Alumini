@@ -51,7 +51,7 @@ describe.skipIf(!dbAvailable)("copying a profile from another institution", () =
     const { tenant: joining } = await createTenant(ctx, { slug: "joining" });
     const admin = await memberSession(ctx, university.id, { role: "TENANT_ADMIN" });
     const me = await memberSession(ctx, college.id, { batchYear: 2008 });
-    await createMembership(ctx, university.id, me.user.id, { batchYear: 2012 });
+    await createMembership(ctx, university.id, me.user.id, { startYear: 2008, batchYear: 2012 });
     const patch = (slug: string, body: object) => api().patch(`/api/v1/t/${slug}/memberships/me`).set(me.headers).send(body);
 
     // An institution's own question, answered at the university: never copied.
@@ -89,6 +89,8 @@ describe.skipIf(!dbAvailable)("copying a profile from another institution", () =
     expect(res.status).toBe(200);
     const offered = res.body.data;
     expect(Object.keys(offered).sort()).toEqual(PORTABLE_KEYS);
+    // Their years are their own at each institution.
+    for (const key of ["startYear", "batchYear"]) expect(offered).not.toHaveProperty(key);
     const { degree: _degree, fieldOfStudy: _field, education, ...rest } = atUniversity;
     // Their birthday is kept off the university's feed, so their date of birth stays there: a new profile would show it.
     expect(offered).toMatchObject({ ...rest, dateOfBirth: null, source: { slug: "demo-university", name: "Demo University" } });

@@ -106,10 +106,10 @@ describe("how a mentorship reads", () => {
   });
 
   it("names a mentor card by everything it shows, starting with the name it shows, the same on both apps", () => {
-    const member = { fullName: "Priya Nair", designation: "Product manager", professionType: "EMPLOYED", companyName: "Wise", batchYear: 2012, city: "London" } as MentorCardDto["member"];
+    const member = { fullName: "Priya Nair", designation: "Product manager", professionType: "EMPLOYED", companyName: "Wise", startYear: 2008, batchYear: 2012, city: "London" } as MentorCardDto["member"];
     expect(mentorCardLabel({ member, areas: ["CAREER_ADVICE", "WORKING_ABROAD"], availability: "FORTNIGHTLY" })).toBe(
-      "Priya Nair, Product manager at Wise, Batch of 2012 · London, Career advice, Working abroad, Availability: Every two weeks",
+      "Priya Nair, Product manager at Wise, 2008–2012 · London, Career advice, Working abroad, Availability: Every two weeks",
     );
-    expect(mentorCardLabel({ member: { ...member, city: null }, areas: ["LAW"], availability: "ONE_OFF" })).toBe("Priya Nair, Product manager at Wise, Batch of 2012, Law, Availability: A one-off conversation");
+    expect(mentorCardLabel({ member: { ...member, city: null }, areas: ["LAW"], availability: "ONE_OFF" })).toBe("Priya Nair, Product manager at Wise, 2008–2012, Law, Availability: A one-off conversation");
   });
 });

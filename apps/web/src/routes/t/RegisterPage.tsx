@@ -72,8 +72,10 @@ export function RegisterPage() {
         : undefined;
   // As the server decides: an invitation the institution lets straight in, or an institution that lets everyone in.
   const autoApprove = (inv?.autoApprove ?? false) || t.settings.memberApprovalMode === "AUTO_APPROVE";
+  // A community has members, not batches.
+  const greeting = t.type === "OTHER" ? "Tell your fellow members who you are" : "Tell your batchmates who you are";
   return (
-    <AuthShell tenant={t} title={reapplying ? "Re-apply to join" : "Create your profile"} subtitle={reapplying ? "Update your profile, then send it again" : "Tell your batchmates who you are"} wide>
+    <AuthShell tenant={t} title={reapplying ? "Re-apply to join" : "Create your profile"} subtitle={reapplying ? "Update your profile, then send it again" : greeting} wide>
       {!t.settings.allowSelfRegistration && !inv ? (
         <ErrorBox error="This institution is not accepting new registrations right now. Contact your alumni office." />
       ) : (

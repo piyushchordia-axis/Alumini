@@ -150,7 +150,9 @@ export async function seedCore(db: Db, platformAdminPhones: string[]): Promise<S
 type MemberSeed = {
   phone: string;
   fullName: string;
-  batchYear: number;
+  startYear: number;
+  /** Null at the Samaj, a community, for someone who still belongs. */
+  batchYear: number | null;
   professionType: (typeof memberships.$inferInsert)["professionType"];
   companyName?: string;
   designation?: string;
@@ -165,42 +167,42 @@ type MemberSeed = {
 
 export const SEED_MEMBERS: Record<string, MemberSeed[]> = {
   "demo-university": [
-    { phone: "+919000000001", fullName: "Ananya Rao", batchYear: 2008, professionType: "EMPLOYED", companyName: "Infosys", designation: "Engineering Manager", city: "Bengaluru", country: "IN", role: "TENANT_ADMIN", bio: "Alumni office volunteer. Happy to help you reconnect." },
-    { phone: "+919100000001", fullName: "Rahul Mehta", batchYear: 2012, professionType: "FOUNDER", companyName: "Zylo Labs", designation: "CEO", city: "Mumbai", country: "IN", bio: "Building fintech for SMEs. Always up for a coffee in Bandra.", interests: ["startups", "cricket"] },
-    { phone: "+919100000002", fullName: "Priya Nair", batchYear: 2012, professionType: "EMPLOYED", companyName: "Google", designation: "Product Manager", city: "London", country: "GB", interests: ["travel", "product"] },
-    { phone: "+919100000003", fullName: "Arjun Singh", batchYear: 2015, professionType: "BUSINESS_OWNER", companyName: "Singh Textiles", city: "Surat", country: "IN" },
-    { phone: "+919100000004", fullName: "Meera Iyer", batchYear: 2018, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Consultant", city: "Dubai", country: "AE" },
-    { phone: "+919100000005", fullName: "Vikram Desai", batchYear: 2020, professionType: "STUDENT", companyName: "IIM Ahmedabad", city: "Ahmedabad", country: "IN" },
-    { phone: "+919100000006", fullName: "Sneha Kulkarni", batchYear: 2008, professionType: "EMPLOYED", companyName: "Microsoft", designation: "Principal Engineer", city: "Seattle", country: "US" },
+    { phone: "+919000000001", fullName: "Ananya Rao", startYear: 2004, batchYear: 2008, professionType: "EMPLOYED", companyName: "Infosys", designation: "Engineering Manager", city: "Bengaluru", country: "IN", role: "TENANT_ADMIN", bio: "Alumni office volunteer. Happy to help you reconnect." },
+    { phone: "+919100000001", fullName: "Rahul Mehta", startYear: 2008, batchYear: 2012, professionType: "FOUNDER", companyName: "Zylo Labs", designation: "CEO", city: "Mumbai", country: "IN", bio: "Building fintech for SMEs. Always up for a coffee in Bandra.", interests: ["startups", "cricket"] },
+    { phone: "+919100000002", fullName: "Priya Nair", startYear: 2008, batchYear: 2012, professionType: "EMPLOYED", companyName: "Google", designation: "Product Manager", city: "London", country: "GB", interests: ["travel", "product"] },
+    { phone: "+919100000003", fullName: "Arjun Singh", startYear: 2011, batchYear: 2015, professionType: "BUSINESS_OWNER", companyName: "Singh Textiles", city: "Surat", country: "IN" },
+    { phone: "+919100000004", fullName: "Meera Iyer", startYear: 2014, batchYear: 2018, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Consultant", city: "Dubai", country: "AE" },
+    { phone: "+919100000005", fullName: "Vikram Desai", startYear: 2016, batchYear: 2020, professionType: "STUDENT", companyName: "IIM Ahmedabad", city: "Ahmedabad", country: "IN" },
+    { phone: "+919100000006", fullName: "Sneha Kulkarni", startYear: 2004, batchYear: 2008, professionType: "EMPLOYED", companyName: "Microsoft", designation: "Principal Engineer", city: "Seattle", country: "US" },
   ],
   "demo-college": [
-    { phone: "+919000000002", fullName: "Suresh Patil", batchYear: 1998, professionType: "EMPLOYED", companyName: "Demo College", designation: "Alumni Relations Officer", city: "Pune", country: "IN", role: "TENANT_ADMIN" },
-    { phone: "+919100000011", fullName: "Kiran Joshi", batchYear: 2005, professionType: "FOUNDER", companyName: "Joshi Robotics", city: "Pune", country: "IN" },
-    { phone: "+919100000012", fullName: "Neha Sharma", batchYear: 2010, professionType: "EMPLOYED", companyName: "TCS", designation: "Architect", city: "Hyderabad", country: "IN" },
-    { phone: "+919100000013", fullName: "Rohan Kapoor", batchYear: 2014, professionType: "EMPLOYED", companyName: "Amazon", designation: "SDE II", city: "Toronto", country: "CA" },
-    { phone: "+919100000014", fullName: "Divya Menon", batchYear: 2019, professionType: "EMPLOYED", companyName: "Zomato", designation: "Analyst", city: "Gurugram", country: "IN", status: "PENDING" },
-    { phone: "+919100000015", fullName: "Amit Verma", batchYear: 2016, professionType: "BUSINESS_OWNER", companyName: "Verma Agro", city: "Nashik", country: "IN", status: "PENDING" },
-    { phone: "+919100000016", fullName: "Pooja Bhatt", batchYear: 2021, professionType: "STUDENT", city: "Pune", country: "IN", status: "PENDING" },
-    { phone: "+919100000017", fullName: "Test Rejected", batchYear: 2001, professionType: "OTHER", city: "Pune", country: "IN", status: "REJECTED", statusReason: "Could not verify batch details" },
+    { phone: "+919000000002", fullName: "Suresh Patil", startYear: 1994, batchYear: 1998, professionType: "EMPLOYED", companyName: "Demo College", designation: "Alumni Relations Officer", city: "Pune", country: "IN", role: "TENANT_ADMIN" },
+    { phone: "+919100000011", fullName: "Kiran Joshi", startYear: 2001, batchYear: 2005, professionType: "FOUNDER", companyName: "Joshi Robotics", city: "Pune", country: "IN" },
+    { phone: "+919100000012", fullName: "Neha Sharma", startYear: 2006, batchYear: 2010, professionType: "EMPLOYED", companyName: "TCS", designation: "Architect", city: "Hyderabad", country: "IN" },
+    { phone: "+919100000013", fullName: "Rohan Kapoor", startYear: 2010, batchYear: 2014, professionType: "EMPLOYED", companyName: "Amazon", designation: "SDE II", city: "Toronto", country: "CA" },
+    { phone: "+919100000014", fullName: "Divya Menon", startYear: 2015, batchYear: 2019, professionType: "EMPLOYED", companyName: "Zomato", designation: "Analyst", city: "Gurugram", country: "IN", status: "PENDING" },
+    { phone: "+919100000015", fullName: "Amit Verma", startYear: 2012, batchYear: 2016, professionType: "BUSINESS_OWNER", companyName: "Verma Agro", city: "Nashik", country: "IN", status: "PENDING" },
+    { phone: "+919100000016", fullName: "Pooja Bhatt", startYear: 2017, batchYear: 2021, professionType: "STUDENT", city: "Pune", country: "IN", status: "PENDING" },
+    { phone: "+919100000017", fullName: "Test Rejected", startYear: 1997, batchYear: 2001, professionType: "OTHER", city: "Pune", country: "IN", status: "REJECTED", statusReason: "Could not verify batch details" },
   ],
   "demo-school": [
-    { phone: "+919000000003", fullName: "Lakshmi Krishnan", batchYear: 1995, professionType: "EMPLOYED", companyName: "Demo International School", designation: "Principal's Office", city: "Bengaluru", country: "IN", role: "TENANT_ADMIN" },
-    { phone: "+919100000021", fullName: "Aditya Reddy", batchYear: 2004, professionType: "EMPLOYED", companyName: "Flipkart", designation: "Director", city: "Bengaluru", country: "IN" },
-    { phone: "+919100000022", fullName: "Shreya Ghosh", batchYear: 2009, professionType: "FOUNDER", companyName: "Ghosh Design Studio", city: "Kolkata", country: "IN" },
-    { phone: "+919100000023", fullName: "Nikhil Bose", batchYear: 2013, professionType: "EMPLOYED", companyName: "Goldman Sachs", designation: "VP", city: "Singapore", country: "SG" },
-    { phone: "+919100000024", fullName: "Tara Pillai", batchYear: 2017, professionType: "EMPLOYED", companyName: "Swiggy", city: "Bengaluru", country: "IN", status: "PENDING" },
-    { phone: "+919100000025", fullName: "Dev Malhotra", batchYear: 2022, professionType: "STUDENT", city: "Chennai", country: "IN", status: "PENDING" },
+    { phone: "+919000000003", fullName: "Lakshmi Krishnan", startYear: 1983, batchYear: 1995, professionType: "EMPLOYED", companyName: "Demo International School", designation: "Principal's Office", city: "Bengaluru", country: "IN", role: "TENANT_ADMIN" },
+    { phone: "+919100000021", fullName: "Aditya Reddy", startYear: 1993, batchYear: 2004, professionType: "EMPLOYED", companyName: "Flipkart", designation: "Director", city: "Bengaluru", country: "IN" },
+    { phone: "+919100000022", fullName: "Shreya Ghosh", startYear: 1999, batchYear: 2009, professionType: "FOUNDER", companyName: "Ghosh Design Studio", city: "Kolkata", country: "IN" },
+    { phone: "+919100000023", fullName: "Nikhil Bose", startYear: 2001, batchYear: 2013, professionType: "EMPLOYED", companyName: "Goldman Sachs", designation: "VP", city: "Singapore", country: "SG" },
+    { phone: "+919100000024", fullName: "Tara Pillai", startYear: 2006, batchYear: 2017, professionType: "EMPLOYED", companyName: "Swiggy", city: "Bengaluru", country: "IN", status: "PENDING" },
+    { phone: "+919100000025", fullName: "Dev Malhotra", startYear: 2012, batchYear: 2022, professionType: "STUDENT", city: "Chennai", country: "IN", status: "PENDING" },
   ],
   "shri-gujarati-samaj": [
-    { phone: "+919000000004", fullName: "Jignesh Patel", batchYear: 1998, professionType: "EMPLOYED", companyName: "Shri Gujarati Samaj", designation: "Community Administrator", city: "Ahmedabad", country: "IN", role: "TENANT_ADMIN", bio: "Looking after member approvals and community events for the Samaj." },
-    { phone: "+919100000031", fullName: "Hetal Shah", batchYear: 2005, professionType: "BUSINESS_OWNER", companyName: "Shah Fabrics", designation: "Proprietor", city: "Surat", country: "IN", bio: "Third-generation textile trader. Happy to help members sourcing fabric or visiting Surat.", interests: ["textiles", "trade"] },
-    { phone: "+919100000032", fullName: "Ravi Mehta", batchYear: 2012, professionType: "EMPLOYED", companyName: "Tata Consultancy Services", designation: "Product Manager", city: "Ahmedabad", country: "IN", bio: "Product at TCS Digital. Often in London for client work.", interests: ["product", "startups"] },
-    { phone: "+919100000033", fullName: "Kiran Parikh", batchYear: 2008, professionType: "BUSINESS_OWNER", companyName: "Parikh Jewellers", designation: "Managing Partner", city: "Surat", country: "IN", bio: "Diamond and gold jewellery for retail and export.", interests: ["jewellery", "export"] },
-    { phone: "+919100000034", fullName: "Asha Desai", batchYear: 2022, professionType: "STUDENT", companyName: "Nirma University", city: "Ahmedabad", country: "IN", bio: "Final-year BBA. Looking for internships in marketing or operations." },
-    { phone: "+919100000035", fullName: "Bhavin Trivedi", batchYear: 1996, professionType: "EMPLOYED", companyName: "HDFC Bank", designation: "Senior Vice President", city: "Ahmedabad", country: "IN", bio: "SME banking. Glad to mentor members starting or expanding a business.", interests: ["finance", "mentoring"] },
-    { phone: "+919100000036", fullName: "Nisha Modi", batchYear: 2010, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Senior Consultant", city: "New Jersey", country: "US", bio: "Strategy consulting in the US. Happy to chat about moving abroad.", interests: ["consulting", "diaspora"] },
-    { phone: "+919100000037", fullName: "Parth Joshi", batchYear: 2018, professionType: "EMPLOYED", companyName: "Infosys", designation: "Senior Developer", city: "Pune", country: "IN", status: "PENDING" },
-    { phone: "+919100000038", fullName: "Diya Raval", batchYear: 2020, professionType: "FOUNDER", companyName: "Raval Foods", city: "Rajkot", country: "IN", status: "PENDING" },
+    { phone: "+919000000004", fullName: "Jignesh Patel", startYear: 1998, batchYear: null, professionType: "EMPLOYED", companyName: "Shri Gujarati Samaj", designation: "Community Administrator", city: "Ahmedabad", country: "IN", role: "TENANT_ADMIN", bio: "Looking after member approvals and community events for the Samaj." },
+    { phone: "+919100000031", fullName: "Hetal Shah", startYear: 2005, batchYear: null, professionType: "BUSINESS_OWNER", companyName: "Shah Fabrics", designation: "Proprietor", city: "Surat", country: "IN", bio: "Third-generation textile trader. Happy to help members sourcing fabric or visiting Surat.", interests: ["textiles", "trade"] },
+    { phone: "+919100000032", fullName: "Ravi Mehta", startYear: 2012, batchYear: null, professionType: "EMPLOYED", companyName: "Tata Consultancy Services", designation: "Product Manager", city: "Ahmedabad", country: "IN", bio: "Product at TCS Digital. Often in London for client work.", interests: ["product", "startups"] },
+    { phone: "+919100000033", fullName: "Kiran Parikh", startYear: 2008, batchYear: 2021, professionType: "BUSINESS_OWNER", companyName: "Parikh Jewellers", designation: "Managing Partner", city: "Surat", country: "IN", bio: "Diamond and gold jewellery for retail and export.", interests: ["jewellery", "export"] },
+    { phone: "+919100000034", fullName: "Asha Desai", startYear: 2022, batchYear: null, professionType: "STUDENT", companyName: "Nirma University", city: "Ahmedabad", country: "IN", bio: "Final-year BBA. Looking for internships in marketing or operations." },
+    { phone: "+919100000035", fullName: "Bhavin Trivedi", startYear: 1996, batchYear: null, professionType: "EMPLOYED", companyName: "HDFC Bank", designation: "Senior Vice President", city: "Ahmedabad", country: "IN", bio: "SME banking. Glad to mentor members starting or expanding a business.", interests: ["finance", "mentoring"] },
+    { phone: "+919100000036", fullName: "Nisha Modi", startYear: 2010, batchYear: null, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Senior Consultant", city: "New Jersey", country: "US", bio: "Strategy consulting in the US. Happy to chat about moving abroad.", interests: ["consulting", "diaspora"] },
+    { phone: "+919100000037", fullName: "Parth Joshi", startYear: 2018, batchYear: null, professionType: "EMPLOYED", companyName: "Infosys", designation: "Senior Developer", city: "Pune", country: "IN", status: "PENDING" },
+    { phone: "+919100000038", fullName: "Diya Raval", startYear: 2020, batchYear: null, professionType: "FOUNDER", companyName: "Raval Foods", city: "Rajkot", country: "IN", status: "PENDING" },
   ],
 };
 
@@ -415,6 +417,7 @@ async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed, profile
       statusReason: m.statusReason ?? null,
       statusChangedAt: status === "PENDING" ? null : new Date(),
       fullName: m.fullName,
+      startYear: m.startYear,
       batchYear: m.batchYear,
       professionType: m.professionType,
       companyName: m.companyName ?? null,
@@ -1073,7 +1076,7 @@ async function seedReferrals(db: Db, tenantId: string, member: (phone: string) =
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
   if (!school) return;
-  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Naina Sen", batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
+  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Naina Sen", startYear: new Date().getFullYear() - 4, batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
 }
 
 /** Direct threads for the Samaj showcase: one accepted chat and one pending request. */

@@ -156,12 +156,12 @@ export function featureHelpText(type: TenantType): string[] {
  * Whether a member of a school is still a pupil, and so kept out of private contact however the school sets its features.
  * Schools only, with the year read in the institution's time zone. A future batch year always counts. Otherwise a date of
  * birth decides: under 18 counts, 18 or over doesn't, even in the current batch year. With no date of birth, the current
- * batch year counts, because they may still be at school.
+ * batch year counts, because they may still be at school. A blank batch year is neither future nor current.
  */
-export function isCurrentPupil(tenant: { type: TenantType; timezone: string }, member: { batchYear: number; dateOfBirth: string | null }, now: Date = new Date()): boolean {
+export function isCurrentPupil(tenant: { type: TenantType; timezone: string }, member: { batchYear: number | null; dateOfBirth: string | null }, now: Date = new Date()): boolean {
   if (tenant.type !== "SCHOOL") return false;
   const today = wallPartsInZone(now, tenant.timezone);
-  if (member.batchYear > today.year) return true;
+  if (member.batchYear !== null && member.batchYear > today.year) return true;
   if (!member.dateOfBirth) return member.batchYear === today.year;
   const [year = 0, month = 0, day = 0] = member.dateOfBirth.split("-").map(Number);
   // As numbers, YYYYMMDD compares like a date. Someone born on 29 February turns 18 on 1 March in a common year.

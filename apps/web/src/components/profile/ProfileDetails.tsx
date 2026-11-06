@@ -4,6 +4,8 @@ import {
   PROFESSION_TYPE_LABELS,
   countryName,
   memberRoleLine,
+  memberYearsLabel,
+  memberYearsLine,
   profileYearsLabel,
   yearsOfExperienceLabel,
   type MembershipDto,
@@ -23,6 +25,7 @@ export type ProfileView = Pick<
   MembershipDto,
   | "fullName"
   | "avatarUrl"
+  | "startYear"
   | "batchYear"
   | "city"
   | "country"
@@ -75,7 +78,7 @@ export function ProfileBadges({ profile, short }: { profile: Pick<ProfileView, "
 }
 
 /**
- * Photo, name, the headline under it, batch and place, then the badges. `nameExtras` sits beside the name (Admin, a
+ * Photo, name, the headline under it, years here and place, then the badges. `nameExtras` sits beside the name (Admin, a
  * status), and `children` below everything (actions). Centred on a phone, beside the photo from `sm` up.
  */
 export function ProfileSummary({
@@ -100,10 +103,7 @@ export function ProfileSummary({
           {nameExtras}
         </div>
         <p className="mt-0.5 text-slate-700 [overflow-wrap:anywhere]">{profileTagline(profile)}</p>
-        <p className="text-sm text-slate-500">
-          Batch of {profile.batchYear}
-          {place ? ` · ${place}` : ""}
-        </p>
+        <p className="text-sm text-slate-500">{memberYearsLine(profile, place)}</p>
         {badges && (
           <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:justify-start">
             <ProfileBadges profile={profile} />
@@ -201,7 +201,7 @@ export function ProfileDetails({
 
   const studies: TimelineItem[] = [];
   const here = tenant.type === "SCHOOL" ? "" : [profile.degree, profile.fieldOfStudy].filter(Boolean).join(", ");
-  if (here) studies.push({ key: "here", title: tenant.name, place: here, when: `Batch of ${profile.batchYear}` });
+  if (here) studies.push({ key: "here", title: tenant.name, place: here, when: memberYearsLabel(profile) });
   profile.education.forEach((e, i) =>
     studies.push({ key: `elsewhere-${i}`, title: e.institution, place: [e.degree, e.fieldOfStudy].filter(Boolean).join(", ") || null, when: profileYearsLabel(e.startYear, e.endYear) }),
   );

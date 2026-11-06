@@ -33,6 +33,7 @@ function membershipFields(m: MembershipRow, fields: ProfileFieldAnswerDto[]): Om
     statusReason: m.statusReason,
     statusChangedAt: iso(m.statusChangedAt),
     fullName: m.fullName,
+    startYear: m.startYear,
     batchYear: m.batchYear,
     dateOfBirth: m.dateOfBirth,
     professionType: m.professionType,
@@ -82,6 +83,7 @@ export function toMemberCardDto(m: MembershipRow, isOpenToWork = false): MemberC
   return {
     id: m.id,
     fullName: m.fullName,
+    startYear: m.startYear,
     batchYear: m.batchYear,
     professionType: m.professionType,
     companyName: m.companyName,

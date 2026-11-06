@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { APPROVAL_MODES, MIN_BATCH_YEAR, TENANT_FEATURES } from "../constants";
-import { hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, trimmedString } from "./common";
+import { hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, trimmedString, yearSchema } from "./common";
 import { timezoneSchema } from "./events";
 
 export const tenantListQuerySchema = z.object({
@@ -12,15 +12,13 @@ export const featuresSchema = z.object(
   Object.fromEntries(TENANT_FEATURES.map((f) => [f, z.boolean()])) as Record<(typeof TENANT_FEATURES)[number], z.ZodBoolean>,
 );
 
-const currentYear = new Date().getFullYear();
-
 export const tenantSettingsUpdateSchema = z
   .object({
     memberApprovalMode: z.enum(APPROVAL_MODES),
     contentModerationMode: z.enum(APPROVAL_MODES),
     allowSelfRegistration: z.boolean(),
-    minBatchYear: z.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10),
-    maxBatchYear: z.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10),
+    minBatchYear: yearSchema(MIN_BATCH_YEAR, 10),
+    maxBatchYear: yearSchema(MIN_BATCH_YEAR, 10),
     features: featuresSchema.partial(),
     /** Invited members (matched by their verified phone) are approved straight away. */
     inviteAutoApprove: z.boolean(),

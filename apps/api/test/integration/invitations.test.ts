@@ -97,6 +97,33 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     expect((await ctx.db.select().from(invitations).where(eq(invitations.phoneE164, "+447700900123")))[0]!.fullName).toBe("Asha R.");
   });
 
+  it("refuses a row whose batch comes before the start its invitation keeps, and imports the rest of the file", async () => {
+    const { tenant, admin, base } = await setup();
+    const [kept] = await ctx.db
+      .insert(invitations)
+      .values({ tenantId: tenant.id, phoneE164: "+919800000031", fullName: "Harsh Vora", startYear: 2012, batchYear: 2016, token: "kept-start-token", expiresAt: new Date(Date.now() + 86_400_000) })
+      .returning();
+    const res = await api()
+      .post(`${base}/admin/invitations/import`)
+      .set(admin.headers)
+      .send({
+        rows: [
+          { phone: "+919800000031", name: "Harsh V.", batchYear: "2010" },
+          { phone: "+919800000032", name: "Leela Menon", batchYear: "2019" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ created: 1, updated: 0, skipped: 1 });
+    expect(res.body.data.results[0]).toMatchObject({ row: 1, status: "invalid", message: "Batch can't be before the year they joined (2012)" });
+    // Left as it was.
+    expect((await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0]).toMatchObject({ fullName: "Harsh Vora", startYear: 2012, batchYear: 2016 });
+
+    // The year they joined itself, or a later one, is taken.
+    const fixed = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919800000031", batchYear: "2012" }] });
+    expect(fixed.body.data).toMatchObject({ updated: 1, skipped: 0 });
+    expect((await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0]).toMatchObject({ startYear: 2012, batchYear: 2012 });
+  });
+
   it("leaves out a row with a cell too long for the request on its own line, through the apps' chunked import", async () => {
     const { base, admin } = await setup();
     const rows: InvitationImportRow[] = [

@@ -9,6 +9,7 @@ import {
   type MentorshipBox,
 } from "../constants";
 import type { MemberCardDto, MentorCardDto, MentorProfileDto, MentorshipDto } from "../types/dto";
+import { memberYearsLine } from "./memberYears";
 
 /** How a mentorship's status reads, in the same words on both apps. Withdrawn and ended share a status and differ in whether it was ever accepted. */
 export function mentorshipStatusLabel(m: Pick<MentorshipDto, "box" | "status" | "acceptedAt">): string {
@@ -101,9 +102,9 @@ export function mentorAvailabilityText(p: { availability: MentorAvailability; av
  */
 export function mentorCardLabel(mentor: Pick<MentorCardDto, "member" | "areas" | "availability">): string {
   const { member } = mentor;
-  const batch = `Batch of ${member.batchYear}${member.city ? ` · ${member.city}` : ""}`;
+  const years = memberYearsLine(member, member.city);
   const areas = mentor.areas.map((a) => MENTOR_AREA_LABELS[a]).join(", ");
-  return [member.fullName, memberRoleLine(member), batch, areas, `Availability: ${MENTOR_AVAILABILITY_LABELS[mentor.availability]}`].join(", ");
+  return [member.fullName, memberRoleLine(member), years, areas, `Availability: ${MENTOR_AVAILABILITY_LABELS[mentor.availability]}`].join(", ");
 }
 
 /** What the filters on Find mentors say when they filter nothing out, the same on both apps. */

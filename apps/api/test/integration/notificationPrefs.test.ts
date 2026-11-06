@@ -170,8 +170,8 @@ describe.skipIf(!dbAvailable)("notification preferences", () => {
     const n = 1203;
     await ctx.db.execute(sql`insert into users (phone_e164) select '+9170' || lpad(g::text, 8, '0') from generate_series(1, ${n}) g`);
     await ctx.db.execute(sql`
-      insert into memberships (tenant_id, user_id, full_name, batch_year, profession_type, status)
-      select ${tenant.id}, id, 'Member', 2010, 'EMPLOYED', 'APPROVED' from users`);
+      insert into memberships (tenant_id, user_id, full_name, start_year, batch_year, profession_type, status)
+      select ${tenant.id}, id, 'Member', 2006, 2010, 'EMPLOYED', 'APPROVED' from users`);
     const ids = (await ctx.db.select({ id: memberships.id }).from(memberships).where(eq(memberships.tenantId, tenant.id))).map((r) => r.id);
     expect(ids).toHaveLength(n);
     await notify(ctx, { tenantId: tenant.id, recipientMembershipIds: ids, type: "ANNOUNCEMENT", title: "Hello all", data: { postId: "p9" }, dedupeKey: "ann-p9", bulk: true });

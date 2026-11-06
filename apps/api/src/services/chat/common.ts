@@ -131,7 +131,7 @@ export function peerIdOf(conversation: Pick<ConversationRow, "directLowId" | "di
 }
 
 /** Whether a member can be reached at all. A block doesn't come into it, because this decides what their contacts are told. */
-export function isReachable(tenant: Pick<TenantRow, "type" | "timezone">, member: { status: string; batchYear: number; dateOfBirth: string | null } | null | undefined): boolean {
+export function isReachable(tenant: Pick<TenantRow, "type" | "timezone">, member: { status: string; batchYear: number | null; dateOfBirth: string | null } | null | undefined): boolean {
   return !!member && member.status === "APPROVED" && !isCurrentPupil(tenant, member);
 }
 

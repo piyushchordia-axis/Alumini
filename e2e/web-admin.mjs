@@ -216,7 +216,7 @@ try {
     const id = href.split("/").pop();
     // As the API sends an admin's copy: who it is about, and where the request stands now.
     const subject = { kind: "membership", membershipId: id, fullName: "Pooja Bhatt", status: "PENDING" };
-    const notice = await scriptNotification(page, "demo-college", { type: "NEW_MEMBER_PENDING", data: { membershipId: id }, title: "New member awaiting approval", body: "Pooja Bhatt (batch of 2021) has requested to join.", subject });
+    const notice = await scriptNotification(page, "demo-college", { type: "NEW_MEMBER_PENDING", data: { membershipId: id }, title: "New member awaiting approval", body: "Pooja Bhatt (2017–2021) has requested to join.", subject });
     try {
       await page.goto(`${BASE}/t/demo-college/app/notifications`);
       const row = page.locator("main li", { hasText: "New member awaiting approval" });
@@ -316,7 +316,7 @@ try {
   await step("a group is approved in two presses: the first opens its name and description, the second sends what was shown, and a preview changed since asks again", async () => {
     // Answered by the script: a group whose owner renamed it after it was approved, so members still see the old name.
     const id = "00000000-0000-4000-8000-0000000000b1";
-    const owner = { id: "00000000-0000-4000-8000-0000000000b2", fullName: "Rohan Gupta", batchYear: 2016, professionType: "EMPLOYED", companyName: null, designation: null, city: "Pune", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
+    const owner = { id: "00000000-0000-4000-8000-0000000000b2", fullName: "Rohan Gupta", startYear: 2012, batchYear: 2016, professionType: "EMPLOYED", companyName: null, designation: null, city: "Pune", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
     const at = new Date().toISOString();
     const item = { contentType: "GROUP", id, title: "Pune robotics club", excerpt: "Weekend builds", author: owner, moderationStatus: "PENDING", moderatedAt: null, createdAt: at, reportCount: 0, isPinned: false, kind: null };
     const group = { id, name: "Pune robotics club", description: "Weekend builds", approvedName: "Robotics club", approvedDescription: "Builds and talks", visibility: "OPEN", memberCount: 6, owner, archived: false, createdAt: at, updatedAt: at, moderationStatus: "PENDING", moderationNote: null, moderatedAt: null };
@@ -344,6 +344,7 @@ try {
       await page.goto(`${BASE}/t/demo-college/admin/moderation?type=GROUP`);
       const row = page.locator("li", { hasText: "Pune robotics club" }).first();
       await row.waitFor();
+      await row.getByText(/^by Rohan Gupta \(2012–2016\) · /).waitFor();
       await row.getByRole("button", { name: "Approve", exact: true }).click();
       await page.waitForSelector("text=Check the group's name and description, then approve it.");
       await row.getByText("Until you decide, members see what was approved before:", { exact: true }).waitFor();
@@ -596,8 +597,10 @@ try {
       await loginWithPhone(invitePhone, guest);
       await guest.waitForURL(/\/register$/);
       await guest.waitForSelector("text=You were invited");
-      // The invitation fills in the name and batch, so the first step is ready to leave.
+      // The invitation fills in the name and the year they left; the year they joined is theirs to pick.
       if ((await guest.inputValue('input[name="fullName"]')) !== "Kavita Invitee") throw new Error("the invitation didn't fill in the name");
+      if ((await guest.inputValue('select[name="batchYear"]')) !== "2015") throw new Error("the invitation didn't fill in the year they left");
+      await guest.selectOption('select[name="startYear"]', "2011");
       await finishRegistration(guest, "Join the network");
       await guest.waitForURL(/\/app\/feed$/); // approved straight away: invitations skip the approval queue
     } finally {
@@ -1064,12 +1067,21 @@ try {
     await page.locator('label:has-text("URL slug") input').fill(`smoke-institute-${unique}`);
     await page.locator('label:has-text("Admin mobile") input').fill(`+9177${unique}0000`.slice(0, 13));
     await page.locator('label:has-text("Admin name") input').fill("Smoke Admin");
+    // The admin's years, labelled for a college, checked by the API as a member's are: an end before the start is refused
+    // on its input, and nothing is created.
+    const joined = page.getByRole("spinbutton", { name: "Year you joined", exact: true });
+    await joined.fill("2016");
+    await page.getByRole("spinbutton", { name: "Year you left (or will leave)", exact: true }).fill("2014");
+    await page.click('button:has-text("Onboard institution")');
+    await page.locator('label:has-text("Year you left (or will leave)")').getByText("Can't be before the year you joined", { exact: true }).waitFor();
+    await joined.fill("2010");
     await page.click('button:has-text("Onboard institution")');
     await page.waitForURL(/\/platform\/tenants\/[0-9a-f-]+$/);
     await page.waitForSelector(`text=Smoke Institute ${unique}`);
     await expectSvgNoEmoji(page.locator(`a[href="/t/smoke-institute-${unique}"]`), "the link to the institution's app");
     await page.click("text=Admins");
     await page.waitForSelector("text=Smoke Admin");
+    await page.locator("li", { hasText: "Smoke Admin" }).getByText(/· 2010–2014 · \+91 /).waitFor();
     await shot("p02-tenant-detail");
   });
 

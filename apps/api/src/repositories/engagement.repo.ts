@@ -59,7 +59,8 @@ export interface CelebrantRow {
   userId: string;
   fullName: string;
   avatarUrl: string | null;
-  batchYear: number;
+  startYear: number;
+  batchYear: number | null;
   kind: CelebrationKind;
   /** Anniversaries: whole years since approval. */
   years: number | null;
@@ -76,7 +77,7 @@ export async function celebrantsOn(db: DbClient, tenantId: string, day: string, 
   const [y, mo, d] = day.split("-").map(Number) as [number, number, number];
   const keys = [mo * 100 + d, ...(!isLeap(y) && mo === 2 && d === 28 ? [229] : [])];
   const base = and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"));
-  const pick = { membershipId: memberships.id, userId: memberships.userId, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, batchYear: memberships.batchYear };
+  const pick = { membershipId: memberships.id, userId: memberships.userId, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, startYear: memberships.startYear, batchYear: memberships.batchYear };
   const local = sql`(${memberships.approvedAt} at time zone ${timeZone})`;
   const [birthdays, anniversaries] = await Promise.all([
     db

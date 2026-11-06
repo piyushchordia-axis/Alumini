@@ -17,7 +17,7 @@ export const PROFILE_SECTION_BODIES: Record<ProfileSection, ComponentType<{ form
 
 /** The edit screen's sections, in order. Each card's id is its anchor (#basics, #work, #about). */
 const PROFILE_SECTION_CARDS: Array<{ id: ProfileSection; description: string }> = [
-  { id: "basics", description: "Your photo, name, batch and where you live." },
+  { id: "basics", description: "Your photo, name, years here and where you live." },
   { id: "work", description: "What you do now, what you did before, and your skills." },
   { id: "about", description: "Your story, studies, links and what you're open to." },
 ];

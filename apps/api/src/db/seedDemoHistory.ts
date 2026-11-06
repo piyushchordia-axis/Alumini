@@ -280,6 +280,13 @@ const POSTS = [
   "Started mentoring two final-year students this month. Highly recommend it.",
   "Our startup crossed 1,000 customers today. Grateful to the alumni who opened doors early on.",
 ] as const;
+/**
+ * A community's posts: POSTS without a batch, which its members don't have. As long as POSTS, so picking one draws from
+ * the stream as before.
+ */
+const COMMUNITY_POSTS: readonly string[] = POSTS.map((post, i) =>
+  i === 2 ? "Throwback to last year's Navratri garba. Who remembers the rain on the final night?" : i === 5 ? "Planning a members' get-together in {city} next month. Reply if you want to help organise." : post,
+);
 const COMMENTS = ["Count me in!", "Congratulations, well deserved 👏", "Sent you a message.", "This is so useful, thanks for sharing.", "Great to see this!", "Would love to join.", "Ha, I remember that night!"] as const;
 
 interface FieldSeed {
@@ -304,7 +311,6 @@ const FIELDS: Record<string, FieldSeed[]> = {
   ],
   "demo-school": [
     { key: "house", label: "School house", type: "SELECT", options: opts("Red", "Blue", "Green", "Yellow"), filterable: true },
-    { key: "year_joined", label: "Year you joined the school", type: "NUMBER" },
   ],
   "shri-gujarati-samaj": [
     { key: "chapter", label: "Chapter", type: "SELECT", options: opts("Ahmedabad", "Surat", "Rajkot", "Diaspora"), filterable: true },
@@ -313,7 +319,7 @@ const FIELDS: Record<string, FieldSeed[]> = {
 };
 
 /** A member's answer to one of the questions. */
-function answerFor(r: () => number, f: { type: FieldSeed["type"]; options: Array<{ value: string }> }, batch: number): ProfileFieldValue {
+function answerFor(r: () => number, f: { type: FieldSeed["type"]; options: Array<{ value: string }> }): ProfileFieldValue {
   switch (f.type) {
     case "SELECT":
       return pick(r, f.options).value;
@@ -323,11 +329,19 @@ function answerFor(r: () => number, f: { type: FieldSeed["type"]; options: Array
     }
     case "BOOLEAN":
       return r() < 0.45;
-    case "NUMBER":
-      return batch - 12 + Math.floor(r() * 4);
     default:
       return pick(r, ["Donated to the library fund in 2024.", "Spoke at the career fair.", "Prefers WhatsApp over email."]);
   }
+}
+
+/**
+ * A generated member's years, from the year drawn for them and their place in the list, so no draw is added and every
+ * other generated value stays as it was. Four years before the batch at a university or college, ten to twelve at the
+ * school. At the community the drawn year is when they joined, and four in five still belong.
+ */
+function generatedYears(slug: string, drawn: number, index: number, year: number): { startYear: number; batchYear: number | null } {
+  if (slug === "shri-gujarati-samaj") return { startYear: drawn, batchYear: index % 5 === 0 ? Math.min(year, drawn + 5 + (index % 4)) : null };
+  return { startYear: drawn - (slug === "demo-school" ? 12 - (index % 3) : 4), batchYear: drawn };
 }
 
 /** Generated members per institution (approved, spread over the last six months). */
@@ -411,7 +425,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
           dob,
           linkedin: r() < 0.4 ? `https://www.linkedin.com/in/${fullName.toLowerCase().replace(/[^a-z]+/g, "-")}-${i}` : null,
         };
-        return { ...person, profile: generatedProfile(profiles, slug, { ...person, index: i }, year) };
+        return { ...person, years: generatedYears(slug, batch, i, year), profile: generatedProfile(profiles, slug, { ...person, index: i }, year) };
       });
       const userRows = await db
         .insert(users)
@@ -430,7 +444,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
             approvedAt: p.approvedAt,
             createdAt: p.createdAt,
             fullName: p.fullName,
-            batchYear: p.batch,
+            ...p.years,
             professionType: p.profession,
             companyName: p.company,
             designation: p.designation,
@@ -494,7 +508,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
           const day = shiftDay(firstDay, w * 7 + Math.floor(r() * 7));
           if (day >= today) continue;
           const createdAt = at(day, 9 + Math.floor(r() * 12), Math.floor(r() * 60));
-          const body = pick(r, POSTS)
+          const body = pick(r, slug === "shri-gujarati-samaj" ? COMMUNITY_POSTS : POSTS)
             .replace("{city}", author.city ?? "town")
             .replace("{company}", author.company ?? "my company")
             .replace("{batch}", String(author.batch))
@@ -536,7 +550,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
       for (const m of all) {
         for (const f of defs) {
           if (r() > (f.visibility === "ADMINS" ? 0.15 : 0.7)) continue;
-          answers.push({ tenantId, membershipId: m.id, fieldId: f.id, value: answerFor(r, f, m.batch) });
+          answers.push({ tenantId, membershipId: m.id, fieldId: f.id, value: answerFor(r, f) });
         }
       }
       await chunked(answers, 1000, (rows) => db.insert(memberFieldValues).values(rows).onConflictDoNothing());
@@ -554,7 +568,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
       const expiresAt = new Date(now.getTime() + 90 * DAY);
       const sentAt = new Date(now.getTime() - 3 * DAY);
       const [joined] = await db
-        .select({ id: memberships.id, phone: users.phoneE164, name: memberships.fullName, batch: memberships.batchYear, approvedAt: memberships.approvedAt })
+        .select({ id: memberships.id, phone: users.phoneE164, name: memberships.fullName, start: memberships.startYear, batch: memberships.batchYear, approvedAt: memberships.approvedAt })
         .from(memberships)
         .innerJoin(users, eq(users.id, memberships.userId))
         .where(and(eq(memberships.tenantId, uni), like(users.phoneE164, "+919310%")))
@@ -562,13 +576,13 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
         .limit(1);
       const base = { tenantId: uni, invitedByUserId: adminUser?.id ?? null, expiresAt };
       await db.insert(invitations).values([
-        { ...base, phoneE164: "+919400000001", fullName: "Harsh Vora", batchYear: 2016, token: token(), fieldValues: { hostel: "raman" } },
-        { ...base, phoneE164: "+919400000002", fullName: "Leela Menon", batchYear: 2019, token: token() },
-        { ...base, phoneE164: "+919400000003", fullName: "Kunal Shah", batchYear: 2011, email: "kunal@example.com", token: token() },
-        { ...base, phoneE164: "+919400000004", fullName: "Nisha Kaur", batchYear: 2014, token: token(), status: "SENT" as const, sendCount: 1, lastSentAt: sentAt },
-        { ...base, phoneE164: "+919400000005", fullName: "Rohit Bajaj", batchYear: 2009, token: token(), status: "SENT" as const, sendCount: 2, lastSentAt: sentAt },
-        { ...base, phoneE164: "+919400000006", fullName: "Old Number", batchYear: 2003, token: token(), status: "REVOKED" as const },
-        ...(joined ? [{ ...base, phoneE164: joined.phone, fullName: joined.name, batchYear: joined.batch, token: token(), status: "ACCEPTED" as const, sendCount: 1, lastSentAt: joined.approvedAt, acceptedMembershipId: joined.id, acceptedAt: joined.approvedAt }] : []),
+        { ...base, phoneE164: "+919400000001", fullName: "Harsh Vora", startYear: 2012, batchYear: 2016, token: token(), fieldValues: { hostel: "raman" } },
+        { ...base, phoneE164: "+919400000002", fullName: "Leela Menon", startYear: 2015, batchYear: 2019, token: token() },
+        { ...base, phoneE164: "+919400000003", fullName: "Kunal Shah", startYear: 2007, batchYear: 2011, email: "kunal@example.com", token: token() },
+        { ...base, phoneE164: "+919400000004", fullName: "Nisha Kaur", startYear: 2010, batchYear: 2014, token: token(), status: "SENT" as const, sendCount: 1, lastSentAt: sentAt },
+        { ...base, phoneE164: "+919400000005", fullName: "Rohit Bajaj", startYear: 2005, batchYear: 2009, token: token(), status: "SENT" as const, sendCount: 2, lastSentAt: sentAt },
+        { ...base, phoneE164: "+919400000006", fullName: "Old Number", startYear: 1999, batchYear: 2003, token: token(), status: "REVOKED" as const },
+        ...(joined ? [{ ...base, phoneE164: joined.phone, fullName: joined.name, startYear: joined.start, batchYear: joined.batch, token: token(), status: "ACCEPTED" as const, sendCount: 1, lastSentAt: joined.approvedAt, acceptedMembershipId: joined.id, acceptedAt: joined.approvedAt }] : []),
       ]);
     }
 

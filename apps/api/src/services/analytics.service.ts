@@ -1,5 +1,5 @@
 import { MESSAGE_CHANNELS, PROFESSION_TYPE_LABELS, countryName, zonedWallTimeToUtc, type CountRow, type MessageChannel, type PlatformComparisonDto, type TenantAnalyticsDto } from "@illuminize/shared";
-import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { AppContext } from "../context";
 import { invitations, memberActivityDays, memberFieldValues, memberships, moderationItems, outboundMessages, tenantBillingPlans, tenants, users } from "../db/schema";
 import { toBillingPlanDto } from "../dto/platform.dto";
@@ -99,7 +99,7 @@ export async function getTenantAnalytics(ctx: AppContext, tenantId: string, week
     ctx.db
       .select({ label: sql<string>`${memberships.batchYear}::text`, count: sql<number>`count(*)::int` })
       .from(memberships)
-      .where(approved)
+      .where(and(approved, isNotNull(memberships.batchYear)))
       .groupBy(memberships.batchYear)
       .orderBy(memberships.batchYear),
     ctx.db

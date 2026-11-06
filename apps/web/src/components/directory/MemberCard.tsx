@@ -1,9 +1,10 @@
-import { type DirectoryCardDto, countryName } from "@illuminize/shared";
+import { type DirectoryCardDto, countryName, memberYearsLine } from "@illuminize/shared";
 import { Link } from "react-router-dom";
 import { ProfileBadges, profileTagline } from "@/components/profile/ProfileDetails";
 import { Avatar, Badge, Card } from "@/components/ui";
 
 export function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }) {
+  const place = [member.city, member.country && member.country !== "IN" ? countryName(member.country) : null].filter(Boolean).join(", ");
   return (
     <Link to={`/t/${slug}/app/directory/${member.id}`}>
       <Card className="flex items-center gap-3 p-4 transition hover:border-slate-300 hover:shadow">
@@ -16,11 +17,7 @@ export function MemberCard({ slug, member }: { slug: string; member: DirectoryCa
           </div>
           {/* One line however long the headline: the whole of it is on their profile. */}
           <p className="truncate text-sm text-slate-600">{profileTagline(member)}</p>
-          <p className="text-xs text-slate-500">
-            Batch of {member.batchYear}
-            {member.city ? ` · ${member.city}` : ""}
-            {member.country && member.country !== "IN" ? `, ${countryName(member.country)}` : ""}
-          </p>
+          <p className="text-xs text-slate-500">{memberYearsLine(member, place)}</p>
         </div>
       </Card>
     </Link>

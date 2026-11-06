@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, memberYearsLabel, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { Text, View } from "react-native";
@@ -46,7 +46,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
   const status = job.moderationStatus === "APPROVED" ? null : MODERATION_STATUS_LABELS[job.moderationStatus];
   const note = job.moderationNote && (job.moderationStatus === "REJECTED" || job.moderationStatus === "REMOVED") ? `Admin note: ${job.moderationNote}` : null;
   const skills = job.skills.length ? `Skills: ${[...shown.map(({ skill, matched: has }) => (has ? `${skill} ${YOU_HAVE_THIS_TEXT}` : skill)), ...(more > 0 ? [`${more} more`] : [])].join(", ")}` : null;
-  const posted = `Posted by ${job.author.fullName} (batch of ${job.author.batchYear}) · ${timeAgo(job.createdAt)}`;
+  const posted = `Posted by ${job.author.fullName} (${memberYearsLabel(job.author)}) · ${timeAgo(job.createdAt)}`;
   // The card's name stands in for everything inside it, so it says all the card shows, in its order, title first.
   const name = [job.title, where, referable && CAN_REFER_BADGE, job.isClosed && "Closed", status, JOB_TYPE_LABELS[job.jobType], experience, pay, note, job.summary, skills, posted]
     .filter(Boolean)

@@ -1,4 +1,4 @@
-import { FUNDING_STAGE_LABELS, plainExcerpt, type FundingDto } from "@illuminize/shared";
+import { FUNDING_STAGE_LABELS, memberYearsLabel, plainExcerpt, type FundingDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
@@ -22,8 +22,8 @@ export function FundingCard({ slug, item }: { slug: string; item: FundingDto }) 
       <ModerationCardNote status={item.moderationStatus} note={item.moderationNote} />
       <p className="mt-2 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere]">{plainExcerpt(item.pitch, 200)}</p>
       {item.sectors.length > 0 && <p className="mt-2 text-xs text-slate-500">{item.sectors.map((s) => `#${s}`).join(" ")}</p>}
-      <p className="mt-2 text-xs text-slate-400">
-        {item.author.fullName} · batch of {item.author.batchYear} · {timeAgo(item.createdAt)}
+      <p className="mt-2 text-xs text-slate-500">
+        {item.author.fullName} · {memberYearsLabel(item.author)} · {timeAgo(item.createdAt)}
       </p>
     </ContentCard>
   );

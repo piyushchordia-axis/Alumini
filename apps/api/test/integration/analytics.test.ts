@@ -281,8 +281,8 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     await ctx.db.execute(sql`insert into users (phone_e164) select '+9170' || lpad(g::text, 8, '0') from generate_series(1, ${n}) g`);
     // Many share a name, so the keyset has to break ties on the id.
     await ctx.db.execute(sql`
-      insert into memberships (tenant_id, user_id, full_name, batch_year, profession_type, status)
-      select ${tenant.id}, id, 'Member ' || (row_number() over () % 50), 2010, 'EMPLOYED', 'APPROVED' from users where phone_e164 like '+9170%'`);
+      insert into memberships (tenant_id, user_id, full_name, start_year, batch_year, profession_type, status)
+      select ${tenant.id}, id, 'Member ' || (row_number() over () % 50), 2006, 2010, 'EMPLOYED', 'APPROVED' from users where phone_e164 like '+9170%'`);
     const res = await csvRequest(api().get(`${base}/exports/members.csv`).set(admin.headers));
     const rows = parseRows(res.body as string).slice(1);
     expect(rows).toHaveLength(n + 1);

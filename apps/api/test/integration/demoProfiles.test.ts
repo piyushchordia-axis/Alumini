@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { isCurrentPupil, membershipProfileUpdateSchema, sortEducation, sortExperiences } from "@illuminize/shared";
+import { isCurrentPupil, memberYearsIssues, membershipProfileUpdateSchema, sortEducation, sortExperiences } from "@illuminize/shared";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { invitations, memberFieldValues, memberships, tenantProfileFields, tenants, users } from "../../src/db/schema";
+import { invitations, memberFieldValues, memberships, tenantProfileFields, tenantSettings, tenants, users } from "../../src/db/schema";
 import { seedAll } from "../../src/db/seed";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -30,11 +30,27 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
   async function seed() {
     const { tenantIds } = await seedAll(ctx.db, ["+919999999999"]);
     const rows = await ctx.db
-      .select({ m: memberships, phone: users.phoneE164, tenant: tenants })
+      .select({ m: memberships, phone: users.phoneE164, tenant: tenants, settings: tenantSettings })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
-      .innerJoin(tenants, eq(tenants.id, memberships.tenantId));
-    return { tenantIds, rows };
+      .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
+      .innerJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id));
+    const invites = await ctx.db
+      .select({ i: invitations, tenant: tenants, settings: tenantSettings })
+      .from(invitations)
+      .innerJoin(tenants, eq(tenants.id, invitations.tenantId))
+      .innerJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id));
+    return { tenantIds, rows, invites };
+  }
+
+  /**
+   * Every seeded member's years pass the checks both apps run on each save of the profile, which sends them as stored,
+   * and the API's; an invitation's, either of which may be blank, as an import's are.
+   */
+  function expectValidYears({ rows, invites }: Awaited<ReturnType<typeof seed>>) {
+    for (const { m, phone, tenant, settings } of rows) expect(memberYearsIssues({ type: tenant.type, settings }, m), phone).toEqual({});
+    for (const { i, tenant, settings } of invites) expect(memberYearsIssues({ type: tenant.type, settings }, i, { required: false }), i.phoneE164).toEqual({});
+    expect(invites.filter(({ i }) => i.startYear !== null).length).toBeGreaterThan(5);
   }
 
   const detailsOf = (m: typeof memberships.$inferSelect) => ({
@@ -55,7 +71,8 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
   });
 
   it("seeds full profiles for a few named members and partial ones for about 60% of generated members, as the API would save them", async () => {
-    const { rows } = await seed();
+    const seeded = await seed();
+    const { rows } = seeded;
     for (const { m, phone, tenant } of rows) {
       const details = detailsOf(m);
       // Valid by the profile's own rules, already in the form they leave it in, and with both lists newest first.
@@ -105,6 +122,24 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     expect(core).toHaveLength(110);
     expect(createHash("sha256").update(JSON.stringify(core)).digest("hex")).toBe(GENERATED_DIGEST);
+
+    // Everyone has a start no later than their end. Only the Samaj, a community, leaves ends blank: most of its members still belong.
+    expectValidYears(seeded);
+    for (const { m, phone, tenant } of rows) {
+      if (m.batchYear !== null) expect(m.startYear, phone).toBeLessThanOrEqual(m.batchYear);
+      else expect(tenant.type, phone).toBe("OTHER");
+    }
+    const samaj = rows.filter((r) => r.tenant.type === "OTHER");
+    const stillThere = samaj.filter((r) => r.m.batchYear === null).length;
+    expect(stillThere / samaj.length).toBeGreaterThan(0.7);
+    expect(stillThere).toBeLessThan(samaj.length);
+    const kiran = samaj.find((r) => r.phone === "+919100000033")?.m;
+    expect([kiran?.startYear, kiran?.batchYear]).toEqual([2008, 2021]);
+    // Years follow from the end the seed drew: four years at university and college, ten to twelve at school.
+    for (const { m, phone, tenant } of generated) {
+      if (tenant.type === "SCHOOL") expect(m.batchYear! - m.startYear, phone).toBeGreaterThanOrEqual(10);
+      else if (tenant.type !== "OTHER") expect(m.batchYear! - m.startYear, phone).toBe(4);
+    }
   });
 
   it("seeds no year past the server's own, even when it's already New Year's Day in India", async () => {
@@ -115,11 +150,12 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     // 20:00 UTC on 31 December is 01:30 on 1 January in India.
     vi.setSystemTime(new Date(`${new Date().getUTCFullYear()}-12-31T20:00:00Z`));
     try {
-      const { rows } = await seed();
-      for (const { m, phone } of rows) {
+      const seeded = await seed();
+      for (const { m, phone } of seeded.rows) {
         const parsed = membershipProfileUpdateSchema.safeParse(detailsOf(m));
         expect(parsed.success, `${phone}: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);
       }
+      expectValidYears(seeded);
     } finally {
       vi.useRealTimers();
       process.env.TZ = zone;
@@ -130,7 +166,8 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     const { tenantIds } = await seed();
     const questions = async (slug: string) => ctx.db.select().from(tenantProfileFields).where(eq(tenantProfileFields.tenantId, tenantIds[slug]!)).orderBy(tenantProfileFields.position);
     expect((await questions("demo-university")).map((f) => f.key)).toEqual(["hostel", "office_notes"]);
-    expect((await questions("demo-school")).map((f) => f.key)).toEqual(["house", "year_joined"]);
+    // The year they joined is part of every profile now.
+    expect((await questions("demo-school")).map((f) => f.key)).toEqual(["house"]);
     const [clubs, ...rest] = await questions("demo-college");
     expect(rest).toEqual([]);
     expect(clubs).toMatchObject({ key: "clubs", label: "Clubs and societies", type: "MULTI_SELECT", filterable: true, visibility: "MEMBERS", memberEditable: true });

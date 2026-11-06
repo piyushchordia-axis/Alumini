@@ -1,4 +1,4 @@
-import type { CelebrationDto } from "@illuminize/shared";
+import { memberYearsLabel, type CelebrationDto } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -42,7 +42,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
                   </Link>
                   <span className="flex items-center gap-1 text-xs text-slate-500">
                     {c.kind === "BIRTHDAY" ? <IconCake size={12} /> : <IconSpark size={12} />}
-                    {what(c)} · batch of {c.batchYear}
+                    {what(c)} · {memberYearsLabel(c)}
                   </span>
                 </div>
                 {c.isMe ? (

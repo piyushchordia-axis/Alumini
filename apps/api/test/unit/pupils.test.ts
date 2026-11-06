@@ -62,6 +62,12 @@ describe("isCurrentPupil", () => {
     expect(isCurrentPupil(school(), { batchYear: 2025, dateOfBirth: null }, MID_2026)).toBe(false);
   });
 
+  it("reads a blank batch year as neither future nor current, leaving the date of birth to decide", () => {
+    expect(isCurrentPupil(school(), { batchYear: null, dateOfBirth: null }, MID_2026)).toBe(false);
+    expect(isCurrentPupil(school(), { batchYear: null, dateOfBirth: "2000-01-01" }, MID_2026)).toBe(false);
+    expect(isCurrentPupil(school(), { batchYear: null, dateOfBirth: "2012-01-01" }, MID_2026)).toBe(true);
+  });
+
   it("applies to schools only", () => {
     for (const type of ["UNIVERSITY", "COLLEGE", "OTHER"] as const) {
       expect(isCurrentPupil({ type, timezone: "Asia/Kolkata" }, { batchYear: 2030, dateOfBirth: "2015-01-01" }, MID_2026), type).toBe(false);

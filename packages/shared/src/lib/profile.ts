@@ -21,7 +21,7 @@ export const PROFILE_SECTION_TITLES: Record<ProfileSection, string> = { basics: 
 
 /** What each registration step asks for, under its heading. */
 export const REGISTRATION_STEP_HINTS: Record<ProfileSection, string> = {
-  basics: "Your photo, name and batch, so batchmates know it's you.",
+  basics: "Your photo, name and years here, so people know it's you.",
   work: "What you do now and what you did before. You can skip this and add it later.",
   about: "Your story, studies, links and what you're open to. All of it is optional.",
 };
@@ -52,6 +52,7 @@ export type ProfileInputKey = Exclude<keyof MembershipProfileInput, "fields">;
 const SECTION_OF: Record<ProfileInputKey, ProfileSection> = {
   avatarUrl: "basics",
   fullName: "basics",
+  startYear: "basics",
   batchYear: "basics",
   professionType: "basics",
   dateOfBirth: "basics",
@@ -121,7 +122,7 @@ export type HiddenProfileKey = "careerStartYear" | "degree" | "fieldOfStudy" | "
  */
 export function hiddenProfileKeys(
   tenant: { type: TenantType; timezone: string },
-  m: { professionType: string; batchYear: number; dateOfBirth: string | null },
+  m: { professionType: string; batchYear: number | null; dateOfBirth: string | null },
   now: Date = new Date(),
 ): HiddenProfileKey[] {
   const hidden: HiddenProfileKey[] = [];

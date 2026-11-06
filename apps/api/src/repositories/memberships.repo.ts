@@ -322,7 +322,8 @@ export async function membershipStatusByPhones(db: DbClient, tenantId: string, p
 /**
  * The pupil rule of isCurrentPupil, in SQL, for a list that has to leave pupils out before it's cut to a page. The same
  * arithmetic: YYYYMMDD as a number compares like a date. Only a school has pupils. Reads the `memberships` table of the
- * query around it, so join the member to check under that name.
+ * query around it, so join the member to check under that name. A blank batch year compares as false, never null, which
+ * `not` would keep null and so drop the row.
  */
 export function notCurrentPupil(tenant: Pick<TenantRow, "type" | "timezone">, now: Date): SQL | undefined {
   if (tenant.type !== "SCHOOL") return undefined;
@@ -330,8 +331,8 @@ export function notCurrentPupil(tenant: Pick<TenantRow, "type" | "timezone">, no
   const today = t.year * 10000 + t.month * 100 + t.day;
   const dob = memberships.dateOfBirth;
   return sql`not (
-    ${memberships.batchYear} > ${t.year}
-    or (${dob} is null and ${memberships.batchYear} = ${t.year})
+    coalesce(${memberships.batchYear} > ${t.year}, false)
+    or (${dob} is null and coalesce(${memberships.batchYear} = ${t.year}, false))
     or (${dob} is not null and (extract(year from ${dob})::int + 18) * 10000 + extract(month from ${dob})::int * 100 + extract(day from ${dob})::int > ${today})
   )`;
 }

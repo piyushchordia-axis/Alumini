@@ -23,6 +23,7 @@ export function toMembershipSummaryDto(m: MembershipRow, t: TenantRow): Membersh
     status: m.status,
     statusReason: m.statusReason,
     fullName: m.fullName,
+    startYear: m.startYear,
     batchYear: m.batchYear,
     avatarUrl: m.avatarUrl,
   };

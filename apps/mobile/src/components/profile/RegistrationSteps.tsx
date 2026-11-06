@@ -30,7 +30,7 @@ import { AccessibilityInfo, BackHandler, Platform, Pressable, StyleSheet, Text, 
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconCheck, IconSwitch } from "@/components/icons";
 import { ProfileAboutSection, ProfileBasicsSection, ProfileWorkSection } from "@/components/profile/ProfileSections";
-import { toDraft, useProfileDraft, type DraftValues, type ProfileDraft } from "@/components/profile/useProfileDraft";
+import { toDraft, useProfileDraft, yearOrNull, type DraftValues, type ProfileDraft } from "@/components/profile/useProfileDraft";
 import { SignedInAs } from "@/components/SignedInAs";
 import type { SkillsInputHandle } from "@/components/SkillsInput";
 import { Button, ErrorText, focusOn, headingRole, type Focusable } from "@/components/ui";
@@ -272,7 +272,7 @@ export function RegistrationSteps({ tenant, initial, customFields, submitLabel, 
   const applyCopy = () => {
     if (!copy || !copyValues) return;
     const d = f.draft;
-    const hidden = hiddenProfileKeys(tenant, { professionType: d.professionType, batchYear: Number(d.batchYear), dateOfBirth: d.dateOfBirth || null });
+    const hidden = hiddenProfileKeys(tenant, { professionType: d.professionType, batchYear: yearOrNull(d.batchYear), dateOfBirth: d.dateOfBirth || null });
     const fill = fillFromPortableProfile(comparable(copyValues), comparable(portableOf(d)), start, hidden);
     const values = Object.fromEntries(fill.filled.map((k) => [k, copyValues[k]])) as DraftValues;
     f.setValues(values);

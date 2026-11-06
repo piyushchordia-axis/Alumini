@@ -3,6 +3,7 @@ import {
   PROFILE_MIN_YEAR,
   hiddenProfileKeys,
   isCurrentPupil,
+  memberYearsIssues,
   membershipProfileSchema,
   profileSectionFields,
   profileSectionOf,
@@ -17,11 +18,13 @@ import {
 import { isApiClientError } from "@illuminize/shared/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, type RefObject } from "react";
-import { useForm, useWatch, type Path, type Resolver } from "react-hook-form";
+import { useForm, useWatch, type FieldErrors, type Path, type Resolver } from "react-hook-form";
 import type { z } from "zod";
 import { answersToValues, type FieldAnswers } from "@/components/profile/CustomFieldInputs";
 
-export type ProfileFormValues = z.input<typeof membershipProfileSchema>;
+type SchemaInput = z.input<typeof membershipProfileSchema>;
+/** The profile body as the inputs hold it: the start year is blank (null) until one is picked, as the end year may be. */
+export type ProfileFormValues = Omit<SchemaInput, "startYear"> & { startYear: number | null };
 
 export interface ProfileFormOptions {
   tenant: TenantPublicDto;
@@ -46,7 +49,8 @@ interface ProfileFormHookOptions extends ProfileFormOptions {
 
 export const toProfileFormValues = (m?: Partial<MembershipDto>): ProfileFormValues => ({
   fullName: m?.fullName ?? "",
-  batchYear: m?.batchYear ?? new Date().getFullYear() - 5,
+  startYear: m?.startYear ?? null,
+  batchYear: m?.batchYear ?? null,
   dateOfBirth: m?.dateOfBirth ?? null,
   professionType: m?.professionType ?? "EMPLOYED",
   companyName: m?.companyName ?? null,
@@ -80,7 +84,11 @@ export const toProfileFormValues = (m?: Partial<MembershipDto>): ProfileFormValu
 /** The form's own fields, so a server error on anything else (which no input would show) is shown in full instead. */
 const FORM_FIELDS = new Set(Object.keys(toProfileFormValues()));
 
-const schemaResolver = zodResolver(membershipProfileSchema);
+/** A year select's value: blank is null. */
+export const yearValue = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
+
+// Over the form's values: a blank start year (null) is the schema's to refuse.
+const schemaResolver = zodResolver(membershipProfileSchema) as unknown as Resolver<ProfileFormValues, unknown, MembershipProfileInput>;
 
 /**
  * The schema's check, on what the form shows this member: an input it hides (the year a student started working, a
@@ -89,13 +97,17 @@ const schemaResolver = zodResolver(membershipProfileSchema);
  */
 const visibleResolver =
   (tenant: TenantPublicDto): Resolver<ProfileFormValues, unknown, MembershipProfileInput> =>
-  (values, context, options) => {
-    const hidden = hiddenProfileKeys(tenant, { professionType: values.professionType, batchYear: Number(values.batchYear), dateOfBirth: values.dateOfBirth ?? null });
-    return schemaResolver(withoutHiddenProfileKeys(values, hidden), context, options);
+  async (values, context, options) => {
+    const hidden = hiddenProfileKeys(tenant, { professionType: values.professionType, batchYear: yearValue(values.batchYear), dateOfBirth: values.dateOfBirth ?? null });
+    const result = await schemaResolver(withoutHiddenProfileKeys(values, hidden), context, options);
+    // The years as the API checks them, for this institution and in its words: the schema can't tell a community's blank
+    // end from a missing one, and calls a blank start "expected number".
+    const years = Object.entries(memberYearsIssues(tenant, { startYear: yearValue(values.startYear), batchYear: yearValue(values.batchYear) }));
+    if (years.length === 0) return result;
+    const errors: FieldErrors<ProfileFormValues> = { ...result.errors };
+    for (const [key, message] of years) errors[key as "startYear" | "batchYear"] = { type: "years", message };
+    return { values: {}, errors };
   };
-
-/** A year select's value: blank is null. */
-export const yearValue = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
 
 const yearsDown = (from: number) => Array.from({ length: from - PROFILE_MIN_YEAR + 1 }, (_, i) => from - i);
 /** Years a past role or the start of studies can have: this year back to PROFILE_MIN_YEAR, newest first. */
@@ -142,7 +154,7 @@ export function useProfileForm({ tenant, initial, customFields = [], mode = "edi
   });
   const [batchYear, dateOfBirth, professionType, fullName] = useWatch({ control: form.control, name: ["batchYear", "dateOfBirth", "professionType", "fullName"] });
   // From what's on the form, so changing the batch or date of birth shows or hides what a pupil can't have at once.
-  const pupil = isCurrentPupil(tenant, { batchYear: Number(batchYear), dateOfBirth: dateOfBirth ?? null });
+  const pupil = isCurrentPupil(tenant, { batchYear: yearValue(batchYear), dateOfBirth: dateOfBirth ?? null });
 
   const readOnly = (f: { memberEditable: boolean }) => !f.memberEditable;
   const required = customFields.filter((f) => f.required && !readOnly(f));

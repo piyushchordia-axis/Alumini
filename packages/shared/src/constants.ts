@@ -491,6 +491,8 @@ export const UPLOAD_JPEG_QUALITY = 0.85;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 export const MIN_BATCH_YEAR = 1950;
+/** The earliest year a member may say they joined an institution in (memberYearsIssues). */
+export const MEMBER_START_MIN_YEAR = 1930;
 /** Limits on the profile's own details (see membershipProfileSchema). */
 export const PROFILE_HEADLINE_MAX_LENGTH = 120;
 export const PROFILE_MAX_SKILLS = 20;

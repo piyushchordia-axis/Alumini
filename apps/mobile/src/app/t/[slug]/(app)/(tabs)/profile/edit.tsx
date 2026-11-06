@@ -14,7 +14,7 @@ import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
 const DESCRIPTIONS: Record<ProfileSection, string> = {
-  basics: "Your photo, name, batch and where you live.",
+  basics: "Your photo, name, years here and where you live.",
   work: "What you do now, what you did before, and your skills.",
   about: "Your story, studies, links and what you're open to.",
 };

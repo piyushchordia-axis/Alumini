@@ -1,5 +1,7 @@
 import {
   isCurrentPupil,
+  memberYearsIssues,
+  memberYearsLabel,
   sortEducation,
   sortExperiences,
   type AdminMemberDto,
@@ -11,6 +13,7 @@ import {
   type MembershipProfileUpdate,
   type MembershipRole,
   type MembershipStatus,
+  type MemberYears,
   type PortableProfileDto,
 } from "@illuminize/shared";
 import type { AppContext } from "../context";
@@ -37,7 +40,7 @@ import { hasOpenReportAbout, lockReportSubject } from "../repositories/chatRepor
 import { claimInvitation, findOpenInvitationByPhone } from "../repositories/invitations.repo";
 import { runInTransaction } from "../lib/transaction";
 import { answersFor, answersForOne, applyInvitationAnswers, saveAnswers } from "./profileFields.service";
-import type { AuthContext, MembershipRow, TenantContext, TenantRow } from "../types/request";
+import type { AuthContext, MembershipRow, TenantContext, TenantRow, TenantSettingsRow } from "../types/request";
 import { assertAdminTransition, initialMembershipStatus, transitionMembership, type MembershipAction } from "./approval";
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { handOverGroupsOf } from "./chat/groups.service";
@@ -54,6 +57,7 @@ export interface Actor extends AuthContext {
 function profileColumns(input: MembershipProfileInput | MembershipProfileUpdate, tenant: Pick<TenantRow, "type">) {
   const out: Partial<MembershipRow> = {};
   if (input.fullName !== undefined) out.fullName = input.fullName;
+  if (input.startYear !== undefined) out.startYear = input.startYear;
   if (input.batchYear !== undefined) out.batchYear = input.batchYear;
   if (input.dateOfBirth !== undefined) out.dateOfBirth = input.dateOfBirth;
   if (input.professionType !== undefined) out.professionType = input.professionType;
@@ -103,14 +107,32 @@ async function applyPupilRules(tx: DbClient, tenant: TenantRow, row: MembershipR
   return (await updateMembership(tx, tenant.id, row.id, { openTo: [] }))!;
 }
 
-function assertBatchYear(tenantCtx: TenantContext, batchYear: number | undefined) {
-  if (batchYear === undefined) return;
-  const { minBatchYear, maxBatchYear } = tenantCtx.settings;
-  if (batchYear < minBatchYear || batchYear > maxBatchYear) {
-    throw AppError.badRequest(`Batch year must be between ${minBatchYear} and ${maxBatchYear}`, [
-      { path: "batchYear", message: `Must be between ${minBatchYear} and ${maxBatchYear}` },
-    ]);
-  }
+/**
+ * Refuses years the institution doesn't take (memberYearsIssues), each problem on its own field, under `prefix` where the
+ * body nests them ("initialAdmin.").
+ */
+export function assertMemberYears(tenant: Pick<TenantRow, "type">, settings: Pick<TenantSettingsRow, "minBatchYear" | "maxBatchYear">, years: MemberYears, prefix = ""): void {
+  const issues = Object.entries(memberYearsIssues({ type: tenant.type, settings }, years));
+  if (issues.length === 0) return;
+  throw AppError.badRequest(
+    "Check the years you've given",
+    issues.map(([path, message]) => ({ path: `${prefix}${path}`, message })),
+  );
+}
+
+/**
+ * An edit's years checked with the ones it leaves as stored, read from the row held for the change. An edit that sends
+ * no year is never refused for years stored under an earlier rule, such as an admin answering the institution's questions.
+ */
+async function assertEditedYears(tx: Tx, tenantCtx: TenantContext, membershipId: string, input: MembershipProfileUpdate): Promise<void> {
+  if (input.startYear === undefined && input.batchYear === undefined) return;
+  await lockMembership(tx, tenantCtx.tenant.id, membershipId);
+  const stored = await findMembershipById(tx, tenantCtx.tenant.id, membershipId);
+  if (!stored) return;
+  assertMemberYears(tenantCtx.tenant, tenantCtx.settings, {
+    startYear: input.startYear ?? stored.startYear,
+    batchYear: input.batchYear === undefined ? stored.batchYear : input.batchYear,
+  });
 }
 
 /**
@@ -126,7 +148,9 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
   if (!settings.allowSelfRegistration && !actor.isPlatformAdmin && !invite) {
     throw AppError.forbidden("This institution is not accepting new registrations", "REGISTRATION_CLOSED");
   }
-  assertBatchYear(tenantCtx, input.batchYear);
+  // Both years, always: an end left out is a community member who still belongs, on registering again too.
+  const years = { startYear: input.startYear, batchYear: input.batchYear ?? null };
+  assertMemberYears(tenant, settings, years);
 
   const approveNow = !!invite && settings.inviteAutoApprove;
   const status = approveNow ? "APPROVED" : initialMembershipStatus(settings.memberApprovalMode);
@@ -154,6 +178,7 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
       const next = approveNow ? "APPROVED" : transitionMembership(existing.status, "reapply", settings.memberApprovalMode);
       row = (await updateMembership(tx, tenant.id, existing.id, {
         ...profileColumns(input, tenant),
+        ...years,
         status: next,
         statusReason: null,
         statusChangedAt: new Date(),
@@ -168,9 +193,9 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
         userId: actor.userId,
         role: "MEMBER",
         fullName: input.fullName,
-        batchYear: input.batchYear,
         professionType: input.professionType,
         ...profileColumns(input, tenant),
+        ...years,
         ...(held.suspendedAt ? heldSuspensionColumns() : { status, statusChangedAt: status === "APPROVED" ? new Date() : null }),
       });
       await restoreHeldSanctions(tx, row, held, { actorUserId: actor.userId, actorMembershipId: row.id, ip: actor.ip });
@@ -200,7 +225,7 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
           tenantId: tenant.id,
           type: "NEW_MEMBER_PENDING",
           title: "New member awaiting approval",
-          body: `${row.fullName} (batch of ${row.batchYear}) has requested to join.`,
+          body: `${row.fullName} (${memberYearsLabel(row)}) has requested to join.`,
           data: { membershipId: row.id },
         },
         tx,
@@ -222,8 +247,8 @@ export async function updateMyProfile(
   membership: MembershipRow,
   input: MembershipProfileUpdate,
 ): Promise<MembershipDto> {
-  assertBatchYear(tenantCtx, input.batchYear);
   const row = await runInTransaction(ctx, async (tx) => {
+    await assertEditedYears(tx, tenantCtx, membership.id, input);
     await applyAvatarChange(ctx, tx, tenantCtx.tenant.id, { membershipId: membership.id, next: input.avatarUrl, uploaderIds: [membership.userId] });
     const updated = await updateMembership(tx, tenantCtx.tenant.id, membership.id, profileColumns(input, tenantCtx.tenant));
     if (!updated) throw AppError.notFound("Membership not found");
@@ -494,7 +519,7 @@ export async function adminUpdateProfile(
     runInTransaction(ctx, async (tx) => {
       await assertNoOpenReportAboutActor(tx, tenant.id, actor);
       const { membership: target, user } = await loadTarget(tx, tenant.id, membershipId);
-      assertBatchYear(tenantCtx, input.batchYear);
+      await assertEditedYears(tx, tenantCtx, membershipId, input);
       await applyAvatarChange(ctx, tx, tenant.id, { membershipId, next: input.avatarUrl, uploaderIds: [target.userId, actor.userId] });
       const row = await applyPupilRules(tx, tenant, (await updateMembership(tx, tenant.id, membershipId, profileColumns(input, tenant)))!);
       if (input.fields) await saveAnswers(ctx, tx, tenant.id, membershipId, input.fields, "admin");

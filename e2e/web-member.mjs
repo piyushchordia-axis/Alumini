@@ -138,8 +138,19 @@ try {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.locator('input[name="fullName"][aria-invalid="true"]').waitFor();
     if ((await page.evaluate(() => document.activeElement?.getAttribute("name"))) !== "fullName") throw new Error("Continue didn't focus the missing name");
+    // Both years start blank and are asked for, by this institution's labels, each saying what's missing.
+    await page.getByLabel("Year you joined").and(page.locator('select[name="startYear"][aria-invalid="true"]')).waitFor();
+    await page.getByText("Enter the year you joined", { exact: true }).waitFor();
+    await page.getByLabel("Year you left (or will leave)").and(page.locator('select[name="batchYear"][aria-invalid="true"]')).waitFor();
+    await page.getByText("Enter the year you left, or will leave", { exact: true }).waitFor();
     await page.fill('input[name="fullName"]', "Smoke Tester");
+    // Leaving before joining is refused on the end year.
+    await page.selectOption('select[name="startYear"]', "2014");
     await page.selectOption('select[name="batchYear"]', "2012");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByText("Can't be before the year you joined", { exact: true }).waitFor();
+    await heading("Step 1 of 3 · Basics").waitFor();
+    await page.selectOption('select[name="startYear"]', "2008");
     await page.selectOption('select[name="professionType"]', "FOUNDER");
     await page.fill('input[name="city"]', "Mumbai");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -293,6 +304,7 @@ try {
     await loginWithPhone(PHONE_C, pageB);
     await pageB.waitForURL(/\/register$/);
     await pageB.fill('input[name="fullName"]', LISTENER);
+    await pageB.selectOption('select[name="startYear"]', "2011");
     await pageB.selectOption('select[name="batchYear"]', "2015");
     await finishRegistration(pageB, "Join the network");
     await pageB.waitForURL(/\/app\/feed$/);
@@ -353,9 +365,9 @@ try {
   await step("celebrations card: send birthday wishes", async () => {
     const card = page.locator("section", { hasText: "Celebrating today" }).first();
     await card.waitFor();
-    // Each row says what it celebrates, and its year is the batch, never a birth year.
-    await card.getByText(/^Birthday · batch of \d{4}$/).first().waitFor();
-    await card.getByText(/^\d+ years? with us · batch of \d{4}$/).first().waitFor();
+    // Each row says what it celebrates, and its years are the member's years here, never a birth year.
+    await card.getByText(/^Birthday · \d{4}(–(\d{4}|present))?$/).first().waitFor();
+    await card.getByText(/^\d+ years? with us · \d{4}(–(\d{4}|present))?$/).first().waitFor();
     await card.getByRole("button", { name: "Wish", exact: true }).first().click();
     await card.getByText("Wished", { exact: true }).first().waitFor();
   });
@@ -862,9 +874,13 @@ try {
     await page.fill('input[placeholder="Name, company, role or skill"]', `smoke run ${unique}`);
     const card = page.locator("a", { hasText: "Smoke Tester" });
     await card.getByText(headline, { exact: true }).waitFor();
+    // The years they gave when registering, under the name on the card and the profile, and when they registered.
+    await card.getByText(/^2008–2012( · |$)/).waitFor();
     await card.click();
     await page.waitForSelector("h1:has-text('Smoke Tester')");
     await page.getByText(headline, { exact: true }).waitFor();
+    await page.locator("main").getByText(/^2008–2012( · |$)/).first().waitFor();
+    await page.getByText("Registered", { exact: true }).waitFor();
     await page.getByText("Playwright", { exact: true }).waitFor();
     await page.getByText("Smoke testing", { exact: true }).waitFor();
     await page.getByText("QA engineer", { exact: true }).waitFor();
@@ -1004,6 +1020,10 @@ try {
     await undo.waitFor();
     await page.getByText("Filled in your headline, company, skills and 2 more from Demo University. Kept what you'd entered for your city.", { exact: true }).waitFor();
     if ((await page.inputValue('input[name="city"]')) !== "Pune") throw new Error("Use details replaced the city typed here");
+    // Years belong to each institution: never copied.
+    if ((await page.inputValue('select[name="startYear"]')) !== "" || (await page.inputValue('select[name="batchYear"]')) !== "") throw new Error("Use details filled in the years");
+    await page.selectOption('select[name="startYear"]', "2010");
+    await page.selectOption('select[name="batchYear"]', "2014");
     await shot("08j-register-copied");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByRole("heading", { name: "Step 2 of 3 · Work", exact: true }).waitFor();
@@ -2162,6 +2182,7 @@ try {
     await loginWithPhone(PHONE_B);
     await page.waitForURL(/\/register$/);
     await page.fill('input[name="fullName"]', "Pending Smoke");
+    await page.selectOption('select[name="startYear"]', "2006");
     await page.selectOption('select[name="batchYear"]', "2010");
     await finishRegistration(page, "Submit for approval", { hint: "will review your profile before you can join" });
     await page.waitForURL(/\/pending$/);

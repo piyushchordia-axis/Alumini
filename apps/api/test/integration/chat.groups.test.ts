@@ -60,7 +60,7 @@ describe.skipIf(!dbAvailable)("groups", () => {
       .returning({ id: users.id });
     const rows = await ctx.db
       .insert(memberships)
-      .values(created.map((u, i) => ({ tenantId, userId: u.id, status: "APPROVED" as const, role: "MEMBER" as const, fullName: `Bulk ${i}`, batchYear: 2010, professionType: "EMPLOYED" as const, statusChangedAt: new Date() })))
+      .values(created.map((u, i) => ({ tenantId, userId: u.id, status: "APPROVED" as const, role: "MEMBER" as const, fullName: `Bulk ${i}`, startYear: 2006, batchYear: 2010, professionType: "EMPLOYED" as const, statusChangedAt: new Date() })))
       .returning({ id: memberships.id });
     return rows.map((r) => r.id);
   }

@@ -1,0 +1,1 @@
+ALTER TABLE "memberships" ALTER COLUMN "start_year" SET NOT NULL;

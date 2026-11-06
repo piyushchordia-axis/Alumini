@@ -50,7 +50,7 @@ import { targetHref as webTargetHref } from "../../../web/src/lib/notificationLi
 
 const ID = "3f2b8a4e-9c1d-4e5f-8a7b-0c1d2e3f4a5b";
 const ALL_ON = Object.fromEntries(TENANT_FEATURES.map((f) => [f, true])) as TenantFeatures;
-const author = { fullName: "Nisha Modi", batchYear: 2010 } as MemberCardDto;
+const author = { fullName: "Nisha Modi", startYear: 2010, batchYear: null } as MemberCardDto;
 
 // Each type's answer as GET /admin/moderation/:type/:id gives it, cut to what the previews read. A group, a business and
 // an event all have a description, and a post and a comment a body.
@@ -232,7 +232,8 @@ describe("the queues' words", () => {
     expect(reportCountLabel(1)).toBe("1 report");
     expect(reportCountLabel(2)).toBe("2 reports");
     expect(reportCountLabel(1200)).toBe("1,200 reports");
-    expect(moderationBylineText({ author }, "3h ago")).toBe("by Nisha Modi (batch of 2010) · 3h ago");
+    expect(moderationBylineText({ author }, "3h ago")).toBe("by Nisha Modi (2010–present) · 3h ago");
+    expect(moderationBylineText({ author: { ...author, startYear: 2006, batchYear: 2010 } }, "3h ago")).toBe("by Nisha Modi (2006–2010) · 3h ago");
     expect(moderationBylineText({ author: null }, "3h ago")).toBe("by a deleted member · 3h ago");
   });
 

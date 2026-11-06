@@ -1,4 +1,4 @@
-import { MENTOR_AREA_LABELS, MENTOR_AVAILABILITY_LABELS, memberRoleLine, mentorCardLabel, type MentorArea, type MentorCardDto } from "@illuminize/shared";
+import { MENTOR_AREA_LABELS, MENTOR_AVAILABILITY_LABELS, memberRoleLine, memberYearsLine, mentorCardLabel, type MentorArea, type MentorCardDto } from "@illuminize/shared";
 import { Link } from "react-router-dom";
 import { Avatar, Badge, Card } from "@/components/ui";
 import { mentorPath } from "@/lib/mentors";
@@ -33,10 +33,7 @@ export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardD
             </Link>
           </h3>
           <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(member)}</p>
-          <p className="text-xs text-slate-500">
-            Batch of {member.batchYear}
-            {member.city ? ` · ${member.city}` : ""}
-          </p>
+          <p className="text-xs text-slate-500">{memberYearsLine(member, member.city)}</p>
         </div>
       </div>
       <div className="mt-3">

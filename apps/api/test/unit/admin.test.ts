@@ -804,16 +804,20 @@ describe("batchYearIssues", () => {
 
 describe("memberListMeta", () => {
   const formatDate = (iso: string) => `on ${iso.slice(0, 10)}`;
-  const member = { batchYear: 2018, phone: "+919100000037", companyName: "Infosys", city: "Pune", createdAt: "2026-11-03T10:00:00.000Z" };
+  const member = { startYear: 2014, batchYear: 2018, phone: "+919100000037", companyName: "Infosys", city: "Pune", createdAt: "2026-11-03T10:00:00.000Z" };
 
-  it("joins the batch, phone, work and request date", () => {
-    expect(memberListMeta(member, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Infosys, Pune · requested on 2026-11-03");
+  it("joins the years, phone, work and request date", () => {
+    expect(memberListMeta(member, formatDate)).toBe("2014–2018 · +91 91000 00037 · Infosys, Pune · requested on 2026-11-03");
+  });
+
+  it("says present for a community member who still belongs", () => {
+    expect(memberListMeta({ ...member, startYear: 2018, batchYear: null }, formatDate)).toBe("2018–present · +91 91000 00037 · Infosys, Pune · requested on 2026-11-03");
   });
 
   it("leaves out what the member didn't give", () => {
-    expect(memberListMeta({ ...member, companyName: null }, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Pune · requested on 2026-11-03");
-    expect(memberListMeta({ ...member, city: null }, formatDate)).toBe("Batch of 2018 · +91 91000 00037 · Infosys · requested on 2026-11-03");
-    expect(memberListMeta({ ...member, companyName: null, city: null, phone: "" }, formatDate)).toBe("Batch of 2018 · requested on 2026-11-03");
+    expect(memberListMeta({ ...member, companyName: null }, formatDate)).toBe("2014–2018 · +91 91000 00037 · Pune · requested on 2026-11-03");
+    expect(memberListMeta({ ...member, city: null }, formatDate)).toBe("2014–2018 · +91 91000 00037 · Infosys · requested on 2026-11-03");
+    expect(memberListMeta({ ...member, companyName: null, city: null, phone: "" }, formatDate)).toBe("2014–2018 · requested on 2026-11-03");
   });
 });
 

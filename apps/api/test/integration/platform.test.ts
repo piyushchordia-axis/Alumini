@@ -1,7 +1,8 @@
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { auditLog, memberActivityDays, memberships, users } from "../../src/db/schema";
+import { wallPartsInZone } from "@illuminize/shared";
 import { refusingAudit, untilSomeoneSleeps, untilSomeoneWaitsFor, withTrigger } from "../helpers/db";
 import { PROFILE, auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -45,12 +46,12 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
         country: "in",
         primaryColor: "#ff0000",
         settings: { memberApprovalMode: "ADMIN_APPROVAL", contentModerationMode: "ADMIN_APPROVAL" },
-        initialAdmin: { phone: "98111 11111", fullName: "First Admin", batchYear: 2005 },
+        initialAdmin: { phone: "98111 11111", fullName: "First Admin", startYear: 2001, batchYear: 2005 },
       });
     expect(res.status).toBe(201);
     expect(res.body.data.tenant).toMatchObject({ slug: "new-college", country: "IN", primaryColor: "#ff0000", status: "ACTIVE" });
     expect(res.body.data.settings.memberApprovalMode).toBe("ADMIN_APPROVAL");
-    expect(res.body.data.admins).toEqual([expect.objectContaining({ fullName: "First Admin", phone: "+919811111111", role: "TENANT_ADMIN", status: "APPROVED", batchYear: 2005 })]);
+    expect(res.body.data.admins).toEqual([expect.objectContaining({ fullName: "First Admin", phone: "+919811111111", role: "TENANT_ADMIN", status: "APPROVED", startYear: 2001, batchYear: 2005 })]);
     expect(res.body.data.counts.approvedMembers).toBe(1);
     expect((await api().post("/api/v1/platform/tenants").set(H).send({ slug: "new-college", name: "Dup" })).status).toBe(409);
 
@@ -72,6 +73,73 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
 
     const settings = await api().patch(`/api/v1/platform/tenants/${res.body.data.tenant.id}/settings`).set(H).send({ allowSelfRegistration: false, features: { funding: false } });
     expect(settings.body.data).toMatchObject({ allowSelfRegistration: false, features: { funding: false, jobs: true } });
+  });
+
+  it("gives a new admin the years given, checked as a member's are, or ones that suit the institution's type", async () => {
+    let phones = 0;
+    const create = (slug: string, type: string, years: object = {}) =>
+      api()
+        .post("/api/v1/platform/tenants")
+        .set(H)
+        .send({ slug, name: `Institution ${slug}`, type, initialAdmin: { phone: `+91981100000${++phones}`, fullName: "First Admin", ...years } });
+    const thisYear = (res: request.Response) => wallPartsInZone(new Date(), res.body.data.tenant.timezone).year;
+
+    const given = await create("given-college", "COLLEGE", { startYear: 2001, batchYear: 2005 });
+    expect(given.body.data.admins[0]).toMatchObject({ startYear: 2001, batchYear: 2005 });
+    // Last year for both, and so no current pupil at a school.
+    const fallback = await create("plain-school", "SCHOOL");
+    expect(fallback.body.data.admins[0]).toMatchObject({ startYear: thisYear(fallback) - 1, batchYear: thisYear(fallback) - 1 });
+    // A member of a community since this year, who still belongs.
+    const community = await create("new-samaj", "OTHER");
+    expect(community.body.data.admins[0]).toMatchObject({ startYear: thisYear(community), batchYear: null });
+    expect((await create("old-samaj", "OTHER", { startYear: 1996 })).body.data.admins[0]).toMatchObject({ startYear: 1996, batchYear: null });
+
+    const pathsOf = (res: request.Response) => {
+      expect(res.status).toBe(400);
+      return Object.fromEntries((res.body.error.details as Array<{ path: string; message: string }>).map((d) => [d.path, d.message]));
+    };
+    expect(pathsOf(await create("backwards", "COLLEGE", { startYear: 2010, batchYear: 2005 }))).toEqual({ "initialAdmin.batchYear": "Can't be before the year you joined" });
+    expect(pathsOf(await create("no-end", "UNIVERSITY", { startYear: 2010 }))).toEqual({ "initialAdmin.batchYear": "Enter the year you left, or will leave" });
+    // An end alone is never taken as the start too, even one ahead, which no start may be: the blank start is asked for.
+    const ahead = new Date().getFullYear() + 2;
+    expect(pathsOf(await create("no-start", "SCHOOL", { batchYear: ahead }))).toEqual({ "initialAdmin.startYear": "Enter the year you joined" });
+    expect(pathsOf(await create("left-samaj", "OTHER", { batchYear: 2015 }))).toEqual({ "initialAdmin.startYear": "Enter the year you joined" });
+    expect(pathsOf(await create("null-end", "COLLEGE", { startYear: 2010, batchYear: null }))).toEqual({ "initialAdmin.batchYear": "Enter the year you left, or will leave" });
+    // Refused before anything is kept: the institution isn't created either.
+    expect((await api().get("/api/v1/tenants/backwards")).status).toBe(404);
+
+    const tenantId = given.body.data.tenant.id as string;
+    const assigned = await api().post(`/api/v1/platform/tenants/${tenantId}/admins`).set(H).send({ phone: "+919833333333", fullName: "Second Admin", startYear: 2003, batchYear: 2007 });
+    expect(assigned.body.data).toMatchObject({ startYear: 2003, batchYear: 2007 });
+    const refused = await api().post(`/api/v1/platform/tenants/${tenantId}/admins`).set(H).send({ phone: "+919844444444", fullName: "Third Admin", startYear: 2030 });
+    expect(Object.keys(pathsOf(refused))).toContain("startYear");
+  });
+
+  it("gives a community's admin no start past the server's year, even when it's already New Year's Day at the institution", async () => {
+    // The fallback reads the institution's year; a member's start is capped by the server's clock, here UTC.
+    const zone = process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    process.env.TZ = "UTC";
+    const year = new Date().getUTCFullYear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 20:00 UTC on 31 December is 01:30 on 1 January in India.
+    vi.setSystemTime(new Date(`${year}-12-31T20:00:00Z`));
+    try {
+      const headers = auth((await loginAs(ctx, "+919999999999")).accessToken);
+      const res = await api()
+        .post("/api/v1/platform/tenants")
+        .set(headers)
+        .send({ slug: "new-year-samaj", name: "New Year Samaj", type: "OTHER", timezone: "Asia/Kolkata", initialAdmin: { phone: "+919855555555", fullName: "First Admin" } });
+      expect(res.status).toBe(201);
+      expect(wallPartsInZone(new Date(), res.body.data.tenant.timezone).year).toBe(year + 1);
+      expect(res.body.data.admins[0]).toMatchObject({ startYear: year, batchYear: null });
+      // So the admin can save their profile, which both apps send with the start as stored.
+      const admin = auth((await loginAs(ctx, "+919855555555")).accessToken);
+      const saved = await api().patch("/api/v1/t/new-year-samaj/memberships/me").set(admin).send({ startYear: year, batchYear: null, city: "Surat" });
+      expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    } finally {
+      vi.useRealTimers();
+      process.env.TZ = zone;
+    }
   });
 
   it("assigns and removes tenant admins for existing and new users", async () => {

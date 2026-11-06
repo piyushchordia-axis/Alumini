@@ -1,4 +1,4 @@
-import { MENTOR_AREA_LABELS, MENTOR_AVAILABILITY_LABELS, memberRoleLine, mentorCardLabel, mentorshipStatusLabel, mentorshipWhen, type MentorArea, type MentorCardDto, type MentorshipDto } from "@illuminize/shared";
+import { MENTOR_AREA_LABELS, MENTOR_AVAILABILITY_LABELS, memberRoleLine, memberYearsLine, mentorCardLabel, mentorshipStatusLabel, mentorshipWhen, type MentorArea, type MentorCardDto, type MentorshipDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -23,11 +23,9 @@ export function MentorAreas({ areas }: { areas: MentorArea[] }) {
   );
 }
 
-const batchLine = (m: { batchYear: number; city: string | null }) => `Batch of ${m.batchYear}${m.city ? ` · ${m.city}` : ""}`;
-
 /**
  * One mentor in Find mentors, opening their page. A link's name stands in for everything inside it, so it says the role,
- * batch, areas and availability the card shows, or a screen reader would hear only the name. The web app's card link has
+ * years, areas and availability the card shows, or a screen reader would hear only the name. The web app's card link has
  * the same name.
  */
 export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardDto }) {
@@ -47,7 +45,7 @@ export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardD
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>{member.fullName}</Text>
           <Text style={{ fontSize: 13, color: "#475569" }}>{role}</Text>
-          <Text style={{ fontSize: 12, color: colors.muted }}>{batchLine(member)}</Text>
+          <Text style={{ fontSize: 12, color: colors.muted }}>{memberYearsLine(member, member.city)}</Text>
         </View>
       </View>
       <MentorAreas areas={mentor.areas} />

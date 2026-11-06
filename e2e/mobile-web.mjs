@@ -151,11 +151,14 @@ try {
     if (await page.getByText("Sign in / Join with mobile number").locator("visible=true").count()) throw new Error("the landing screen offers a signed-in member to sign in");
     await shot("m02b-landing-signed-in");
     const inputs = page.locator("input:visible");
+    // The years by their labels, which this institution words as a university's, never by position.
+    const startBox = page.getByLabel("Year you joined *", { exact: true }).locator("visible=true");
+    const endBox = page.getByLabel("Year you left (or will leave) *", { exact: true }).locator("visible=true");
     const fillBasics = async () => {
       await tap("Join DemoU");
       await stepHeading(1, "Basics").waitFor();
       await inputs.nth(0).fill("Mobile Smoke");
-      await inputs.nth(1).fill("2014");
+      await endBox.fill("2014");
       if (!(await holdsBack())) throw new Error("Basics with a name typed doesn't hold going back");
     };
     await fillBasics();
@@ -184,6 +187,11 @@ try {
     await page.getByText("Create your profile").waitFor({ state: "detached" });
     if (await holdsBack()) throw new Error("the landing screen holds going back: Leave left registration's hold behind");
     await fillBasics();
+    // The year they joined is required: Continue stays on Basics and says what's missing on its box.
+    await pressStepButton("Continue");
+    await page.getByText("Enter the year you joined", { exact: true }).locator("visible=true").waitFor();
+    await stepHeading(1, "Basics").waitFor();
+    await startBox.fill("2010");
     await pressStepButton("Continue");
     // Skip for now puts Work back as it was last accepted (here, as it started): never what was typed and left
     // unchecked, even after going back a step and returning, which keeps it.
@@ -251,7 +259,7 @@ try {
   await step("the profile card on the feed lists what to add, opens its section, and Not now puts it away", async () => {
     const card = page.getByRole("region", { name: "Complete your profile", exact: true });
     await card.waitFor();
-    // Nothing but a name and a batch yet: the heaviest three of everything.
+    // Nothing but a name and years yet: the heaviest three of everything.
     const score = await card.getByRole("progressbar", { name: "Profile strength", exact: true }).getAttribute("aria-valuenow");
     if (score !== "0") throw new Error(`a new profile scores ${score}, not 0`);
     const items = await card.getByRole("link").allInnerTexts();
@@ -331,9 +339,9 @@ try {
   await step("celebrations card and a poll vote on the feed", async () => {
     const card = page.getByText("Celebrating today", { exact: true }).locator("visible=true").first();
     await card.waitFor();
-    // Each row says what it celebrates, and its year is the batch, never a birth year.
-    await page.getByText(/^Birthday · batch of \d{4}$/).locator("visible=true").first().waitFor();
-    await page.getByText(/^\d+ years? with us · batch of \d{4}$/).locator("visible=true").first().waitFor();
+    // Each row says what it celebrates, and its years are the member's years here, never a birth year.
+    await page.getByText(/^Birthday · \d{4}(–(\d{4}|present))?$/).locator("visible=true").first().waitFor();
+    await page.getByText(/^\d+ years? with us · \d{4}(–(\d{4}|present))?$/).locator("visible=true").first().waitFor();
     await page.getByRole("button", { name: "Wish", exact: true }).locator("visible=true").first().click();
     await page.getByText("Wished", { exact: true }).locator("visible=true").first().waitFor();
     await shot("m04c-celebrations");
@@ -758,11 +766,12 @@ try {
     await shot("m07-directory-filters");
     // inactive tab stacks stay mounted on web and overlap; dispatch the click straight to the card
     await hit.dispatchEvent("click");
-    await page.getByText("Member since").waitFor();
+    await page.getByText(/^Registered /).waitFor();
     // Her profile: the headline, skills, her current role then her past one, studies here and elsewhere, and a LinkedIn
     // link that opens in a new tab and passes nothing on. The screen on top is the last match.
     const onTop = (text) => page.getByText(text, { exact: true }).locator("visible=true").last();
-    for (const text of ["Product manager at Google, working on consumer apps", "User research", "Product Manager", "Software engineer", "London Business School", "B.Tech, Electronics"]) await onTop(text).waitFor();
+    for (const text of ["2008–2012 · London, United Kingdom", "Product manager at Google, working on consumer apps", "User research", "Product Manager", "Software engineer", "London Business School", "B.Tech, Electronics"])
+      await onTop(text).waitFor();
     const roles = await onTop("Experience")
       .locator("xpath=../..")
       .locator('[role="listitem"]')
@@ -2333,7 +2342,8 @@ try {
     await page.getByText("Create your profile").waitFor();
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Pending Mobile");
-    await inputs.nth(1).fill("2011");
+    await page.getByLabel("Year you joined *", { exact: true }).locator("visible=true").fill("2007");
+    await page.getByLabel("Year you left (or will leave) *", { exact: true }).locator("visible=true").fill("2011");
     // Their profile at Demo University is offered: it fills what they haven't typed, and Undo takes it back, all but what
     // was changed since.
     await tap("Use details from Demo University");
@@ -2387,7 +2397,8 @@ try {
     await page.getByText("Create your profile").waitFor();
     const inputs = page.locator("input:visible");
     await inputs.nth(0).fill("Forced Out");
-    await inputs.nth(1).fill("2015");
+    await page.getByLabel("Year you joined *", { exact: true }).locator("visible=true").fill("2011");
+    await page.getByLabel("Year you left (or will leave) *", { exact: true }).locator("visible=true").fill("2015");
     await finishRegistration("Join the network");
     await barTab("More").waitFor();
     const membership = await scriptMembership(page, "demo-university");
@@ -3021,7 +3032,8 @@ try {
     await pending.waitFor();
     if ((await pending.getAttribute("aria-selected")) !== "true") throw new Error("the members list didn't open on Pending");
     if (!/^Pending\s*2$/.test((await pending.innerText()).trim())) throw new Error(`the Pending tab reads "${await pending.innerText()}", not its count of 2`);
-    await shown(page.getByText(/^Batch of 2018 · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
+    // A community member who still belongs: their years run to the present.
+    await shown(page.getByText(/^2018–present · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
     for (const name of ["Approve Parth Joshi", "Reject Parth Joshi", "Approve Diya Raval", "Reject Diya Raval"]) {
       const box = await memberButton(name).boundingBox();
       if (!box || box.height < 44) throw new Error(`"${name}" is ${box?.height}px tall, under 44px`);
@@ -3049,7 +3061,7 @@ try {
   await step("a request to join is approved from its notice, which then says where it stands", async () => {
     // As the API sends an admin's copy: who it is about, and where the request stands now.
     const subject = { kind: "membership", membershipId: parthId, fullName: "Parth Joshi", status: "PENDING" };
-    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "NEW_MEMBER_PENDING", data: { membershipId: parthId }, title: "New member awaiting approval", body: "Parth Joshi (batch of 2018) has requested to join.", subject });
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "NEW_MEMBER_PENDING", data: { membershipId: parthId }, title: "New member awaiting approval", body: "Parth Joshi (2018–present) has requested to join.", subject });
     try {
       await page.goto(SAMAJ + "/profile/notifications");
       const approve = memberButton("Approve Parth Joshi");
@@ -3278,7 +3290,7 @@ try {
   await step("a member's page shows their facts and mentor profile, and Remove as mentor asks first", async () => {
     await page.goto(SAMAJ + "/admin/members?status=APPROVED&q=Nisha");
     // The row's name and details open her page; its actions sit beside the link, never in it.
-    await shown(page.getByRole("link", { name: /^Nisha Modi, Approved, Batch of 2010/ })).click();
+    await shown(page.getByRole("link", { name: /^Nisha Modi, Approved, 2010–present/ })).click();
     await page.waitForURL(/\/t\/shri-gujarati-samaj\/admin\/members\/[0-9a-f-]{36}$/);
     nishaId = page.url().split("/").pop();
     await shown(page.getByRole("heading", { name: "Nisha Modi", exact: true })).waitFor();
@@ -3542,7 +3554,7 @@ try {
   await step("a group waiting is approved in two presses, the second sending what was shown, a change meanwhile refused in its row, and a preview changed since asking again", async () => {
     // Answered by the script: a group whose owner renamed it after it was approved, so members still see the old name.
     const id = "00000000-0000-4000-8000-0000000000a1";
-    const owner = { id: "00000000-0000-4000-8000-0000000000a2", fullName: "Hetal Shah", batchYear: 2012, professionType: "BUSINESS_OWNER", companyName: null, designation: null, city: "Surat", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
+    const owner = { id: "00000000-0000-4000-8000-0000000000a2", fullName: "Hetal Shah", startYear: 2005, batchYear: null, professionType: "BUSINESS_OWNER", companyName: null, designation: null, city: "Surat", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
     const at = new Date().toISOString();
     const item = { contentType: "GROUP", id, title: "Surat traders", excerpt: "Buying and selling in Surat", author: owner, moderationStatus: "PENDING", moderatedAt: null, createdAt: at, reportCount: 0, isPinned: false, kind: null };
     const group = { id, name: "Surat traders", description: "Buying and selling in Surat", approvedName: "Surat chapter", approvedDescription: "Chapter news", visibility: "OPEN", memberCount: 4, owner, archived: false, createdAt: at, updatedAt: at, moderationStatus: "PENDING", moderationNote: null, moderatedAt: null };
@@ -3568,7 +3580,7 @@ try {
     try {
       await page.goto(SAMAJ + "/admin/moderation");
       const row = queueRow("Surat traders");
-      await row.getByText(/^by Hetal Shah \(batch of 2012\) · /).waitFor();
+      await row.getByText(/^by Hetal Shah \(2005–present\) · /).waitFor();
       // The first press opens the name and description to check, and sends nothing.
       await row.getByRole("button", { name: "Approve", exact: true }).click();
       await row.getByRole("status").filter({ hasText: "Check the group's name and description, then approve it." }).waitFor();

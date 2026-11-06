@@ -27,7 +27,7 @@ import { SignedInAs } from "@/components/auth/SignedInAs";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconCheck, IconSwitch } from "@/components/icons";
 import { PROFILE_SECTION_BODIES, PhotoWait } from "@/components/profile/ProfileForm";
-import { toProfileFormValues, useProfileForm, type ProfileFormOptions, type ProfileFormValues } from "@/components/profile/useProfileForm";
+import { toProfileFormValues, useProfileForm, yearValue, type ProfileFormOptions, type ProfileFormValues } from "@/components/profile/useProfileForm";
 import { Button, ErrorBox } from "@/components/ui";
 
 type FormKey = Path<ProfileFormValues>;
@@ -233,7 +233,7 @@ export function RegistrationSteps({ submitLabel, needsApproval, reapplying = fal
   const applyCopy = () => {
     if (!copy || !copyValues) return;
     const values = form.getValues();
-    const hidden = hiddenProfileKeys(f.tenant, { professionType: values.professionType, batchYear: Number(values.batchYear), dateOfBirth: values.dateOfBirth ?? null });
+    const hidden = hiddenProfileKeys(f.tenant, { professionType: values.professionType, batchYear: yearValue(values.batchYear), dateOfBirth: values.dateOfBirth ?? null });
     const fill = fillFromPortableProfile<Values>(copyValues, values, start, hidden);
     const before = Object.fromEntries(fill.filled.map((k) => [k, structuredClone(values[k])])) as Values;
     for (const k of fill.filled) form.setValue(k, structuredClone(fill.values[k]) as never, { shouldDirty: true });

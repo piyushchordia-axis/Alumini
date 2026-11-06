@@ -14,6 +14,7 @@ import {
 import { isOutOfDate } from "../client/ApiClientError";
 import type { AdminReportDto, BusinessDto, ChatGroupContentDto, ContentDto, ContentPreviewDto, DashboardDto, JobDto, ModerationItemDto, PostDto } from "../types/dto";
 import { formatCount, type ContentAction } from "./admin";
+import { memberYearsLabel } from "./memberYears";
 import { uuidOf, type NotificationTarget } from "./notifications";
 
 /**
@@ -193,9 +194,11 @@ export function reportCountLabel(n: number): string {
   return `${formatCount(n)} ${n === 1 ? "report" : "reports"}`;
 }
 
-/** A queue row's byline, with `ago` already written: "by Nisha Modi (batch of 2010) · 3h ago". */
+/** A queue row's byline, with `ago` already written: "by Nisha Modi (2010–present) · 3h ago". */
 export function moderationBylineText(item: Pick<ModerationItemDto, "author">, ago: string): string {
-  return `${item.author ? `by ${item.author.fullName} (batch of ${item.author.batchYear})` : "by a deleted member"} · ${ago}`;
+  if (!item.author) return `by a deleted member · ${ago}`;
+  const years = memberYearsLabel(item.author);
+  return `by ${item.author.fullName}${years ? ` (${years})` : ""} · ${ago}`;
 }
 
 export const MODERATION_EMPTY_TITLE = "Nothing to review";

@@ -7,6 +7,7 @@ import {
   fillFromPortableProfile,
   hiddenProfileKeys,
   hostUrlSchema,
+  initialAdminSchema,
   linkUrlSchema,
   membershipProfileSchema,
   membershipProfileUpdateSchema,
@@ -25,6 +26,7 @@ import {
   socialUrlFromInput,
   sortEducation,
   sortExperiences,
+  tenantSettingsUpdateSchema,
   undoPortableProfileFill,
   withoutHiddenProfileKeys,
   yearsOfExperience,
@@ -167,7 +169,7 @@ describe("profileStepOf", () => {
   ];
 
   it("puts each field in the step that holds it, nested paths included", () => {
-    for (const path of ["avatarUrl", "fullName", "batchYear", "professionType", "dateOfBirth", "city", "country"]) expect(profileStepOf(path)).toBe(1);
+    for (const path of ["avatarUrl", "fullName", "startYear", "batchYear", "professionType", "dateOfBirth", "city", "country"]) expect(profileStepOf(path)).toBe(1);
     for (const path of ["headline", "companyName", "designation", "industry", "careerStartYear", "skills.3", "experiences.1.endYear"]) expect(profileStepOf(path)).toBe(2);
     for (const path of ["bio", "interests", "degree", "fieldOfStudy", "education.0.institution", "linkedinUrl", "xUrl", "openTo", "maritalStatus", "kidsCount", "isPhoneVisible"])
       expect(profileStepOf(path)).toBe(3);
@@ -207,7 +209,7 @@ describe("registration steps", () => {
   });
 
   it("lists each section's inputs, every input in exactly one, as profileSectionOf places them", () => {
-    expect(profileSectionFields("basics").sort()).toEqual(["avatarUrl", "batchYear", "city", "country", "dateOfBirth", "fullName", "professionType"]);
+    expect(profileSectionFields("basics").sort()).toEqual(["avatarUrl", "batchYear", "city", "country", "dateOfBirth", "fullName", "professionType", "startYear"]);
     expect(profileSectionFields("work").sort()).toEqual(["careerStartYear", "companyName", "designation", "experiences", "headline", "industry", "skills"]);
     const all = PROFILE_SECTIONS.flatMap((s) => profileSectionFields(s));
     expect(new Set(all).size).toBe(all.length);
@@ -361,10 +363,10 @@ describe("hiddenProfileKeys", () => {
   });
 
   it("leaves out only those keys, so the schema neither checks nor sends what the member can't see", () => {
-    const form = { fullName: "Naina Sen", batchYear: 2028, dateOfBirth: null, professionType: "STUDENT" as const, careerStartYear: 20, githubUrl: "my github", openTo: ["HIRING" as const], bio: "Hi" };
+    const form = { fullName: "Naina Sen", startYear: 2022, batchYear: 2028, dateOfBirth: null, professionType: "STUDENT" as const, careerStartYear: 20, githubUrl: "my github", openTo: ["HIRING" as const], bio: "Hi" };
     const hidden = hiddenProfileKeys(school, form, NOW);
     const sent = withoutHiddenProfileKeys(form, hidden);
-    expect(sent).toEqual({ fullName: "Naina Sen", batchYear: 2028, dateOfBirth: null, professionType: "STUDENT", bio: "Hi" });
+    expect(sent).toEqual({ fullName: "Naina Sen", startYear: 2022, batchYear: 2028, dateOfBirth: null, professionType: "STUDENT", bio: "Hi" });
     expect(form.githubUrl).toBe("my github"); // the form's own values are left alone
     // Unstripped, the hidden year and link would block the save with errors no input shows.
     expect(membershipProfileSchema.safeParse(form).success).toBe(false);
@@ -517,10 +519,20 @@ describe("profile schema", () => {
 
   it("checks years against the year when it parses, not when it loaded", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
+    // Each is refused in 2026 and taken in 2027: a career's start, the year a member joined, an end ten years ahead, an
+    // institution's latest batch, and a new admin's start and end.
+    const checks = (year: number) => [
+      membershipProfileUpdateSchema.safeParse({ careerStartYear: year }).success,
+      membershipProfileUpdateSchema.safeParse({ startYear: year }).success,
+      membershipProfileSchema.safeParse({ fullName: "Asha Rao", startYear: 2020, batchYear: year + 10, professionType: "EMPLOYED" }).success,
+      tenantSettingsUpdateSchema.safeParse({ maxBatchYear: year + 10 }).success,
+      initialAdminSchema.safeParse({ phone: "+919811111111", fullName: "First Admin", startYear: year }).success,
+      initialAdminSchema.safeParse({ phone: "+919811111111", fullName: "First Admin", batchYear: year + 10 }).success,
+    ];
     vi.setSystemTime(new Date("2026-06-01T00:00:00Z"));
-    expect(membershipProfileUpdateSchema.safeParse({ careerStartYear: 2027 }).success).toBe(false);
+    expect(checks(2027)).toEqual([false, false, false, false, false, false]);
     vi.setSystemTime(new Date("2027-06-01T00:00:00Z"));
-    expect(membershipProfileUpdateSchema.safeParse({ careerStartYear: 2027 }).success).toBe(true);
+    expect(checks(2027)).toEqual([true, true, true, true, true, true]);
   });
 
   it("lets studies elsewhere end up to ten years ahead, and nothing start before 1940", () => {
@@ -549,7 +561,7 @@ describe("profile schema", () => {
   });
 
   it("leaves the new details out of a registration that doesn't send them, so nothing stored is cleared", () => {
-    const parsed = membershipProfileSchema.parse({ fullName: "Asha Rao", batchYear: 2012, professionType: "EMPLOYED" });
+    const parsed = membershipProfileSchema.parse({ fullName: "Asha Rao", startYear: 2008, batchYear: 2012, professionType: "EMPLOYED" });
     for (const key of ["headline", "industry", "careerStartYear", "skills", "degree", "fieldOfStudy", "openTo", "experiences", "education", "websiteUrl", "githubUrl"]) {
       expect(parsed, key).not.toHaveProperty(key);
     }

@@ -132,6 +132,7 @@ export async function getCelebrationsToday(ctx: AppContext, tenantCtx: TenantCon
         membershipId: c.membershipId,
         fullName: c.fullName,
         avatarUrl: c.avatarUrl,
+        startYear: c.startYear,
         batchYear: c.batchYear,
         kind: c.kind,
         years: c.years,

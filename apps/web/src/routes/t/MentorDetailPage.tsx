@@ -1,4 +1,4 @@
-import { memberRoleLine, mentorAvailabilityText, mentorshipKeys, type MentorDto } from "@illuminize/shared";
+import { memberRoleLine, memberYearsLine, mentorAvailabilityText, mentorshipKeys, type MentorDto } from "@illuminize/shared";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -85,10 +85,7 @@ function MentorDetailPage({ id }: { id: string }) {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold text-slate-900 [overflow-wrap:anywhere]">{member.fullName}</h1>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(member)}</p>
-            <p className="text-sm text-slate-500">
-              Batch of {member.batchYear}
-              {member.city ? ` · ${member.city}` : ""}
-            </p>
+            <p className="text-sm text-slate-500">{memberYearsLine(member, member.city)}</p>
             {tenant.settings.features.directory && (
               <Link to={`/t/${slug}/app/directory/${member.id}`} className="mt-1 inline-flex min-h-11 items-center text-sm text-primary underline">
                 View full profile

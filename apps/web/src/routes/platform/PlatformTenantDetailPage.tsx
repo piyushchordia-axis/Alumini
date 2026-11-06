@@ -5,6 +5,7 @@ import {
   MESSAGE_CHANNELS,
   MESSAGE_CHANNEL_LABELS,
   formatPhone,
+  memberYearsLine,
   type BillingModel,
   type BillingPlanCreateInput,
   type BillingPlanDto,
@@ -187,7 +188,7 @@ function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: A
             <Avatar name={a.fullName} src={a.avatarUrl} size="sm" />
             <span className="flex-1 text-sm">
               <span className="font-medium text-slate-900">{a.fullName}</span>
-              <span className="text-slate-500"> · {formatPhone(a.phone)} · batch of {a.batchYear}</span>
+              <span className="text-slate-500"> · {memberYearsLine(a, formatPhone(a.phone))}</span>
             </span>
             <Button size="sm" variant="ghost" onClick={() => confirm(`Remove admin role from ${a.fullName}?`) && remove.mutate(a.id)}>
               Remove

@@ -130,7 +130,7 @@ interface MemberRow {
   fullName: string;
   phone: string;
   email: string | null;
-  batchYear: number;
+  batchYear: number | null;
   status: keyof typeof MEMBERSHIP_STATUS_LABELS;
   role: MembershipRole;
   professionType: keyof typeof PROFESSION_TYPE_LABELS;

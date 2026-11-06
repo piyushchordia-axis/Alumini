@@ -18,6 +18,7 @@ import { tenantSettingsUpdateSchema, type TenantSettingsUpdate } from "../schema
 import type { AdminMemberDto, DashboardDto, TenantPublicSettings, TenantSettingsDto } from "../types/dto";
 import { changedFeatures } from "./features";
 import { MONTHS } from "./jobs";
+import { memberYearsLabel, memberYearsLine } from "./memberYears";
 import { NOTIFICATION_CATEGORY } from "./notifications";
 import { formatPhone } from "./phone";
 import { groupDigits } from "./salary";
@@ -403,10 +404,10 @@ export function parseMemberStatus(raw: unknown): MembershipStatus {
   return MEMBERSHIP_STATUSES.find((s) => s === value) ?? "PENDING";
 }
 
-/** A member row's second line: "Batch of 2018 · +91 91000 00037 · Infosys, Pune · requested 3 Nov 2026". */
-export function memberListMeta(m: Pick<AdminMemberDto, "batchYear" | "phone" | "companyName" | "city" | "createdAt">, formatDate: (iso: string) => string): string {
+/** A member row's second line: "2014–2018 · +91 91000 00037 · Infosys, Pune · requested 3 Nov 2026". */
+export function memberListMeta(m: Pick<AdminMemberDto, "startYear" | "batchYear" | "phone" | "companyName" | "city" | "createdAt">, formatDate: (iso: string) => string): string {
   const work = [m.companyName, m.city].filter(Boolean).join(", ");
-  return [`Batch of ${m.batchYear}`, formatPhone(m.phone), work, `requested ${formatDate(m.createdAt)}`].filter(Boolean).join(" · ");
+  return memberYearsLine(m, formatPhone(m.phone), work, `requested ${formatDate(m.createdAt)}`);
 }
 
 /** One fact on a member's admin page. */
@@ -421,18 +422,18 @@ export interface MemberFact {
  * date of birth is a calendar date, written by formatCalendarDate, so it never shows a day early west of UTC.
  */
 export function memberFacts(
-  m: Pick<AdminMemberDto, "phone" | "batchYear" | "professionType" | "city" | "country" | "dateOfBirth" | "maritalStatus" | "kidsCount" | "createdAt" | "lastActiveAt" | "lastLoginAt">,
+  m: Pick<AdminMemberDto, "phone" | "startYear" | "batchYear" | "professionType" | "city" | "country" | "dateOfBirth" | "maritalStatus" | "kidsCount" | "createdAt" | "lastActiveAt" | "lastLoginAt">,
   format: { formatDate: (iso: string) => string; formatDateTime: (iso: string) => string },
 ): MemberFact[] {
   const facts: Array<[string, string | number | null]> = [
     ["Phone", formatPhone(m.phone)],
-    ["Batch", m.batchYear],
+    ["Years here", memberYearsLabel(m)],
     ["Profession", PROFESSION_TYPE_LABELS[m.professionType]],
     ["City", [m.city, countryName(m.country)].filter(Boolean).join(", ")],
     ["Date of birth", m.dateOfBirth ? formatCalendarDate(m.dateOfBirth) : null],
     ["Marital status", m.maritalStatus ? MARITAL_STATUS_LABELS[m.maritalStatus] : null],
     ["Kids", m.kidsCount],
-    ["Member since", format.formatDate(m.createdAt)],
+    ["Registered", format.formatDate(m.createdAt)],
     ["Last active", m.lastActiveAt ? format.formatDateTime(m.lastActiveAt) : "never"],
     ["Last login", m.lastLoginAt ? format.formatDateTime(m.lastLoginAt) : "never"],
   ];

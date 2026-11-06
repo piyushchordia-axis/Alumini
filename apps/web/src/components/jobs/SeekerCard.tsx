@@ -1,4 +1,4 @@
-import type { JobSeekerDto } from "@illuminize/shared";
+import { memberYearsLabel, type JobSeekerDto } from "@illuminize/shared";
 import { MemberLink } from "@/components/common/MemberLink";
 import { Card } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
@@ -9,7 +9,7 @@ export function SeekerCard({ slug, seeker }: { slug: string; seeker: JobSeekerDt
       <MemberLink
         slug={slug}
         member={seeker.member}
-        meta={seeker.member.headline ?? (`${seeker.member.designation ?? ""}${seeker.member.companyName ? ` · ${seeker.member.companyName}` : ""}`.replace(/^ · /, "") || `Batch of ${seeker.member.batchYear}`)}
+        meta={seeker.member.headline ?? (`${seeker.member.designation ?? ""}${seeker.member.companyName ? ` · ${seeker.member.companyName}` : ""}`.replace(/^ · /, "") || memberYearsLabel(seeker.member))}
       />
       <p className="mt-3 text-sm text-slate-800">{seeker.note}</p>
       <dl className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">

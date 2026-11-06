@@ -1,4 +1,4 @@
-import { DELETED_MEMBER_NAME, memberRoleLine, type MemberCardDto } from "@illuminize/shared";
+import { DELETED_MEMBER_NAME, memberRoleLine, memberYearsLabel, type MemberCardDto } from "@illuminize/shared";
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Avatar, Badge } from "@/components/ui";
@@ -63,7 +63,7 @@ export function RequestRow({
           </View>
           {member && (
             <Text style={{ fontSize: 13, color: "#475569" }}>
-              {memberRoleLine(member)} · Batch of {member.batchYear}
+              {memberRoleLine(member)} · {memberYearsLabel(member)}
             </Text>
           )}
           {about}

@@ -1,4 +1,4 @@
-import { TENANT_TYPES, TENANT_TYPE_LABELS, type PlatformTenantCreateInput, type TenantType } from "@illuminize/shared";
+import { TENANT_TYPES, TENANT_TYPE_LABELS, memberYearFields, type PlatformTenantCreateInput, type TenantType } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -35,7 +35,8 @@ export function PlatformTenantFormPage() {
   const [withAdmin, setWithAdmin] = useState(true);
   const [adminPhone, setAdminPhone] = useState("+91");
   const [adminName, setAdminName] = useState("");
-  const [adminBatch, setAdminBatch] = useState("");
+  const [adminStart, setAdminStart] = useState("");
+  const [adminEnd, setAdminEnd] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +57,9 @@ export function PlatformTenantFormPage() {
       welcomeMessage: welcome || null,
       primaryColor,
       settings: { memberApprovalMode, contentModerationMode },
-      ...(withAdmin ? { initialAdmin: { phone: adminPhone, fullName: adminName, batchYear: adminBatch ? Number(adminBatch) : undefined } } : {}),
+      ...(withAdmin
+        ? { initialAdmin: { phone: adminPhone, fullName: adminName, startYear: adminStart ? Number(adminStart) : undefined, batchYear: adminEnd ? Number(adminEnd) : undefined } }
+        : {}),
     };
     try {
       const created = await api.platform.tenants.create(input);
@@ -74,6 +77,7 @@ export function PlatformTenantFormPage() {
     }
   };
 
+  const years = memberYearFields(type);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Onboard an institution" subtitle="Creates the tenant, its settings and (optionally) its first admin" />
@@ -155,17 +159,27 @@ export function PlatformTenantFormPage() {
           <fieldset className="rounded-lg border border-slate-200 p-4">
             <Checkbox checked={withAdmin} onChange={(e) => setWithAdmin(e.target.checked)} label="Create the first institution admin now" className="font-medium" />
             {withAdmin && (
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <FormField label="Admin mobile" required error={errors["initialAdmin.phone"]}>
-                  <Input value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} placeholder="+91…" />
-                </FormField>
-                <FormField label="Admin name" required error={errors["initialAdmin.fullName"]}>
-                  <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} />
-                </FormField>
-                <FormField label="Batch year" error={errors["initialAdmin.batchYear"]}>
-                  <Input type="number" value={adminBatch} onChange={(e) => setAdminBatch(e.target.value)} />
-                </FormField>
-              </div>
+              <>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <FormField label="Admin mobile" required error={errors["initialAdmin.phone"]}>
+                    <Input value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} placeholder="+91…" />
+                  </FormField>
+                  <FormField label="Admin name" required error={errors["initialAdmin.fullName"]}>
+                    <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} />
+                  </FormField>
+                  <FormField label={years.start.label} error={errors["initialAdmin.startYear"]}>
+                    <Input type="number" inputMode="numeric" value={adminStart} onChange={(e) => setAdminStart(e.target.value)} />
+                  </FormField>
+                  <FormField label={years.end.label} error={errors["initialAdmin.batchYear"]}>
+                    <Input type="number" inputMode="numeric" value={adminEnd} onChange={(e) => setAdminEnd(e.target.value)} />
+                  </FormField>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {type === "OTHER"
+                    ? "Optional. Left blank, the admin is a member since this year. Fill in “Until” only if they have left."
+                    : "Give both years or neither. Left blank, the admin is given last year for both."}
+                </p>
+              </>
             )}
           </fieldset>
           {serverError ? <ErrorBox error={serverError} /> : null}

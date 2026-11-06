@@ -72,20 +72,20 @@ describe.skipIf(!dbAvailable)("celebrations", () => {
     expect((await celebrantsOn(ctx.db, t.id, "2028-02-29", t.timezone)).map((c) => c.membershipId)).toEqual([leap.membership.id]);
     expect(await celebrantsOn(ctx.db, t.id, "2028-02-28", t.timezone)).toEqual([]); // 28 Feb in a leap year: only real 28 Feb birthdays (opted out)
     const march15 = await celebrantsOn(ctx.db, t.id, "2026-03-15", t.timezone);
-    expect(march15).toEqual([expect.objectContaining({ membershipId: anniv.membership.id, kind: "ANNIVERSARY", years: 2 })]);
+    expect(march15).toEqual([expect.objectContaining({ membershipId: anniv.membership.id, kind: "ANNIVERSARY", years: 2, startYear: 2006, batchYear: 2010 })]);
     expect(await celebrantsOn(ctx.db, t.id, "2026-03-15", "UTC")).toEqual([]);
   });
 
   it("shows today's celebrations without years, and merges wishes into one notification per person", async () => {
     const t = await tenantIn("Asia/Kolkata");
     const today = localClock(new Date(), "Asia/Kolkata").day;
-    const asha = await memberSession(ctx, t.id, { fullName: "Asha Rao", dateOfBirth: `1990-${today.slice(5)}` });
+    const asha = await memberSession(ctx, t.id, { fullName: "Asha Rao", startYear: 2008, batchYear: 2012, dateOfBirth: `1990-${today.slice(5)}` });
     const bala = await memberSession(ctx, t.id, { fullName: "Bala Iyer" });
     const chitra = await memberSession(ctx, t.id, { fullName: "Chitra Das" });
     const base = `/api/v1/t/${t.slug}`;
 
     const card = await api().get(`${base}/celebrations/today`).set(bala.headers);
-    expect(card.body.data).toMatchObject({ date: today, more: 0, showNotice: false, items: [{ membershipId: asha.membership.id, kind: "BIRTHDAY", years: null, isMe: false, wishedByMe: false, wishCount: 0 }] });
+    expect(card.body.data).toMatchObject({ date: today, more: 0, showNotice: false, items: [{ membershipId: asha.membership.id, startYear: 2008, batchYear: 2012, kind: "BIRTHDAY", years: null, isMe: false, wishedByMe: false, wishCount: 0 }] });
     expect(JSON.stringify(card.body.data)).not.toContain("1990");
     // Asha sees herself first and the one-time notice about birthdays on the feed.
     expect((await api().get(`${base}/celebrations/today`).set(asha.headers)).body.data).toMatchObject({ showNotice: true, items: [{ isMe: true }] });

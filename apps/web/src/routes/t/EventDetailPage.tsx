@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, memberYearsLabel } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -137,7 +137,7 @@ export function EventDetailPage() {
                 <Avatar name={m.fullName} src={m.avatarUrl} size="sm" />
                 <span className="text-sm">
                   <span className="font-medium text-slate-900">{m.fullName}</span>
-                  <span className="text-slate-500"> · {m.batchYear}</span>
+                  <span className="text-slate-500"> · {memberYearsLabel(m)}</span>
                 </span>
               </Link>
             </li>

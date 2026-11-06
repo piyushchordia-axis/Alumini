@@ -1,4 +1,4 @@
-import { DELETED_MEMBER_NAME, memberRoleLine, type MemberCardDto } from "@illuminize/shared";
+import { DELETED_MEMBER_NAME, memberRoleLine, memberYearsLabel, type MemberCardDto } from "@illuminize/shared";
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Avatar, Badge } from "@/components/ui";
@@ -58,7 +58,7 @@ export function RequestRow({
           </div>
           {member && (
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">
-              {memberRoleLine(member)} · Batch of {member.batchYear}
+              {memberRoleLine(member)} · {memberYearsLabel(member)}
             </p>
           )}
           {about}

@@ -1,4 +1,4 @@
-import { memberRoleLine, mentorAvailabilityText } from "@illuminize/shared";
+import { memberRoleLine, memberYearsLine, mentorAvailabilityText } from "@illuminize/shared";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -62,10 +62,7 @@ function MentorDetail({ id }: { id: string }) {
                 {member.fullName}
               </Text>
               <Text style={{ fontSize: 14, color: "#475569" }}>{memberRoleLine(member)}</Text>
-              <Text style={{ fontSize: 13, color: colors.muted }}>
-                Batch of {member.batchYear}
-                {member.city ? ` · ${member.city}` : ""}
-              </Text>
+              <Text style={{ fontSize: 13, color: colors.muted }}>{memberYearsLine(member, member.city)}</Text>
             </View>
           </View>
           {tenant.settings.features.directory && (

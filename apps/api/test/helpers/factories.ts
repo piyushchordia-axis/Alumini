@@ -80,7 +80,10 @@ export interface MembershipFactoryOptions {
   status?: MembershipRow["status"];
   role?: MembershipRow["role"];
   fullName?: string;
-  batchYear?: number;
+  /** Defaults to 2006, or the end year if that's earlier. */
+  startYear?: number;
+  /** Null only at a community; defaults to 2010. */
+  batchYear?: number | null;
   city?: string;
   country?: string;
   companyName?: string;
@@ -91,6 +94,7 @@ export interface MembershipFactoryOptions {
 
 export async function createMembership(ctx: TestContext, tenantId: string, userId: string, opts: MembershipFactoryOptions = {}) {
   const n = nextId();
+  const batchYear = opts.batchYear === undefined ? 2010 : opts.batchYear;
   const [row] = await ctx.db
     .insert(memberships)
     .values({
@@ -99,7 +103,8 @@ export async function createMembership(ctx: TestContext, tenantId: string, userI
       status: opts.status ?? "APPROVED",
       role: opts.role ?? "MEMBER",
       fullName: opts.fullName ?? `Member ${n}`,
-      batchYear: opts.batchYear ?? 2010,
+      startYear: opts.startYear ?? Math.min(2006, batchYear ?? 2006),
+      batchYear,
       professionType: opts.professionType ?? "EMPLOYED",
       companyName: opts.companyName ?? null,
       city: opts.city ?? "Mumbai",
@@ -125,6 +130,7 @@ export async function memberSession(ctx: TestContext, tenantId: string, opts: Me
 
 export const PROFILE = {
   fullName: "Test Member",
+  startYear: 2008,
   batchYear: 2012,
   professionType: "EMPLOYED",
   companyName: "Acme",

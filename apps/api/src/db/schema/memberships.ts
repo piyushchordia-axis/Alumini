@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   char,
+  check,
   date,
   index,
   integer,
@@ -33,7 +34,10 @@ export const memberships = pgTable(
     statusChangedByUserId: uuid("status_changed_by_user_id").references(() => users.id, { onDelete: "set null" }),
 
     fullName: text("full_name").notNull(),
-    batchYear: integer("batch_year").notNull(),
+    /** The year they joined the institution. */
+    startYear: integer("start_year").notNull(),
+    /** The year they left or will leave. Null only at a community (type OTHER), for someone who still belongs. */
+    batchYear: integer("batch_year"),
     dateOfBirth: date("date_of_birth"),
     professionType: professionTypeEnum("profession_type").notNull(),
     companyName: text("company_name"),
@@ -87,6 +91,7 @@ export const memberships = pgTable(
     uniqueIndex("memberships_tenant_user_uq").on(t.tenantId, t.userId),
     index("memberships_tenant_status_idx").on(t.tenantId, t.status),
     index("memberships_tenant_batch_idx").on(t.tenantId, t.batchYear),
+    index("memberships_tenant_years_idx").on(t.tenantId, t.startYear, t.batchYear),
     index("memberships_tenant_city_idx").on(t.tenantId, t.city),
     index("memberships_tenant_country_idx").on(t.tenantId, t.country),
     index("memberships_tenant_profession_idx").on(t.tenantId, t.professionType),
@@ -95,6 +100,7 @@ export const memberships = pgTable(
     index("memberships_tenant_active_idx").on(t.tenantId, t.lastActiveAt),
     index("memberships_user_idx").on(t.userId),
     index("memberships_tenant_approved_idx").on(t.tenantId, t.approvedAt),
+    check("memberships_years_order", sql`${t.batchYear} IS NULL OR ${t.startYear} <= ${t.batchYear}`),
   ],
 );
 

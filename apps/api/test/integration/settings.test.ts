@@ -37,7 +37,7 @@ describe.skipIf(!dbAvailable)("tenant admin settings + branding", () => {
     const session = await loginAs(ctx, user.phoneE164);
     const reg = await api().post(`${base}/memberships`).set(auth(session.accessToken)).send(PROFILE);
     expect(reg.body.data.status).toBe("PENDING");
-    expect((await api().post(`${base}/memberships`).set(auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken)).send({ ...PROFILE, batchYear: 1999 })).status).toBe(400);
+    expect((await api().post(`${base}/memberships`).set(auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken)).send({ ...PROFILE, startYear: 1995, batchYear: 1999 })).status).toBe(400);
 
     const audit = await api().get(`${base}/admin/audit?action=tenant.settings`).set(admin.headers);
     expect(audit.body.total).toBe(1);

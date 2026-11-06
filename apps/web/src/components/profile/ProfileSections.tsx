@@ -12,6 +12,9 @@ import {
   PROFILE_MAX_SKILLS,
   RICH_TEXT_HINT,
   SKILL_MAX_LENGTH,
+  memberEndYearOptions,
+  memberStartYearOptions,
+  memberYearFields,
   mentorshipAvailable,
   mentorshipKeys,
   socialUrlFromInput,
@@ -59,12 +62,11 @@ export function DisclosureSummary({ children }: { children: ReactNode }) {
   );
 }
 
-/** Photo, name, batch, what they do, date of birth, where they live, and every question registration requires. */
+/** Photo, name, years here, what they do, date of birth, where they live, and every question registration requires. */
 export function ProfileBasicsSection({ form: f }: { form: ProfileFormController }) {
   const { register, control, formState, clearErrors } = f.form;
   const errors = formState.errors;
-  const years: number[] = [];
-  for (let y = f.tenant.settings.maxBatchYear; y >= f.tenant.settings.minBatchYear; y--) years.push(y);
+  const years = memberYearFields(f.tenant.type);
   return (
     <div className="space-y-5">
       <Controller
@@ -86,12 +88,26 @@ export function ProfileBasicsSection({ form: f }: { form: ProfileFormController 
       />
       <div className="grid gap-4 sm:grid-cols-2">
         {/* A blank name says what's missing rather than the schema's "Too small". */}
-        <FormField label="Full name" required error={errors.fullName && (errors.fullName.type === "too_small" ? "Enter your full name" : errors.fullName.message)}>
-          <Input {...register("fullName")} invalid={!!errors.fullName} aria-invalid={!!errors.fullName || undefined} autoComplete="name" />
+        <div className="sm:col-span-2">
+          <FormField label="Full name" required error={errors.fullName && (errors.fullName.type === "too_small" ? "Enter your full name" : errors.fullName.message)}>
+            <Input {...register("fullName")} invalid={!!errors.fullName} aria-invalid={!!errors.fullName || undefined} autoComplete="name" />
+          </FormField>
+        </div>
+        {/* Blank until picked, so nobody is given years they never chose. A community's blank end means they still belong. */}
+        <FormField label={years.start.label} required error={errors.startYear?.message}>
+          <Select {...register("startYear", { setValueAs: yearValue })} invalid={!!errors.startYear} aria-invalid={!!errors.startYear || undefined}>
+            <option value="">{years.start.blank}</option>
+            {memberStartYearOptions().map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </Select>
         </FormField>
-        <FormField label="Batch (year of passing out)" required error={errors.batchYear?.message}>
-          <Select {...register("batchYear", { valueAsNumber: true })} invalid={!!errors.batchYear} aria-invalid={!!errors.batchYear || undefined}>
-            {years.map((y) => (
+        <FormField label={years.end.label} required={years.end.required} error={errors.batchYear?.message}>
+          <Select {...register("batchYear", { setValueAs: yearValue })} invalid={!!errors.batchYear} aria-invalid={!!errors.batchYear || undefined}>
+            <option value="">{years.end.blank}</option>
+            {memberEndYearOptions(f.tenant).map((y) => (
               <option key={y} value={y}>
                 {y}
               </option>

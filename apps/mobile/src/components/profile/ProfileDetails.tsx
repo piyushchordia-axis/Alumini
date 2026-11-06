@@ -4,6 +4,8 @@ import {
   PROFESSION_TYPE_LABELS,
   countryName,
   memberRoleLine,
+  memberYearsLabel,
+  memberYearsLine,
   profileYearsLabel,
   yearsOfExperienceLabel,
   type MembershipDto,
@@ -25,6 +27,7 @@ export type ProfileView = Pick<
   MembershipDto,
   | "fullName"
   | "avatarUrl"
+  | "startYear"
   | "batchYear"
   | "city"
   | "country"
@@ -78,7 +81,7 @@ export function ProfileBadges({ profile, short }: { profile: BadgeSource; short?
 }
 
 /**
- * Photo, name, the headline under it, batch and place, then the badges, centred as on the web app's phone layout.
+ * Photo, name, the headline under it, years here and place, then the badges, centred as on the web app's phone layout.
  * `nameExtras` sits beside the name (Admin), and `children` below everything.
  */
 export function ProfileSummary({ profile, nameExtras, children }: { profile: ProfileView; nameExtras?: ReactNode; children?: ReactNode }) {
@@ -94,10 +97,7 @@ export function ProfileSummary({ profile, nameExtras, children }: { profile: Pro
         {nameExtras}
       </Row>
       <Text style={styles.tagline}>{profileTagline(profile)}</Text>
-      <Text style={styles.meta}>
-        Batch of {profile.batchYear}
-        {place ? ` · ${place}` : ""}
-      </Text>
+      <Text style={styles.meta}>{memberYearsLine(profile, place)}</Text>
       {badges && (
         <Row gap={6} style={{ justifyContent: "center", marginTop: 2 }}>
           <ProfileBadges profile={profile} />
@@ -217,7 +217,7 @@ export function ProfileDetails({ profile, tenant, style }: { profile: ProfileVie
 
   const studies: TimelineItem[] = [];
   const here = tenant.type === "SCHOOL" ? "" : [profile.degree, profile.fieldOfStudy].filter(Boolean).join(", ");
-  if (here) studies.push({ key: "here", title: tenant.name, place: here, when: `Batch of ${profile.batchYear}` });
+  if (here) studies.push({ key: "here", title: tenant.name, place: here, when: memberYearsLabel(profile) });
   profile.education.forEach((e, i) =>
     studies.push({ key: `elsewhere-${i}`, title: e.institution, place: [e.degree, e.fieldOfStudy].filter(Boolean).join(", ") || null, when: profileYearsLabel(e.startYear, e.endYear) }),
   );

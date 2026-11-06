@@ -743,7 +743,7 @@ describe.skipIf(!dbAvailable)("chat push", () => {
         .returning({ id: usersTable.id });
       const members = await ctx.db
         .insert(memberships)
-        .values(users.map((u, i) => ({ tenantId: tenant.id, userId: u.id, status: "APPROVED" as const, role: "MEMBER" as const, fullName: `Runner ${i}`, batchYear: 2010, professionType: "EMPLOYED" as const, statusChangedAt: new Date() })))
+        .values(users.map((u, i) => ({ tenantId: tenant.id, userId: u.id, status: "APPROVED" as const, role: "MEMBER" as const, fullName: `Runner ${i}`, startYear: 2006, batchYear: 2010, professionType: "EMPLOYED" as const, statusChangedAt: new Date() })))
         .returning({ id: memberships.id });
       await ctx.db.insert(pushTokens).values(users.map((u) => ({ userId: u.id, token: `ExponentPushToken[${u.id}]`, platform: "ANDROID" as const })));
       await ctx.db.insert(chatParticipants).values(members.map((m) => ({ conversationId: group.id, membershipId: m.id, tenantId: tenant.id, state: "ACTIVE" as const, role: "MEMBER" as const, joinedAt: new Date() })));

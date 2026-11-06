@@ -346,6 +346,19 @@ describe.skipIf(!dbAvailable)("current pupils", () => {
       expect((await chatApi(ctx, tenant.slug, alum).direct(member.membership.id)).status).toBe(201);
     });
 
+    it("a blank batch year with no date of birth, as when a community becomes a school, by the rule in code and in SQL", async () => {
+      const { tenant, alum, other } = await school();
+      const member = await memberSession(ctx, tenant.id, { startYear: 2010, batchYear: null });
+      const pupil = await memberSession(ctx, tenant.id, { batchYear: null, dateOfBirth: yearsAgo(15) });
+      expect((await me(tenant.slug, member)).body.data.chatEligible).toBe(true);
+      expect((await me(tenant.slug, pupil)).body.data.chatEligible).toBe(false);
+      expect((await chatApi(ctx, tenant.slug, alum).direct(member.membership.id)).status).toBe(201);
+      // The directory's Open-to filter leaves pupils out in SQL, where a null comparison would drop the row too.
+      await ctx.db.update(memberships).set({ openTo: ["HIRING"] }).where(eq(memberships.tenantId, tenant.id));
+      const open = (await request(ctx.app).get(`/api/v1/t/${tenant.slug}/directory?openTo=HIRING`).set(alum.headers)).body.data as Array<{ id: string }>;
+      expect(open.map((m) => m.id).sort()).toEqual([alum.membership.id, other.membership.id, member.membership.id].sort());
+    });
+
     it("nobody outside a school", async () => {
       for (const type of ["COLLEGE", "UNIVERSITY", "OTHER"] as const) {
         const { tenant } = await createTenant(ctx, { type });

@@ -62,7 +62,7 @@ export function MemberProfilePage() {
             </div>
           ))}
           <div>
-            <dt className="text-slate-500">Member since</dt>
+            <dt className="text-slate-500">Registered</dt>
             <dd>{formatDate(m.memberSince)}</dd>
           </div>
         </dl>

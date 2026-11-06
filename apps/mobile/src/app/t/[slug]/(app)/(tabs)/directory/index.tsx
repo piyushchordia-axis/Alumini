@@ -1,5 +1,7 @@
 import {
   countryName,
+  memberYearsLabel,
+  memberYearsLine,
   INDUSTRY_LABELS,
   OPEN_TO,
   OPEN_TO_LABELS,
@@ -29,8 +31,9 @@ function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }
   const tagline = profileTagline(member);
   // The card's name stands in for what's inside it, so it says the badges in full too.
   const badges = [...(member.role === "TENANT_ADMIN" ? ["Admin"] : []), ...profileBadgeWords(member)];
+  const place = [member.city, member.country && member.country !== "IN" ? countryName(member.country) : null].filter(Boolean).join(", ");
   return (
-    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, tagline, `batch of ${member.batchYear}`].join(", ")}>
+    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, tagline, memberYearsLabel(member)].join(", ")}>
       <Row gap={12} style={{ flexWrap: "nowrap" }}>
         <Avatar name={member.fullName} src={member.avatarUrl} size={48} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -45,11 +48,7 @@ function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }
           <Text style={{ fontSize: 13, color: colors.muted }} numberOfLines={1}>
             {tagline}
           </Text>
-          <Muted>
-            Batch of {member.batchYear}
-            {member.city ? ` · ${member.city}` : ""}
-            {member.country && member.country !== "IN" ? `, ${countryName(member.country)}` : ""}
-          </Muted>
+          <Muted>{memberYearsLine(member, place)}</Muted>
         </View>
       </Row>
     </Card>

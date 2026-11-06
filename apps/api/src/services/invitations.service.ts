@@ -152,6 +152,11 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
         continue;
       }
       const prior = existingByPhone.get(v.phone);
+      // A new end is checked against the start the invitation keeps, as a member's edit is against theirs.
+      if (prior?.startYear != null && v.batchYear !== null && v.batchYear < prior.startYear) {
+        results.push({ row: v.row, phone: v.phone, status: "invalid", message: `Batch can't be before the year they joined (${prior.startYear})` });
+        continue;
+      }
       if (prior) {
         const reopen = !isOpen(prior);
         const updated = (await updateInvitation(tx, tenant.id, prior.id, {

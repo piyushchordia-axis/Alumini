@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, type RsvpStatus } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, memberYearsLabel, type RsvpStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -122,7 +122,7 @@ export default function EventDetailScreen() {
             <Row gap={8}>
               <Avatar name={m.fullName} src={m.avatarUrl} size={28} />
               <Text style={{ color: colors.text }}>
-                {m.fullName} <Muted>· {m.batchYear}</Muted>
+                {m.fullName} <Muted>· {memberYearsLabel(m)}</Muted>
               </Text>
             </Row>
           </Pressable>

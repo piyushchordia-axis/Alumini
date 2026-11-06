@@ -92,6 +92,17 @@ export const booleanQuerySchema = z
 export const tenantSlugParamsSchema = z.object({ slug: tenantSlugSchema });
 export const idParamsSchema = z.object({ id: uuidSchema });
 
+/**
+ * A year from `min` to `ahead` years from now. "Now" is when the input is parsed, not when this module loaded, which in a
+ * server that runs for months would be a year or more ago.
+ */
+export const yearSchema = (min: number, ahead = 0) =>
+  z
+    .number()
+    .int("Enter a year")
+    .min(min, `Use a year from ${min} on`)
+    .refine((y) => y <= new Date().getFullYear() + ahead, ahead === 0 ? "This year at the latest" : "Too far in the future");
+
 export const trimmedString = (max: number, min = 1) => z.string().trim().min(min).max(max);
 export const optionalTrimmed = (max: number) =>
   z

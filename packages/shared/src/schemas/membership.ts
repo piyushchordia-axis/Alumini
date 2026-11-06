@@ -6,6 +6,7 @@ import {
   MEMBER_BACKDROPS,
   MEMBERSHIP_ROLES,
   MEMBERSHIP_STATUSES,
+  MEMBER_START_MIN_YEAR,
   MIN_BATCH_YEAR,
   OPEN_TO,
   PROFESSION_TYPES,
@@ -32,10 +33,9 @@ import {
   tenantSlugSchema,
   trimmedString,
   uuidSchema,
+  yearSchema,
 } from "./common";
 import { profileFieldAnswersSchema } from "./profileFields";
-
-const currentYear = new Date().getFullYear();
 
 const dateOfBirthSchema = dateOnlySchema.refine((d) => {
   const dob = new Date(d);
@@ -45,16 +45,28 @@ const dateOfBirthSchema = dateOnlySchema.refine((d) => {
   return dob <= tenYearsAgo && dob.getFullYear() >= 1900;
 }, "Enter a valid date of birth");
 
+/** A year in the work and study history: from PROFILE_MIN_YEAR to `ahead` years from now (see yearSchema). */
+const profileYearSchema = (ahead = 0) => yearSchema(PROFILE_MIN_YEAR, ahead);
+
+/** The year a member joined the institution: from MEMBER_START_MIN_YEAR to this year. */
+export const memberStartYearSchema = yearSchema(MEMBER_START_MIN_YEAR);
 /**
- * A year from PROFILE_MIN_YEAR to `ahead` years from now. "Now" is when the input is parsed, not when this module loaded,
- * which in a server that runs for months would be a year or more ago.
+ * The year a member left or will leave (batchYear): up to ten years ahead. memberYearsIssues checks it against the
+ * institution's own range, and a community's against this year.
  */
-const profileYearSchema = (ahead = 0) =>
-  z
-    .number()
-    .int("Enter a year")
-    .min(PROFILE_MIN_YEAR, `Use a year from ${PROFILE_MIN_YEAR} on`)
-    .refine((y) => y <= new Date().getFullYear() + ahead, ahead === 0 ? "This year at the latest" : "Too far in the future");
+export const memberEndYearSchema = yearSchema(MIN_BATCH_YEAR, 10);
+
+const memberYearsInOrder = (v: { startYear?: number | null; batchYear?: number | null }, c: z.RefinementCtx) => {
+  if (v.startYear != null && v.batchYear != null && v.batchYear < v.startYear) c.addIssue({ code: "custom", path: ["batchYear"], message: "Can't be before the year you joined" });
+};
+/**
+ * When memberYearsInOrder runs: as zod's default, not after an issue that stops parsing, and also not after one with
+ * either year, so a year out of range isn't said to be out of order too.
+ */
+const yearsInOrder = {
+  when: (payload: { aborted?: boolean; issues: ReadonlyArray<{ continue?: boolean; path?: PropertyKey[] }> }) =>
+    !payload.aborted && payload.issues.every((i) => i.continue === true && i.path?.[0] !== "startYear" && i.path?.[0] !== "batchYear"),
+};
 
 const endNotBeforeStart = (v: { startYear?: number | null; endYear?: number | null }, c: z.RefinementCtx) => {
   if (v.startYear != null && v.endYear != null && v.endYear < v.startYear) c.addIssue({ code: "custom", path: ["endYear"], message: "Can't be before the start year" });
@@ -106,9 +118,12 @@ const openToSchema = z
   .max(10)
   .transform((list) => OPEN_TO.filter((v) => list.includes(v)));
 
-export const membershipProfileSchema = z.object({
+/** The profile body, unrefined, because zod refuses to make a refined object partial. */
+const profileBase = z.object({
   fullName: trimmedString(100, 2),
-  batchYear: z.coerce.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10),
+  startYear: memberStartYearSchema,
+  /** Null only at a community (type OTHER), for someone who still belongs. Left out, it stays as stored. */
+  batchYear: memberEndYearSchema.nullable().optional(),
   dateOfBirth: dateOfBirthSchema.nullable().optional(),
   professionType: z.enum(PROFESSION_TYPES),
   companyName: optionalTrimmed(120),
@@ -149,9 +164,11 @@ export const membershipProfileSchema = z.object({
   /** Answers to the institution's own profile questions, by field key. */
   fields: profileFieldAnswersSchema.optional(),
 });
+
+export const membershipProfileSchema = profileBase.superRefine(memberYearsInOrder, yearsInOrder);
 export type MembershipProfileInput = z.infer<typeof membershipProfileSchema>;
 
-export const membershipProfileUpdateSchema = membershipProfileSchema.partial();
+export const membershipProfileUpdateSchema = profileBase.partial().superRefine(memberYearsInOrder, yearsInOrder);
 export type MembershipProfileUpdate = z.infer<typeof membershipProfileUpdateSchema>;
 
 /**

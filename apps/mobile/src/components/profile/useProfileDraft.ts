@@ -3,6 +3,7 @@ import {
   PROFILE_SECTION_TITLES,
   hiddenProfileKeys,
   isCurrentPupil,
+  memberYearsIssues,
   membershipProfileSchema,
   profileEducationSchema,
   profileExperienceSchema,
@@ -50,6 +51,7 @@ export interface EducationDraft {
 /** Everything the profile form edits, as its inputs hold it: text as typed, blanks as "". */
 export interface ProfileDraft {
   fullName: string;
+  startYear: string;
   batchYear: string;
   dateOfBirth: string;
   professionType: ProfessionType;
@@ -101,6 +103,7 @@ const blankEducation = (): EducationDraft => ({ key: rowKey(), institution: "", 
 /** A membership (or any part of one, such as PortableProfileDto) as the form's inputs hold it, blanks filled in. */
 export const toDraft = (m?: Partial<MembershipDto>): ProfileDraft => ({
   fullName: m?.fullName ?? "",
+  startYear: m?.startYear ? String(m.startYear) : "",
   batchYear: m?.batchYear ? String(m.batchYear) : "",
   dateOfBirth: m?.dateOfBirth ?? "",
   professionType: m?.professionType ?? "EMPLOYED",
@@ -136,7 +139,8 @@ export const toDraft = (m?: Partial<MembershipDto>): ProfileDraft => ({
 const FORM_FIELDS = new Set<string>(Object.keys(toDraft()));
 
 const nul = (s: string) => (s.trim() ? s.trim() : null);
-const yearOrNull = (s: string) => (s.trim() ? Number(s) : null);
+/** A year box's value: blank is null. */
+export const yearOrNull = (s: string) => (s.trim() ? Number(s) : null);
 /** Digits only, at most four: what a year box takes. */
 export const yearDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
 
@@ -164,11 +168,6 @@ function issueErrors(issues: readonly { path: readonly PropertyKey[]; code: stri
   return out;
 }
 
-/** `errors`, saying what's missing for a batch left blank, which the schema reads as the year 0. */
-function withBlankBatch(errors: Record<string, string>, d: ProfileDraft): Record<string, string> {
-  return errors.batchYear && !d.batchYear.trim() ? { ...errors, batchYear: "Enter the year you passed out" } : errors;
-}
-
 /**
  * The draft as the profile body, for the schema to check: `skills` with whatever is still typed in the skills box, and
  * the photo only when it changed from `savedAvatar`, as a form opened before the photo changed elsewhere would otherwise
@@ -178,7 +177,8 @@ function draftBody(d: ProfileDraft, skills: string[], savedAvatar: string | null
   const link = (key: ProfileLinkKey) => socialUrlFromInput(LINK_KINDS[key], d[key]);
   return {
     fullName: d.fullName,
-    batchYear: d.batchYear,
+    startYear: yearOrNull(d.startYear),
+    batchYear: yearOrNull(d.batchYear),
     dateOfBirth: nul(d.dateOfBirth),
     professionType: d.professionType,
     companyName: nul(d.companyName),
@@ -280,7 +280,7 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
   const required = customFields.filter((x) => x.required && x.memberEditable);
   const optional = customFields.filter((x) => !x.required || !x.memberEditable);
   // From what's on the form, so changing the batch or date of birth shows or hides what a pupil can't have at once.
-  const pupil = isCurrentPupil(tenant, { batchYear: Number(draft.batchYear), dateOfBirth: draft.dateOfBirth || null });
+  const pupil = isCurrentPupil(tenant, { batchYear: yearOrNull(draft.batchYear), dateOfBirth: draft.dateOfBirth || null });
 
   const set = <K extends FieldKey>(key: K, value: ProfileDraft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -364,11 +364,17 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
    * neither checked nor sent, so nothing they can't see may block a save.
    */
   const parse = (skills: string[]) => {
-    const hidden = hiddenProfileKeys(tenant, { professionType: draft.professionType, batchYear: Number(draft.batchYear), dateOfBirth: draft.dateOfBirth || null });
+    const hidden = hiddenProfileKeys(tenant, { professionType: draft.professionType, batchYear: yearOrNull(draft.batchYear), dateOfBirth: draft.dateOfBirth || null });
     return membershipProfileSchema.safeParse(withoutHiddenProfileKeys(draftBody(draft, skills, initial?.avatarUrl ?? null), hidden));
   };
-  const batchOutOfRange = (batch: number) =>
-    batch < tenant.settings.minBatchYear || batch > tenant.settings.maxBatchYear ? `Must be between ${tenant.settings.minBatchYear} and ${tenant.settings.maxBatchYear}` : null;
+  /**
+   * The years as the API checks them, for this institution and in its words, over what the schema says of them: it can't
+   * tell a community's blank end from a missing one, and calls a blank start "expected number".
+   */
+  const yearsChecked = (found: Record<string, string>): Record<string, string> => ({
+    ...found,
+    ...memberYearsIssues(tenant, { startYear: yearOrNull(draft.startYear), batchYear: yearOrNull(draft.batchYear) }),
+  });
 
   /**
    * Checks one section as saving would, with the institution's questions in it, as registration does before leaving a
@@ -380,9 +386,7 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     setServerError(null);
     const skills = section === "work" ? (skillsRef.current?.commit() ?? draft.skills) : draft.skills;
     const parsed = parse(skills);
-    const found: Record<string, string> = parsed.success ? {} : Object.fromEntries(Object.entries(withBlankBatch(issueErrors(parsed.error.issues), draft)).filter(([path]) => profileSectionOf(path) === section));
-    const outOfRange = section === "basics" && !("batchYear" in found) ? batchOutOfRange(Number(draft.batchYear)) : null;
-    if (outOfRange) found.batchYear = outOfRange;
+    const found: Record<string, string> = Object.fromEntries(Object.entries(yearsChecked(parsed.success ? {} : issueErrors(parsed.error.issues))).filter(([path]) => profileSectionOf(path) === section));
     const defs = customFields.filter((x) => profileSectionOf(`fields.${x.key}`, customFields) === section);
     const { errors: wrong } = checkAnswers(defs);
     const keys = profileSectionFields(section);
@@ -404,15 +408,10 @@ export function useProfileDraft({ tenant, initial, customFields = [], mode = "ed
     setAnswerErrors(check.errors);
     if (Object.keys(check.errors).length) return reveal(Object.keys(check.errors).map((k) => `fields.${k}`));
     const parsed = parse(skills);
-    if (!parsed.success) {
-      const next = withBlankBatch(issueErrors(parsed.error.issues), draft);
-      setErrors(next);
-      return reveal(Object.keys(next));
-    }
-    const outOfRange = batchOutOfRange(parsed.data.batchYear);
-    if (outOfRange) {
-      setErrors({ batchYear: outOfRange });
-      return reveal(["batchYear"]);
+    const found = yearsChecked(parsed.success ? {} : issueErrors(parsed.error.issues));
+    if (!parsed.success || Object.keys(found).length) {
+      setErrors(found);
+      return reveal(Object.keys(found));
     }
     setBusy(true);
     try {

@@ -32,7 +32,7 @@ export default function MemberProfileScreen() {
         {m.id === membership.id && <Button title="Edit my profile" variant="outline" onPress={() => router.push(`/t/${slug}/profile/edit`, { withAnchor: true })} />}
         {chatOn && m.canMessage && <MessageMemberButton slug={slug} member={m} />}
         <ProfileDetails profile={m} tenant={tenant} style={divider} />
-        {/* The phone, the institution's questions and since when, in the order the web app lists them. */}
+        {/* The phone, the institution's questions and when they registered, in the order the web app lists them. */}
         <View style={[{ gap: spacing.sm }, divider]}>
           {m.phone && (
             <Row>
@@ -46,7 +46,7 @@ export default function MemberProfileScreen() {
               {f.display}
             </Text>
           ))}
-          <Muted>Member since {formatDate(m.memberSince)}</Muted>
+          <Muted>Registered {formatDate(m.memberSince)}</Muted>
         </View>
         {canBlock && (
           <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>

@@ -15,7 +15,8 @@ const format = { formatDate: (iso: string) => `date(${iso})`, formatDateTime: (i
 
 const NISHA = {
   phone: "+919100000036",
-  batchYear: 2010,
+  startYear: 2010,
+  batchYear: null,
   professionType: "EMPLOYED" as const,
   city: "New Jersey",
   country: "US",
@@ -31,16 +32,20 @@ describe("memberFacts", () => {
   it("lists what a member's admin page shows beside their profile, in order, with labels and the place by name", () => {
     expect(memberFacts(NISHA, format)).toEqual([
       { label: "Phone", value: "+91 91000 00036" },
-      { label: "Batch", value: "2010" },
+      { label: "Years here", value: "2010–present" },
       { label: "Profession", value: "Working at a company" },
       { label: "City", value: "New Jersey, United States" },
       { label: "Date of birth", value: "12 Mar 1990" },
       { label: "Marital status", value: "Married" },
       { label: "Kids", value: "0" },
-      { label: "Member since", value: "date(2026-01-05T10:00:00.000Z)" },
+      { label: "Registered", value: "date(2026-01-05T10:00:00.000Z)" },
       { label: "Last active", value: "time(2026-11-01T08:30:00.000Z)" },
       { label: "Last login", value: "time(2026-10-30T07:00:00.000Z)" },
     ]);
+  });
+
+  it("gives a closed range as a range", () => {
+    expect(memberFacts({ ...NISHA, startYear: 2006, batchYear: 2010 }, format).find((f) => f.label === "Years here")?.value).toBe("2006–2010");
   });
 
   it("writes a date of birth from its text, never through the formatters, so it can't move a day in any time zone", () => {

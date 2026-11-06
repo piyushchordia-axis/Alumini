@@ -50,9 +50,10 @@ import {
   upsertSettings,
 } from "../repositories/tenants.repo";
 import { findOrCreateUserByPhone, findUserById, searchUsers, updateUser } from "../repositories/users.repo";
-import type { AuthContext, MembershipRow, TenantRow } from "../types/request";
+import type { AuthContext, MembershipRow, TenantRow, TenantSettingsRow } from "../types/request";
 import { recordAudit, recordAuditStrict } from "./audit.service";
 import { heldSuspensionColumns, restoreHeldSanctions, takeHeldSanctions } from "./deletedAccounts.service";
+import { assertMemberYears } from "./membership.service";
 import { featuresToStore, invalidateTenantCache } from "./tenant.service";
 
 interface PlatformActor extends AuthContext {
@@ -112,13 +113,33 @@ function settingsColumns(input: TenantSettingsUpdate | undefined) {
   };
 }
 
+type BatchRange = Pick<TenantSettingsRow, "minBatchYear" | "maxBatchYear">;
+
 /**
- * The batch year of an admin given none: last year, within what the institution allows. Not this year, because in a school
- * this year's batch with no date of birth counts as a current pupil, which would shut an adult admin out of private contact.
+ * The years of an admin given none. At a community, a member since this year who still is. Elsewhere, last year for both,
+ * within what the institution allows: not this year, because in a school this year's batch with no date of birth counts as
+ * a current pupil, which would shut an adult admin out of private contact.
  */
-function fallbackAdminBatchYear(tenant: Pick<TenantRow, "timezone">, settings: { minBatchYear: number; maxBatchYear: number }): number {
-  const lastYear = wallPartsInZone(new Date(), tenant.timezone).year - 1;
-  return Math.max(settings.minBatchYear, Math.min(settings.maxBatchYear, lastYear));
+function fallbackAdminYears(tenant: Pick<TenantRow, "type" | "timezone">, settings: BatchRange): { startYear: number; batchYear: number | null } {
+  const thisYear = wallPartsInZone(new Date(), tenant.timezone).year;
+  // No later than the server's own year, by which the profile's rules cap a start: around New Year, India's can be ahead,
+  // and a start past it would refuse every save of the admin's profile.
+  if (tenant.type === "OTHER") return { startYear: Math.min(thisYear, new Date().getFullYear()), batchYear: null };
+  const batchYear = Math.max(settings.minBatchYear, Math.min(settings.maxBatchYear, thisYear - 1));
+  return { startYear: Math.min(thisYear - 1, batchYear), batchYear };
+}
+
+/**
+ * A new admin's years: the fallback when none are given, else the ones given, checked as a member's are. So a year
+ * given alone needs the other where a member's form would, and the problem is reported on the blank one: a start alone
+ * is taken only at a community, an end alone never. Neither is made up from the other.
+ */
+function adminYears(tenant: Pick<TenantRow, "type" | "timezone">, settings: BatchRange, input: Pick<AssignAdminInput, "startYear" | "batchYear">, errorPrefix: string) {
+  const { startYear = null, batchYear = null } = input;
+  if (startYear === null && batchYear === null) return fallbackAdminYears(tenant, settings);
+  assertMemberYears(tenant, settings, { startYear, batchYear }, errorPrefix);
+  // Refused above when blank: a start is always required.
+  return { startYear: startYear!, batchYear };
 }
 
 const SUSPENDED_ADMIN = "This member is suspended. Reinstate them first.";
@@ -144,7 +165,8 @@ async function ensureAdminMembership(
   tenant: TenantRow,
   input: AssignAdminInput,
   actor: PlatformActor,
-  fallbackBatchYear: number,
+  settings: BatchRange,
+  errorPrefix = "",
 ): Promise<EnsuredAdmin> {
   const { e164, region } = normalizePhone(input.phone);
   const user = await findOrCreateUserByPhone(db, e164, region);
@@ -169,7 +191,7 @@ async function ensureAdminMembership(
       userId: user.id,
       ...(held.suspendedAt ? { role: "MEMBER", ...heldSuspensionColumns() } : { role: "TENANT_ADMIN", status: "APPROVED", statusChangedAt: new Date(), statusChangedByUserId: actor.userId }),
       fullName: input.fullName,
-      batchYear: input.batchYear ?? fallbackBatchYear,
+      ...adminYears(tenant, settings, input, errorPrefix),
       professionType: "OTHER",
       city: tenant.city,
       country: tenant.country,
@@ -209,7 +231,7 @@ export async function createPlatformTenant(ctx: AppContext, actor: PlatformActor
       updatedByUserId: actor.userId,
     });
     if (input.initialAdmin) {
-      const ensured = await ensureAdminMembership(ctx, tx, tenant, input.initialAdmin, actor, fallbackAdminBatchYear(tenant, settings));
+      const ensured = await ensureAdminMembership(ctx, tx, tenant, input.initialAdmin, actor, settings, "initialAdmin.");
       // A new institution holds nothing, so no suspension can come back with the number; refused all the same if one did.
       if (ensured.suspended) throw AppError.conflict(SUSPENDED_ADMIN);
     }
@@ -291,7 +313,7 @@ export async function listPlatformTenantAdmins(ctx: AppContext, tenantId: string
 export async function assignTenantAdmin(ctx: AppContext, actor: PlatformActor, tenantId: string, input: AssignAdminInput): Promise<AdminMemberDto> {
   const { tenant, settings } = await loadTenant(ctx, tenantId);
   const membership = await runInTransaction(ctx, async (tx) => {
-    const { membership, created, from, suspended } = await ensureAdminMembership(ctx, tx, tenant, input, actor, fallbackAdminBatchYear(tenant, settings));
+    const { membership, created, from, suspended } = await ensureAdminMembership(ctx, tx, tenant, input, actor, settings);
     // Their suspension came back with their number: kept, so the institution sees it and can lift it, but not made an admin.
     if (suspended) return null;
     await recordAuditStrict(tx, {

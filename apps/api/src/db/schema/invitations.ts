@@ -1,5 +1,6 @@
 import type { ProfileFieldValue } from "@illuminize/shared";
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { invitationStatusEnum } from "./enums";
 import { tenantScoped, timestamps } from "./helpers";
 import { memberships } from "./memberships";
@@ -18,6 +19,8 @@ export const invitations = pgTable(
     phoneE164: text("phone_e164").notNull(),
     email: text("email"),
     fullName: text("full_name"),
+    /** The years to prefill registration with, either of which may be blank. */
+    startYear: integer("start_year"),
     batchYear: integer("batch_year"),
     /** Profile field answers by key, applied when the invitation is accepted. */
     fieldValues: jsonb("field_values").$type<Record<string, ProfileFieldValue>>().notNull().default({}),
@@ -31,5 +34,9 @@ export const invitations = pgTable(
     acceptedAt: timestamp("accepted_at", { withTimezone: true, precision: 3 }),
     ...timestamps(),
   },
-  (t) => [uniqueIndex("invitations_tenant_phone_uq").on(t.tenantId, t.phoneE164), index("invitations_tenant_status_created_idx").on(t.tenantId, t.status, t.createdAt)],
+  (t) => [
+    uniqueIndex("invitations_tenant_phone_uq").on(t.tenantId, t.phoneE164),
+    index("invitations_tenant_status_created_idx").on(t.tenantId, t.status, t.createdAt),
+    check("invitations_years_order", sql`${t.startYear} IS NULL OR ${t.batchYear} IS NULL OR ${t.startYear} <= ${t.batchYear}`),
+  ],
 );

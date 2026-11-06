@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { auditLog, memberships, notifications, uploads } from "../../src/db/schema";
+import { auditLog, invitations, memberships, notifications, tenantSettings, uploads } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { updateMembership } from "../../src/repositories/memberships.repo";
 import { updateMyProfile } from "../../src/services/membership.service";
@@ -79,7 +79,7 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect((await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(auth(session.accessToken))).status).toBe(200);
 
     const adminNotifs = await api().get(`/api/v1/t/${tenant.slug}/notifications`).set(admin.headers);
-    expect(adminNotifs.body.data[0]).toMatchObject({ type: "NEW_MEMBER_PENDING", data: { membershipId } });
+    expect(adminNotifs.body.data[0]).toMatchObject({ type: "NEW_MEMBER_PENDING", body: "Test Member (2008–2012) has requested to join.", data: { membershipId } });
 
     const dashboard = await api().get(`/api/v1/t/${tenant.slug}/admin/dashboard`).set(admin.headers);
     expect(dashboard.body.data).toMatchObject({ pendingMembers: 1, approvedMembers: 1 });
@@ -283,8 +283,9 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(closed.body.error.code).toBe("REGISTRATION_CLOSED");
 
     const { tenant: open } = await createTenant(ctx, { slug: "open" });
-    const badYear = await api().post(`/api/v1/t/${open.slug}/memberships`).set(auth(session.accessToken)).send({ ...PROFILE, batchYear: 1900 });
+    const badYear = await api().post(`/api/v1/t/${open.slug}/memberships`).set(auth(session.accessToken)).send({ ...PROFILE, startYear: 1930, batchYear: 1900 });
     expect(badYear.status).toBe(400);
+    expect(badYear.body.error.details).toEqual([expect.objectContaining({ path: "batchYear" })]);
     const badBody = await api().post(`/api/v1/t/${open.slug}/memberships`).set(auth(session.accessToken)).send({ fullName: "x" });
     expect(badBody.status).toBe(400);
     expect(badBody.body.error.code).toBe("VALIDATION_ERROR");
@@ -308,6 +309,103 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(res.body.data).not.toHaveProperty("extra");
     const bad = await api().patch(`/api/v1/t/${tenant.slug}/memberships/me`).set(member.headers).send({ linkedinUrl: "https://example.com/x" });
     expect(bad.status).toBe(400);
+  });
+
+  describe("years here", () => {
+    const thisYear = new Date().getFullYear();
+    const issuesOf = (res: request.Response) => {
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      return Object.fromEntries((res.body.error.details as Array<{ path: string; message: string }>).map((d) => [d.path, d.message]));
+    };
+    const newcomer = async () => auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+    const { batchYear: _end, ...withoutEnd } = PROFILE;
+    const { startYear: _start, ...withoutStart } = PROFILE;
+
+    it("needs a start everywhere and an end except at a community, where a blank end is still a member", async () => {
+      const { tenant: college } = await createTenant(ctx, { type: "COLLEGE", memberApprovalMode: "ADMIN_APPROVAL" });
+      const register = async (body: object) => api().post(`/api/v1/t/${college.slug}/memberships`).set(await newcomer()).send(body);
+      expect(issuesOf(await register(withoutStart))).toHaveProperty("startYear");
+      expect(issuesOf(await register(withoutEnd))).toEqual({ batchYear: "Enter the year you left, or will leave" });
+      expect(issuesOf(await register({ ...PROFILE, batchYear: null }))).toEqual({ batchYear: "Enter the year you left, or will leave" });
+      expect((await register(PROFILE)).body.data).toMatchObject({ startYear: 2008, batchYear: 2012 });
+
+      const { tenant: samaj } = await createTenant(ctx, { type: "OTHER", memberApprovalMode: "ADMIN_APPROVAL" });
+      const admin = await memberSession(ctx, samaj.id, { role: "TENANT_ADMIN", startYear: 1998, batchYear: null });
+      const session = await newcomer();
+      const joined = await api().post(`/api/v1/t/${samaj.slug}/memberships`).set(session).send({ ...PROFILE, batchYear: null });
+      expect(joined.status).toBe(201);
+      expect(joined.body.data).toMatchObject({ startYear: 2008, batchYear: null });
+      const notice = (await api().get(`/api/v1/t/${samaj.slug}/notifications`).set(admin.headers)).body.data[0];
+      expect(notice).toMatchObject({ type: "NEW_MEMBER_PENDING", body: "Test Member (2008–present) has requested to join." });
+      expect(issuesOf(await api().post(`/api/v1/t/${samaj.slug}/memberships`).set(await newcomer()).send(withoutStart))).toHaveProperty("startYear");
+      const leftOut = await api().post(`/api/v1/t/${samaj.slug}/memberships`).set(await newcomer()).send(withoutEnd);
+      expect(leftOut.body.data).toMatchObject({ startYear: 2008, batchYear: null });
+
+      // Registering again after a rejection, an end left out is still a member, whatever was stored before.
+      await api().post(`/api/v1/t/${samaj.slug}/admin/members/${joined.body.data.id}/reject`).set(admin.headers).send({ reason: "Couldn't verify" });
+      await ctx.db.update(memberships).set({ batchYear: 2015 }).where(eq(memberships.id, joined.body.data.id));
+      const again = await api().post(`/api/v1/t/${samaj.slug}/memberships`).set(session).send({ ...withoutEnd, startYear: 2016 });
+      expect(again.body.data).toMatchObject({ id: joined.body.data.id, startYear: 2016, batchYear: null });
+    });
+
+    it("keeps the years in order, the start past, the end in the institution's range, and a community's end past", async () => {
+      const { tenant: college } = await createTenant(ctx);
+      const { tenant: samaj } = await createTenant(ctx, { type: "OTHER" });
+      const register = async (slug: string, body: object) => api().post(`/api/v1/t/${slug}/memberships`).set(await newcomer()).send(body);
+      expect(issuesOf(await register(college.slug, { ...PROFILE, startYear: 2012, batchYear: 2008 }))).toEqual({ batchYear: "Can't be before the year you joined" });
+      expect(issuesOf(await register(college.slug, { ...PROFILE, startYear: thisYear + 1, batchYear: thisYear + 2 }))).toHaveProperty("startYear");
+      expect(issuesOf(await register(college.slug, { ...PROFILE, startYear: 1929 }))).toHaveProperty("startYear");
+      expect(issuesOf(await register(college.slug, { ...PROFILE, batchYear: thisYear + 7 }))).toEqual({ batchYear: `Must be between 1950 and ${thisYear + 6}` });
+      // A pupil's or student's end may be ahead; a community member who'll leave hasn't left yet.
+      expect((await register(college.slug, { ...PROFILE, startYear: thisYear, batchYear: thisYear + 3 })).status).toBe(201);
+      expect(issuesOf(await register(samaj.slug, { ...PROFILE, batchYear: thisYear + 1 }))).toEqual({ batchYear: "Leave this blank if you still are" });
+      expect((await register(samaj.slug, { ...PROFILE, startYear: 1996, batchYear: thisYear })).body.data).toMatchObject({ startYear: 1996, batchYear: thisYear });
+    });
+
+    it("checks an edit of one year with the other as stored, and never refuses a save that sends no year", async () => {
+      const { tenant } = await createTenant(ctx, { type: "COLLEGE" });
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", startYear: 1990, batchYear: 1994 });
+      const member = await memberSession(ctx, tenant.id, { startYear: 2006, batchYear: 2010 });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const range = `Must be between 2015 and ${thisYear + 6}`;
+      // The institution's range moves past what this member saved, before anything about it is cached.
+      await ctx.db.update(tenantSettings).set({ minBatchYear: 2015 }).where(eq(tenantSettings.tenantId, tenant.id));
+      const own = async (body: object) => api().patch(`${base}/memberships/me`).set(member.headers).send(body);
+      const byAdmin = async (body: object) => api().patch(`${base}/admin/members/${member.membership.id}/profile`).set(admin.headers).send(body);
+
+      // Saves that leave both years alone go through, the admin's answers editor's included.
+      expect((await own({ bio: "Hello" })).status).toBe(200);
+      expect((await byAdmin({ fields: {} })).status).toBe(200);
+      expect((await byAdmin({ city: "Pune" })).status).toBe(200);
+
+      // A new start alone is checked with the end it keeps, which is now out of range.
+      expect(issuesOf(await own({ startYear: 2007 }))).toEqual({ batchYear: range });
+      expect(issuesOf(await byAdmin({ startYear: 2007 }))).toEqual({ batchYear: range });
+      expect((await own({ batchYear: 2016 })).body.data).toMatchObject({ startYear: 2006, batchYear: 2016 });
+      expect(issuesOf(await own({ startYear: 2017 }))).toEqual({ batchYear: "Can't be before the year you joined" });
+      expect((await own({ startYear: 2012 })).body.data).toMatchObject({ startYear: 2012, batchYear: 2016 });
+      expect(issuesOf(await byAdmin({ startYear: 2020 }))).toEqual({ batchYear: "Can't be before the year you joined" });
+      expect(issuesOf(await own({ batchYear: null }))).toEqual({ batchYear: "Enter the year you left, or will leave" });
+      expect(issuesOf(await own({ startYear: null }))).toHaveProperty("startYear");
+      expect((await byAdmin({ startYear: 2011, batchYear: 2015 })).body.data).toMatchObject({ startYear: 2011, batchYear: 2015 });
+      const [row] = await ctx.db.select().from(memberships).where(eq(memberships.id, member.membership.id));
+      expect(row).toMatchObject({ startYear: 2011, batchYear: 2015 });
+    });
+
+    it("can't store an end before the start, even past the API", async () => {
+      const { tenant } = await createTenant(ctx);
+      const user = await createUser(ctx);
+      const order = { cause: { constraint: "memberships_years_order" } };
+      await expect(createMembership(ctx, tenant.id, user.id, { startYear: 2012, batchYear: 2008 })).rejects.toMatchObject(order);
+      const member = await createMembership(ctx, tenant.id, user.id, { startYear: 2008, batchYear: 2012 });
+      await expect(ctx.db.update(memberships).set({ startYear: 2013 }).where(eq(memberships.id, member.id))).rejects.toMatchObject(order);
+      // A blank end puts no limit on the start.
+      await ctx.db.update(memberships).set({ startYear: 2013, batchYear: null }).where(eq(memberships.id, member.id));
+      const invitation = { tenantId: tenant.id, phoneE164: "+919812345678", token: "years-order", expiresAt: new Date(Date.now() + 86_400_000) };
+      await expect(ctx.db.insert(invitations).values({ ...invitation, startYear: 2012, batchYear: 2008 })).rejects.toMatchObject({ cause: { constraint: "invitations_years_order" } });
+      await ctx.db.insert(invitations).values({ ...invitation, startYear: 2012 });
+    });
   });
 
   describe("profile details", () => {

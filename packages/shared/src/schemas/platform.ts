@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { BILLING_CYCLES, BILLING_MODELS, MESSAGE_CHANNELS, MIN_BATCH_YEAR, TENANT_STATUSES, TENANT_TYPES } from "../constants";
+import { BILLING_CYCLES, BILLING_MODELS, MESSAGE_CHANNELS, TENANT_STATUSES, TENANT_TYPES } from "../constants";
 import { phoneInputSchema } from "./auth";
 import { dateOnlySchema, hexColorSchema, httpUrlSchema, isoCountrySchema, optionalTrimmed, pageQuerySchema, tenantSlugSchema, trimmedString, uuidSchema } from "./common";
 import { timezoneSchema } from "./events";
+import { memberEndYearSchema, memberStartYearSchema } from "./membership";
 import { tenantBrandingUpdateSchema, tenantSettingsUpdateSchema } from "./tenant";
-
-const currentYear = new Date().getFullYear();
 
 export const tenantIdParamsSchema = z.object({ tenantId: uuidSchema });
 export const planIdParamsSchema = z.object({ planId: uuidSchema });
@@ -21,7 +20,9 @@ export type PlatformTenantsQuery = z.infer<typeof platformTenantsQuerySchema>;
 export const initialAdminSchema = z.object({
   phone: phoneInputSchema,
   fullName: trimmedString(100, 2),
-  batchYear: z.number().int().min(MIN_BATCH_YEAR).max(currentYear + 10).optional(),
+  /** Without years, the API gives the admin some (fallbackAdminYears), and checks any given against the institution. */
+  startYear: memberStartYearSchema.optional(),
+  batchYear: memberEndYearSchema.nullable().optional(),
 });
 export type InitialAdminInput = z.infer<typeof initialAdminSchema>;
 

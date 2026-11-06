@@ -118,8 +118,8 @@ describe.skipIf(!dbAvailable)("weekly digest", () => {
     const n = DIGEST_PAGE + 3;
     await ctx.db.execute(sql`insert into users (phone_e164, email, email_verified_at) select '+9170' || lpad(g::text, 8, '0'), 'm' || g || '@example.com', now() from generate_series(1, ${n}) g`);
     await ctx.db.execute(sql`
-      insert into memberships (tenant_id, user_id, full_name, batch_year, profession_type, status)
-      select ${tenant.id}, id, 'Member', 2010, 'EMPLOYED', 'APPROVED' from users where email like 'm%@example.com'`);
+      insert into memberships (tenant_id, user_id, full_name, start_year, batch_year, profession_type, status)
+      select ${tenant.id}, id, 'Member', 2006, 2010, 'EMPLOYED', 'APPROVED' from users where email like 'm%@example.com'`);
     await runDigest(ctx, { tenantId: tenant.id, weekStart: week }, meta);
     await ctx.jobs.drain({ maxJobs: 5000 });
     const rows = await ctx.db.select({ to: outboundMessages.toEmail, status: outboundMessages.status }).from(outboundMessages);

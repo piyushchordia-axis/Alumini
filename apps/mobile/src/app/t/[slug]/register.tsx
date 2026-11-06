@@ -89,9 +89,11 @@ export default function RegisterScreen() {
         : undefined;
   // As the server decides: an invitation the institution lets straight in, or an institution that lets everyone in.
   const autoApprove = (inv?.autoApprove ?? false) || t.settings.memberApprovalMode === "AUTO_APPROVE";
+  // A community has members, not batches.
+  const greeting = t.type === "OTHER" ? `Tell your fellow ${t.shortName ?? t.name} members who you are` : `Tell your ${t.shortName ?? t.name} batchmates who you are`;
   return (
     <Screen topInset scrollRef={scroller}>
-      <Title sub={reapplying ? "Update your profile, then send it again" : `Tell your ${t.shortName ?? t.name} batchmates who you are`}>{reapplying ? "Re-apply to join" : "Create your profile"}</Title>
+      <Title sub={reapplying ? "Update your profile, then send it again" : greeting}>{reapplying ? "Re-apply to join" : "Create your profile"}</Title>
       {!t.settings.allowSelfRegistration && !inv ? (
         <ErrorText error="This institution is not accepting new registrations right now. Contact your alumni office." />
       ) : (

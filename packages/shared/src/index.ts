@@ -6,6 +6,7 @@ export * from "./lib/sections";
 export * from "./lib/phone";
 export * from "./lib/skills";
 export * from "./lib/profile";
+export * from "./lib/memberYears";
 export * from "./lib/richText";
 export * from "./lib/salary";
 export * from "./lib/color";
