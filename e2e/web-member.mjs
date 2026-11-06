@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { bigPhoto, dropFrames, expectChosenChip, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1114,8 +1114,21 @@ try {
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
   const expectMoreActive = async (active, where) => {
     const current = (await moreButton.getAttribute("aria-current")) === "true";
-    const tinted = (await moreButton.getAttribute("class")).split(" ").includes("text-primary");
+    const tinted = (await moreButton.getAttribute("class")).split(" ").includes("text-primary-ink");
     if (current !== active || tinted !== active) throw new Error(`More on ${where}: aria-current ${current}, tinted ${tinted}, expected ${active}`);
+  };
+  // A current link, in the sheet or the sidebar, is chosen: Demo University's wash (its tones are pinned in
+  // color.test.ts) in a thin inset ring of its ring colour, with its text in the page's ink, readable on the wash.
+  const expectCurrentLink = async (link, where) => {
+    if (!(await link.getAttribute("class")).split(" ").includes("text-page-ink")) throw new Error(`${where} isn't written in the page's ink`);
+    const { colour } = await paintedColour(link, "backgroundColor");
+    if (colour !== "223 230 250") throw new Error(`${where} is on rgb ${colour}, not Demo University's wash`);
+    const ring = await link.evaluate(async (el) => {
+      await Promise.all(el.getAnimations().map((a) => a.finished));
+      return getComputedStyle(el).boxShadow;
+    });
+    if (!ring.includes("rgb(153, 175, 237) 0px 0px 0px 1px inset")) throw new Error(`${where} has no inset ring in Demo University's ring colour (box-shadow ${ring})`);
+    await expectReadable(link, where);
   };
 
   await step("phone layout: every section opens, with Events and Funding behind More", async () => {
@@ -1137,7 +1150,7 @@ try {
 
     await moreButton.click();
     await page.waitForSelector('[role="dialog"] >> text=Switch institution');
-    if (!(await moreButton.getAttribute("class")).split(" ").includes("text-primary")) throw new Error("More isn't highlighted while its sheet is open");
+    if (!(await moreButton.getAttribute("class")).split(" ").includes("text-primary-ink")) throw new Error("More isn't highlighted while its sheet is open");
     if (await page.locator('[role="dialog"] a[aria-current="page"]').count()) throw new Error("a sheet link shows as current on Directory, which is on the bar");
     await page.click('[role="dialog"] a:has-text("Events")');
     await page.waitForURL(/\/app\/events$/);
@@ -1154,7 +1167,7 @@ try {
     const current = page.locator('[role="dialog"] a[aria-current="page"]');
     await current.filter({ hasText: "Funding" }).waitFor();
     if ((await current.count()) !== 1) throw new Error("only the Funding link should show as current in the sheet");
-    if (!(await current.getAttribute("class")).split(" ").includes("text-primary")) throw new Error("the current sheet link isn't styled as active");
+    await expectCurrentLink(current, "the current sheet link");
     await shot("08a-phone-more-sheet");
     await page.keyboard.press("Escape");
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
@@ -1180,6 +1193,11 @@ try {
     await page.locator("article", { hasText: "Rahul Mehta" }).waitFor();
     await expectMoreActive(true, "Mentors");
     await page.setViewportSize({ width: 1280, height: 900 });
+    // On a wide screen the sidebar's current link is chosen the same way.
+    const sidebarCurrent = page.locator('aside nav[aria-label="Main"] a[aria-current="page"]');
+    await sidebarCurrent.filter({ hasText: "Mentors" }).waitFor();
+    if ((await sidebarCurrent.count()) !== 1) throw new Error("only the Mentors link should show as current in the sidebar");
+    await expectCurrentLink(sidebarCurrent, "the sidebar's current link");
   });
 
   await step("phone layout: More sheet reaches My posts and past events", async () => {

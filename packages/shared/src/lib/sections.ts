@@ -21,6 +21,19 @@ export type MemberSection = keyof typeof SECTION_RULES;
 
 export const MEMBER_SECTIONS = Object.keys(SECTION_RULES) as MemberSection[];
 
+/** Each section's name, the same on the web's sidebar, bar and More sheet and on the phone's tabs and More. */
+export const SECTION_LABELS: Readonly<Record<MemberSection, string>> = {
+  feed: "Feed",
+  messages: "Messages",
+  jobs: "Jobs",
+  directory: "Directory",
+  events: "Events",
+  groups: "Groups",
+  mentors: "Mentors",
+  businesses: "Businesses",
+  funding: "Funding",
+};
+
 /** Phones show this many sections in the bar. More is always there too, because it also holds the profile and sign out. */
 const BAR_SECTIONS = 4;
 

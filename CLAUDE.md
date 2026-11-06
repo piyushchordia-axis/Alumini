@@ -19,7 +19,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet).
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
-  no React; `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections;
+  no React, and the navigation's badges (`sectionBadges`, `moreBadgeLabel`); `src/lib/features.ts` the feature switches
+  and current pupils; `src/lib/sections.ts` the member sections and their names (`SECTION_LABELS`);
   `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
@@ -191,6 +192,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Landing / auth.** Brand-first full-bleed cover in `AuthShell` (web) and the tenant landing screen (mobile);
     institution name is the hero; one CTA; features below the fold with SVG + text.
   - **Nav.** Sidebar / tabs need ≥40–44px targets, clear active weight (primary wash + stronger text), and SVG icons.
+    The member sections, their badges and More's come from one `useMemberSections` hook per app (web `HomeLayout`, the
+    phone's tabs and More), never worked out again in place. A current link is chosen: web `bg-primary-wash ring-1
+    ring-inset ring-primary-ring`, with its text in `text-page-ink`, in the sidebar and the More sheet alike: text on
+    the opaque wash needs 4.5:1, which pageInk reaches for any brand (`appearance.test.ts`) and the brand's ink may not
+    (it is sure only of 3:1 there). `text-primary-ink` stays for text on white: the web bottom bar and the phone's
+    tabs tint in the ink (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work
+    waiting in the warning fill, edge and ink (web `NavBadge`, the bell included; the phone's tab badges and `HubRow`).
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
     way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row

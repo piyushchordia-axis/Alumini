@@ -1,4 +1,4 @@
-import { homeSection, MEMBER_SECTIONS, splitSections, TENANT_FEATURES, type MemberSection, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
+import { homeSection, MEMBER_SECTIONS, SECTION_LABELS, splitSections, TENANT_FEATURES, type MemberSection, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 /** Everything off except the named keys, so a rule reading the wrong key shows up. */
@@ -7,6 +7,13 @@ const only = (...on: TenantFeature[]) => Object.fromEntries(TENANT_FEATURES.map(
 describe("MEMBER_SECTIONS", () => {
   it("is in priority order, which isn't the order of the feature keys, with Groups after Events and Mentors after Groups", () => {
     expect(MEMBER_SECTIONS).toEqual(["feed", "messages", "jobs", "directory", "events", "groups", "mentors", "businesses", "funding"]);
+  });
+});
+
+describe("SECTION_LABELS", () => {
+  it("names every section once, as both apps' navigation and e2e read them", () => {
+    expect(MEMBER_SECTIONS.map((s) => SECTION_LABELS[s])).toEqual(["Feed", "Messages", "Jobs", "Directory", "Events", "Groups", "Mentors", "Businesses", "Funding"]);
+    expect(Object.keys(SECTION_LABELS).sort()).toEqual([...MEMBER_SECTIONS].sort());
   });
 });
 

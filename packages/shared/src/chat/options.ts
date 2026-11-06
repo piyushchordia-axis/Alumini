@@ -1,3 +1,4 @@
+import { SECTION_LABELS, type MemberSection } from "../lib/sections";
 import type { ChatBadgeDto } from "../types/dto";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -41,13 +42,30 @@ export interface ChatBadgeLabel {
 /** The Messages badge, the same on both apps: threads with something unread plus requests waiting. */
 export function chatBadgeLabel(badge: ChatBadgeDto | undefined): ChatBadgeLabel {
   const count = (badge?.unread ?? 0) + (badge?.requests ?? 0);
-  return { count, label: count > 0 ? `Messages, ${count} unread` : "Messages" };
+  const name = SECTION_LABELS.messages;
+  return { count, label: count > 0 ? `${name}, ${count} unread` : name };
 }
 
 /** The Groups badge, the same on both apps: invitations waiting for an answer. */
 export function groupsBadgeLabel(badge: ChatBadgeDto | undefined): ChatBadgeLabel {
   const count = badge?.invites ?? 0;
-  return { count, label: count > 0 ? `Groups, ${count} ${count === 1 ? "invitation" : "invitations"}` : "Groups" };
+  const name = SECTION_LABELS.groups;
+  return { count, label: count > 0 ? `${name}, ${count} ${count === 1 ? "invitation" : "invitations"}` : name };
+}
+
+/** The badges sections have, the same on every bar, sidebar and More: unread chats on Messages, invitations on Groups. */
+export function sectionBadges(badge: ChatBadgeDto | undefined): Partial<Record<MemberSection, ChatBadgeLabel>> {
+  return { messages: chatBadgeLabel(badge), groups: groupsBadgeLabel(badge) };
+}
+
+/**
+ * The badge on More: a section behind it has its badge there, so More adds them up and its name says what's inside, such
+ * as "More, Groups, 1 invitation". Only `overflow` counts, because a section on the bar shows its own.
+ */
+export function moreBadgeLabel(overflow: readonly MemberSection[], badges: Partial<Record<MemberSection, ChatBadgeLabel>>): ChatBadgeLabel {
+  const inside = overflow.map((s) => badges[s]).filter((b): b is ChatBadgeLabel => !!b && b.count > 0);
+  const count = inside.reduce((sum, b) => sum + b.count, 0);
+  return { count, label: count > 0 ? ["More", ...inside.map((b) => b.label)].join(", ") : "More" };
 }
 
 /**

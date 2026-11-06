@@ -1,5 +1,5 @@
-import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, groupsBadgeLabel, chatMuteUntil, conversationPreview, conversationTitle, directThreadSubtitle, formatChatTime, isMuted, isMutedUntilTurnedOn, messageSenderName, peerName, peerYears, systemLineText, unsentRemainder } from "@illuminize/shared/chat";
-import { BLOCKED_MEMBER_NAME, DELETED_MEMBER_NAME, chatMuteSchema, type ChatConversationGroupDto, type ChatLastMessageDto } from "@illuminize/shared";
+import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, groupsBadgeLabel, chatMuteUntil, conversationPreview, conversationTitle, directThreadSubtitle, formatChatTime, isMuted, isMutedUntilTurnedOn, messageSenderName, moreBadgeLabel, peerName, peerYears, sectionBadges, systemLineText, unsentRemainder } from "@illuminize/shared/chat";
+import { BLOCKED_MEMBER_NAME, DELETED_MEMBER_NAME, chatMuteSchema, splitSections, TENANT_FEATURES, type ChatConversationGroupDto, type ChatLastMessageDto, type TenantFeatures } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
@@ -54,6 +54,38 @@ describe("groupsBadgeLabel", () => {
   it("counts invitations waiting, one or several", () => {
     expect(groupsBadgeLabel({ unread: 0, requests: 0, invites: 1 })).toEqual({ count: 1, label: "Groups, 1 invitation" });
     expect(groupsBadgeLabel({ unread: 3, requests: 0, invites: 2 })).toEqual({ count: 2, label: "Groups, 2 invitations" });
+  });
+});
+
+describe("sectionBadges", () => {
+  it("gives Messages and Groups their badge, and no other section one, before the badge has loaded too", () => {
+    expect(sectionBadges(undefined)).toEqual({ messages: { count: 0, label: "Messages" }, groups: { count: 0, label: "Groups" } });
+  });
+
+  it("puts unread threads and requests on Messages, and invitations on Groups", () => {
+    expect(sectionBadges({ unread: 2, requests: 1, invites: 4 })).toEqual({ messages: { count: 3, label: "Messages, 3 unread" }, groups: { count: 4, label: "Groups, 4 invitations" } });
+  });
+});
+
+describe("moreBadgeLabel", () => {
+  const everything = Object.fromEntries(TENANT_FEATURES.map((f) => [f, true])) as TenantFeatures;
+  // With everything on, Messages is on the bar and Groups behind More.
+  const { bar, overflow } = splitSections(everything, true);
+
+  it("counts what's waiting behind More and names it, leaving out a Messages badge on the bar", () => {
+    expect(bar).toContain("messages");
+    expect(overflow).toContain("groups");
+    expect(moreBadgeLabel(overflow, sectionBadges({ unread: 2, requests: 1, invites: 1 }))).toEqual({ count: 1, label: "More, Groups, 1 invitation" });
+  });
+
+  it("is plain More with nothing waiting inside, or nothing there at all", () => {
+    expect(moreBadgeLabel(overflow, sectionBadges({ unread: 5, requests: 0, invites: 0 }))).toEqual({ count: 0, label: "More" });
+    expect(moreBadgeLabel(overflow, sectionBadges(undefined))).toEqual({ count: 0, label: "More" });
+    expect(moreBadgeLabel([], sectionBadges({ unread: 1, requests: 1, invites: 1 }))).toEqual({ count: 0, label: "More" });
+  });
+
+  it("adds up several sections' badges, in the order they're listed", () => {
+    expect(moreBadgeLabel(["messages", "events", "groups"], sectionBadges({ unread: 2, requests: 1, invites: 2 }))).toEqual({ count: 5, label: "More, Messages, 3 unread, Groups, 2 invitations" });
   });
 });
 

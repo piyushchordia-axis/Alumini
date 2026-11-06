@@ -28,7 +28,10 @@ export const BACKDROP_SCRIM = 0.85;
 export const DIM_PAGE_TEXT = GREYS.secondary;
 /** What the institution colour is mixed into for its tint, as pageTint's default. */
 const TINT_BASE = "#f8fafc";
-/** The share of the brand behind a current link on the page (web `bg-primary/12`, mobile `primarySoft`). */
+/**
+ * The share of the brand in the soft wash pageInk reads under on the page (as in mobile `primarySoft`). It leaves a
+ * margin for the web's current links, which sit on the opaque chosen-state wash (brandTones' wash) instead.
+ */
 const PAGE_LINK_WASH = 0.12;
 
 /**
@@ -88,12 +91,13 @@ export function pageBackdrop(
 }
 
 /**
- * The brand colour as text drawn on the page itself rather than in a card: the current section's link in the web
- * sidebar, the phone's Filters toggles. It is the brand's ink (brandTones) darkened until it reads at 4.5:1 on the
- * darkest the page gets (the plain page, the tint, or the veil over a black photo) with a soft wash on it, as a current
- * link has: the ink's own at 12%, and the brand's (web `bg-primary/12`), which for some reds and teals is the darker of
- * the two. A brand that reads there as it is keeps its colour; a pale one, which the raw brand left unreadable even on
- * the plain page, gets a darker shade.
+ * The brand colour as text in the member app that isn't on white: on the page itself (the phone's Filters toggles), and
+ * the web's current links in the sidebar and the More sheet, on the opaque chosen-state wash (web `bg-primary-wash`),
+ * where the brand's ink is sure only of 3:1. It is the brand's ink (brandTones) darkened until it reads at 4.5:1 on the
+ * darkest the page gets (the plain page, the tint, or the veil over a black photo) under a soft wash: the ink's own at
+ * 12%, and the brand's, which for some reds and teals is the darker of the two. That keeps it at 4.5:1 on the opaque
+ * wash too, for any brand (appearance.test.ts). A brand that reads there as it is keeps its colour; a pale one, which
+ * the raw brand left unreadable even on the plain page, gets a darker shade.
  */
 export function pageInk(primary: string, page: PageBackdropSpec): string {
   const { ink } = brandTones(primary);

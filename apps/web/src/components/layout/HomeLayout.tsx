@@ -1,19 +1,19 @@
-import { adminConsoleLabel, adminWaitingCount, chatAvailable, pageBackdrop, pageInk, parseHex, splitSections, type MemberSection } from "@illuminize/shared";
-import { chatBadgeLabel, groupsBadgeLabel, type ChatBadgeLabel } from "@illuminize/shared/chat";
+import { adminConsoleLabel, adminWaitingCount, chatAvailable, pageBackdrop, pageInk, parseHex } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState, type CSSProperties } from "react";
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { IconBell, IconDashboard, NavIcon, type NavIconName } from "@/components/icons";
+import { NavBadge } from "@/components/layout/NavBadge";
 import { Avatar, Modal } from "@/components/ui";
-import { useChatBadge, useChatScope } from "@/hooks/useChat";
+import { useChatScope } from "@/hooks/useChat";
+import { useMemberSections } from "@/hooks/useMemberSections";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
-import { useMentorsWayOut } from "@/lib/mentors";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
 import { useAppRouteHandle } from "@/lib/routeHandle";
-import { homePath, SECTION_LINKS } from "@/lib/sections";
+import { homePath } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 
 function NavLabel({ icon, label }: { icon: NavIconName; label: string }) {
@@ -28,24 +28,12 @@ function NavLabel({ icon, label }: { icon: NavIconName; label: string }) {
 export function HomeLayout() {
   const { tenant, membership, isTenantAdmin } = useMembership();
   const base = `/t/${tenant.slug}/app`;
-  const toLink = (section: MemberSection) => ({ ...SECTION_LINKS[section], section, to: `${base}/${SECTION_LINKS[section].path}` });
-  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible, { mentorsWayOut: useMentorsWayOut() });
+  // On a phone a section in the sheet has its badge there, so More's badge says there's something inside.
+  const { bar, overflow, toLink, badgeFor, moreBadge } = useMemberSections();
   const barLinks = bar.map(toLink);
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];
-
-  const chatEnabled = chatAvailable(tenant.settings.features, membership.chatEligible);
-  useChatScope(tenant.slug, chatEnabled);
-  const badgeData = useChatBadge(tenant.slug, chatEnabled).data;
-  const badges: Partial<Record<MemberSection, ChatBadgeLabel>> = { messages: chatBadgeLabel(badgeData), groups: groupsBadgeLabel(badgeData) };
-  /** The badge on a section's link, for the sections that have one. */
-  const badgeFor = (section: MemberSection) => {
-    const badge = badges[section];
-    return badge && badge.count > 0 ? badge : null;
-  };
-  // On a phone a section in the sheet has its badge there, so More says there's something inside.
-  const moreBadges = overflow.map(badgeFor).filter((b): b is ChatBadgeLabel => b !== null);
-  const moreCount = moreBadges.reduce((sum, b) => sum + b.count, 0);
+  useChatScope(tenant.slug, chatAvailable(tenant.settings.features, membership.chatEligible));
   const { fullHeight, immersive } = useAppRouteHandle();
 
   const pollInterval = usePollInterval();
@@ -76,14 +64,17 @@ export function HomeLayout() {
     }
   };
 
-  // The sidebar sits on the page, so its current link is written in the page's ink (the brand, darkened on a tint or a photo).
+  // A current link is chosen: the wash, a thin ring and the ink, with hover only on the others. Its text, in the sidebar
+  // and the sheet alike, takes the page's ink (pageInk): the wash is opaque, and the brand's ink is sure only of 3:1 on
+  // it, where pageInk reads at 4.5:1 for any brand (appearance.test.ts).
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
       "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-[var(--duration-fast)]",
-      isActive ? "bg-primary/12 font-semibold text-page-ink shadow-[inset_3px_0_0_0_rgb(var(--c-primary))]" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800",
+      isActive ? "bg-primary-wash font-semibold text-page-ink ring-1 ring-inset ring-primary-ring" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800",
     );
   const sheetRow = "flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium";
-  const sheetLinkClass = ({ isActive }: { isActive: boolean }) => clsx(sheetRow, isActive ? "bg-primary/12 font-semibold text-primary" : "text-slate-700 hover:bg-slate-100");
+  const sheetLinkClass = ({ isActive }: { isActive: boolean }) =>
+    clsx(sheetRow, isActive ? "bg-primary-wash font-semibold text-page-ink ring-1 ring-inset ring-primary-ring" : "text-slate-700 hover:bg-slate-100");
   // The member's own background. Set here, on the member app's root, and not on the document, so the admin console and
   // the platform console (other layouts) stay plain. On a tint or a photo (dimText), grey text on the page steps one
   // shade darker (index.css). Brand text on the page takes pageInk on every page, the plain one included, where a pale
@@ -124,11 +115,7 @@ export function HomeLayout() {
             )}
             <NavLink to={`${base}/notifications`} className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}>
               <IconBell size={20} />
-              {!!unreadCount && (
-                <span aria-hidden className="absolute -right-0.5 -top-0.5 rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
+              {!!unreadCount && <NavBadge count={unreadCount} className="absolute -right-0.5 -top-0.5" />}
             </NavLink>
             <NavLink to={`${base}/profile`} className="rounded-full" aria-label="My profile">
               <Avatar name={membership.fullName} src={membership.avatarUrl} size="sm" />
@@ -179,7 +166,7 @@ export function HomeLayout() {
         {barLinks.map((i) => {
           const badge = badgeFor(i.section);
           return (
-            <NavLink key={i.to} to={i.to} aria-label={badge?.label} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary" : "text-slate-500")}>
+            <NavLink key={i.to} to={i.to} aria-label={badge?.label} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary-ink" : "text-slate-500")}>
               <span className="relative" aria-hidden>
                 <NavIcon name={i.icon} size={20} />
                 {badge && <NavBadge count={badge.count} className="absolute -right-3 -top-1.5" />}
@@ -194,12 +181,12 @@ export function HomeLayout() {
           aria-haspopup="dialog"
           aria-expanded={moreOpen}
           aria-current={onSheetRoute ? "true" : undefined}
-          aria-label={moreCount > 0 ? `More, ${moreBadges.map((b) => b.label).join(", ")}` : undefined}
-          className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", moreOpen || onSheetRoute ? "text-primary" : "text-slate-500")}
+          aria-label={moreBadge.count > 0 ? moreBadge.label : undefined}
+          className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", moreOpen || onSheetRoute ? "text-primary-ink" : "text-slate-500")}
         >
           <span className="relative" aria-hidden>
             <NavIcon name="more" size={20} />
-            {moreCount > 0 && <NavBadge count={moreCount} className="absolute -right-3 -top-1.5" />}
+            {moreBadge.count > 0 && <NavBadge count={moreBadge.count} className="absolute -right-3 -top-1.5" />}
           </span>
           More
         </button>
@@ -238,20 +225,5 @@ export function HomeLayout() {
         </div>
       </Modal>
     </div>
-  );
-}
-
-const NAV_BADGE_TONES = {
-  danger: "bg-red-500 text-white",
-  // Work waiting for an admin, in the console's amber.
-  warning: "bg-amber-100 text-amber-800",
-};
-
-/** A count on a navigation link. Hidden from screen readers, because the link's own name says it. */
-function NavBadge({ count, tone = "danger", className }: { count: number; tone?: keyof typeof NAV_BADGE_TONES; className?: string }) {
-  return (
-    <span aria-hidden className={clsx("rounded-full px-1.5 text-[10px] font-semibold leading-4", NAV_BADGE_TONES[tone], className)}>
-      {count > 99 ? "99+" : count}
-    </span>
   );
 }

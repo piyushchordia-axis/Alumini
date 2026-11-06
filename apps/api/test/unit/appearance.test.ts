@@ -123,8 +123,8 @@ describe("pageInk", () => {
   });
 
   it("reads at 4.5:1, under a current link's wash, on the plain page, a tint and over the darkest photo the veil lets through", () => {
-    // The last three are brands whose own wash (bg-primary/12) is darker than their ink's, on the plain page, the tint
-    // and a photo in turn, which the colour cube's 17 steps pass between.
+    // The last three are brands whose own 12% wash is darker than their ink's, on the plain page, the tint and a photo
+    // in turn, which the colour cube's 17 steps pass between.
     for (const primary of [...SEEDED, "#111111", "#fde047", "#ffffff", "#dc0f41", "#d20a64", "#007d55"]) {
       const institution = { primaryColor: primary, coverImageUrl: COVER };
       for (const [page, darkest] of [
@@ -133,10 +133,13 @@ describe("pageInk", () => {
         [pageBackdrop({ backdrop: "COVER" }, institution), mixHex(PLAIN_PAGE_COLOR, "#000000", BACKDROP_SCRIM)],
       ] as const) {
         const ink = pageInk(primary, page);
-        // The web sidebar's current link: the brand at 12% (bg-primary/12) on the page.
+        // The brand at 12% on the page, one of the two washes pageInk reads under.
         const under = mixHex(primary, darkest ?? page.color, 0.12);
         expect(contrastRatio(ink, under), `${primary} on ${page.imageUrl ? "a photo" : page.dimText ? "its tint" : "the plain page"}`).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(ink, darkest ?? page.color)).toBeGreaterThanOrEqual(4.5);
+        // The web's current links (the sidebar, the More sheet) on the opaque chosen-state wash: the seeded Samaj,
+        // college and school brands' own ink reads at only 4.45 to 4.49 there.
+        expect(contrastRatio(ink, brandTones(primary).wash), `${primary}'s current link`).toBeGreaterThanOrEqual(4.5);
       }
     }
     // A brand that already reads keeps its colour on the tint.
@@ -157,6 +160,9 @@ describe("pageInk", () => {
         [pageBackdrop({ backdrop: "COVER" }, institution), darkPhoto, "a photo"],
       ] as const) {
         expect(contrastRatio(pageInk(primary, page), mixHex(primary, darkest, 0.12)), `${primary} on ${where}`).toBeGreaterThanOrEqual(4.5);
+        // The web's current links, in the sidebar and the More sheet, on the opaque chosen-state wash, where the ink
+        // alone is sure only of 3:1.
+        expect(contrastRatio(pageInk(primary, page), brandTones(primary).wash), `${primary}'s current link on ${where}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });

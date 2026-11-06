@@ -1,4 +1,4 @@
-import { chatAvailable, MEMBER_SECTIONS, splitSections, type MemberSection } from "@illuminize/shared";
+import { MEMBER_SECTIONS, STATUS_TONES, type MemberSection } from "@illuminize/shared";
 import type { ChatBadgeLabel } from "@illuminize/shared/chat";
 import { Tabs, useIsFocused, useSegments } from "expo-router";
 import { PlatformPressable } from "expo-router/react-navigation";
@@ -6,10 +6,8 @@ import type { ReactNode } from "react";
 import type { ColorValue, ViewStyle } from "react-native";
 import { Platform, View } from "react-native";
 import { NavIcon, type NavIconName } from "@/components/icons";
-import { useChatBadge } from "@/hooks/useChat";
-import { useMembership } from "@/hooks/useMembership";
-import { useMentorsWayOut } from "@/lib/mentors";
-import { SECTION_TABS, sectionBadges } from "@/lib/sections";
+import { useMemberSections } from "@/hooks/useMemberSections";
+import { SECTION_TABS } from "@/lib/sections";
 import { colors, useTheme } from "@/theme";
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: "600" } as const;
@@ -37,29 +35,24 @@ export const unstable_settings = { anchor: "feed" };
  */
 const NO_BUTTON = { tabBarButton: () => null, tabBarItemStyle: { display: "none" } } as const;
 
-const BADGE_STYLE = { backgroundColor: colors.danger, color: "#fff", fontSize: 10, fontWeight: "700" } as const;
+const BADGE_STYLE = { backgroundColor: STATUS_TONES.danger.solid, color: "#fff", fontSize: 10, fontWeight: "700" } as const;
 
 function TabIcon({ name, active, color }: { name: NavIconName; active: boolean; color?: ColorValue }) {
   return <NavIcon name={name} size={22} color={active ? color : colors.muted} />;
 }
 
 /** On the icon, so the label below keeps its room. The tab's name carries the count for screen readers. */
-const tabBadge = (badge: ChatBadgeLabel | undefined) =>
+const tabBadge = (badge: ChatBadgeLabel | null) =>
   badge && badge.count > 0 ? { tabBarAccessibilityLabel: badge.label, tabBarBadge: badge.count > 99 ? "99+" : badge.count, tabBarBadgeStyle: BADGE_STYLE } : {};
 
 /** The member tabs: four sections, then More. Each tab's stack draws its own header (see AppHeader). */
 export default function TabsLayout() {
-  const { tenant, membership } = useMembership();
   const theme = useTheme();
   const segments: string[] = useSegments();
-  // Mentors stays behind More while this member can't use mentorship but still has something there to leave.
-  const { bar, overflow } = splitSections(tenant.settings.features, membership.chatEligible, { mentorsWayOut: useMentorsWayOut() });
-  const badgeData = useChatBadge(tenant.slug, chatAvailable(tenant.settings.features, membership.chatEligible)).data;
-  const badges = sectionBadges(badgeData);
-  // A section behind More has its badge in the More hub, so More says there's something inside, and what.
-  const moreBadges = overflow.map((s) => badges[s]).filter((b): b is ChatBadgeLabel => !!b && b.count > 0);
-  const moreBadge: ChatBadgeLabel = { count: moreBadges.reduce((sum, b) => sum + b.count, 0), label: `More, ${moreBadges.map((b) => b.label).join(", ")}` };
-  const badgeFor = (section: MemberSection) => tabBadge(bar.includes(section) ? badges[section] : undefined);
+  // Mentors stays behind More while this member can't use mentorship but still has something there to leave. A section
+  // behind More has its badge in the More hub, so More's says there's something inside, and what.
+  const { bar, overflow, badgeFor, moreBadge } = useMemberSections();
+  const tabBadgeFor = (section: MemberSection) => tabBadge(bar.includes(section) ? badgeFor(section) : null);
   // Mentors stays reachable while it's off for this member, with no button, so a link to it (a push, say) still opens the
   // screen that says so (see the Mentors screen). Declared after the profile, so a link to a section that's off never
   // redirects to it. With something there to leave, it's in More instead, above.
@@ -75,7 +68,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: theme.primary,
+        tabBarActiveTintColor: theme.primaryInk,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: LABEL_STYLE,
         tabBarStyle: { backgroundColor: "rgba(255,255,255,0.96)", borderTopColor: colors.border },
@@ -93,7 +86,7 @@ export default function TabsLayout() {
             options={{
               title: label,
               tabBarIcon: ({ focused, color }) => <TabIcon name={icon} active={focused} color={color} />,
-              ...badgeFor(section),
+              ...tabBadgeFor(section),
               ...visibility,
             }}
           />
@@ -108,8 +101,8 @@ export default function TabsLayout() {
         options={{
           title: "More",
           ...tabBadge(moreBadge),
-          tabBarIcon: ({ focused, color }) => <TabIcon name="more" active={focused || moreActive} color={moreActive ? theme.primary : color} />,
-          tabBarLabelStyle: moreActive ? { ...LABEL_STYLE, color: theme.primary } : LABEL_STYLE,
+          tabBarIcon: ({ focused, color }) => <TabIcon name="more" active={focused || moreActive} color={moreActive ? theme.primaryInk : color} />,
+          tabBarLabelStyle: moreActive ? { ...LABEL_STYLE, color: theme.primaryInk } : LABEL_STYLE,
           tabBarButton: (props) => <PlatformPressable {...props} aria-selected={moreActive || props["aria-selected"]} />,
         }}
       />

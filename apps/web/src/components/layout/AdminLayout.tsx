@@ -69,7 +69,7 @@ export function AdminLayout() {
               <NavLink key={i.to} to={i.to} className={linkClass}>
                 <NavIcon name={i.icon} size={16} />
                 <span className="whitespace-nowrap">{i.label}</span>
-                {!!i.count && <span aria-label={`${i.count} waiting`} className="ml-auto rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800">{i.count}</span>}
+                {!!i.count && <span aria-label={`${i.count} waiting`} className="ml-auto rounded-full border border-tone-warning-edge bg-tone-warning-fill px-[5px] text-xs font-semibold text-tone-warning-ink">{i.count}</span>}
               </NavLink>
             ))}
           </nav>

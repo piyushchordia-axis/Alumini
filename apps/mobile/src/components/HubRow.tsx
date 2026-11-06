@@ -1,11 +1,14 @@
+import { STATUS_TONES } from "@illuminize/shared";
 import { Pressable, Text, View } from "react-native";
 import { IconChevronRight, NavIcon, type NavIconName } from "@/components/icons";
 import { colors, spacing } from "@/theme";
 
+// The shared status tones, as the web's NavBadge draws them. The edge keeps the amber count's shape on a white row.
 const COUNT_TONES = {
-  danger: { bg: colors.danger, fg: "#fff" },
+  // Something unread: white on the danger solid.
+  danger: { bg: STATUS_TONES.danger.solid, fg: "#fff", edge: STATUS_TONES.danger.solid },
   // Work waiting for an admin, in the web console's amber.
-  warning: { bg: "#fef3c7", fg: "#92400e" },
+  warning: { bg: STATUS_TONES.warning.fill, fg: STATUS_TONES.warning.ink, edge: STATUS_TONES.warning.edge },
 };
 
 /**
@@ -44,7 +47,7 @@ export function HubRow({
       <NavIcon name={icon} size={dense ? 18 : 20} color={tint} />
       <Text style={{ flex: 1, fontSize: dense ? 14 : 15, fontWeight: "600", color: tint }}>{label}</Text>
       {count > 0 && (
-        <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: tone.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
+        <View style={{ minWidth: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: tone.edge, backgroundColor: tone.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
           <Text style={{ color: tone.fg, fontSize: 11, fontWeight: "700" }}>{count > 99 ? "99+" : count}</Text>
         </View>
       )}

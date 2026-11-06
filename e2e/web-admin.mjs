@@ -961,10 +961,11 @@ try {
       const box = await admin.boundingBox();
       if (!box || box.width < 44 || box.height < 44) throw new Error(`the header's Admin link is ${box?.width}×${box?.height}px, under 44px`);
       await expectSvgNoEmoji(admin, "the header's Admin link");
-      // The count shows, in the amber of work waiting rather than the red of unread.
+      // The count shows, in the amber of work waiting rather than the red of unread, readable.
       const badge = admin.getByText(String(waiting), { exact: true });
       await badge.waitFor();
-      if (!/\bbg-amber-/.test((await badge.getAttribute("class")) ?? "")) throw new Error("the header's Admin link's count isn't amber");
+      if (!/\bbg-tone-warning-fill\b/.test((await badge.getAttribute("class")) ?? "")) throw new Error("the header's Admin link's count isn't amber");
+      await expectReadable(badge, "the header's Admin link's count");
       // The sidebar's row, on a wider screen, carries the same count.
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.locator('aside nav[aria-label="Main"]').getByRole("link", { name, exact: true }).waitFor();
