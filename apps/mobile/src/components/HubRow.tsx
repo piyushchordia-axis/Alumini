@@ -1,7 +1,9 @@
-import { STATUS_TONES } from "@illuminize/shared";
-import { Pressable, Text, View } from "react-native";
+import { GREYS, STATUS_TONES } from "@illuminize/shared";
+import { useId } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { IconChevronRight, NavIcon, type NavIconName } from "@/components/icons";
-import { colors, spacing } from "@/theme";
+import { describedBy } from "@/components/ui";
+import { colors, radius, spacing } from "@/theme";
 
 // The shared status tones, as the web's NavBadge draws them. The edge keeps the amber count's shape on a white row.
 const COUNT_TONES = {
@@ -14,11 +16,13 @@ const COUNT_TONES = {
 /**
  * One row of a hub (More, the admin console's home). A count shows beside it, and its accessible name says what it
  * counts, such as "Groups, 2 invitations". `danger` is a destructive row, such as Sign out. `dense` is the console's
- * tighter row, still a 44-point target.
+ * tighter row, still a 44-point target. With a `description` it's a described row, as More's are: its icon in a well and
+ * the line under its name, read after the name (the hint on a phone, aria-describedby in the browser build).
  */
 export function HubRow({
   icon,
   label,
+  description,
   danger,
   count = 0,
   countLabel,
@@ -28,6 +32,7 @@ export function HubRow({
 }: {
   icon: NavIconName;
   label: string;
+  description?: string;
   danger?: boolean;
   count?: number;
   countLabel?: string;
@@ -35,6 +40,7 @@ export function HubRow({
   dense?: boolean;
   onPress: () => void;
 }) {
+  const descriptionId = useId();
   const tint = danger ? colors.danger : colors.text;
   const tone = COUNT_TONES[countTone];
   return (
@@ -42,12 +48,27 @@ export function HubRow({
       onPress={onPress}
       accessibilityRole="link"
       accessibilityLabel={count > 0 && countLabel ? countLabel : label}
-      style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: dense ? 44 : 48, opacity: pressed ? 0.6 : 1 })}
+      accessibilityHint={description}
+      {...(description ? describedBy(descriptionId) : {})}
+      style={({ pressed }) => [styles.row, description ? styles.described : { minHeight: dense ? 44 : 48 }, { opacity: pressed ? 0.6 : 1 }]}
     >
-      <NavIcon name={icon} size={dense ? 18 : 20} color={tint} />
-      <Text style={{ flex: 1, fontSize: dense ? 14 : 15, fontWeight: "600", color: tint }}>{label}</Text>
+      {description ? (
+        <View style={styles.well}>
+          <NavIcon name={icon} size={20} color={GREYS.body} />
+        </View>
+      ) : (
+        <NavIcon name={icon} size={dense ? 18 : 20} color={tint} />
+      )}
+      <View style={styles.text}>
+        <Text style={{ fontSize: dense ? 14 : 15, fontWeight: "600", color: tint }}>{label}</Text>
+        {description ? (
+          <Text nativeID={descriptionId} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+      </View>
       {count > 0 && (
-        <View style={{ minWidth: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: tone.edge, backgroundColor: tone.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
+        <View style={[styles.count, { borderColor: tone.edge, backgroundColor: tone.bg }]}>
           <Text style={{ color: tone.fg, fontSize: 11, fontWeight: "700" }}>{count > 99 ? "99+" : count}</Text>
         </View>
       )}
@@ -55,3 +76,14 @@ export function HubRow({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  // Taller than a plain row, so a line that wraps at a large text size still has room.
+  described: { minHeight: 56, paddingVertical: spacing.xs },
+  // Slate-100 under a slate-700 icon, as the web's More sheet draws it.
+  well: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: STATUS_TONES.neutral.fill, alignItems: "center", justifyContent: "center" },
+  text: { flex: 1, minWidth: 0 },
+  description: { fontSize: 13, lineHeight: 18, color: colors.muted, marginTop: 1 },
+  count: { minWidth: 20, height: 20, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 },
+});

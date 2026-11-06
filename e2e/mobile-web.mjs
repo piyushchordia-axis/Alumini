@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -622,6 +622,51 @@ try {
     await barTab("More").click();
     await page.waitForURL("**/t/demo-university/more");
     for (const row of ["Funding", "My profile", "Switch institution", "Sign out"]) await hubRow(row).waitFor();
+    // Grouped as the web's More sheet is, each row with a line under its name that is its description, not its name.
+    const headings = await page.getByRole("heading", { level: 2 }).locator("visible=true").allInnerTexts();
+    const groups = headings.filter((h) => ["Connect", "Community", "You"].includes(h));
+    if (groups.join() !== "Connect,Community,You") throw new Error(`More's groups are ${groups.join(", ") || "missing"}, expected Connect, Community, You`);
+    await expectDescription(hubRow("Funding"), "Members raising and investing", "More's Funding row");
+    await expectDescription(hubRow("My posts"), "Everything you've shared", "More's My posts row");
+    await expectSvgNoEmoji(hubRow("Funding"), "More's Funding row");
+    for (const row of ["Events", "Funding", "My posts", "Sign out"]) {
+      const box = await hubRow(row).boundingBox();
+      if (!box || box.height < 44) throw new Error(`More's ${row} row is ${box?.height}px tall, under 44`);
+    }
+    await shot("m09a-more-hub");
+    // It scrolls, so Sign out is in reach on a small phone. Not scrollIntoView, which also scrolls the tab navigator's
+    // overflow: hidden box, as a finger can't: the rows have to sit in an area that scrolls (a ScrollView's
+    // overflow-y: auto) and is taller inside than out, and the wheel over it has to bring Sign out up, uncovered.
+    await page.setViewportSize({ width: 320, height: 568 });
+    try {
+      const signOut = hubRow("Sign out");
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+      const area = await signOut.evaluate((el) => {
+        for (let box = el.parentElement; box; box = box.parentElement) {
+          const { overflowY } = getComputedStyle(box);
+          if (overflowY !== "auto" && overflowY !== "scroll") continue;
+          const { left, top, width } = box.getBoundingClientRect();
+          return { left, top, width, bottom: Math.min(top + box.clientHeight, window.innerHeight), hidden: box.scrollHeight - box.clientHeight };
+        }
+        return null;
+      });
+      if (!area) throw new Error("More's rows are in no area that scrolls, so on a small phone Sign out is out of reach");
+      if (area.hidden <= 0) throw new Error("More fits a 320×568 screen whole, so this check can't show that it scrolls");
+      const inReach = () =>
+        signOut.evaluate((el, { top, bottom }) => {
+          const r = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return r.top >= top && r.bottom <= bottom && !!hit && el.contains(hit);
+        }, area);
+      await page.mouse.move(area.left + area.width / 2, (area.top + area.bottom) / 2);
+      for (let i = 0; i < 20 && !(await inReach()); i++) {
+        await page.mouse.wheel(0, 200);
+        await page.waitForTimeout(100);
+      }
+      if (!(await inReach())) throw new Error(`scrolling More doesn't bring Sign out into a 320×568 screen (it's at ${(await signOut.boundingBox())?.y})`);
+    } finally {
+      await page.setViewportSize({ width: 390, height: 844 });
+    }
     await hubRow("My posts").click();
     await page.waitForURL("**/t/demo-university/profile/my-content");
     await selectedBarTab("More").waitFor();
@@ -1709,7 +1754,10 @@ try {
     off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
     await mentee.goto(`${app}/feed`);
     await tabBar(mentee).filter({ hasText: "More" }).first().click();
-    await shown(mentee.getByRole("link", { name: "Mentors", exact: true })).click();
+    // Its line says what's left there, not what the switched-off section offered.
+    const mentorsRow = shown(mentee.getByRole("link", { name: "Mentors", exact: true }));
+    await expectDescription(mentorsRow, "Your requests and mentorships", "More's Mentors row, kept as a way out");
+    await mentorsRow.click();
     await mentee.waitForURL(/\/t\/demo-university\/mentors$/);
     await shown(mentee.getByText("has switched mentorship off", { exact: false })).waitFor();
     await tab(mentee, "Sent").click();
@@ -2639,6 +2687,7 @@ try {
     const name = await row.getAttribute("aria-label");
     if (name !== "Admin console, 2 waiting") throw new Error(`the More row is named "${name}", expected "Admin console, 2 waiting"`);
     await expectSvgNoEmoji(row, "the More hub's Admin console row");
+    await expectDescription(row, "Members, moderation and settings", "the More hub's Admin console row");
     await row.click();
     await page.waitForURL("**/t/shri-gujarati-samaj/admin");
 
@@ -3459,7 +3508,8 @@ try {
     await search.fill("Jignesh");
     await page.waitForURL(/q=Jignesh/);
     await shown(page.getByText("Jignesh Patel", { exact: true })).waitFor();
-    await shown(page.getByText("You", { exact: true })).waitFor();
+    // In the Approved list, not More's "You" heading, which may be mounted under the console.
+    await shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByText("You", { exact: true }).waitFor();
     if (await page.getByRole("button", { name: /Jignesh Patel$/ }).locator("visible=true").count()) throw new Error("the admin's own row offers actions on himself");
     await memberButton("Clear search").click();
     await memberButton("Suspend Parth Joshi").waitFor();

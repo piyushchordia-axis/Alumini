@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1003,6 +1003,16 @@ try {
       await badge.waitFor();
       if (!/\bbg-tone-warning-fill\b/.test((await badge.getAttribute("class")) ?? "")) throw new Error("the header's Admin link's count isn't amber");
       await expectReadable(badge, "the header's Admin link's count");
+      // The More sheet has it under You, with the same name, its line and the amber count.
+      await page.locator('nav[aria-label="Main"] button:has-text("More")').click();
+      const sheetRow = page.getByRole("dialog").getByRole("group", { name: "You", exact: true }).getByRole("link", { name, exact: true });
+      await sheetRow.waitFor();
+      await expectDescription(sheetRow, "Members, moderation and settings", "the More sheet's Admin console tile");
+      await expectSvgNoEmoji(sheetRow, "the More sheet's Admin console tile");
+      const sheetCount = sheetRow.getByText(String(waiting), { exact: true });
+      if (!/\bbg-tone-warning-fill\b/.test((await sheetCount.getAttribute("class")) ?? "")) throw new Error("the More sheet's Admin console count isn't amber");
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "detached" });
       // The sidebar's row, on a wider screen, carries the same count.
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.locator('aside nav[aria-label="Main"]').getByRole("link", { name, exact: true }).waitFor();

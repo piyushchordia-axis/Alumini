@@ -184,9 +184,9 @@ before showing the demo.
   and neither are chat messages, which never reach moderation at all. Tenant admins' own content is always published.
   Members can report content; admins resolve reports by removing content or dismissing them.
 - The **admin console** is in the web app and the phone app. On the web, the header links to it at every width, and the
-  link, the sidebar and the More sheet show an amber count of what's waiting (pending members, content to review, open
-  reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
-  profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
+  link, the sidebar and the More sheet (under **You**) show an amber count of what's waiting (pending members, content
+  to review, open reports and chat reports). In the phone app, admins open it from More, whose row under You carries
+  the same count, or from My profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
   the member's page, content waiting on the moderation queue with that item open, a report on the open reports, and a
   chat report on the open chat reports, scrolled to it but never opened. Every page of the web console is in the phone
   app too: the members list, moderation and reports are there, with the same status tabs and counts, search and
@@ -281,6 +281,22 @@ which would give it away). Both apps hide every entry point when these are false
 Other members never see a current pupil's profile links or Open to (admins still see any that are stored, on the
 member's page and in the members CSV), the forms don't ask them for either, and every save clears their Open to (see
 **Profiles and onboarding**).
+
+### Navigation on phones
+
+On a computer the web app's sidebar lists every section the member can open. On a phone (the phone app, and the web
+app below its `md` width) the bar shows the first four in priority order, and **More** holds the rest with the
+member's own links (`splitSections` in `packages/shared/src/lib/sections.ts`, read through one `useMemberSections` hook
+per app, so feature switches, current pupils and Mentors kept as a way out apply everywhere alike).
+
+More is a hub of described rows in groups, the same on both apps (the phone's More tab, the web's More sheet):
+**Connect** (Groups and Mentors at a university with everything on), **Community** (Events, Businesses and Funding),
+then **You** (My posts, My profile and, for an admin, Admin console with its amber count), then Switch institution and
+Sign out. A group with nothing in it is left out, so a current pupil sees Community and You. Each row has its icon in
+a well and a line under its name ("Members raising and investing"), which screen readers hear as its description after
+the name; the name stays the label, or the label with its count ("Groups, 1 invitation"). The lines are
+`SECTION_DESCRIPTIONS` and `MORE_HUB_ROWS`, and a unit test keeps every one free of another link's name. The phone's
+More scrolls, so Sign out stays in reach on a small phone at a large text size.
 
 ### Profiles and onboarding
 

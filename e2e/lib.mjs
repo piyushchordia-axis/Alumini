@@ -255,6 +255,22 @@ export async function fitsPhone(where, content) {
 }
 
 /**
+ * Fails unless `locator` (one element) is described by exactly `text`: what its aria-describedby points at, which a
+ * screen reader reads after its name. The phone app's rows put it there in the browser build, which ignores
+ * accessibilityHint.
+ */
+export async function expectDescription(locator, text, where) {
+  const described = await locator.evaluate((el) =>
+    (el.getAttribute("aria-describedby") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+      .join(" "),
+  );
+  if (described !== text) throw new Error(`${where} is described as "${described}", expected "${text}"`);
+}
+
+/**
  * Fails unless `chip`, a chosen toggle in a tray (a reaction), looks chosen once any transition ends: laid over its tray
  * on the white card, it visibly differs from the tray alone and from the white card, and its icon is filled, in a
  * colour that isn't near-black (no seeded institution's colour is) and reads on the chip (3:1, WCAG 1.4.11). A chosen

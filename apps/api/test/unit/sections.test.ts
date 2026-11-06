@@ -1,4 +1,20 @@
-import { homeSection, MEMBER_SECTIONS, SECTION_LABELS, splitSections, TENANT_FEATURES, type MemberSection, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
+import {
+  HUB_GROUP_TITLES,
+  homeSection,
+  MEMBER_SECTIONS,
+  MENTORS_WAY_OUT_DESCRIPTION,
+  MORE_HUB_ROWS,
+  MORE_HUB_YOU_TITLE,
+  moreHubGroups,
+  SECTION_DESCRIPTIONS,
+  SECTION_LABELS,
+  sectionDescription,
+  splitSections,
+  TENANT_FEATURES,
+  type MemberSection,
+  type TenantFeature,
+  type TenantFeatures,
+} from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 /** Everything off except the named keys, so a rule reading the wrong key shows up. */
@@ -14,6 +30,79 @@ describe("SECTION_LABELS", () => {
   it("names every section once, as both apps' navigation and e2e read them", () => {
     expect(MEMBER_SECTIONS.map((s) => SECTION_LABELS[s])).toEqual(["Feed", "Messages", "Jobs", "Directory", "Events", "Groups", "Mentors", "Businesses", "Funding"]);
     expect(Object.keys(SECTION_LABELS).sort()).toEqual([...MEMBER_SECTIONS].sort());
+  });
+});
+
+describe("SECTION_DESCRIPTIONS", () => {
+  // Every name a link in the navigation goes by: the sections, More's own rows and the account's, More itself and the
+  // feed's shortcuts to what's behind it.
+  const NAV_NAMES = [...Object.values(SECTION_LABELS), ...Object.values(MORE_HUB_ROWS).map((r) => r.label), "Switch institution", "Sign out", "More", "Explore", "Upcoming events"];
+  // Each line with the name it sits under: a line may say its own row's name (Mentors' way out does), never another's.
+  const lines: [string, string][] = [
+    ...MEMBER_SECTIONS.map((s): [string, string] => [SECTION_LABELS[s], SECTION_DESCRIPTIONS[s]]),
+    [SECTION_LABELS.mentors, MENTORS_WAY_OUT_DESCRIPTION],
+    ...Object.values(MORE_HUB_ROWS).map((r): [string, string] => [r.label, r.description]),
+  ];
+
+  it("gives every section a line, short enough for one line on a phone", () => {
+    expect(Object.keys(SECTION_DESCRIPTIONS).sort()).toEqual([...MEMBER_SECTIONS].sort());
+    for (const [name, line] of lines) {
+      expect(line.length, name).toBeGreaterThan(0);
+      expect(line.length, `${name}: "${line}"`).toBeLessThanOrEqual(32);
+    }
+  });
+
+  // e2e (and a member) find a link by its text, such as a:has-text("Groups") (any case, anywhere in it), and every line
+  // sits inside its link.
+  it.each(lines)("never names another way through the app under %s: %s", (name, line) => {
+    for (const other of NAV_NAMES.filter((n) => n !== name)) expect(line.toLowerCase(), `"${line}" says "${other}"`).not.toContain(other.toLowerCase());
+  });
+
+  it("gives Mentors its way out's line only for a member it's open to as a way out", () => {
+    expect(sectionDescription("mentors")).toBe("Find a mentor, or become one");
+    expect(sectionDescription("mentors", { mentorsWayOut: false })).toBe("Find a mentor, or become one");
+    expect(sectionDescription("mentors", { mentorsWayOut: true })).toBe("Your requests and mentorships");
+    // The flag means nothing to another section.
+    expect(sectionDescription("funding", { mentorsWayOut: true })).toBe("Members raising and investing");
+  });
+});
+
+describe("moreHubGroups", () => {
+  it("groups everything behind More at a university with everything on: Connect, then Community, each in priority order", () => {
+    expect(moreHubGroups(splitSections(only(...TENANT_FEATURES), true).overflow)).toEqual([
+      { key: "connect", title: "Connect", sections: ["groups", "mentors"] },
+      { key: "community", title: "Community", sections: ["events", "businesses", "funding"] },
+    ]);
+  });
+
+  it("leaves Connect out for a current pupil, who has nothing in it", () => {
+    expect(moreHubGroups(splitSections(only(...TENANT_FEATURES), false).overflow)).toEqual([{ key: "community", title: "Community", sections: ["businesses", "funding"] }]);
+  });
+
+  it("puts Mentors in Connect when it's only there as a way out", () => {
+    expect(moreHubGroups(splitSections(only("feed", "messaging"), true, { mentorsWayOut: true }).overflow)).toEqual([{ key: "connect", title: "Connect", sections: ["mentors"] }]);
+    expect(moreHubGroups(splitSections(only(...TENANT_FEATURES), false, { mentorsWayOut: true }).overflow)).toEqual([
+      { key: "connect", title: "Connect", sections: ["mentors"] },
+      { key: "community", title: "Community", sections: ["businesses", "funding"] },
+    ]);
+  });
+
+  it("is empty with nothing behind More", () => {
+    expect(moreHubGroups([])).toEqual([]);
+    expect(moreHubGroups(splitSections(only("feed", "jobs", "directory", "events"), true).overflow)).toEqual([]);
+  });
+
+  it("has a place for every section, should any overflow, and keeps priority order whatever order it's given", () => {
+    expect(moreHubGroups([...MEMBER_SECTIONS].reverse())).toEqual([
+      { key: "connect", title: "Connect", sections: ["messages", "directory", "groups", "mentors"] },
+      { key: "community", title: "Community", sections: ["feed", "jobs", "events", "businesses", "funding"] },
+    ]);
+  });
+
+  it("titles More's own rows You, after the groups", () => {
+    expect(MORE_HUB_YOU_TITLE).toBe("You");
+    expect(Object.values(HUB_GROUP_TITLES)).not.toContain(MORE_HUB_YOU_TITLE);
+    expect(Object.values(MORE_HUB_ROWS).map((r) => r.label)).toEqual(["My posts", "My profile", "Admin console"]);
   });
 });
 

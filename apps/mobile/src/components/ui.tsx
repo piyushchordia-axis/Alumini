@@ -241,6 +241,13 @@ export function ChipSelect<T extends string>({
 export const toggleState = (on: boolean) => ({ "aria-selected": on, "aria-pressed": on }) as { "aria-selected": boolean };
 
 /**
+ * Describes a control by the element whose `nativeID` is `id`, in the browser build, which ignores accessibilityHint:
+ * pass the same text as the hint, which phones read. React Native's types omit aria-describedby, and phones have no use
+ * for it.
+ */
+export const describedBy = (id: string): Record<never, never> => (Platform.OS === "web" ? { "aria-describedby": id } : {});
+
+/**
  * A heading at `level`. The web build makes it an <h2>, <h3> and so on from aria-level, which React Native's types omit;
  * phones have one heading role and no levels.
  */

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, INSTITUTION_INITIALS, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, INSTITUTION_INITIALS, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1236,6 +1236,20 @@ try {
     await page.waitForSelector('[role="dialog"] >> text=Switch institution');
     if (!(await moreButton.getAttribute("class")).split(" ").includes("text-primary-ink")) throw new Error("More isn't highlighted while its sheet is open");
     if (await page.locator('[role="dialog"] a[aria-current="page"]').count()) throw new Error("a sheet link shows as current on Directory, which is on the bar");
+    // Grouped as the phone app's More is, each tile with a line under its name that is its description, not its name.
+    const groups = await page.locator('[role="dialog"] h3').allInnerTexts();
+    if (groups.join() !== "Connect,Community,You") throw new Error(`the sheet's groups are ${groups.join(", ")}, expected Connect, Community, You`);
+    const fundingTile = page.getByRole("dialog").getByRole("group", { name: "Community", exact: true }).getByRole("link", { name: "Funding", exact: true });
+    await expectDescription(fundingTile, "Members raising and investing", "the sheet's Funding tile");
+    await expectSvgNoEmoji(fundingTile, "the sheet's Funding tile");
+    // Hovered, the row turns the icon well's own grey: the well has to stand apart from it still, and the line to read.
+    await fundingTile.hover();
+    const well = await paintedColour(fundingTile.locator("span[aria-hidden]").first(), "backgroundColor");
+    if (Math.max(...well.colour.split(" ").map((c, i) => Math.abs(c - well.behind.split(" ")[i]))) < 10) throw new Error(`the hovered Funding tile's icon well (rgb ${well.colour}) melts into the row (rgb ${well.behind})`);
+    await expectReadable(page.locator(`[id="${await fundingTile.getAttribute("aria-describedby")}"]`), "the hovered Funding tile's line");
+    for (const box of await page.locator('[role="dialog"] a').evaluateAll((links) => links.map((a) => [a.innerText.split("\n")[0], a.getBoundingClientRect().height]))) {
+      if (box[1] < 44) throw new Error(`the sheet's ${box[0]} link is ${box[1]}px tall, under 44px`);
+    }
     await page.click('[role="dialog"] a:has-text("Events")');
     await page.waitForURL(/\/app\/events$/);
     await page.waitForSelector("text=Mumbai alumni coffee meetup");
@@ -2048,6 +2062,14 @@ try {
     const off = await scriptFeatures(mentee, "demo-university");
     off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
     await mentee.goto(`${app}/feed`);
+    // On a phone, the sheet's Mentors tile says what's left there, not what the switched-off section offered.
+    await mentee.setViewportSize({ width: 390, height: 844 });
+    await moreButton.click();
+    const mentorsTile = mentee.getByRole("dialog").getByRole("group", { name: "Connect", exact: true }).getByRole("link", { name: "Mentors", exact: true });
+    await expectDescription(mentorsTile, "Your requests and mentorships", "the sheet's Mentors tile, kept as a way out");
+    await mentee.keyboard.press("Escape");
+    await mentee.getByRole("dialog").waitFor({ state: "detached" });
+    await mentee.setViewportSize({ width: 1280, height: 900 });
     await mentee.locator('nav[aria-label="Main"]:visible a[href$="/app/mentors"]').click();
     await mentee.waitForURL(/\/app\/mentors$/);
     await mentee.getByText("has switched mentorship off", { exact: false }).waitFor();

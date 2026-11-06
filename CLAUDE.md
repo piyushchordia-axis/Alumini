@@ -21,8 +21,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React, the navigation's badges (`sectionBadges`, `moreBadgeLabel`) and `chat/empty.ts` what an empty inbox says
   and offers (`emptyChatsHint`, `emptyChatsActions`) and an empty thread's line (`emptyThreadText`);
-  `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections and their
-  names (`SECTION_LABELS`);
+  `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections, their
+  names (`SECTION_LABELS`) and lines (`SECTION_DESCRIPTIONS`, `sectionDescription`) and More's groups
+  (`moreHubGroups`, `MORE_HUB_ROWS`);
   `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
@@ -238,6 +239,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `text-primary-ink` stays for text on white: the web bottom bar and the phone's tabs tint in the ink
     (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work
     waiting in the warning fill, edge and ink (web `NavBadge`, the bell included; the phone's tab badges and `HubRow`).
+    More (the phone's More tab, the web's phone sheet) groups what's behind it (`moreHubGroups`: Connect, Community,
+    then You and the account's rows) in described rows: the phone's `HubRow description`, the web's `SheetTile`. A row's
+    line is its description, never part of its name, which stays the label or its count's: the phone gives it as the
+    hint and, because react-native-web ignores `accessibilityHint`, through `describedBy` (`components/ui.tsx`) to a
+    `nativeID`. No line names another nav label (`sections.test.ts`), as e2e finds links by their text; the phone's
+    More scrolls, so Sign out stays in reach.
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
     way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row
@@ -303,7 +310,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   layout hides unfocused ones (`detachInactiveScreens` + focused-only `display`) so search chrome cannot stack.
 - react-native-web ignores `accessibilityState`: use `aria-checked` on checkboxes and radios and `aria-selected` on
   tabs so state is exposed on the web build. A toggle button needs `toggleState` (`components/ui.tsx`), which adds
-  `aria-pressed`, because `aria-selected` isn't valid on `role="button"` in a browser.
+  `aria-pressed`, because `aria-selected` isn't valid on `role="button"` in a browser. It ignores `accessibilityHint`
+  too: a description that matters also goes through `describedBy(id)` to a `nativeID`, as `HubRow` does.
 - A FlatList hands its `ListEmptyComponent` a `style` (an inverted list's flip back the right way up) and an `onLayout`.
   `EmptyState` takes neither, so in a list put it in a plain `View`, or an inverted thread draws it upside down.
 - `Alert.alert` does nothing on the web export and e2e dismisses `window.confirm`: new flows use `ConfirmSheet` (mobile)

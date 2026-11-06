@@ -1,10 +1,11 @@
-import { adminConsoleLabel, adminWaitingCount, chatAvailable, pageBackdrop, pageInk, parseHex } from "@illuminize/shared";
+import { adminConsoleLabel, adminWaitingCount, chatAvailable, MORE_HUB_ROWS, MORE_HUB_YOU_TITLE, moreHubGroups, pageBackdrop, pageInk, parseHex, sectionDescription } from "@illuminize/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState, type CSSProperties } from "react";
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { IconBell, IconDashboard, NavIcon, type NavIconName } from "@/components/icons";
 import { NavBadge } from "@/components/layout/NavBadge";
+import { SheetGroup, SheetTile } from "@/components/layout/SheetTile";
 import { Avatar, Modal } from "@/components/ui";
 import { useChatScope } from "@/hooks/useChat";
 import { useMemberSections } from "@/hooks/useMemberSections";
@@ -29,7 +30,7 @@ export function HomeLayout() {
   const { tenant, membership, isTenantAdmin } = useMembership();
   const base = `/t/${tenant.slug}/app`;
   // On a phone a section in the sheet has its badge there, so More's badge says there's something inside.
-  const { bar, overflow, toLink, badgeFor, moreBadge } = useMemberSections();
+  const { bar, overflow, toLink, badgeFor, moreBadge, mentorsWayOut } = useMemberSections();
   const barLinks = bar.map(toLink);
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];
@@ -72,9 +73,8 @@ export function HomeLayout() {
       "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-[var(--duration-fast)]",
       isActive ? "bg-primary-wash font-semibold text-page-ink ring-1 ring-inset ring-primary-ring" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800",
     );
+  // The sheet's account rows. Its other links are SheetTiles, chosen the same way as linkClass.
   const sheetRow = "flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium";
-  const sheetLinkClass = ({ isActive }: { isActive: boolean }) =>
-    clsx(sheetRow, isActive ? "bg-primary-wash font-semibold text-page-ink ring-1 ring-inset ring-primary-ring" : "text-slate-700 hover:bg-slate-100");
   // The member's own background. Set here, on the member app's root, and not on the document, so the admin console and
   // the platform console (other layouts) stay plain. On a tint or a photo (dimText), grey text on the page steps one
   // shade darker (index.css). Brand text on the page takes pageInk on every page, the plain one included, where a pale
@@ -193,35 +193,38 @@ export function HomeLayout() {
       </nav>
 
       <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title={tenant.shortName ?? tenant.name}>
-        {/* Following any link in the sheet closes it. */}
-        <div className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setMoreOpen(false)}>
-          {overflowLinks.map((i) => {
-            const badge = badgeFor(i.section);
-            return (
-              <NavLink key={i.to} to={i.to} className={sheetLinkClass} aria-label={badge?.label}>
-                <NavLabel icon={i.icon} label={i.label} />
-                {badge && <NavBadge count={badge.count} className="ml-auto" />}
-              </NavLink>
-            );
-          })}
-          <NavLink to={`${base}/my-content`} className={sheetLinkClass}>
-            <NavLabel icon="posts" label="My posts" />
-          </NavLink>
-          <NavLink to={`${base}/profile`} className={sheetLinkClass}>
-            <NavLabel icon="profile" label="My profile" />
-          </NavLink>
-          {isTenantAdmin && (
-            <NavLink to={`/t/${tenant.slug}/admin`} className={sheetLinkClass} aria-label={adminWaiting > 0 ? adminLabel : undefined}>
-              <NavLabel icon="dashboard" label="Admin console" />
-              {adminWaiting > 0 && <NavBadge count={adminWaiting} tone="warning" className="ml-auto" />}
+        {/* Following any link in the sheet closes it. The phone app's More has the same groups and lines. */}
+        <div className="space-y-4" onClick={(e) => (e.target as HTMLElement).closest("a") && setMoreOpen(false)}>
+          {moreHubGroups(overflow).map((group) => (
+            <SheetGroup key={group.key} title={group.title}>
+              {group.sections.map((section) => {
+                const i = toLink(section);
+                const badge = badgeFor(section);
+                return <SheetTile key={i.to} to={i.to} icon={i.icon} label={i.label} description={sectionDescription(section, { mentorsWayOut })} name={badge?.label} badge={badge && <NavBadge count={badge.count} />} />;
+              })}
+            </SheetGroup>
+          ))}
+          <SheetGroup title={MORE_HUB_YOU_TITLE}>
+            <SheetTile to={`${base}/my-content`} icon="posts" {...MORE_HUB_ROWS.myPosts} />
+            <SheetTile to={`${base}/profile`} icon="profile" {...MORE_HUB_ROWS.myProfile} />
+            {isTenantAdmin && (
+              <SheetTile
+                to={`/t/${tenant.slug}/admin`}
+                icon="dashboard"
+                {...MORE_HUB_ROWS.adminConsole}
+                name={adminWaiting > 0 ? adminLabel : undefined}
+                badge={adminWaiting > 0 && <NavBadge count={adminWaiting} tone="warning" />}
+              />
+            )}
+          </SheetGroup>
+          <div className="space-y-1 border-t border-slate-200 pt-3">
+            <NavLink to="/?switch=1" className={clsx(sheetRow, "text-slate-700 hover:bg-slate-100")}>
+              <NavLabel icon="switch" label="Switch institution" />
             </NavLink>
-          )}
-          <NavLink to="/?switch=1" className={sheetLinkClass({ isActive: false })}>
-            <NavLabel icon="switch" label="Switch institution" />
-          </NavLink>
-          <button type="button" className={clsx(sheetRow, "w-full text-left text-red-600 hover:bg-slate-100")} onClick={() => void signOut()}>
-            <NavLabel icon="signOut" label="Sign out" />
-          </button>
+            <button type="button" className={clsx(sheetRow, "w-full text-left text-red-600 hover:bg-slate-100")} onClick={() => void signOut()}>
+              <NavLabel icon="signOut" label="Sign out" />
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

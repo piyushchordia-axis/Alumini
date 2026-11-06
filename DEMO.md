@@ -208,8 +208,9 @@ apps match.
 
 Demo University now has **Messages**, **Groups**, **Mentors** and **Businesses** too, and referral requests inside
 **Jobs**. On a computer every section is in the menu on the left. On a phone, or a narrow window, the bar at the bottom
-shows four sections and **More** holds the rest (Events, Groups, Mentors, Businesses and Funding), with your posts,
-profile and sign out.
+shows four sections and **More** holds the rest, grouped, with a line under each saying what's there: **Connect**
+(Groups, Mentors), **Community** (Events, Businesses, Funding), then **You** (your posts, your profile and, for an
+admin, the admin console), switching institution and signing out.
 
 - **Messages, with two browsers.** This walks through a message request, live messages, a report and what an admin
   sees.

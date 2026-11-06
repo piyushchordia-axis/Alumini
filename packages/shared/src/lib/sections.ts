@@ -34,6 +34,75 @@ export const SECTION_LABELS: Readonly<Record<MemberSection, string>> = {
   funding: "Funding",
 };
 
+/**
+ * One line on what each section holds, under its name in More and on the walk-through's list. No line holds another
+ * section's name or another way through the app (sections.test.ts checks): members and e2e alike find a link by its
+ * text, and a line that said "Groups" would be a second match for it.
+ */
+export const SECTION_DESCRIPTIONS: Readonly<Record<MemberSection, string>> = {
+  feed: "Posts and news from members",
+  messages: "Your conversations",
+  jobs: "Openings and referrals",
+  directory: "Find people by name or year",
+  events: "Meetups and get-togethers",
+  groups: "Shared conversations",
+  mentors: "Find a mentor, or become one",
+  businesses: "Companies run by members",
+  funding: "Members raising and investing",
+};
+
+/** Mentors' line for a member it stays open to only as a way out (splitSections' `mentorsWayOut`): there's no one to find there now. */
+export const MENTORS_WAY_OUT_DESCRIPTION = "Your requests and mentorships";
+
+/** A section's line, as `splitSections` was asked for it: pass the same `mentorsWayOut`. */
+export function sectionDescription(section: MemberSection, opts: { mentorsWayOut?: boolean } = {}): string {
+  return section === "mentors" && opts.mentorsWayOut ? MENTORS_WAY_OUT_DESCRIPTION : SECTION_DESCRIPTIONS[section];
+}
+
+/** More's groups of sections, before its own rows (You) and the account's. */
+export type HubGroupKey = "connect" | "community";
+
+/** Every section has a group, so one that ever overflows (Messages or Directory, Feed or Jobs) still finds its place. */
+const HUB_GROUP_OF: Readonly<Record<MemberSection, HubGroupKey>> = {
+  feed: "community",
+  messages: "connect",
+  jobs: "community",
+  directory: "connect",
+  events: "community",
+  groups: "connect",
+  mentors: "connect",
+  businesses: "community",
+  funding: "community",
+};
+
+export const HUB_GROUP_TITLES: Readonly<Record<HubGroupKey, string>> = { connect: "Connect", community: "Community" };
+
+const HUB_GROUP_ORDER: readonly HubGroupKey[] = ["connect", "community"];
+
+export interface MoreHubGroup {
+  key: HubGroupKey;
+  title: string;
+  sections: MemberSection[];
+}
+
+/**
+ * The sections behind More (`overflow` from splitSections, so feature switches, current pupils and the mentors way out
+ * are already applied), grouped: Connect, then Community, each in priority order. A group with nothing in it is left out.
+ */
+export function moreHubGroups(sections: readonly MemberSection[]): MoreHubGroup[] {
+  return HUB_GROUP_ORDER.map((key) => ({ key, title: HUB_GROUP_TITLES[key], sections: MEMBER_SECTIONS.filter((s) => HUB_GROUP_OF[s] === key && sections.includes(s)) })).filter((g) => g.sections.length > 0);
+}
+
+/** The heading over More's own rows: My posts, My profile and, for an admin, Admin console. Switch institution and Sign out come after it, untitled. */
+export const MORE_HUB_YOU_TITLE = "You";
+
+/** More's own rows, each with its line, which follows the rule SECTION_DESCRIPTIONS does. Admin console's name gains its count (adminConsoleLabel). */
+export const MORE_HUB_ROWS = {
+  myPosts: { label: "My posts", description: "Everything you've shared" },
+  myProfile: { label: "My profile", description: "Your details and settings" },
+  adminConsole: { label: "Admin console", description: "Members, moderation and settings" },
+} as const satisfies Record<string, { label: string; description: string }>;
+
 /** Phones show this many sections in the bar. More is always there too, because it also holds the profile and sign out. */
 const BAR_SECTIONS = 4;
 

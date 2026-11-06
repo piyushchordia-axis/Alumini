@@ -144,9 +144,11 @@ Covers:
   goes to the landing page;
   re-applying after a rejection (answered by the script) prefilling every step, with the reason on each and no Use
   details offer;
-- the phone layout: every section opens its own page, the More sheet, its active state, sections the institution has
-  switched off, and the guards keeping the open screen when a refetch fails (the registration form keeping what's
-  typed, even when the account details fail too);
+- the phone layout: every section opens its own page, the More sheet (grouped Connect, Community, You, its tiles at
+  least 44px with an SVG icon and a line read as the description, not the name: Funding's "Members raising and
+  investing"; hovered, a tile's icon well standing apart from the row and its line still reading), its active state,
+  sections the institution has switched off, and the guards keeping the open screen when a refetch fails (the
+  registration form keeping what's typed, even when the account details fail too);
 - direct messages between two seeded members (Meera and Sneha): a request (refused once for going too fast, keeping
   its words in the box), accepted live, replies both ways with exactly one bubble each, a thread in a background tab
   not marking anything read, Try again reusing the client key, a refusal for sending too fast, a draft surviving a
@@ -160,7 +162,8 @@ Covers:
   it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
-  Mentor badge in the directory and on the new mentor's own profile;
+  Mentor badge in the directory and on the new mentor's own profile; switched off, Mentors kept as a way out, its
+  More sheet tile at a phone's width saying "Your requests and mentorships";
 - referrals: a job offered for referral, the Can refer filter, a request reported, one accepted into a live chat that
   opens with the note, closing a job closing a waiting request, and the bell;
 - a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
@@ -241,7 +244,8 @@ Covers:
   weeks' answer; and the members CSV, starting Name, Phone, Email, Start year, End year, Status, with Rahul's 2008 and
   2012, and with the profile's own columns after "Last active" and Rahul's seeded headline and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
-  console's dashboard counts it, the count in amber, and the sidebar's row named the same on a wider screen), and
+  console's dashboard counts it, the count in amber, the More sheet's tile under You named the same, with its line and
+  its count in amber, and the sidebar's row named the same on a wider screen), and
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
   status tabs, a member's page and the Branding tab;
 - Appearance on My profile, as the Demo University admin: Plain chosen and no Cover tile without a cover; Institution
@@ -304,8 +308,11 @@ Covers:
   row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
   still to add, skills no longer among it, and `?section=about` scrolling About you into view; Delete my account's
   confirm sheet, saying a suspension or blocks come back with the number, cancelled with the account still there;
-- every section opening its own screen, with Events, Groups, Mentors and Funding behind More; My posts from the More
-  hub, its tabs scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px;
+- every section opening its own screen, with Events, Groups, Mentors and Funding behind More; the More hub grouped
+  under Connect, Community and You headings, its rows at least 44 tall, each with a line exposed as its description
+  (Funding's "Members raising and investing", My posts' "Everything you've shared"), and on a 320×568 screen sitting
+  in an area that scrolls, which the mouse wheel scrolls to an uncovered Sign out; My posts from the More hub, its tabs
+  scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px;
 - jobs: seeded cards with place, pay, experience and "+1 more" skills, and Zylo Labs's and Deloitte's initials in a
   tone from each company's name, two tones apart and not the institution's; the Work mode and experience filters behind
   Filters, and Clear filters; the Backend Engineer page, its title the only heading holding it, with its facts, section
@@ -332,7 +339,8 @@ Covers:
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including the request refused once for
   going too fast, a report from tapping a message, a block, a cold start on a thread, and a lost socket frame
   recovered by the gap fill;
-- groups, mentorship and referrals, as on the web, between two generated members and a member the run registers;
+- groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
+  (More's Mentors row, kept as a way out, saying "Your requests and mentorships");
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
   list and a contact email; the job's facts after posting and after an edit of the title alone, its page comparing
@@ -347,7 +355,8 @@ Covers:
   opens the list), with Use details from Demo University and Undo keeping a headline changed after it, then Submit for
   approval with its note, landing on the pending screen; switching institution and signing out from the More hub; a
   forced sign-out leaving nothing cached;
-- the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", and My profile's link; the
+- the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", described "Members, moderation and
+  settings", and My profile's link; the
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
   review, 0" not, no report tiles with none open, the four figures at a glance, the Growth and activity charts link,
   the approval sentence, and a row for every section, Analytics first, with nothing left for the web console; Back to
@@ -720,6 +729,11 @@ the console (part 14).
 - [ ] Bell notifications of each kind open their screen, a chat message's time and day labels look right, and a group
       whose name starts with an emoji (create "🏃 Morning runners") shows the initials "MR". These check `Object.hasOwn`,
       `Intl` and Unicode handling on Hermes.
+- [ ] More, on the narrowest phone you have with the largest text size: the Connect, Community and You groups, each
+      row's line wrapping under its name without overlapping the chevron or a count, and the screen scrolling down to
+      Sign out.
+- [ ] VoiceOver and TalkBack read each More row's name (with its count, such as "Groups, 1 invitation"), then its line
+      ("Members raising and investing"), and the group headings as headings.
 
 ### 7. Messages
 
