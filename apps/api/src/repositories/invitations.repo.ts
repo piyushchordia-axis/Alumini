@@ -19,12 +19,17 @@ export async function findInvitationByToken(db: DbClient, token: string): Promis
   return row;
 }
 
-export async function findInvitationsByPhones(db: DbClient, tenantId: string, phones: string[]): Promise<InvitationRow[]> {
+/**
+ * The invitations for these phones in one institution. `forUpdate` (in a transaction) locks them, in id order so two
+ * imports sharing phones take the locks in the same order, and waits for one being changed to give its new values.
+ */
+export async function findInvitationsByPhones(db: DbClient, tenantId: string, phones: string[], forUpdate = false): Promise<InvitationRow[]> {
   if (phones.length === 0) return [];
-  return db
+  const query = db
     .select()
     .from(invitations)
     .where(and(eq(invitations.tenantId, tenantId), inArray(invitations.phoneE164, phones)));
+  return forUpdate ? query.orderBy(invitations.id).for("update") : query;
 }
 
 /** The open (pending or sent, unexpired) invitation for a phone in one institution. */

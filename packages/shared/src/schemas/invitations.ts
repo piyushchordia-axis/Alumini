@@ -10,6 +10,8 @@ import { profileFieldAnswersSchema } from "./profileFields";
 export const invitationImportRowSchema = z.object({
   phone: z.string().max(40),
   name: z.string().max(200).nullish(),
+  /** The year they joined, and the year they left or will leave, as typed. */
+  startYear: z.union([z.number(), z.string().max(10)]).nullish(),
   batchYear: z.union([z.number(), z.string().max(10)]).nullish(),
   email: z.string().max(254).nullish(),
   fields: profileFieldAnswersSchema.optional(),

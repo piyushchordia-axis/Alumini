@@ -8,7 +8,9 @@ import {
   importProblems,
   importProgressText,
   importResultText,
+  importRowMeta,
   importSummaryText,
+  invitationColumnsHint,
   invitationTemplateCsv,
   partialImportText,
   readInvitationCsv,
@@ -137,7 +139,7 @@ export default function InvitationImportScreen() {
     if (!fields.data) return;
     setTemplateError(null);
     try {
-      await saveFile(INVITATION_TEMPLATE_FILE, withBom(invitationTemplateCsv(fields.data)), "text/csv");
+      await saveFile(INVITATION_TEMPLATE_FILE, withBom(invitationTemplateCsv(fields.data, tenant.type)), "text/csv");
     } catch (err) {
       setTemplateError(err instanceof Error && err.message ? err.message : "Couldn't save the template");
     }
@@ -148,7 +150,7 @@ export default function InvitationImportScreen() {
   const ignored = picked ? importIgnoredText(picked.mapping) : null;
   return (
     <AdminScreen title="Import a list">
-      <Muted size={13}>{"A CSV with a phone column, and optionally name, batch, email and your profile field keys. Numbers without a country code use your institution's country."}</Muted>
+      <Muted size={13}>{invitationColumnsHint(tenant.type)}</Muted>
       <Muted size={13}>{INVITATION_CSV_HINT}</Muted>
       {fields.error && !fields.data ? (
         <>
@@ -173,12 +175,15 @@ export default function InvitationImportScreen() {
           </Text>
           {ignored ? <Muted size={13}>{ignored}</Muted> : null}
           <View role="list" aria-label="First rows">
-            {rows.slice(0, PREVIEW_ROWS).map((r, i) => (
-              <View key={i} role="listitem" style={styles.previewRow}>
-                <Text style={styles.phone}>{r.phone || "—"}</Text>
-                {[r.name, r.batchYear, r.email].some(Boolean) ? <Text style={styles.previewMeta}>{[r.name, r.batchYear, r.email].filter(Boolean).join(" · ")}</Text> : null}
-              </View>
-            ))}
+            {rows.slice(0, PREVIEW_ROWS).map((r, i) => {
+              const meta = importRowMeta(r);
+              return (
+                <View key={i} role="listitem" style={styles.previewRow}>
+                  <Text style={styles.phone}>{r.phone || "—"}</Text>
+                  {meta ? <Text style={styles.previewMeta}>{meta}</Text> : null}
+                </View>
+              );
+            })}
           </View>
           {rows.length > PREVIEW_ROWS ? <Muted size={12}>…and {formatCount(rows.length - PREVIEW_ROWS)} more</Muted> : null}
           <Choice kind="checkbox" label={sendNowLabel(channels)} checked={sendNow} disabled={channels.length === 0 || importing} onPress={() => setSendChoice(!sendNow)} />

@@ -2,11 +2,12 @@
  * The admin console's invitations, the same on both apps: reading an imported CSV, the template, importing in chunks,
  * and each invitation's status, delivery and actions.
  */
-import { MAX_INVITE_IMPORT_ROWS, channelName, type InvitationStatus, type MessageChannel } from "../constants";
+import { MAX_INVITE_IMPORT_ROWS, channelName, type InvitationStatus, type MessageChannel, type TenantType } from "../constants";
 import { invitationImportRowSchema, type InvitationImportRow, type InvitationsQuery } from "../schemas/invitations";
 import type { InvitationDto, InvitationImportResultDto, ProfileFieldDto } from "../types/dto";
 import { formatCount } from "./admin";
 import { csvLine, parseCsv, type ParsedCsv } from "./csv";
+import { invitationYearsLabel } from "./memberYears";
 import { formatPhone } from "./phone";
 import { MAX_MULTI_SELECT_VALUES } from "./profileFields";
 
@@ -14,7 +15,10 @@ import { MAX_MULTI_SELECT_VALUES } from "./profileFields";
 export const INVITE_CSV_HEADERS = {
   phone: ["phone", "mobile", "phone_number", "mobile_number", "whatsapp"],
   name: ["name", "full_name", "fullname"],
-  batch: ["batch", "batch_year", "year", "graduation_year"],
+  /** The year they joined: a community's "member since". */
+  start: ["start_year", "start", "year_joined", "joined", "member_since", "since", "from"],
+  /** The year they left or will leave, which many lists call the batch. */
+  end: ["end_year", "end", "batch", "batch_year", "year", "graduation_year", "year_left", "until", "to"],
   email: ["email", "email_address", "e_mail"],
 } as const;
 
@@ -26,26 +30,34 @@ export interface InviteImportMapping {
   /** The phone column's header, or undefined when the list has none, so nothing can be imported. */
   phoneColumn: string | undefined;
   /** The other columns used: the headers of the known details, and the labels of the profile questions. */
-  columns: { name: string | undefined; batch: string | undefined; email: string | undefined; fields: string[] };
+  columns: { name: string | undefined; start: string | undefined; end: string | undefined; email: string | undefined; fields: string[] };
   /** Headers that match nothing, left out. */
   ignored: string[];
 }
 
-/** Parsed CSV rows as import rows: the known details by any of their names, and the columns named by a profile question's key. */
+/**
+ * Parsed CSV rows as import rows: the known details by any of their names, and the columns named by a profile question's
+ * key. The years go by everyday words ("year", "since", "joined"), so a column named for one of the institution's
+ * questions is that question's answer only, never a year as well.
+ */
 export function toImportRows(csv: ParsedCsv, fields: readonly InviteImportField[]): InviteImportMapping {
   const { headers, rows } = csv;
   const pick = (names: readonly string[]) => headers.find((h) => names.includes(h));
+  const fieldCols = fields.filter((f) => headers.includes(f.key));
+  const questionKeys = new Set(fieldCols.map((f) => f.key));
+  const pickYear = (names: readonly string[]) => headers.find((h) => names.includes(h) && !questionKeys.has(h));
   const phoneCol = pick(INVITE_CSV_HEADERS.phone);
   const nameCol = pick(INVITE_CSV_HEADERS.name);
-  const batchCol = pick(INVITE_CSV_HEADERS.batch);
+  const startCol = pickYear(INVITE_CSV_HEADERS.start);
+  const endCol = pickYear(INVITE_CSV_HEADERS.end);
   const emailCol = pick(INVITE_CSV_HEADERS.email);
-  const fieldCols = fields.filter((f) => headers.includes(f.key));
-  const used = new Set([phoneCol, nameCol, batchCol, emailCol, ...fieldCols.map((f) => f.key)]);
+  const used = new Set([phoneCol, nameCol, startCol, endCol, emailCol, ...questionKeys]);
   const ignored = headers.filter((h) => h && !used.has(h));
   const out: InvitationImportRow[] = rows.map((r) => ({
     phone: phoneCol ? (r[phoneCol] ?? "") : "",
     name: nameCol ? r[nameCol] || null : null,
-    batchYear: batchCol ? r[batchCol] || null : null,
+    startYear: startCol ? r[startCol] || null : null,
+    batchYear: endCol ? r[endCol] || null : null,
     email: emailCol ? r[emailCol] || null : null,
     fields: Object.fromEntries(
       fieldCols
@@ -61,7 +73,7 @@ export function toImportRows(csv: ParsedCsv, fields: readonly InviteImportField[
         .filter(([, v]) => v !== null),
     ),
   }));
-  return { rows: out, phoneColumn: phoneCol, columns: { name: nameCol, batch: batchCol, email: emailCol, fields: fieldCols.map((f) => f.label) }, ignored };
+  return { rows: out, phoneColumn: phoneCol, columns: { name: nameCol, start: startCol, end: endCol, email: emailCol, fields: fieldCols.map((f) => f.label) }, ignored };
 }
 
 /** A picked file's text read as an invitation list, or why it can't be imported. */
@@ -78,10 +90,27 @@ export function rowCountText(n: number): string {
   return `${formatCount(n)} ${n === 1 ? "row" : "rows"}`;
 }
 
-/** The preview's first line after the file's name: "2 rows. Using phone, name, batch, Chapter." */
+/** The preview's first line after the file's name: "2 rows. Using phone, name, start year, end year, Chapter." */
 export function importSummaryText(m: InviteImportMapping): string {
-  const used = ["phone", m.columns.name && "name", m.columns.batch && "batch", m.columns.email && "email", ...m.columns.fields].filter(Boolean);
+  const used = ["phone", m.columns.name && "name", m.columns.start && "start year", m.columns.end && "end year", m.columns.email && "email", ...m.columns.fields].filter(Boolean);
   return `${rowCountText(m.rows.length)}. Using ${used.join(", ")}.`;
+}
+
+/**
+ * A previewed row's years as typed, worded as an invitation's are (invitationYearsLabel): "2008–2012", "From 2008",
+ * "2012", or "". A cell that isn't a year shows as it is, for the API to refuse with its reason.
+ */
+export function importRowYears(row: Pick<InvitationImportRow, "startYear" | "batchYear">): string {
+  const cell = (v: InvitationImportRow["startYear"]) => (v == null ? "" : String(v).trim());
+  const start = cell(row.startYear);
+  const end = cell(row.batchYear);
+  if (start && end) return start === end ? start : `${start}–${end}`;
+  return start ? `From ${start}` : end;
+}
+
+/** A previewed row's details under its phone: "Asha Rao · 2008–2012 · asha@example.com". */
+export function importRowMeta(row: Pick<InvitationImportRow, "name" | "startYear" | "batchYear" | "email">): string {
+  return [row.name, importRowYears(row), row.email].filter(Boolean).join(" · ");
 }
 
 /** The columns left out, "Ignoring: notes.", or null. */
@@ -91,6 +120,12 @@ export function importIgnoredText(m: InviteImportMapping): string | null {
 
 export const INVITATION_TEMPLATE_FILE = "invitations-template.csv";
 
+/** Above the import's buttons: the columns a list may have. At a community, a blank end year means they still belong. */
+export function invitationColumnsHint(type: TenantType): string {
+  const years = type === "OTHER" ? "start year, end year (blank for someone who still belongs)" : "start year, end year";
+  return `A CSV with a phone column, and optionally name, ${years}, email and your profile field keys. Numbers without a country code use your institution's country.`;
+}
+
 /**
  * Under the import's buttons. Excel turns a typed +919876543210 into a number (shown 9.19876E+11, which the API refuses)
  * unless the column is text, and a CSV saved another way loses names in other scripts.
@@ -98,12 +133,12 @@ export const INVITATION_TEMPLATE_FILE = "invitations-template.csv";
 export const INVITATION_CSV_HINT = "In Excel, format the phone column as Text before typing numbers, and save as CSV UTF-8 so names keep their accents and scripts.";
 
 /**
- * The import template: the known columns and the institution's question keys, with an example row. Without the BOM: add
- * it with withBom when saving.
+ * The import template: the known columns and the institution's question keys, with an example row. At a community the
+ * example still belongs, so its end year is blank. Without the BOM: add it with withBom when saving.
  */
-export function invitationTemplateCsv(fields: readonly Pick<ProfileFieldDto, "key" | "options">[]): string {
-  const headers = ["phone", "name", "batch", "email", ...fields.map((f) => f.key)];
-  const example = ["+919876543210", "Asha Rao", "2012", "asha@example.com", ...fields.map((f) => f.options[0]?.value ?? "")];
+export function invitationTemplateCsv(fields: readonly Pick<ProfileFieldDto, "key" | "options">[], type: TenantType): string {
+  const headers = ["phone", "name", "start_year", "end_year", "email", ...fields.map((f) => f.key)];
+  const example = ["+919876543210", "Asha Rao", "2008", type === "OTHER" ? "" : "2012", "asha@example.com", ...fields.map((f) => f.options[0]?.value ?? "")];
   // csvCell marks a cell starting "+" as text against formula injection, which would show the example phone as
   // '+919876543210: it's there to be copied as it is.
   return csvLine(headers) + csvLine(example).replace(/^'/, "");
@@ -149,7 +184,7 @@ const IMPORT_DETAIL_NAMES: Readonly<Record<string, string>> = { phone: "Phone nu
 
 /**
  * Why the API would refuse the whole request carrying this row, or null. The API checks each row's details itself and
- * gives each row its reason, but a cell longer than it takes at all ("Class of 2012" as a batch) fails the request's
+ * gives each row its reason, but a cell longer than it takes at all ("Class of 2012" as a year) fails the request's
  * own check first. `fields` names the questions.
  */
 export function importRowTooLong(row: InvitationImportRow, fields: readonly InviteImportField[] = []): string | null {
@@ -162,7 +197,8 @@ export function importRowTooLong(row: InvitationImportRow, fields: readonly Invi
     if (Array.isArray(value) && value.length > MAX_MULTI_SELECT_VALUES) return `${label}: at most ${MAX_MULTI_SELECT_VALUES} choices`;
     return `${label} is too long`;
   }
-  if (top === "batchYear") return "Batch is too long to be a year";
+  if (top === "startYear") return "Start year is too long to be a year";
+  if (top === "batchYear") return "End year is too long to be a year";
   return `${IMPORT_DETAIL_NAMES[String(top)] ?? "A cell"} is too long`;
 }
 
@@ -296,9 +332,9 @@ export function invitationName(inv: Pick<InvitationDto, "fullName" | "phone">): 
   return inv.fullName ?? formatPhone(inv.phone);
 }
 
-/** A row's details line, "+91 98765 43210 · 2012 · asha@example.com", leaving out the number when it's the row's title. */
-export function invitationMeta(inv: Pick<InvitationDto, "fullName" | "phone" | "batchYear" | "email">): string {
-  return [inv.fullName ? formatPhone(inv.phone) : null, inv.batchYear, inv.email].filter(Boolean).join(" · ");
+/** A row's details line, "+91 98765 43210 · 2008–2012 · asha@example.com", leaving out the number when it's the row's title. */
+export function invitationMeta(inv: Pick<InvitationDto, "fullName" | "phone" | "startYear" | "batchYear" | "email">): string {
+  return [inv.fullName ? formatPhone(inv.phone) : null, invitationYearsLabel(inv), inv.email].filter(Boolean).join(" · ");
 }
 
 /**

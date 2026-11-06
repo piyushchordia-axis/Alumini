@@ -66,7 +66,7 @@ export function RegisterPage() {
     ? existing
     : inv
       ? // The form reads only each answer's key and value.
-        ({ fullName: inv.fullName ?? displayName ?? undefined, batchYear: inv.batchYear ?? undefined, fields: Object.entries(inv.fields).map(([key, value]) => ({ key, value })) } as Partial<MembershipDto>)
+        ({ fullName: inv.fullName ?? displayName ?? undefined, startYear: inv.startYear ?? undefined, batchYear: inv.batchYear ?? undefined, fields: Object.entries(inv.fields).map(([key, value]) => ({ key, value })) } as Partial<MembershipDto>)
       : displayName
         ? { fullName: displayName }
         : undefined;

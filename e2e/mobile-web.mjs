@@ -4538,15 +4538,19 @@ try {
     if (saved.suggestedFilename() !== "invitations-template.csv") throw new Error(`the template downloads as ${saved.suggestedFilename()}`);
     const templateText = readFileSync(await saved.path(), "utf8");
     if (templateText.charCodeAt(0) !== 0xfeff) throw new Error("the template has no byte order mark, so Excel would garble names");
-    if (!templateText.slice(1).startsWith("phone,name,batch,email,chapter,interests")) throw new Error(`the template starts "${templateText.slice(1, 60)}"`);
+    if (!templateText.slice(1).startsWith("phone,name,start_year,end_year,email,chapter,interests")) throw new Error(`the template starts "${templateText.slice(1, 60)}"`);
     if (!templateText.includes("\r\n+919876543210,")) throw new Error("the template's example phone is guarded as a formula");
+    // A community's example still belongs: no end year.
+    if (!templateText.includes("\r\n+919876543210,Asha Rao,2008,,asha@example.com,")) throw new Error(`the template's example row is "${templateText.split("\r\n")[1]}"`);
+    await shown(page.getByText("A CSV with a phone column, and optionally name, start year, end year (blank for someone who still belongs), email and your profile field keys. Numbers without a country code use your institution's country.", { exact: true })).waitFor();
 
-    const csv = `Phone,Name,Batch,Chapter,Notes\r\n+91${invitePhones[0]},Mitesh Shah,2015,surat,met at Garba\r\n+91${invitePhones[1]},Komal Desai,2016,surat,\r\n`;
+    const csv = `Phone,Name,Member Since,Until,Chapter,Notes\r\n+91${invitePhones[0]},Mitesh Shah,2015,,surat,met at Garba\r\n+91${invitePhones[1]},Komal Desai,2009,2016,surat,\r\n`;
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), memberButton("Choose CSV file").click()]);
     await chooser.setFiles({ name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
-    await shown(page.getByText("invites.csv: 2 rows. Using phone, name, batch, Chapter.", { exact: true })).waitFor();
+    await shown(page.getByText("invites.csv: 2 rows. Using phone, name, start year, end year, Chapter.", { exact: true })).waitFor();
     await shown(page.getByText("Ignoring: notes.", { exact: true })).waitFor();
-    await shown(page.getByText("Mitesh Shah · 2015", { exact: true })).waitFor();
+    await shown(page.getByText("Mitesh Shah · From 2015", { exact: true })).waitFor();
+    await shown(page.getByText("Komal Desai · 2009–2016", { exact: true })).waitFor();
     const sendNow = shown(page.getByRole("checkbox", { name: "Sending isn't included in your plan; you'll share the links yourself", exact: true }));
     if ((await sendNow.getAttribute("aria-disabled")) !== "true") throw new Error("Send now can be chosen on a plan that sends nothing");
     // While the import runs (the script holds its request), it counts up and Back leaves the screen where it is.
@@ -4578,6 +4582,8 @@ try {
     await page.waitForURL((url) => url.pathname.endsWith("/t/shri-gujarati-samaj/admin/invitations"));
     await statusSays("2 invited, 0 updated").waitFor();
     for (const name of ["Mitesh Shah", "Komal Desai"]) await invitationRow(name).getByText("Not sent", { exact: true }).waitFor();
+    await invitationRow("Mitesh Shah").getByText(/ · From 2015$/).waitFor();
+    await invitationRow("Komal Desai").getByText(/ · 2009–2016$/).waitFor();
 
     // Copy link, read back from the clipboard.
     await memberButton("Copy link for Mitesh Shah").click();

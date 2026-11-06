@@ -2,6 +2,7 @@ import {
   INVITE_TTL_DAYS,
   emailAddressSchema,
   isExcelScientific,
+  memberYearsIssues,
   validateProfileFieldValues,
   type InvitationDto,
   type InvitationImportInput,
@@ -68,6 +69,7 @@ function toInvitationDto(ctx: AppContext, r: InvitationRow, latest?: OutboundMes
     phone: r.phoneE164,
     email: r.email,
     fullName: r.fullName,
+    startYear: r.startYear,
     batchYear: r.batchYear,
     status: r.status,
     expired: (r.status === "PENDING" || r.status === "SENT") && r.expiresAt <= now,
@@ -80,6 +82,34 @@ function toInvitationDto(ctx: AppContext, r: InvitationRow, latest?: OutboundMes
     link: inviteLink(ctx, r.token),
     delivery: latest ? { status: latest.status, channel: latest.channel, lastError: latest.lastError, at: (latest.sentAt ?? latest.updatedAt).toISOString() } : null,
   };
+}
+
+/** A year cell as a number: blank is null, and anything else that isn't a whole number is left for memberYearsIssues to refuse. */
+function yearCell(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  const text = String(v).trim();
+  return text === "" ? null : Number(text);
+}
+
+/**
+ * memberYearsIssues words two of its problems for members giving their own years; the admin importing a list reads them
+ * about the person invited. The others say nothing about who.
+ */
+const ADMIN_YEAR_WORDING: Readonly<Record<string, string>> = {
+  "Can't be before the year you joined": "Can't be before the start year",
+  "Leave this blank if you still are": "Can't be in the future; leave it blank for someone who still belongs",
+};
+const yearProblemForAdmin = (issue: string) => ADMIN_YEAR_WORDING[issue] ?? issue;
+
+/**
+ * Why a row's years can't be kept with the ones its invitation already has, or null. A row gives either year or both; one
+ * it leaves blank keeps the stored one, so a lone year is checked against that, as a member's edit is against theirs.
+ */
+function storedYearsProblem(prior: Pick<InvitationRow, "startYear" | "batchYear"> | undefined, start: number | null, end: number | null): string | null {
+  if (!prior || (start === null) === (end === null)) return null;
+  if (end !== null && prior.startYear !== null && end < prior.startYear) return `End year: Can't be before the start year on their invitation (${prior.startYear})`;
+  if (start !== null && prior.batchYear !== null && start > prior.batchYear) return `Start year: Can't be after the end year on their invitation (${prior.batchYear})`;
+  return null;
 }
 
 const MEMBER_MESSAGES: Record<string, string> = {
@@ -100,7 +130,7 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
   const fields = await getActiveFields(ctx, tenant.id);
   const offset = input.rowOffset;
   const results: InvitationImportResultDto["results"] = [];
-  const valid: Array<{ row: number; phone: string; name: string | null; batchYear: number | null; email: string | null; fieldValues: Record<string, ProfileFieldValue> }> = [];
+  const valid: Array<{ row: number; phone: string; name: string | null; startYear: number | null; batchYear: number | null; email: string | null; fieldValues: Record<string, ProfileFieldValue> }> = [];
   const seen = new Set<string>();
 
   input.rows.forEach((r, i) => {
@@ -118,11 +148,12 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
     if (seen.has(phone)) return invalid("Same phone number as an earlier row", phone);
     const name = r.name?.trim() || null;
     if (name && name.length > 100) return invalid("Name is longer than 100 characters", phone);
-    let batchYear: number | null = null;
-    if (r.batchYear !== null && r.batchYear !== undefined && String(r.batchYear).trim() !== "") {
-      batchYear = Number(String(r.batchYear).trim());
-      if (!Number.isInteger(batchYear) || batchYear < settings.minBatchYear || batchYear > settings.maxBatchYear) return invalid(`Batch must be a year between ${settings.minBatchYear} and ${settings.maxBatchYear}`, phone);
-    }
+    // Only the years given are checked; either may be blank on an invitation, and the member gives what's missing.
+    const startYear = yearCell(r.startYear);
+    const batchYear = yearCell(r.batchYear);
+    const years = memberYearsIssues({ type: tenant.type, settings }, { startYear, batchYear }, { required: false });
+    if (years.startYear) return invalid(`Start year: ${yearProblemForAdmin(years.startYear)}`, phone);
+    if (years.batchYear) return invalid(`End year: ${yearProblemForAdmin(years.batchYear)}`, phone);
     let email: string | null = null;
     if (r.email?.trim()) {
       const parsed = emailAddressSchema.safeParse(r.email);
@@ -137,14 +168,17 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
     }
     const fieldValues = Object.fromEntries(Object.entries(check.values).filter((e): e is [string, ProfileFieldValue] => e[1] !== null));
     seen.add(phone);
-    valid.push({ row, phone, name, batchYear, email, fieldValues });
+    valid.push({ row, phone, name, startYear, batchYear, email, fieldValues });
   });
 
   const phones = valid.map((v) => v.phone);
-  const [memberStatus, existing] = await Promise.all([membershipStatusByPhones(ctx.db, tenant.id, phones), findInvitationsByPhones(ctx.db, tenant.id, phones)]);
-  const existingByPhone = new Map(existing.map((e) => [e.phoneE164, e]));
+  const memberStatus = await membershipStatusByPhones(ctx.db, tenant.id, phones);
   const openIds: string[] = [];
   await runInTransaction(ctx, async (tx) => {
+    // Locked, so the years checked below are the ones each update builds on, even with another import of the same
+    // phones under way.
+    const existing = await findInvitationsByPhones(tx, tenant.id, phones, true);
+    const existingByPhone = new Map(existing.map((e) => [e.phoneE164, e]));
     for (const v of valid) {
       const status = memberStatus.get(v.phone);
       if (status && status !== "REJECTED") {
@@ -152,16 +186,18 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
         continue;
       }
       const prior = existingByPhone.get(v.phone);
-      // A new end is checked against the start the invitation keeps, as a member's edit is against theirs.
-      if (prior?.startYear != null && v.batchYear !== null && v.batchYear < prior.startYear) {
-        results.push({ row: v.row, phone: v.phone, status: "invalid", message: `Batch can't be before the year they joined (${prior.startYear})` });
+      // Refused here rather than by the table's check on the years' order, which would fail the whole import.
+      const kept = storedYearsProblem(prior, v.startYear, v.batchYear);
+      if (kept) {
+        results.push({ row: v.row, phone: v.phone, status: "invalid", message: kept });
         continue;
       }
       if (prior) {
         const reopen = !isOpen(prior);
         const updated = (await updateInvitation(tx, tenant.id, prior.id, {
           ...(v.name ? { fullName: v.name } : {}),
-          ...(v.batchYear ? { batchYear: v.batchYear } : {}),
+          ...(v.startYear !== null ? { startYear: v.startYear } : {}),
+          ...(v.batchYear !== null ? { batchYear: v.batchYear } : {}),
           ...(v.email ? { email: v.email } : {}),
           fieldValues: { ...prior.fieldValues, ...v.fieldValues },
           ...(reopen ? { status: "PENDING" as const, acceptedAt: null, acceptedMembershipId: null } : {}),
@@ -175,6 +211,7 @@ export async function importInvitations(ctx: AppContext, tenantCtx: TenantContex
           phoneE164: v.phone,
           email: v.email,
           fullName: v.name,
+          startYear: v.startYear,
           batchYear: v.batchYear,
           fieldValues: v.fieldValues,
           token: opaqueToken(16),
@@ -328,5 +365,5 @@ export async function findMyInvitation(ctx: AppContext, tenantCtx: TenantContext
   const user = await findUserById(ctx.db, userId);
   const inv = user ? await findOpenInvitationByPhone(ctx.db, tenantCtx.tenant.id, user.phoneE164) : undefined;
   if (!inv) return null;
-  return { fullName: inv.fullName, batchYear: inv.batchYear, fields: inv.fieldValues, autoApprove: tenantCtx.settings.inviteAutoApprove };
+  return { fullName: inv.fullName, startYear: inv.startYear, batchYear: inv.batchYear, fields: inv.fieldValues, autoApprove: tenantCtx.settings.inviteAutoApprove };
 }

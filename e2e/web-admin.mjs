@@ -579,10 +579,13 @@ try {
     await expectSvgNoEmoji(page.getByRole("button", { name: "Template", exact: true }), "the Template button");
     // The file input waits for the profile questions, whose keys are columns too.
     await page.locator('input[aria-label="CSV file"]:enabled').waitFor({ state: "attached" });
-    await page.setInputFiles('input[aria-label="CSV file"]', { name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(`Phone,Name,Batch\r\n+91${invitePhone},Kavita Invitee,2015\r\n`) });
+    await page.setInputFiles('input[aria-label="CSV file"]', { name: "invites.csv", mimeType: "text/csv", buffer: Buffer.from(`Phone,Name,Year Joined,Batch\r\n+91${invitePhone},Kavita Invitee,2011,2015\r\n`) });
+    await page.getByText("invites.csv: 1 row. Using phone, name, start year, end year.", { exact: true }).waitFor();
+    await page.locator("tr", { hasText: "Kavita Invitee" }).getByRole("cell", { name: "2011–2015", exact: true }).waitFor();
     await page.click('button:has-text("Import 1 row")');
     await page.waitForSelector("text=1 new");
     const row = page.locator("tr", { hasText: "Kavita Invitee" }).first();
+    await row.getByText(/ · 2011–2015$/).waitFor();
     await row.locator('button:has-text("Copy link")').click();
     const link = await page.evaluate(() => navigator.clipboard.readText());
     if (!/\/i\/[\w-]+$/.test(link)) throw new Error(`unexpected invite link: ${link}`);
@@ -597,10 +600,10 @@ try {
       await loginWithPhone(invitePhone, guest);
       await guest.waitForURL(/\/register$/);
       await guest.waitForSelector("text=You were invited");
-      // The invitation fills in the name and the year they left; the year they joined is theirs to pick.
+      // The invitation fills in the name and both years.
       if ((await guest.inputValue('input[name="fullName"]')) !== "Kavita Invitee") throw new Error("the invitation didn't fill in the name");
+      if ((await guest.inputValue('select[name="startYear"]')) !== "2011") throw new Error("the invitation didn't fill in the year they joined");
       if ((await guest.inputValue('select[name="batchYear"]')) !== "2015") throw new Error("the invitation didn't fill in the year they left");
-      await guest.selectOption('select[name="startYear"]', "2011");
       await finishRegistration(guest, "Join the network");
       await guest.waitForURL(/\/app\/feed$/); // approved straight away: invitations skip the approval queue
     } finally {

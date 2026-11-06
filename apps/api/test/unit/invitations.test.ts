@@ -1,4 +1,5 @@
 import {
+  INVITE_CSV_HEADERS,
   MAX_INVITE_IMPORT_ROWS,
   channelsSentence,
   chunkInviteRows,
@@ -9,10 +10,13 @@ import {
   importProblems,
   importProgressText,
   importResultText,
+  importRowMeta,
   importRowTooLong,
+  importRowYears,
   importSummaryText,
   invitationActionLabel,
   invitationActions,
+  invitationColumnsHint,
   invitationMeta,
   invitationName,
   invitationStatusFilter,
@@ -55,6 +59,7 @@ const invitation = (over: Partial<InvitationDto> = {}): InvitationDto => ({
   phone: "+919876543210",
   email: null,
   fullName: "Asha Rao",
+  startYear: 2008,
   batchYear: 2012,
   status: "PENDING",
   expired: false,
@@ -71,12 +76,51 @@ const invitation = (over: Partial<InvitationDto> = {}): InvitationDto => ({
 
 describe("toImportRows", () => {
   it("finds the known columns by any of their names, and the questions by key", () => {
-    const csv = parseCsv("Mobile Number,Full Name,Graduation Year,E-mail,Chapter,Notes\r\n+919876543210,Asha Rao,2012,asha@example.com,surat,met at Garba\r\n");
+    const csv = parseCsv("Mobile Number,Full Name,Joined,Graduation Year,E-mail,Chapter,Notes\r\n+919876543210,Asha Rao,2008,2012,asha@example.com,surat,met at Garba\r\n");
     const m = toImportRows(csv, FIELDS);
     expect(m.phoneColumn).toBe("mobile_number");
-    expect(m.columns).toEqual({ name: "full_name", batch: "graduation_year", email: "e_mail", fields: ["Chapter"] });
+    expect(m.columns).toEqual({ name: "full_name", start: "joined", end: "graduation_year", email: "e_mail", fields: ["Chapter"] });
     expect(m.ignored).toEqual(["notes"]);
-    expect(m.rows).toEqual([{ phone: "+919876543210", name: "Asha Rao", batchYear: "2012", email: "asha@example.com", fields: { chapter: "surat" } }]);
+    expect(m.rows).toEqual([{ phone: "+919876543210", name: "Asha Rao", startYear: "2008", batchYear: "2012", email: "asha@example.com", fields: { chapter: "surat" } }]);
+  });
+
+  it("reads the year they joined and the year they left by each of their names", () => {
+    expect(INVITE_CSV_HEADERS.start).toEqual(["start_year", "start", "year_joined", "joined", "member_since", "since", "from"]);
+    expect(INVITE_CSV_HEADERS.end).toEqual(["end_year", "end", "batch", "batch_year", "year", "graduation_year", "year_left", "until", "to"]);
+    for (const name of INVITE_CSV_HEADERS.start) {
+      const m = toImportRows(parseCsv(`phone,${name}\n1,2008\n`), []);
+      expect(m.columns.start, name).toBe(name);
+      expect(m.columns.end, name).toBeUndefined();
+      expect(m.rows[0], name).toMatchObject({ startYear: "2008", batchYear: null });
+    }
+    for (const name of INVITE_CSV_HEADERS.end) {
+      const m = toImportRows(parseCsv(`phone,${name}\n1,2012\n`), []);
+      expect(m.columns.end, name).toBe(name);
+      expect(m.columns.start, name).toBeUndefined();
+      expect(m.rows[0], name).toMatchObject({ startYear: null, batchYear: "2012" });
+    }
+    // As a community's list may head them.
+    const samaj = toImportRows(parseCsv("Phone,Member Since,Until\n1,1996,\n2,2001,2019\n"), []);
+    expect(samaj.columns).toMatchObject({ start: "member_since", end: "until" });
+    expect(samaj.rows.map((r) => [r.startYear, r.batchYear])).toEqual([
+      ["1996", null],
+      ["2001", "2019"],
+    ]);
+    // Only those names: a "Left" column (often a yes or no) is left out, not read as a year and refused.
+    const other = toImportRows(parseCsv("Phone,Left,Joined Year\n1,Y,2001\n"), []);
+    expect(other.columns).toMatchObject({ start: undefined, end: undefined });
+    expect(other.ignored).toEqual(["left", "joined_year"]);
+    expect(other.rows[0]).toMatchObject({ startYear: null, batchYear: null });
+  });
+
+  it("reads a column named for one of the institution's questions as its answer only, never as a year", () => {
+    // FIELDS asks "year_joined", which is also a name for the start year.
+    const m = toImportRows(parseCsv("phone,year_joined,batch\n1,2001,2005\n"), FIELDS);
+    expect(m.columns).toMatchObject({ start: undefined, end: "batch", fields: ["Year joined"] });
+    expect(m.rows[0]).toMatchObject({ startYear: null, batchYear: "2005", fields: { year_joined: 2001 } });
+    expect(m.ignored).toEqual([]);
+    // Without that question it's the start year.
+    expect(toImportRows(parseCsv("phone,year_joined\n1,2001\n"), []).rows[0]).toMatchObject({ startYear: "2001", fields: {} });
   });
 
   it("reads several choices from one cell, yes and no in their usual words, and numbers", () => {
@@ -89,9 +133,9 @@ describe("toImportRows", () => {
   });
 
   it("leaves out empty cells, and gives no phone when the list has no phone column", () => {
-    const m = toImportRows(parseCsv("name,batch\nAsha,\n"), FIELDS);
+    const m = toImportRows(parseCsv("name,start_year,batch\nAsha,,\n"), FIELDS);
     expect(m.phoneColumn).toBeUndefined();
-    expect(m.rows).toEqual([{ phone: "", name: "Asha", batchYear: null, email: null, fields: {} }]);
+    expect(m.rows).toEqual([{ phone: "", name: "Asha", startYear: null, batchYear: null, email: null, fields: {} }]);
   });
 });
 
@@ -103,9 +147,11 @@ describe("readInvitationCsv", () => {
   });
 
   it("reads a list, and says which columns it uses and which it leaves out", () => {
-    const { mapping } = readInvitationCsv("\uFEFFPhone,Name,Batch,Chapter,Notes\r\n+917600000021,Mitesh Shah,2015,surat,x\r\n+917600000022,Komal Desai,2016,surat,\r\n", FIELDS);
+    const { mapping } = readInvitationCsv("\uFEFFPhone,Name,Since,Batch,Chapter,Notes\r\n+917600000021,Mitesh Shah,2011,2015,surat,x\r\n+917600000022,Komal Desai,,2016,surat,\r\n", FIELDS);
     expect(mapping!.rows).toHaveLength(2);
-    expect(importSummaryText(mapping!)).toBe("2 rows. Using phone, name, batch, Chapter.");
+    expect(importSummaryText(mapping!)).toBe("2 rows. Using phone, name, start year, end year, Chapter.");
+    expect(importSummaryText(readInvitationCsv("phone,batch,email\n1,2015,a@b.co\n", FIELDS).mapping!)).toBe("1 row. Using phone, end year, email.");
+    expect(importSummaryText(readInvitationCsv("phone,member_since\n1,1996\n", FIELDS).mapping!)).toBe("1 row. Using phone, start year.");
     expect(importIgnoredText(mapping!)).toBe("Ignoring: notes.");
     expect(importSummaryText(readInvitationCsv("phone\n1\n", FIELDS).mapping!)).toBe("1 row. Using phone.");
     expect(importIgnoredText(readInvitationCsv("phone\n1\n", FIELDS).mapping!)).toBeNull();
@@ -119,11 +165,54 @@ describe("invitationTemplateCsv", () => {
   ];
 
   it("has the known columns and the questions' keys, and an example phone with no formula guard", () => {
-    const text = invitationTemplateCsv(fields);
+    const text = invitationTemplateCsv(fields, "COLLEGE");
     expect(text.charCodeAt(0)).not.toBe(0xfeff);
-    expect(text.split("\r\n")[0]).toBe("phone,name,batch,email,chapter,note");
-    expect(text.split("\r\n")[1]).toBe("+919876543210,Asha Rao,2012,asha@example.com,ahmedabad,");
-    expect(parseCsv(withBom(text)).rows).toEqual([{ phone: "+919876543210", name: "Asha Rao", batch: "2012", email: "asha@example.com", chapter: "ahmedabad", note: "" }]);
+    expect(text.split("\r\n")[0]).toBe("phone,name,start_year,end_year,email,chapter,note");
+    expect(text.split("\r\n")[1]).toBe("+919876543210,Asha Rao,2008,2012,asha@example.com,ahmedabad,");
+    expect(parseCsv(withBom(text)).rows).toEqual([{ phone: "+919876543210", name: "Asha Rao", start_year: "2008", end_year: "2012", email: "asha@example.com", chapter: "ahmedabad", note: "" }]);
+    for (const type of ["SCHOOL", "UNIVERSITY"] as const) expect(invitationTemplateCsv(fields, type)).toBe(text);
+  });
+
+  it("leaves a community's example end year blank, as they still belong", () => {
+    const text = invitationTemplateCsv(fields, "OTHER");
+    expect(text.split("\r\n")[0]).toBe("phone,name,start_year,end_year,email,chapter,note");
+    expect(text.split("\r\n")[1]).toBe("+919876543210,Asha Rao,2008,,asha@example.com,ahmedabad,");
+  });
+
+  it("reads back as the import reads a list, every column used", () => {
+    const asked: InviteImportField[] = [
+      { key: "chapter", label: "Chapter", type: "SELECT" },
+      { key: "note", label: "Note", type: "TEXT" },
+    ];
+    const { mapping } = readInvitationCsv(withBom(invitationTemplateCsv(fields, "OTHER")), asked);
+    expect(mapping!.columns).toEqual({ name: "name", start: "start_year", end: "end_year", email: "email", fields: ["Chapter", "Note"] });
+    expect(mapping!.ignored).toEqual([]);
+    expect(mapping!.rows).toEqual([{ phone: "+919876543210", name: "Asha Rao", startYear: "2008", batchYear: null, email: "asha@example.com", fields: { chapter: "ahmedabad" } }]);
+  });
+
+  it("says which columns a list may have, and at a community what a blank end year means", () => {
+    expect(invitationColumnsHint("COLLEGE")).toBe("A CSV with a phone column, and optionally name, start year, end year, email and your profile field keys. Numbers without a country code use your institution's country.");
+    expect(invitationColumnsHint("OTHER")).toBe(
+      "A CSV with a phone column, and optionally name, start year, end year (blank for someone who still belongs), email and your profile field keys. Numbers without a country code use your institution's country.",
+    );
+  });
+});
+
+describe("a previewed row", () => {
+  it("shows its years as typed, worded as an invitation's are", () => {
+    expect(importRowYears({ startYear: "2008", batchYear: "2012" })).toBe("2008–2012");
+    expect(importRowYears({ startYear: 2010, batchYear: 2010 })).toBe("2010");
+    expect(importRowYears({ startYear: " 1996 ", batchYear: null })).toBe("From 1996");
+    expect(importRowYears({ batchYear: "2012" })).toBe("2012");
+    expect(importRowYears({ startYear: "", batchYear: "" })).toBe("");
+    // Not a year: shown as typed, for the API to give its reason.
+    expect(importRowYears({ startYear: "soon", batchYear: "2012" })).toBe("soon–2012");
+  });
+
+  it("has its name, years and email under its phone", () => {
+    expect(importRowMeta({ name: "Asha Rao", startYear: "2008", batchYear: "2012", email: "asha@example.com" })).toBe("Asha Rao · 2008–2012 · asha@example.com");
+    expect(importRowMeta({ name: "Mitesh Shah", startYear: "2015", batchYear: null, email: null })).toBe("Mitesh Shah · From 2015");
+    expect(importRowMeta({ name: null, startYear: null, batchYear: null, email: null })).toBe("");
   });
 });
 
@@ -205,7 +294,7 @@ describe("importing in chunks", () => {
 
   it("sends a row with a cell too long for the API as a blank row on its line, and gives its own reason", async () => {
     const list: InvitationImportRow[] = [
-      { phone: "+917600000001", name: "Asha", batchYear: "2012" },
+      { phone: "+917600000001", name: "Asha", startYear: "2008", batchYear: "2012" },
       { phone: "+917600000002", name: "Ravi", batchYear: "Class of 2012" },
       { phone: "+917600000003", name: "Mina", email: `${"a".repeat(250)}@example.com` },
       { phone: `+91 76000 00004 ${"x".repeat(40)}` },
@@ -214,7 +303,10 @@ describe("importing in chunks", () => {
       { phone: "+917600000007", name: "Neel" },
     ];
     expect(importRowTooLong(list[0]!, FIELDS)).toBeNull();
-    expect(importRowTooLong(list[1]!, FIELDS)).toBe("Batch is too long to be a year");
+    expect(importRowTooLong(list[1]!, FIELDS)).toBe("End year is too long to be a year");
+    expect(importRowTooLong({ phone: "1", startYear: "Since about 1990" })).toBe("Start year is too long to be a year");
+    // Not a year, but short enough to be sent: the API says why on its line.
+    expect(importRowTooLong({ phone: "1", startYear: "soon", batchYear: "later" })).toBeNull();
     expect(importRowTooLong(list[2]!, FIELDS)).toBe("Email address is too long");
     expect(importRowTooLong(list[3]!, FIELDS)).toBe("Phone number is too long");
     expect(importRowTooLong(list[4]!, FIELDS)).toBe("Community interests: at most 20 choices");
@@ -238,7 +330,7 @@ describe("importing in chunks", () => {
     expect(outcome.result.created).toBe(2);
     expect(outcome.result.skipped).toBe(5);
     expect(importProblems(outcome.result)).toEqual([
-      { row: 3, phone: "+917600000002", status: "invalid", message: "Batch is too long to be a year" },
+      { row: 3, phone: "+917600000002", status: "invalid", message: "End year is too long to be a year" },
       { row: 4, phone: "+917600000003", status: "invalid", message: "Email address is too long" },
       { row: 5, phone: `+91 76000 00004 ${"x".repeat(23)}…`, status: "invalid", message: "Phone number is too long" },
       { row: 6, phone: "+917600000005", status: "invalid", message: "Community interests: at most 20 choices" },
@@ -247,7 +339,7 @@ describe("importing in chunks", () => {
   });
 
   it("keeps the line numbers of a long cell's row in a later chunk", async () => {
-    const many: InvitationImportRow[] = Array.from({ length: 700 }, (_, i) => ({ phone: String(i), batchYear: i === 600 ? "MBA 2012-14" : null }));
+    const many: InvitationImportRow[] = Array.from({ length: 700 }, (_, i) => ({ phone: String(i), startYear: i === 600 ? "MBA 2012-14" : null }));
     const offsets: number[] = [];
     const outcome = await importInChunks(many, async (chunk) => {
       offsets.push(chunk.rowOffset);
@@ -256,7 +348,7 @@ describe("importing in chunks", () => {
     });
     expect(offsets).toEqual([1, 501]);
     // Row 600 of the data is line 602 of the file, under the header.
-    expect(importProblems(outcome.result)).toEqual([{ row: 602, phone: "600", status: "invalid", message: "Batch is too long to be a year" }]);
+    expect(importProblems(outcome.result)).toEqual([{ row: 602, phone: "600", status: "invalid", message: "Start year is too long to be a year" }]);
   });
 
   it("says what an import did, and lists the rows it left out", () => {
@@ -284,8 +376,16 @@ describe("an invitation's row", () => {
   it("is named for the person, or their number, with the number in its details only beside a name", () => {
     expect(invitationName(invitation())).toBe("Asha Rao");
     expect(invitationName(invitation({ fullName: null }))).toBe("+91 98765 43210");
-    expect(invitationMeta(invitation({ email: "asha@example.com" }))).toBe("+91 98765 43210 · 2012 · asha@example.com");
-    expect(invitationMeta(invitation({ fullName: null, batchYear: null }))).toBe("");
+    expect(invitationMeta(invitation({ email: "asha@example.com" }))).toBe("+91 98765 43210 · 2008–2012 · asha@example.com");
+    expect(invitationMeta(invitation({ fullName: null, startYear: null, batchYear: null }))).toBe("");
+  });
+
+  it("shows whichever years it has", () => {
+    expect(invitationMeta(invitation({ fullName: null }))).toBe("2008–2012");
+    // A community's member who still belongs, and an end given without a start.
+    expect(invitationMeta(invitation({ batchYear: null }))).toBe("+91 98765 43210 · From 2008");
+    expect(invitationMeta(invitation({ startYear: null, email: "asha@example.com" }))).toBe("+91 98765 43210 · 2012 · asha@example.com");
+    expect(invitationMeta(invitation({ startYear: 2012 }))).toBe("+91 98765 43210 · 2012");
   });
 
   it("says how its latest message went", () => {

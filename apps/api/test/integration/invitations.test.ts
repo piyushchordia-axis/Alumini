@@ -1,8 +1,9 @@
-import { importInChunks, importProblems, type InvitationImportResultDto, type InvitationImportRow, type MessageChannel } from "@illuminize/shared";
+import { importInChunks, importProblems, type InvitationImportResultDto, type InvitationImportRow, type MessageChannel, type TenantType } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { invitations, memberships, outboundMessages, tenantBillingPlans, tenantSettings, tenants } from "../../src/db/schema";
+import { runInTransaction } from "../../src/lib/transaction";
 import { claimInvitation } from "../../src/repositories/invitations.repo";
 import type { ChannelSender, RenderedMessage } from "../../src/services/messages/types";
 import { PROFILE, auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
@@ -37,13 +38,13 @@ describe.skipIf(!dbAvailable)("invitations", () => {
   });
   const api = () => request(ctx.app);
 
-  async function setup(opts: { channels?: MessageChannel[]; country?: string; approval?: "AUTO_APPROVE" | "ADMIN_APPROVAL" } = {}) {
-    const { tenant } = await createTenant(ctx, { name: "Invite College", memberApprovalMode: opts.approval ?? "ADMIN_APPROVAL", allowSelfRegistration: false });
+  async function setup(opts: { channels?: MessageChannel[]; country?: string; approval?: "AUTO_APPROVE" | "ADMIN_APPROVAL"; type?: TenantType } = {}) {
+    const { tenant, settings } = await createTenant(ctx, { name: "Invite College", memberApprovalMode: opts.approval ?? "ADMIN_APPROVAL", allowSelfRegistration: false, type: opts.type });
     if (opts.country) await ctx.db.update(tenants).set({ country: opts.country }).where(eq(tenants.id, tenant.id));
     if (opts.channels) await ctx.db.insert(tenantBillingPlans).values({ tenantId: tenant.id, billingModel: "FREE", effectiveFrom: "2020-01-01", includedChannels: opts.channels });
     const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
     const base = `/api/v1/t/${tenant.slug}`;
-    return { tenant, admin, base };
+    return { tenant, settings, admin, base };
   }
 
   it("imports rows with a result per row", async () => {
@@ -60,7 +61,7 @@ describe.skipIf(!dbAvailable)("invitations", () => {
       .send({
         rowOffset: 100,
         rows: [
-          { phone: "07700 900123", name: "Asha Rao", batchYear: "2012", email: "Asha@Example.com", fields: { house: "blue" } },
+          { phone: "07700 900123", name: "Asha Rao", startYear: "2008", batchYear: "2012", email: "Asha@Example.com", fields: { house: "blue" } },
           { phone: "+447700900123", name: "Duplicate" },
           { phone: "9.19876E+11" },
           { phone: "123" },
@@ -89,15 +90,75 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     expect(d.results[2].message).toMatch(/scientific notation/);
     expect(d.results[6].message).toBe("House: Choose one of the options");
     const [row] = await ctx.db.select().from(invitations).where(eq(invitations.phoneE164, "+447700900123"));
-    expect(row).toMatchObject({ fullName: "Asha Rao", batchYear: 2012, email: "asha@example.com", fieldValues: { house: "blue" }, status: "PENDING" });
+    expect(row).toMatchObject({ fullName: "Asha Rao", startYear: 2008, batchYear: 2012, email: "asha@example.com", fieldValues: { house: "blue" }, status: "PENDING" });
 
-    // Importing again updates the invitation instead of duplicating it.
+    // Importing again updates the invitation instead of duplicating it, keeping the years the row leaves blank.
     const again = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+447700900123", name: "Asha R." }] });
     expect(again.body.data).toMatchObject({ created: 0, updated: 1 });
-    expect((await ctx.db.select().from(invitations).where(eq(invitations.phoneE164, "+447700900123")))[0]!.fullName).toBe("Asha R.");
+    expect((await ctx.db.select().from(invitations).where(eq(invitations.phoneE164, "+447700900123")))[0]).toMatchObject({ fullName: "Asha R.", startYear: 2008, batchYear: 2012 });
+
+    // The list shows both years.
+    const list = await api().get(`${base}/admin/invitations?q=Asha`).set(admin.headers);
+    expect(list.body.data).toEqual([expect.objectContaining({ fullName: "Asha R.", startYear: 2008, batchYear: 2012 })]);
   });
 
-  it("refuses a row whose batch comes before the start its invitation keeps, and imports the rest of the file", async () => {
+  it("checks only the years a row gives, by the institution's rules, and keeps both", async () => {
+    const { base, admin, settings } = await setup();
+    const thisYear = new Date().getFullYear();
+    const res = await api()
+      .post(`${base}/admin/invitations/import`)
+      .set(admin.headers)
+      .send({
+        rows: [
+          { phone: "+919800000041", name: "Both", startYear: "2008", batchYear: "2012" },
+          { phone: "+919800000042", name: "Start only", startYear: 2010 },
+          { phone: "+919800000043", name: "End only", batchYear: " 2014 " },
+          { phone: "+919800000044", name: "Neither", startYear: "", batchYear: null },
+          { phone: "+919800000045", startYear: "2014", batchYear: "2012" },
+          { phone: "+919800000046", startYear: "1890" },
+          { phone: "+919800000047", startYear: String(thisYear + 1) },
+          { phone: "+919800000048", startYear: "soon" },
+          { phone: "+919800000049", batchYear: String(settings.minBatchYear - 1) },
+          { phone: "+919800000050", startYear: "2009", batchYear: "2012.5" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ created: 4, skipped: 6 });
+    expect(res.body.data.results.slice(4).map((r: { status: string; message: string }) => [r.status, r.message])).toEqual([
+      ["invalid", "End year: Can't be before the start year"],
+      ["invalid", "Start year: Use a year from 1930 on"],
+      ["invalid", "Start year: This year at the latest"],
+      ["invalid", "Start year: Enter a year"],
+      ["invalid", `End year: Must be between ${settings.minBatchYear} and ${settings.maxBatchYear}`],
+      ["invalid", "End year: Enter a year"],
+    ]);
+    const stored = await ctx.db.select({ name: invitations.fullName, start: invitations.startYear, end: invitations.batchYear }).from(invitations);
+    expect(stored.sort((a, b) => a.name!.localeCompare(b.name!))).toEqual([
+      { name: "Both", start: 2008, end: 2012 },
+      { name: "End only", start: null, end: 2014 },
+      { name: "Neither", start: null, end: null },
+      { name: "Start only", start: 2010, end: null },
+    ]);
+  });
+
+  it("takes a community's invitation with no end, but no end in the future", async () => {
+    const { base, admin } = await setup({ type: "OTHER" });
+    const thisYear = new Date().getFullYear();
+    const res = await api()
+      .post(`${base}/admin/invitations/import`)
+      .set(admin.headers)
+      .send({
+        rows: [
+          { phone: "+919800000051", name: "Still here", startYear: "1996" },
+          { phone: "+919800000052", startYear: "2001", batchYear: String(thisYear + 1) },
+        ],
+      });
+    expect(res.body.data).toMatchObject({ created: 1, skipped: 1 });
+    expect(res.body.data.results[1]).toMatchObject({ status: "invalid", message: "End year: Can't be in the future; leave it blank for someone who still belongs" });
+    expect((await ctx.db.select().from(invitations))[0]).toMatchObject({ fullName: "Still here", startYear: 1996, batchYear: null });
+  });
+
+  it("refuses a lone year that the other year its invitation keeps rules out, and imports the rest of the file", async () => {
     const { tenant, admin, base } = await setup();
     const [kept] = await ctx.db
       .insert(invitations)
@@ -114,14 +175,63 @@ describe.skipIf(!dbAvailable)("invitations", () => {
       });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ created: 1, updated: 0, skipped: 1 });
-    expect(res.body.data.results[0]).toMatchObject({ row: 1, status: "invalid", message: "Batch can't be before the year they joined (2012)" });
+    expect(res.body.data.results[0]).toMatchObject({ row: 1, status: "invalid", message: "End year: Can't be before the start year on their invitation (2012)" });
+    const stored = async () => (await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0];
     // Left as it was.
-    expect((await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0]).toMatchObject({ fullName: "Harsh Vora", startYear: 2012, batchYear: 2016 });
+    expect(await stored()).toMatchObject({ fullName: "Harsh Vora", startYear: 2012, batchYear: 2016 });
 
-    // The year they joined itself, or a later one, is taken.
+    // A start after the end it keeps, likewise, within one file with a row that's fine.
+    const late = await api()
+      .post(`${base}/admin/invitations/import`)
+      .set(admin.headers)
+      .send({ rows: [{ phone: "+919800000031", startYear: "2018" }, { phone: "+919800000033", name: "Ravi Iyer", startYear: "2018" }] });
+    expect(late.status).toBe(200);
+    expect(late.body.data).toMatchObject({ created: 1, updated: 0, skipped: 1 });
+    expect(late.body.data.results[0]).toMatchObject({ row: 1, status: "invalid", message: "Start year: Can't be after the end year on their invitation (2016)" });
+    expect(await stored()).toMatchObject({ startYear: 2012, batchYear: 2016 });
+
+    // The year they joined itself, or a later one, is taken, and the start is kept.
     const fixed = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919800000031", batchYear: "2012" }] });
     expect(fixed.body.data).toMatchObject({ updated: 1, skipped: 0 });
-    expect((await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0]).toMatchObject({ startYear: 2012, batchYear: 2012 });
+    expect(await stored()).toMatchObject({ startYear: 2012, batchYear: 2012 });
+    // A lone start no later than the end it keeps, and the end is kept.
+    await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919800000031", startYear: "2009" }] });
+    expect(await stored()).toMatchObject({ startYear: 2009, batchYear: 2012 });
+    // Both years given replace both, whatever was kept.
+    const both = await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919800000031", startYear: "2017", batchYear: "2021" }] });
+    expect(both.body.data).toMatchObject({ updated: 1, skipped: 0 });
+    expect(await stored()).toMatchObject({ startYear: 2017, batchYear: 2021 });
+  });
+
+  it("checks a lone year against the stored one another import changes meanwhile, refusing the row rather than the request", async () => {
+    const { tenant, admin, base } = await setup();
+    const [kept] = await ctx.db
+      .insert(invitations)
+      .values({ tenantId: tenant.id, phoneE164: "+919800000061", fullName: "Harsh Vora", startYear: 2008, batchYear: 2012, token: "raced-token", expiresAt: new Date(Date.now() + 86_400_000) })
+      .returning();
+    // The invitation is held while the import starts, then given an end before the import's start, as another import
+    // committing first would. Checked against the years it read before, the import's update would break their order.
+    const { pending } = await runInTransaction(ctx, async (tx) => {
+      await tx.select({ id: invitations.id }).from(invitations).where(eq(invitations.id, kept!.id)).for("update");
+      const pending = api()
+        .post(`${base}/admin/invitations/import`)
+        .set(admin.headers)
+        .send({ rows: [{ phone: "+919800000061", startYear: "2010" }] })
+        .then((res) => res);
+      for (let i = 0; i < 200; i++) {
+        const { rows } = await ctx.pool.query("select count(*)::int as n from pg_stat_activity where wait_event_type = 'Lock' and datname = current_database()");
+        if (rows[0].n > 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await tx.update(invitations).set({ batchYear: 2009 }).where(eq(invitations.id, kept!.id));
+      // Wrapped, or returning it here would wait for the import, which is waiting for this transaction to commit.
+      return { pending };
+    });
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ created: 0, updated: 0, skipped: 1 });
+    expect(res.body.data.results[0]).toMatchObject({ status: "invalid", message: "Start year: Can't be after the end year on their invitation (2009)" });
+    expect((await ctx.db.select().from(invitations).where(eq(invitations.id, kept!.id)))[0]).toMatchObject({ startYear: 2008, batchYear: 2009 });
   });
 
   it("leaves out a row with a cell too long for the request on its own line, through the apps' chunked import", async () => {
@@ -143,7 +253,7 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     expect(outcome.error).toBeUndefined();
     expect(outcome.result).toMatchObject({ created: 2, updated: 0, skipped: 1 });
     // The header is line 1, so the second data row is line 3.
-    expect(importProblems(outcome.result)).toEqual([{ row: 3, phone: "+917600000102", status: "invalid", message: "Batch is too long to be a year" }]);
+    expect(importProblems(outcome.result)).toEqual([{ row: 3, phone: "+917600000102", status: "invalid", message: "End year is too long to be a year" }]);
     expect((await ctx.db.select().from(invitations)).map((r) => r.fullName).sort()).toEqual(["Asha Rao", "Mina Patel"]);
   });
 
@@ -218,7 +328,7 @@ describe.skipIf(!dbAvailable)("invitations", () => {
       .post(`${base}/admin/profile-fields`)
       .set(admin.headers)
       .send({ key: "roll", label: "Roll", type: "TEXT", memberEditable: false, visibility: "ADMINS" });
-    await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919811111111", name: "Asha Rao", batchYear: 2012, fields: { roll: "EE-42" } }] });
+    await api().post(`${base}/admin/invitations/import`).set(admin.headers).send({ rows: [{ phone: "+919811111111", name: "Asha Rao", startYear: 2008, batchYear: 2012, fields: { roll: "EE-42" } }] });
 
     // Someone else can't join (registration is closed).
     const stranger = await loginAs(ctx, "+919811111199");
@@ -227,7 +337,7 @@ describe.skipIf(!dbAvailable)("invitations", () => {
     const invited = await loginAs(ctx, "+919811111111");
     const h = auth(invited.accessToken);
     const mine = await api().get(`${base}/memberships/invitation`).set(h);
-    expect(mine.body.data).toEqual({ fullName: "Asha Rao", batchYear: 2012, fields: { roll: "EE-42" }, autoApprove: true });
+    expect(mine.body.data).toEqual({ fullName: "Asha Rao", startYear: 2008, batchYear: 2012, fields: { roll: "EE-42" }, autoApprove: true });
     const joined = await api().post(`${base}/memberships`).set(h).send({ ...PROFILE, fullName: "Asha Rao" });
     expect(joined.status).toBe(201);
     expect(joined.body.data.status).toBe("APPROVED");

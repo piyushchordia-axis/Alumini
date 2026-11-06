@@ -237,6 +237,8 @@ export interface InvitationDto {
   phone: string;
   email: string | null;
   fullName: string | null;
+  /** The years to prefill registration with, either of which may be blank: shown through invitationYearsLabel. */
+  startYear: number | null;
   batchYear: number | null;
   status: InvitationStatus;
   /** Past expires_at and not accepted or revoked. */
@@ -285,6 +287,7 @@ export interface InvitePublicDto {
 /** The signed-in person's open invitation to an institution, to prefill registration. */
 export interface MyInvitationDto {
   fullName: string | null;
+  startYear: number | null;
   batchYear: number | null;
   fields: Record<string, ProfileFieldValue>;
   /** Accepting approves the membership straight away. */

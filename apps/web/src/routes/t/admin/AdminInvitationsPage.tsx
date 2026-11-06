@@ -12,10 +12,12 @@ import {
   importProblems,
   importProgressText,
   importResultText,
+  importRowYears,
   importSummaryText,
   invitationActionLabel,
   invitationActionText,
   invitationActions,
+  invitationColumnsHint,
   invitationMeta,
   invitationName,
   invitationStatusFilter,
@@ -100,7 +102,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-semibold text-slate-900">Import a list</h2>
-          <p className="text-sm text-slate-500">A CSV with a phone column, and optionally name, batch, email and your profile field keys. Numbers without a country code use your institution&apos;s country.</p>
+          <p className="text-sm text-slate-500">{invitationColumnsHint(tenant.type)}</p>
           <p className="mt-1 text-sm text-slate-500">{INVITATION_CSV_HINT}</p>
         </div>
         <Button
@@ -108,7 +110,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
           size="sm"
           className="gap-1.5"
           disabled={!fields}
-          onClick={() => fields && saveBlob(new Blob([withBom(invitationTemplateCsv(fields))], { type: "text/csv;charset=utf-8" }), INVITATION_TEMPLATE_FILE)}
+          onClick={() => fields && saveBlob(new Blob([withBom(invitationTemplateCsv(fields, tenant.type))], { type: "text/csv;charset=utf-8" }), INVITATION_TEMPLATE_FILE)}
         >
           <IconDownload size={16} />
           Template
@@ -161,7 +163,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
                 <tr>
                   <th className="py-1 pr-3">Phone</th>
                   <th className="py-1 pr-3">Name</th>
-                  <th className="py-1 pr-3">Batch</th>
+                  <th className="py-1 pr-3">Years</th>
                   <th className="py-1 pr-3">Email</th>
                 </tr>
               </thead>
@@ -170,7 +172,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
                   <tr key={i} className="border-t border-slate-200">
                     <td className="py-1 pr-3 font-mono">{r.phone}</td>
                     <td className="py-1 pr-3">{r.name}</td>
-                    <td className="py-1 pr-3">{r.batchYear}</td>
+                    <td className="py-1 pr-3">{importRowYears(r)}</td>
                     <td className="py-1 pr-3">{r.email}</td>
                   </tr>
                 ))}
