@@ -79,7 +79,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   target membership row), the member (per-member limits), the pair (`lockPair`, which blocks take too), mentorship or
   referral rows, the conversation, a participant. Every emit and push goes to `chatRecipients()` (or `chatRecipientOf`
   for a badge). Chat writes go over REST only; the socket stays server to client. Message bodies and request notes never
-  go into pushes, notifications, audit metadata, job payloads or logs.
+  go into pushes, notifications, audit metadata, job payloads or logs. In the consoles, a chat report's audited view
+  (and the note closing it) never goes into a query or mutation cache: it lives in one component's state (web
+  `ChatReportRow`; mobile `useChatReportView`, which also drops it on blur and in the background, over
+  `chatReportViewStep` in shared `lib/chatReports.ts`), and a link to a report only scrolls to it.
 - **Invisible blocks.** A request or invitation that meets a block gets the normal answer and is stored suppressed
   (`withheld`, `suppressed`, `invite_suppressed`); nobody is told. Tests deep-equal the blocked and unblocked views.
 - **Ways out.** A gated connection (mentorship, referrals) keeps its ways out (own lists, withdraw, end, report, stop)
@@ -279,8 +282,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-  - admin pages not yet in the phone app, which show there as on the web console for now: chat reports, invitations and
-    analytics (README → Known gaps lists them too);
+  - admin pages not yet in the phone app, which show there as on the web console for now: invitations and analytics
+    (README → Known gaps lists them too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

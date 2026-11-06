@@ -655,6 +655,8 @@ try {
     if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the chat reports queue shows a message before anyone asked to see it");
     if (await row.locator("text=Reported message").count()) throw new Error("the chat reports queue shows a message before anyone asked to see it");
     await row.locator("text=recorded in the audit log").waitFor();
+    // The Open tab counts the open reports, as the phone's does.
+    await page.getByRole("tab", { name: /^Open\s*1$/ }).waitFor();
     await shot("a08d-chat-reports-queue");
     await row.locator('button:has-text("View messages")').click();
     await row.locator(`text=${SEEDED_BODY}`).waitFor();
@@ -663,6 +665,24 @@ try {
     await row.locator('button:text-is("Hide")').click();
     await row.locator('button:has-text("View messages")').waitFor();
     if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("hiding the messages left them on the page");
+
+    // A note typed and cancelled (it may quote the message) goes with the messages: the next view's dialog starts empty.
+    const note = page.locator('div[role="dialog"] textarea');
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    await row.locator('button:has-text("Remove message")').click();
+    await note.fill(`He wrote ${SEEDED_BODY}`);
+    await page.click('div[role="dialog"] button:text-is("Cancel")');
+    await page.locator('div[role="dialog"]').waitFor({ state: "detached" });
+    await row.locator('button:text-is("Hide")').click();
+    await row.locator('button:has-text("View messages")').click();
+    await row.locator(`text=${SEEDED_BODY}`).waitFor();
+    await row.locator('button:has-text("Remove message")').click();
+    if ((await note.inputValue()) !== "") throw new Error(`a cancelled note came back with the next view: "${await note.inputValue()}"`);
+    await page.click('div[role="dialog"] button:text-is("Cancel")');
+    await page.locator('div[role="dialog"]').waitFor({ state: "detached" });
+    await row.locator('button:text-is("Hide")').click();
+    await row.locator('button:has-text("View messages")').waitFor();
   });
 
   await step("viewing a chat report writes an audit row", async () => {
@@ -731,6 +751,7 @@ try {
     await page.click('div[role="dialog"] button:has-text("Remove")');
     await page.waitForSelector("text=Report resolved");
     await page.waitForSelector("text=No open chat reports");
+    await page.getByRole("tab", { name: /^Open\s*0$/ }).waitFor();
     await page.click('[role="tab"]:has-text("Resolved")');
     const closed = page.locator("li", { hasText: "Arjun" }).first();
     await closed.locator("text=Message removed").waitFor();

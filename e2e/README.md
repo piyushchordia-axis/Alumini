@@ -159,9 +159,11 @@ Covers:
   name filled in and the three steps; an announcement that also goes by email;
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
-  audit row the view writes, the audit log's Chat reports chip showing only that family and the console's Audit log
-  link then showing the whole log again, with no filter written back, the messages discarded on leaving the page, a
-  report another admin just handled, removing the reported message, and the page on a phone;
+  Open tab counting the open report (1, then 0 once it's resolved), a note typed and cancelled gone from the next
+  view's dialog after Hide, the audit row the view writes, the audit log's Chat reports chip showing only that family
+  and the console's Audit log link then showing the whole log again, with no filter written back, the messages
+  discarded on leaving the page, a report another admin just handled, removing the reported message, and the page on a
+  phone;
 - analytics charts and the members CSV, with the profile's own columns after "Last active" and Rahul's seeded headline
   and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
@@ -257,8 +259,9 @@ Covers:
 - the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", and My profile's link; the
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
   review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
-  still on the web console; Back to More and to My profile; an admin notice tapped in Notifications opening the console,
-  with Back returning to the list; Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
+  still on the web console; Back to More and to My profile; a chat report's notice tapped in Notifications opening the
+  open chat reports (saying the report isn't there, as Samaj has none), with Back returning to the list;
+  Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
   tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
   darker, and the feed after a reload with its post cards painting their own white, the console's home staying on the
   plain page, and Plain putting the page and its grey text back; the console's Settings, reached from the approval
@@ -326,14 +329,32 @@ Covers:
   handled, closing the sheet, saying so and refetching the list; Resolve, keep content with a note, then "No open
   reports" and the note under Resolved; and a report notice (answered by the script) for it saying it has already been
   handled, then, tapped again once the script lists it as open, the Open list fetched again and the report shown with no
-  "already handled" line.
+  "already handled" line;
+- chat reports in the console, as the Samaj admin, the list and every view answered by the script (so no view writes an
+  audit row) and each view the app asks for counted: the tile and the row with the open count, the Open tab with it, the
+  privacy lines, and who reported whom and why with no words anywhere in the page until View messages; the thread
+  oldest first with the reporter's note, "System message", "Reported message" and "Removed", 44px actions, the link to
+  the reported member's page, no sideways scrolling, and Hide taking the words away; the words gone from the page (where
+  hidden screens stay) with that member's page opened over them and after Back, after a tab change, and with the page
+  hidden as when the app goes to the background, each View asked for once; a request report's note with Resolve and no
+  Remove message, while a message's view held back by the script lands after it and is dropped; a view refused by the
+  hourly limit said in its row, one refused as out of date said under the tabs with the list fetched again, and one
+  refused only after another report was opened said nowhere and fetching nothing; the words going when the list's next
+  answer leaves the report out, and not coming back when it returns; a note typed in the Remove sheet kept through
+  Cancel, gone with the sheet when the app goes to the background, and not in the next view's sheet; Remove message
+  with a note refused as already handled, closing the sheet, saying so and fetching the list again; Remove failing
+  after the app went to the background took its sheet, said under the tabs; Dismiss sending its note, saying so, and
+  the report leaving the list and the count; and a chat report's notice opening the list scrolled to its report
+  (twelfth in the list) without opening it, then View there scrolling the row up so its words, down to Hide, are on
+  screen.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
 Android the native navigation doesn't have this quirk.
 
 Not covered by any script: reporting a declined, withdrawn or closed mentorship or referral request's note, and the
-admin's view of a note report (**View request** in Chat reports). The API tests cover them. Nor is the last registration
+admin's view of a note report from the API (**View request** in Chat reports; the phone journey's is answered by the
+script). The API tests cover them. Nor is the last registration
 step's **Join the network** for an invitation at an institution that approves members automatically but has invitation
 auto-approve off, as no seeded institution is set up that way.
 
@@ -688,6 +709,20 @@ waiting for approval. Sign Rahul back in afterwards.
       Members fills the field with "membership." and TalkBack or VoiceOver reads each row's action, time, who acted and
       its details. A row's "membership …" link opens that member's page, and Back returns to the log with Members still
       chosen. Scroll fast to the end: more rows load with no repeats, and the line under them counts what's shown.
+- [ ] Chat reports, signed in as Demo University's admin (`+91 90000 00001`), which has a seeded open report: the row
+      says who reported whom and why, and no words. View messages, then open the app switcher (iPhone: swipe up and
+      hold; Android: Recents): the app's picture there shows no message text, and back in the app the report is closed
+      again (View messages). Do the same by switching to another app and back. Until this passes on both phones,
+      README only says the app means to keep the text out of that picture.
+- [ ] The same with the note sheet open: View messages, Remove message, type a note, then open the app switcher or
+      Recents at once: the picture shows neither the note nor the messages, not even part way through the sheet sliding
+      away. If it does, the sheet has to close without its animation when the app goes inactive. Back in the app, the
+      report is closed, and View messages then Remove message opens an empty note.
+- [ ] With the messages open, VoiceOver or TalkBack reads each message's sender and time, "Reported message" on the
+      reported one, then its words; a long press on the words offers no Copy.
+- [ ] From an open report, open "…'s member page", then go back (iPhone swipe back, Android back button): the report
+      is closed, with no words. Remove message: with the keyboard up, the note box and Remove stay above it on both
+      phones; on Android the back button closes the sheet. Cancel, and Hide.
 
 **Appearance**
 

@@ -16,7 +16,7 @@ const ADMIN_PAYLOADS: Record<string, Record<string, string>> = {
 };
 
 describe("notificationHref in the phone app", () => {
-  it("opens each admin notice's section for an admin, on the item (or member) it names, and the console's home for one not in the phone app yet", () => {
+  it("opens each admin notice's section for an admin, on the item (or member) it names, and the section's list from one that names none", () => {
     const adminTypes = NOTIFICATION_TYPES.filter(isAdminNotification);
     expect(adminTypes).toEqual(Object.keys(ADMIN_PAYLOADS));
     // [with the payload it's sent with, with none]
@@ -24,7 +24,8 @@ describe("notificationHref in the phone app", () => {
       NEW_MEMBER_PENDING: [`/t/demo/admin/members/${ID}`, "/t/demo/admin/members?status=PENDING"],
       CONTENT_PENDING: [`/t/demo/admin/moderation?status=PENDING&type=POST&item=${ID}`, "/t/demo/admin/moderation?status=PENDING"],
       REPORT_FILED: [`/t/demo/admin/reports?status=OPEN&item=${ID}`, "/t/demo/admin/reports?status=OPEN"],
-      CHAT_REPORT_FILED: ["/t/demo/admin", "/t/demo/admin"],
+      // On the report but never opened: opening its messages writes an audit row.
+      CHAT_REPORT_FILED: [`/t/demo/admin/chat-reports?status=OPEN&item=${ID}`, "/t/demo/admin/chat-reports?status=OPEN"],
     };
     for (const type of adminTypes) {
       expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe(hrefs[type]![0]);
@@ -43,6 +44,12 @@ describe("notificationHref in the phone app", () => {
     expect(notificationHref("demo", "CONTENT_PENDING", { contentType: "POST", contentId: "../members" }, { isAdmin: true })).toBe("/t/demo/admin/moderation?status=PENDING");
     expect(notificationHref("demo", "CONTENT_PENDING", { contentType: "NOPE", contentId: ID }, { isAdmin: true })).toBe("/t/demo/admin/moderation?status=PENDING");
     expect(notificationHref("demo", "REPORT_FILED", { reportId: "1 OR 1=1", contentType: "POST", contentId: ID }, { isAdmin: true })).toBe("/t/demo/admin/reports?status=OPEN");
+  });
+
+  it("opens the open chat reports from a chat report that doesn't name one, or names one by something other than an id", () => {
+    for (const data of [{}, { chatReportId: "../members" }, { chatReportId: `${ID}&status=RESOLVED` }, { chatReportId: 7 }, null]) {
+      expect(notificationHref("demo", "CHAT_REPORT_FILED", data, { isAdmin: true }), JSON.stringify(data)).toBe("/t/demo/admin/chat-reports?status=OPEN");
+    }
   });
 
   it("opens nothing from an admin notice for someone who isn't an admin, such as one demoted since", () => {

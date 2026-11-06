@@ -6,8 +6,8 @@ type AdminTarget = Extract<NotificationTarget, { kind: "admin" }>;
 /**
  * The console's screen for an admin target: a request to join opens the member's page (the members waiting, from a
  * notice that didn't name them); content to review the moderation queue, on the item when the notice named it; a report
- * the open reports, on the report; and otherwise the console's home, which shows what's waiting, until the section is in
- * the phone app.
+ * the open reports, on the report; and a chat report the open chat reports, on the report. The console's home, which
+ * shows what's waiting, is the fallback while a section isn't in the phone app.
  */
 function adminTargetHref(slug: string, t: AdminTarget): `/t/${string}` {
   switch (t.section) {
@@ -18,7 +18,8 @@ function adminTargetHref(slug: string, t: AdminTarget): `/t/${string}` {
     case "reports":
       return adminSectionHref(slug, "reports", { status: "OPEN", ...(t.reportId ? { item: t.reportId } : {}) }) ?? adminHomeHref(slug);
     case "chat-reports":
-      return adminHomeHref(slug);
+      // Scrolled to the report but never opened: opening its messages writes an audit row.
+      return adminSectionHref(slug, "chatReports", { status: "OPEN", ...(t.chatReportId ? { item: t.chatReportId } : {}) }) ?? adminHomeHref(slug);
   }
 }
 

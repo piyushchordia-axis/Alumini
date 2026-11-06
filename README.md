@@ -186,7 +186,8 @@ before showing the demo.
   reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
   profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
   the member's page, content waiting on the moderation queue with that item open, a report on the open reports, and a
-  chat report on the dashboard. Its pages are coming to the phone one at a time (see Known gaps); the members list,
+  chat report on the open chat reports, scrolled to it but never opened. Its pages are coming to the phone one at a time
+  (see Known gaps); the members list,
   moderation and reports are there, with the same status tabs and counts, search and filters, Approve all and row
   actions as the web's, scrolling on through the pages, and so is a member's page: their facts and profile, their
   answers to the institution's questions (which admins can edit), their mentor profile (Remove as mentor), Make admin or
@@ -201,7 +202,8 @@ before showing the demo.
   shows it decided elsewhere closes an open Reject and says so. The notice and the list send the status they showed, so
   a screen left open can't overturn another admin's decision: the API refuses (409) and the apps say where the member
   stands now. A reason sheet in the queues closes the same way when another admin got there first, saying so, and the
-  list refreshes.
+  list refreshes. Chat reports are in the phone app too, as on the web (see "Chat reports and admin access"), with the
+  phone's own care for the text a view shows.
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
@@ -896,7 +898,18 @@ because admins can read everything in that view. Instead:
 - **The audited view.** **View messages** is a `POST` that reads only the frozen ids and writes a `chat_report.view`
   audit row, with ids and counts only, in the same transaction (`recordAuditStrict`): if the audit row can't be
   written, no text comes back. The answer isn't cached and the page keeps it in memory only, so a refetch can't write
-  a false audit row and leaving the page discards the text. 120 views an hour per admin.
+  a false audit row and leaving the page discards the text. 120 views an hour per admin. The admin's note on closing a
+  report may quote the message, so both apps send it with a plain call rather than through a mutation, whose cache
+  would keep it, and a note typed and cancelled goes when the messages close.
+- **On the phone.** The phone console's Chat reports shows one report's text at a time, in one screen's state, and
+  drops it whenever that screen isn't the one in front: another screen opened over it (the reported member's page),
+  a tab change, the app going to the background or the app switcher, and the report leaving the list; a note typed in
+  its sheet goes with it. Dropping it as the app leaves the foreground is meant to keep the text out of the picture the
+  phone keeps for its app switcher, but the app clears it only once the system has said so, and whether that comes
+  before the picture (and before a closing sheet has slid away) is a device check not yet run (`e2e/README.md` →
+  "Checks that need a real phone"). An answer or refusal that lands after any of these is dropped. A notice or push
+  opens the list scrolled to the report and never the text, as that would write an audit row. The words can't be
+  selected, and nothing stops a screenshot.
 - **Acting.** **Remove message** turns it into "This message was removed" for everyone in the thread and tells its
   sender "A message you sent was removed", with the admin's note in the app only. **Resolve, keep message** and
   **Dismiss** close the report. Each is audited. Suspending the sender stays on the member's page, which the report
@@ -1259,7 +1272,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   from Android, 48 and 50 megapixel photos, transparent PNG and GIF logos and a large cut-out PNG, cancelling while a
   photo is prepared and iPhone Safari's own HEIC conversion. Appearance added picking a background photo and
   scrolling over one on a low-end Android.
-  The keyboard fix for Android's edge-to-edge windows needs the long forms checked.
+  The keyboard fix for Android's edge-to-edge windows needs the long forms checked. Chat reports added whether the app
+  switcher's and Recents' picture of the phone console is taken before it clears a report's text, or a note in its
+  closing sheet.
 - **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
 **Smaller follow-ups.**
@@ -1330,9 +1345,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
-  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: chat reports,
-    invitations and analytics. Until each lands, its tile on the console's home (chat reports has one) opens nothing,
-    and its admin notices open the console's home.
+  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: invitations and
+    analytics. Neither has a tile on the console's home or an admin notice.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

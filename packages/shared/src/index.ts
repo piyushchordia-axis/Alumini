@@ -36,6 +36,7 @@ export * from "./types/dto";
 export * from "./lib/notifications";
 export * from "./lib/mentorship";
 export * from "./lib/referrals";
+export * from "./lib/chatReports";
 export * from "./lib/profileFields";
 export * from "./lib/csv";
 export * from "./lib/admin";

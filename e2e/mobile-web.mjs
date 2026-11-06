@@ -2405,7 +2405,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Chat reports", "Invitations"];
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Invitations"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2451,16 +2451,16 @@ try {
     if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
-    // Until a section is in the phone app, the home lists it as on the web console. Members, Moderation and Reports are,
-    // so their tiles and rows link (as do the rows of Profile fields, Settings and the Audit log, which the steps after
-    // this use).
+    // Until a section is in the phone app, the home lists it as on the web console. Members, Moderation, Reports and Chat
+    // reports are, so their tiles and rows link (as do the rows of Profile fields, Settings and the Audit log, which the
+    // steps after this use).
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
     const listed = (await page.getByRole("list").filter({ hasText: "Invitations" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
     await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
     await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
     await page.getByRole("link", { name: "Content to review, 0", exact: true }).waitFor();
-    for (const section of ["Moderation", "Reports", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
+    for (const section of ["Moderation", "Reports", "Chat reports", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
     await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
@@ -2483,13 +2483,14 @@ try {
   });
 
   await step("an admin notice tapped in the list opens the console, and Back returns to the list", async () => {
-    // An admin notice other than a request to join opens the console's home until its own section is in the phone app.
+    // A chat report notice opens the open chat reports on its report. Samaj has none, so the screen says it isn't there.
     const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "CHAT_REPORT_FILED", data: { chatReportId: "00000000-0000-4000-8000-0000000000c1" }, title: "A message was reported" });
     try {
       await page.goto(SAMAJ + "/profile/notifications");
       await page.getByText("A message was reported", { exact: true }).click();
-      await page.waitForURL("**/t/shri-gujarati-samaj/admin");
-      await page.getByLabel("Pending members, 2", { exact: true }).waitFor();
+      await page.waitForURL("**/t/shri-gujarati-samaj/admin/chat-reports?status=OPEN&item=00000000-0000-4000-8000-0000000000c1");
+      await page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().waitFor();
+      await page.getByRole("status").filter({ hasText: "That report isn't in this list any more: it may have been handled already." }).locator("visible=true").last().waitFor();
       await backButton().click();
       await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
     } finally {
@@ -3836,6 +3837,488 @@ try {
     } finally {
       await page.unroute(listUrl);
       await notice.stop();
+    }
+  });
+
+  // Chat reports, as the Samaj admin. The list and every view are answered by the script, so no view writes an audit row
+  // and no Samaj chat is needed; the reported member is real, for the link to their page. Each view the app asks for is
+  // counted, as each would be an audit row. Hidden screens stay in the page on the web build, so the words are looked
+  // for in the whole document, attributes too.
+  const CHAT_MARK = "e2e-chat-7Q4X";
+  const MESSAGE_REPORT = "00000000-0000-4000-8000-0000000000d1";
+  const REQUEST_REPORT = "00000000-0000-4000-8000-0000000000d2";
+  const marks = () => page.evaluate((mark) => document.documentElement.outerHTML.split(mark).length - 1, CHAT_MARK);
+  const noMarks = (why) => page.waitForFunction((mark) => !document.documentElement.outerHTML.includes(mark), CHAT_MARK, { timeout: 5000 }).catch(() => Promise.reject(new Error(`the reported words are still in the page ${why}`)));
+  const setAppVisible = (visible) =>
+    page.evaluate((v) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (v ? "visible" : "hidden") });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, visible);
+  // A report's card: the innermost box holding its headline and its own View (or Hide).
+  const chatRow = (headline) =>
+    page
+      .locator("div")
+      .filter({ has: page.getByText(new RegExp(`^${headline} · `)) })
+      .filter({ has: page.getByRole("button", { name: /^(View messages|View request|Hide)$/ }) })
+      .locator("visible=true")
+      .last();
+  const MESSAGE_ROW = "Hetal Shah reported Ravi Mehta";
+  const REQUEST_ROW = "Nisha Modi reported Ravi Mehta";
+  let raviId = null;
+  /**
+   * Answers the chat reports list (two open reports, or with `many`, the message report after eleven others, less those
+   * in `dismissed`), each view (the one for `slow` late by `delay`, and each failing with the next of `viewFails`, taken
+   * as it is asked for), a dismiss (which takes the report off the list) and the dashboard's open count.
+   */
+  const scriptChatReports = async () => {
+    if (!raviId) {
+      const token = await page.evaluate(() => localStorage.getItem("illuminize.access"));
+      const res = await fetch(`${API}/api/v1/t/shri-gujarati-samaj/admin/members?status=APPROVED&q=Ravi`, { headers: { Authorization: `Bearer ${token}` } });
+      raviId = (await res.json()).data?.find((m) => m.fullName === "Ravi Mehta")?.id;
+      if (!raviId) throw new Error("Ravi Mehta isn't among the approved members");
+    }
+    const at = new Date().toISOString();
+    const member = (id, fullName) => ({ id, fullName, avatarUrl: null });
+    const hetal = member("00000000-0000-4000-8000-0000000000d3", "Hetal Shah");
+    const ravi = member(raviId, "Ravi Mehta");
+    const report = (id, targetKind, reason, reporter) => ({ id, targetKind, reason, status: "OPEN", reporter, reported: ravi, resolutionAction: null, resolvedAt: null, createdAt: at });
+    const messageReport = report(MESSAGE_REPORT, "MESSAGE", "HARASSMENT", hetal);
+    const requestReport = report(REQUEST_REPORT, "REFERRAL_NOTE", "SPAM", member("00000000-0000-4000-8000-0000000000d4", "Nisha Modi"));
+    const views = {
+      [MESSAGE_REPORT]: {
+        ...messageReport,
+        details: `He keeps writing ${CHAT_MARK}-details`,
+        noteSnapshot: null,
+        resolutionNote: null,
+        messages: [
+          { id: "00000000-0000-4000-8000-0000000000e1", kind: "SYSTEM", sender: null, body: `Hetal Shah accepted the request ${CHAT_MARK}-system`, removed: false, isTarget: false, createdAt: at },
+          { id: "00000000-0000-4000-8000-0000000000e2", kind: "TEXT", sender: ravi, body: `Answer me or else ${CHAT_MARK}-reported`, removed: false, isTarget: true, createdAt: at },
+          { id: "00000000-0000-4000-8000-0000000000e3", kind: "TEXT", sender: hetal, body: `Please stop ${CHAT_MARK}-removed`, removed: true, isTarget: false, createdAt: at },
+        ],
+      },
+      [REQUEST_REPORT]: { ...requestReport, details: null, noteSnapshot: `Refer me or I'll tell everyone ${CHAT_MARK}-note`, resolutionNote: null, messages: [] },
+    };
+    const others = Array.from({ length: 11 }, (_, i) => report(`00000000-0000-4000-8000-0000000001${String(i).padStart(2, "0")}`, "MESSAGE", "SPAM", member(`00000000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`, `Member ${i + 1}`)));
+    const state = { views: [], lists: 0, dismissed: [], dismissBody: null, slow: null, delay: 0, many: false, viewFails: [] };
+    const open = () => (state.many ? [...others, messageReport] : [messageReport, requestReport]).filter((r) => !state.dismissed.includes(r.id));
+    const listUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports(\?|$)/;
+    const viewUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/([^/]+)\/view$/;
+    const dismissUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/([^/]+)\/dismiss$/;
+    const dashboardUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/dashboard$/;
+    await page.route(listUrl, (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      state.lists += 1;
+      const rows = new URL(route.request().url()).searchParams.get("status") === "OPEN" ? open() : [];
+      return answer(route, 200, { data: rows, page: 1, pageSize: 20, total: rows.length });
+    });
+    await page.route(viewUrl, async (route) => {
+      const id = viewUrl.exec(route.request().url())[1];
+      state.views.push(id);
+      const fail = state.viewFails.shift();
+      if (id === state.slow) await new Promise((resolve) => setTimeout(resolve, state.delay));
+      if (fail) return answer(route, fail.status, { error: { code: fail.code, message: fail.message } });
+      return answer(route, 200, { data: views[id] });
+    });
+    await page.route(dismissUrl, (route) => {
+      const id = dismissUrl.exec(route.request().url())[1];
+      state.dismissed.push(id);
+      state.dismissBody = route.request().postDataJSON();
+      return answer(route, 200, { data: { ...(id === REQUEST_REPORT ? requestReport : messageReport), status: "DISMISSED" } });
+    });
+    await page.route(dashboardUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      try {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { data: { ...(await response.json()).data, openChatReports: open().length } } });
+      } catch {
+        // The console polls its counts, so a request can be cut off by the next step's page load.
+      }
+    });
+    state.stop = async () => {
+      for (const url of [listUrl, viewUrl, dismissUrl, dashboardUrl]) await page.unroute(url);
+    };
+    return state;
+  };
+  const expectViews = (chat, n, why) => {
+    if (chat.views.length !== n) throw new Error(`the app asked for ${chat.views.length} views ${why}, expected ${n}`);
+  };
+  // Every query goes stale (the page's clock moved past their 30 seconds) and is fetched again as after a lost
+  // connection, which leaves the app active: so the list is fetched again with a report's words still open.
+  const refetchStale = async (chat, why) => {
+    const lists = chat.lists;
+    await page.evaluate(() => {
+      const now = Date.now;
+      Date.now = () => now() + 31_000;
+    });
+    await reconnect(page);
+    for (let i = 0; i < 50 && chat.lists === lists; i++) await page.waitForTimeout(100);
+    if (chat.lists === lists) throw new Error(`the list wasn't fetched again ${why}`);
+  };
+  // Whether a note box holds the mark: what is typed is in no attribute, so the page's HTML doesn't show it.
+  const noteHeld = () => page.evaluate((mark) => [...document.querySelectorAll("input, textarea")].some((el) => el.value.includes(mark)), CHAT_MARK);
+
+  await step("chat reports say who reported whom and why, with no words until View, which shows the thread oldest first, and Hide takes it away", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin");
+      // The console's home links the open chat reports by its tile and its row.
+      await shown(page.getByRole("link", { name: "Chat reports, 2 waiting", exact: true })).waitFor();
+      await shown(page.getByRole("link", { name: "Open chat reports, 2", exact: true })).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/admin/chat-reports");
+      await shown(page.getByRole("heading", { name: "Chat reports", exact: true })).waitFor();
+      const open = memberTab("Open");
+      await open.waitFor();
+      if ((await open.getAttribute("aria-selected")) !== "true") throw new Error("chat reports didn't open on Open");
+      if (!/^Open\s*2$/.test((await open.innerText()).trim())) throw new Error(`the Open tab reads "${await open.innerText()}", not its count of 2`);
+      await shown(page.getByText("Private messages members reported. You see a message only if you choose to, and never a whole conversation.", { exact: true })).waitFor();
+      await shown(page.getByText("Messages you open are hidden again when you leave this screen, change tab or switch to another app. Seeing them again is another recorded view.", { exact: true })).waitFor();
+      const row = chatRow(MESSAGE_ROW);
+      for (const text of ["Harassment", "Message", "Each view is recorded in the audit log."]) await row.getByText(text, { exact: true }).waitFor();
+      await chatRow(REQUEST_ROW).getByText("Referral request", { exact: true }).waitFor();
+      if (await marks()) throw new Error("the chat reports list shows reported words before anyone asked to see them");
+      expectViews(chat, 0, "before any View");
+
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      expectViews(chat, 1, "after one View");
+      await row.getByText(`He keeps writing ${CHAT_MARK}-details`).waitFor();
+      for (const text of ["Reported message", "System message", "Removed"]) await row.getByText(text, { exact: true }).waitFor();
+      const thread = (await row.getByRole("listitem").allInnerTexts()).map((t) => /-(system|reported|removed)$/.exec(t.trim())?.[1]);
+      if (thread.join() !== "system,reported,removed") throw new Error(`the thread reads ${thread.join(", ")}, not oldest first`);
+      await row.getByRole("link", { name: "Ravi Mehta's member page", exact: true }).waitFor();
+      for (const name of ["Remove message", "Resolve, keep message", "Dismiss", "Hide"]) {
+        const box = await row.getByRole("button", { name, exact: true }).boundingBox();
+        if (!box || box.height < 44) throw new Error(`"${name}" is ${box?.height}px tall, under 44px`);
+      }
+      await fitsPhone("chat reports with a thread open", row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }));
+      await shot("m19-admin-chat-report");
+      await row.getByRole("button", { name: "Hide", exact: true }).click();
+      await noMarks("after Hide");
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      expectViews(chat, 1, "after Hide");
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("chat report words go when the member's page opens over them, when the tab changes and when the app goes to the background", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const row = chatRow(MESSAGE_ROW);
+      const reported = row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true });
+      // The member page, pushed within the console, leaves this screen mounted under it.
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await reported.waitFor();
+      await row.getByRole("link", { name: "Ravi Mehta's member page", exact: true }).click();
+      await page.waitForURL(`**/t/shri-gujarati-samaj/admin/members/${raviId}`);
+      await shown(page.getByRole("heading", { name: "Ravi Mehta", exact: true })).waitFor();
+      await noMarks("with the member's page open over them");
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/admin/chat-reports");
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      if (await marks()) throw new Error("the reported words came back with Back");
+
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await reported.waitFor();
+      await memberTab("Resolved").click();
+      await page.waitForURL(/status=RESOLVED/);
+      await shown(page.getByText("No resolved chat reports", { exact: true })).waitFor();
+      await noMarks("after changing tab");
+      await memberTab("Open").click();
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      if (await marks()) throw new Error("the reported words came back with the Open tab");
+
+      // What react-native-web's AppState reads, as the app switcher or another app would make it.
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await reported.waitFor();
+      await setAppVisible(false);
+      try {
+        await noMarks("with the app in the background");
+      } finally {
+        await setAppVisible(true);
+      }
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      if (await marks()) throw new Error("the reported words came back with the app");
+      expectViews(chat, 3, "for three Views, none asked for again by itself");
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("a request report shows its note with Resolve and no Remove message, and a late answer to another report is dropped", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const message = chatRow(MESSAGE_ROW);
+      const request = chatRow(REQUEST_ROW);
+      await message.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      // The message's view lands late, after the request was opened in its place: it must not show.
+      chat.slow = MESSAGE_REPORT;
+      chat.delay = 1500;
+      await message.getByRole("button", { name: "View messages", exact: true }).click();
+      for (let i = 0; i < 50 && chat.views.length < 1; i++) await page.waitForTimeout(50);
+      await request.getByRole("button", { name: "View request", exact: true }).click();
+      await request.getByText(`Refer me or I'll tell everyone ${CHAT_MARK}-note`, { exact: true }).waitFor();
+      await request.getByRole("button", { name: "Resolve", exact: true }).waitFor();
+      if (await request.getByRole("button", { name: "Remove message", exact: true }).count()) throw new Error("a request report offers Remove message");
+      await page.waitForTimeout(2500);
+      expectViews(chat, 2, "for the two Views");
+      if ((await page.content()).includes(`${CHAT_MARK}-reported`)) throw new Error("the late answer brought the message's words back");
+      await request.getByText(`Refer me or I'll tell everyone ${CHAT_MARK}-note`, { exact: true }).waitFor();
+      await message.getByRole("button", { name: "View messages", exact: true }).waitFor();
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("a view refused says why: in its row when limited, under the tabs with the list fetched again when out of date, and not at all when it lands late", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const message = chatRow(MESSAGE_ROW);
+      const request = chatRow(REQUEST_ROW);
+      // Over the hourly limit: said in the report's own row, and no words.
+      chat.viewFails.push({ status: 429, code: "RATE_LIMITED", message: "e2e too many views" });
+      await message.getByRole("button", { name: "View messages", exact: true }).click();
+      await message.getByRole("status").filter({ hasText: "e2e too many views" }).waitFor();
+      await message.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      if (await marks()) throw new Error("a view refused by the limit showed words");
+      if ((await page.getByRole("status").filter({ hasText: "e2e too many views" }).locator("visible=true").count()) !== 1) throw new Error("a view refused by the limit was said under the tabs as well as in its row");
+
+      // Gone since, as when another admin's action took it: said under the tabs, and the list fetched again.
+      chat.viewFails.push({ status: 404, code: "NOT_FOUND", message: "e2e report gone" });
+      const lists = chat.lists;
+      await request.getByRole("button", { name: "View request", exact: true }).click();
+      await statusSays("e2e report gone").waitFor();
+      for (let i = 0; i < 50 && chat.lists === lists; i++) await page.waitForTimeout(100);
+      if (chat.lists === lists) throw new Error("the list wasn't fetched again after a view refused as out of date");
+      await request.getByRole("button", { name: "View request", exact: true }).waitFor();
+      if (await message.getByRole("status").filter({ hasText: "e2e too many views" }).count()) throw new Error("the limit's line stayed in its row after another View");
+      if (await marks()) throw new Error("a view refused as out of date showed words");
+
+      // Refused, but only after the request was opened in its place: dropped like a late answer, so nothing is said
+      // about a report the admin has left, and nothing fetched.
+      chat.slow = MESSAGE_REPORT;
+      chat.delay = 1500;
+      chat.viewFails.push({ status: 409, code: "INVALID_TRANSITION", message: "e2e late refusal" });
+      await message.getByRole("button", { name: "View messages", exact: true }).click();
+      for (let i = 0; i < 50 && chat.views.length < 3; i++) await page.waitForTimeout(50);
+      await request.getByRole("button", { name: "View request", exact: true }).click();
+      await request.getByText(`Refer me or I'll tell everyone ${CHAT_MARK}-note`, { exact: true }).waitFor();
+      const before = chat.lists;
+      await page.waitForTimeout(2500);
+      expectViews(chat, 4, "for the four Views");
+      if (await page.getByRole("status").filter({ hasText: "e2e late refusal" }).count()) throw new Error("a refusal that landed late was said");
+      if (chat.lists !== before) throw new Error("a refusal that landed late fetched the list again");
+      await request.getByText(`Refer me or I'll tell everyone ${CHAT_MARK}-note`, { exact: true }).waitFor();
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("a report that leaves the list takes its words with it, and they don't come back with the report", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const row = chatRow(MESSAGE_ROW);
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      // Closed by another admin, which only the list's next answer shows: the app stays active and the screen in front.
+      chat.dismissed.push(MESSAGE_REPORT);
+      await refetchStale(chat, "with the report closed elsewhere");
+      await page.getByText(new RegExp(`^${MESSAGE_ROW} · `)).waitFor({ state: "detached" });
+      await noMarks("with the report gone from the list");
+      // Back in the list, as when it was reopened or the list changed under it: closed, and not asked for by itself.
+      chat.dismissed.length = 0;
+      await refetchStale(chat, "with the report back");
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+      if (await marks()) throw new Error("the words came back with the report");
+      expectViews(chat, 1, "with the report gone and back");
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("a note typed in the sheet goes with the words when the app goes to the background", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const row = chatRow(MESSAGE_ROW);
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      const sheet = shown(page.getByRole("dialog", { name: "Remove this message?", exact: true }));
+      const note = sheet.getByPlaceholder("Optional note");
+      // A note quoting the message, cancelled: kept for the next try while the report stays open.
+      await row.getByRole("button", { name: "Remove message", exact: true }).click();
+      await note.fill(`He wrote ${CHAT_MARK}-quoted`);
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await row.getByRole("button", { name: "Remove message", exact: true }).click();
+      if ((await note.inputValue()) !== `He wrote ${CHAT_MARK}-quoted`) throw new Error("Cancel lost the note while the report stayed open");
+      await setAppVisible(false);
+      try {
+        await sheet.waitFor({ state: "hidden" });
+        await noMarks("with the sheet open and the app in the background");
+        if (await noteHeld()) throw new Error("the note stayed in the page with the app in the background");
+      } finally {
+        await setAppVisible(true);
+      }
+      // Seeing the words again is another View, and its sheet starts with no note.
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Remove message", exact: true }).click();
+      if ((await note.inputValue()) !== "") throw new Error(`the note came back with the next View: "${await note.inputValue()}"`);
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await row.getByRole("button", { name: "Hide", exact: true }).click();
+      await noMarks("after Hide");
+      expectViews(chat, 2, "for two Views");
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("Remove message answered as already handled closes the sheet, says so and fetches the list again, the words gone", async () => {
+    const chat = await scriptChatReports();
+    const resolveUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/[^/]+\/resolve$/;
+    const sent = [];
+    await page.route(resolveUrl, (route) => {
+      sent.push(route.request().postDataJSON());
+      return answer(route, 409, { error: { code: "INVALID_TRANSITION", message: "This report has already been handled" } });
+    });
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const row = chatRow(MESSAGE_ROW);
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Remove message", exact: true }).click();
+      const sheet = shown(page.getByRole("dialog", { name: "Remove this message?", exact: true }));
+      await sheet.getByText("Everyone in the thread sees that it was removed. The sender is notified and sees your note in the app. All open reports on it are resolved.", { exact: true }).waitFor();
+      await sheet.getByPlaceholder("Optional note").fill("Threatening another member");
+      const lists = chat.lists;
+      await sheet.getByRole("button", { name: "Remove", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays("This report has already been handled").waitFor();
+      for (let i = 0; i < 50 && chat.lists === lists; i++) await page.waitForTimeout(100);
+      if (chat.lists === lists) throw new Error("the list wasn't fetched again after the refusal");
+      if (sent.length !== 1 || sent[0].action !== "REMOVE_MESSAGE" || sent[0].note !== "Threatening another member") throw new Error(`Remove sent ${JSON.stringify(sent)}`);
+      await noMarks("after the refusal");
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+    } finally {
+      await page.unroute(resolveUrl);
+      await chat.stop();
+    }
+  });
+
+  await step("Remove message failing after the app went to the background, which took the sheet, says so on the screen", async () => {
+    const chat = await scriptChatReports();
+    const resolveUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/[^/]+\/resolve$/;
+    let asked = 0;
+    let release = () => {};
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(resolveUrl, async (route) => {
+      asked += 1;
+      await held;
+      return answer(route, 500, { error: { code: "INTERNAL", message: "e2e INTERNAL" } });
+    });
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const row = chatRow(MESSAGE_ROW);
+      await row.getByRole("button", { name: "View messages", exact: true }).click();
+      await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Remove message", exact: true }).click();
+      const sheet = shown(page.getByRole("dialog", { name: "Remove this message?", exact: true }));
+      await sheet.getByPlaceholder("Optional note").fill("Threatening another member");
+      await sheet.getByRole("button", { name: "Remove", exact: true }).click();
+      for (let i = 0; i < 50 && !asked; i++) await page.waitForTimeout(100);
+      if (!asked) throw new Error("Remove sent nothing");
+      // On its way when the app goes to the background, which takes the words and the sheet with its note.
+      await setAppVisible(false);
+      try {
+        await sheet.waitFor({ state: "hidden" });
+        await noMarks("with Remove on its way and the app in the background");
+      } finally {
+        await setAppVisible(true);
+      }
+      release();
+      await statusSays("The report wasn't resolved: e2e INTERNAL").waitFor();
+      await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
+    } finally {
+      release();
+      await page.unroute(resolveUrl);
+      await chat.stop();
+    }
+  });
+
+  await step("Dismiss sends its note, says so, and the report leaves the list", async () => {
+    const chat = await scriptChatReports();
+    try {
+      await page.goto(SAMAJ + "/admin/chat-reports");
+      const request = chatRow(REQUEST_ROW);
+      await request.getByRole("button", { name: "View request", exact: true }).click();
+      await request.getByText(`Refer me or I'll tell everyone ${CHAT_MARK}-note`, { exact: true }).waitFor();
+      await request.getByRole("button", { name: "Dismiss", exact: true }).click();
+      const sheet = shown(page.getByRole("dialog", { name: "Dismiss this report", exact: true }));
+      await sheet.getByPlaceholder("Optional note").fill("A misunderstanding, sorted out");
+      await sheet.getByRole("button", { name: "Dismiss", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays("Report dismissed").waitFor();
+      if (chat.dismissed.join() !== REQUEST_REPORT || chat.dismissBody?.note !== "A misunderstanding, sorted out") throw new Error(`Dismiss sent ${JSON.stringify(chat.dismissBody)} for ${chat.dismissed.join()}`);
+      await page.getByText(new RegExp(`^${REQUEST_ROW} · `)).waitFor({ state: "detached" });
+      await noMarks("after the dismissal");
+      await shown(page.getByRole("tab", { name: /^Open\s*1$/ })).waitFor();
+    } finally {
+      await chat.stop();
+    }
+  });
+
+  await step("a chat report notice opens the open chat reports scrolled to its report, and never opens it", async () => {
+    const chat = await scriptChatReports();
+    chat.many = true;
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "CHAT_REPORT_FILED", data: { chatReportId: MESSAGE_REPORT }, title: "A message was reported" });
+    try {
+      await page.goto(SAMAJ + "/profile/notifications");
+      await page.getByText("A message was reported", { exact: true }).click();
+      await page.waitForURL(`**/t/shri-gujarati-samaj/admin/chat-reports?status=OPEN&item=${MESSAGE_REPORT}`);
+      // Twelfth in the list, well below the fold until the screen scrolls to it.
+      const view = chatRow(MESSAGE_ROW).getByRole("button", { name: "View messages", exact: true });
+      let box = null;
+      for (let i = 0; i < 50; i++) {
+        box = await view.boundingBox().catch(() => null);
+        if (box && box.y >= 0 && box.y + box.height <= 844) break;
+        await page.waitForTimeout(100);
+      }
+      if (!box || box.y < 0 || box.y + box.height > 844) throw new Error(`the linked report's View is at ${JSON.stringify(box)}, not on screen`);
+      await page.waitForTimeout(1000);
+      expectViews(chat, 0, "from a notice");
+      if (await marks()) throw new Error("a notice opened the reported words");
+
+      // Opened at the foot of the screen, its words would reach below it: the row's top is scrolled up into view, with
+      // everything down to Hide on screen.
+      await view.evaluate((el) => el.scrollIntoView({ block: "end" }));
+      await page.waitForTimeout(300);
+      await view.click();
+      const row = chatRow(MESSAGE_ROW);
+      const hide = row.getByRole("button", { name: "Hide", exact: true });
+      await hide.waitFor();
+      expectViews(chat, 1, "for one View");
+      const tabs = await shown(page.getByRole("tablist")).boundingBox();
+      const headline = row.getByText(new RegExp(`^${MESSAGE_ROW} · `));
+      let boxes = null;
+      for (let i = 0; i < 30; i++) {
+        boxes = { headline: await headline.boundingBox(), hide: await hide.boundingBox() };
+        if (boxes.headline && boxes.hide && boxes.headline.y >= tabs.y + tabs.height - 1 && boxes.hide.y + boxes.hide.height <= 844) break;
+        await page.waitForTimeout(100);
+      }
+      if (!(boxes.headline && boxes.hide && boxes.headline.y >= tabs.y + tabs.height - 1 && boxes.hide.y + boxes.hide.height <= 844)) throw new Error(`the opened report wasn't scrolled into view: ${JSON.stringify(boxes)}, the tabs ending at ${tabs.y + tabs.height}`);
+      await hide.click();
+      await noMarks("after Hide");
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
+    } finally {
+      await notice.stop();
+      await chat.stop();
     }
   });
 
