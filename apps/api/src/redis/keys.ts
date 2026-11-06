@@ -15,8 +15,8 @@ export const keys = {
   cacheTenantsList: () => `cache:tenants:list`,
   /** Versioned: bump when the cached tenant/settings row shape changes, so old entries are not revived. */
   cacheTenant: (slug: string) => `cache:tenant:v5:${slug}`,
-  /** Versioned like cacheTenant: v3 added the industries, skills and fields of study. */
-  cacheDirectoryFilters: (tenantId: string) => `cache:directory:filters:v3:${tenantId}`,
+  /** Versioned like cacheTenant: v3 added the industries, skills and fields of study; v4 has `years` for `batchYears`. */
+  cacheDirectoryFilters: (tenantId: string) => `cache:directory:filters:v4:${tenantId}`,
   /** An institution's active profile fields (definitions only). */
   cacheProfileFields: (tenantId: string) => `cache:profile-fields:v1:${tenantId}`,
   rateLimit: (bucket: string, key: string) => `rl:${bucket}:${key}`,

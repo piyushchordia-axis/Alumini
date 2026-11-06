@@ -6,7 +6,7 @@ import { keys } from "../redis/keys";
 import { directoryFacets, findApprovedMemberWithUser, searchDirectory } from "../repositories/directory.repo";
 import { openToWorkSet } from "../repositories/memberships.repo";
 import { listedMentorsAmong } from "../repositories/mentorship.repo";
-import type { MembershipRow, TenantContext } from "../types/request";
+import type { MembershipRow, TenantContext, TenantRow } from "../types/request";
 import { answersForOne, getActiveFields } from "./profileFields.service";
 
 /**
@@ -26,11 +26,11 @@ export async function searchMembers(ctx: AppContext, tenantCtx: TenantContext, v
   };
 }
 
-export async function getDirectoryFilters(ctx: AppContext, tenantId: string): Promise<DirectoryFiltersDto> {
-  const key = keys.cacheDirectoryFilters(tenantId);
+export async function getDirectoryFilters(ctx: AppContext, tenant: Pick<TenantRow, "id" | "timezone">): Promise<DirectoryFiltersDto> {
+  const key = keys.cacheDirectoryFilters(tenant.id);
   const cached = await ctx.redis.get(key);
   if (cached) return JSON.parse(cached) as DirectoryFiltersDto;
-  const [facets, fields] = await Promise.all([directoryFacets(ctx.db, tenantId), getActiveFields(ctx, tenantId)]);
+  const [facets, fields] = await Promise.all([directoryFacets(ctx.db, tenant), getActiveFields(ctx, tenant.id)]);
   const out: DirectoryFiltersDto = {
     ...facets,
     fields: fields

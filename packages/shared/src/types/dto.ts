@@ -1096,6 +1096,9 @@ export interface TenantAnalyticsDto {
     events: number[];
   };
   coverage: {
+    /** Which year `batches` counts: the end year (BATCH), or at a community, where most have no end, the start (JOINED). */
+    yearsOf: "BATCH" | "JOINED";
+    /** Approved members per year, oldest first. */
     batches: CountRow[];
     cities: CountRow[];
     countries: CountRow[];
@@ -1307,7 +1310,8 @@ export interface ModerationItemDto {
 }
 
 export interface DirectoryFiltersDto {
-  batchYears: number[];
+  /** The years "Were there in" offers: every year from the first a member joined to the last anyone was there (this year at most), newest first. */
+  years: number[];
   cities: string[];
   countries: string[];
   companies: string[];

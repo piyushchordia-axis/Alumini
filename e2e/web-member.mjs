@@ -599,6 +599,20 @@ try {
     await page.click('button:has-text("Hide filters")');
 
     await page.waitForSelector("text=Priya Nair");
+    // Were there in, beside the search: Priya was here 2008–2012, so in 2012 and not in 2013. "Any year" takes it off,
+    // which brings her back from an empty list.
+    const thereIn = page.getByLabel("Were there in", { exact: true });
+    const option2012 = await thereIn.locator('option[value="2012"]').textContent();
+    if (option2012 !== "Were there in 2012") throw new Error(`the year filter offers 2012 as "${option2012}"`);
+    await thereIn.selectOption("2013");
+    await page.getByText("No members match", { exact: true }).waitFor();
+    await thereIn.selectOption("2012");
+    await page.locator("a", { hasText: "Priya Nair" }).waitFor();
+    await thereIn.selectOption("2013");
+    await page.getByText("No members match", { exact: true }).waitFor();
+    await thereIn.selectOption("");
+    await page.locator("a", { hasText: "Priya Nair" }).waitFor();
+    if ((await thereIn.inputValue()) !== "") throw new Error(`"Any year" leaves the year filter at ${await thereIn.inputValue()}`);
     // A seeded mentor, which the directory says on her card, with her headline in place of her role.
     const priya = page.locator("a", { hasText: "Priya Nair" });
     await priya.getByText("Mentor", { exact: true }).waitFor();

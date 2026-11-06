@@ -903,6 +903,17 @@ try {
     if (await card.locator("svg[aria-label^='New members per week']").count()) throw new Error("the New members chart still shows beside its table");
     await tableSwitch.click();
     await card.locator("svg[aria-label^='New members per week']").waitFor();
+    // A university counts its members by the year they finish: Rahul and Priya's 2012 among them.
+    const batches = page.locator("section").filter({ has: page.getByRole("heading", { name: "Members by batch", exact: true }) });
+    await batches.locator("svg[aria-label='Members by batch']").waitFor();
+    await batches.getByRole("button", { name: "Table", exact: true }).click();
+    const batchTable = batches.getByRole("table", { name: "Members by batch", exact: true });
+    await batchTable.getByRole("columnheader").first().waitFor();
+    const batchColumns = await batchTable.getByRole("columnheader").allTextContents();
+    if (batchColumns.join() !== "Batch,Members") throw new Error(`the Members by batch table has the columns ${batchColumns.join(", ")}`);
+    await batchTable.getByRole("cell", { name: "2012", exact: true }).waitFor();
+    await batches.getByRole("button", { name: "Table", exact: true }).click();
+    await batches.locator("svg[aria-label='Members by batch']").waitFor();
     // Six months, with the 12 weeks' charts kept up and "Updating…" said while the script holds the answer.
     const rangeUrl = "**/api/v1/t/demo-university/admin/analytics?weeks=26";
     let release;
@@ -924,13 +935,14 @@ try {
     if (await updating.count()) throw new Error(`"Updating…" stays once the new range has loaded`);
     const csv = await download(() => page.click('button:has-text("Members CSV")'));
     if (!/^demo-university-members-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
-    if (!csv.text.startsWith("\uFEFFName,Phone,Email,")) throw new Error("members CSV is missing its BOM or header");
+    if (!csv.text.startsWith("\uFEFFName,Phone,Email,Start year,End year,Status,")) throw new Error(`members CSV is missing its BOM, or its header starts ${JSON.stringify(csv.text.slice(0, 60))}`);
     const lines = csv.text.split("\r\n");
     if (!lines[0].includes("Alumni office notes")) throw new Error("admin-only profile question missing from the export");
     // The profile's own details come after "Last active", before the institution's questions; Rahul's are seeded.
     if (!lines[0].includes("Last active,Headline,Industry,Started working,Skills,Degree,Field of study,Past roles,Studies elsewhere,")) throw new Error(`the members CSV's profile columns are missing or out of place: ${lines[0]}`);
     const rahul = lines.find((l) => l.startsWith("Rahul Mehta,"));
     if (!rahul?.includes("Founder and CEO of Zylo Labs") || !rahul.includes("Fundraising; Lending")) throw new Error(`Rahul's profile details are missing from the export: ${rahul}`);
+    if (!/^Rahul Mehta,[^,]*,[^,]*,2008,2012,Approved,/.test(rahul)) throw new Error(`Rahul's years aren't 2008 and 2012 in the export: ${rahul.slice(0, 80)}`);
   });
 
   await step("the app's header links to the console on a phone, and every admin page fits one", async () => {

@@ -180,9 +180,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     takes 9-digit Indian ones (the seed has them).
     Regenerate countries via `node packages/shared/scripts/generate-countries.mjs` after changing length rules.
   - **Composer.** Avatar top-aligned to the textarea; Add image / Poll / Post live in one footer tray inside the card.
-  - **Directory and Jobs.** Search plus a filter or two in view (web directory: batch; Jobs on both apps: type and Can
-    refer; the mobile directory shows search alone); the rest behind More filters (web) / Filters (mobile), not a
-    six-column slab.
+  - **Directory and Jobs.** Search plus a filter or two in view (web directory: "Were there in", a year; Jobs on both
+    apps: type and Can refer; the mobile directory shows search alone); the rest behind More filters (web) / Filters
+    (mobile), not a six-column slab.
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.

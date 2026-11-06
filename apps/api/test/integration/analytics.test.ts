@@ -171,6 +171,7 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     expect(d.coverage.cities[0]).toEqual({ label: "Mumbai", count: 3 }); // the admin lives in Mumbai too; spelling variants merge
     expect(d.coverage.cities).toHaveLength(11);
     expect(d.coverage.cities[10]).toEqual({ label: "Other", count: 3 });
+    expect(d.coverage.yearsOf).toBe("BATCH");
     expect(d.coverage.batches).toEqual([
       { label: "2010", count: 8 },
       { label: "2011", count: 7 },
@@ -185,11 +186,37 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     expect(d.invites).toEqual({ total: 3, sent: 2, accepted: 1 });
   });
 
+  it("counts a community's members by the year they joined, and elsewhere only the members with a batch", async () => {
+    // Most of a community's members have no end year: it counts the year they joined, oldest first.
+    const { tenant: samaj } = await createTenant(ctx, { type: "OTHER", name: "Analytics Samaj" });
+    const samajAdmin = await memberSession(ctx, samaj.id, { role: "TENANT_ADMIN", startYear: 2005, batchYear: null });
+    for (const [startYear, batchYear] of [[2012, null], [1996, null], [1996, 2010]] as const) await createMembership(ctx, samaj.id, (await createUser(ctx)).id, { startYear, batchYear });
+    await createMembership(ctx, samaj.id, (await createUser(ctx)).id, { startYear: 1996, batchYear: null, status: "PENDING" });
+    const community = (await api().get(`/api/v1/t/${samaj.slug}/admin/analytics`).set(samajAdmin.headers)).body.data;
+    expect(community.coverage.yearsOf).toBe("JOINED");
+    expect(community.coverage.batches).toEqual([
+      { label: "1996", count: 2 },
+      { label: "2005", count: 1 },
+      { label: "2012", count: 1 },
+    ]);
+
+    // A college counts the year they finish. An end left blank (the institution was a community once) is no batch.
+    const { tenant, admin, base } = await setup();
+    await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { startYear: 2008, batchYear: 2012 });
+    await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { startYear: 2008, batchYear: null });
+    const college = (await api().get(`${base}/analytics`).set(admin.headers)).body.data;
+    expect(college.coverage.yearsOf).toBe("BATCH");
+    expect(college.coverage.batches).toEqual([
+      { label: "2010", count: 1 },
+      { label: "2012", count: 1 },
+    ]);
+  });
+
   it("exports members as a UTF-8 CSV with every field, escaped against spreadsheet formulas, and audits it", async () => {
     const { tenant, admin, base } = await setup();
     const u = await createUser(ctx, { phone: "+919811122233" });
     await ctx.db.update(users).set({ email: "asha@example.com", emailVerifiedAt: new Date() }).where(eq(users.id, u.id));
-    const m = await createMembership(ctx, tenant.id, u.id, { fullName: 'Rao, "Asha"', companyName: "=HYPERLINK(\"http://x\")", city: "Pune", country: "IN", approvedAt: new Date("2024-03-10T20:00:00Z") });
+    const m = await createMembership(ctx, tenant.id, u.id, { fullName: 'Rao, "Asha"', startYear: 2009, batchYear: 2013, companyName: "=HYPERLINK(\"http://x\")", city: "Pune", country: "IN", approvedAt: new Date("2024-03-10T20:00:00Z") });
     await ctx.db
       .update(memberships)
       .set({
@@ -228,16 +255,17 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     const rows = parseRows(body);
     expect(rows[0]!.slice(-2)).toEqual(["House", "Admin notes"]);
     const asha = rows.find((r) => r[0] === 'Rao, "Asha"')!;
-    expect(asha.slice(0, 3)).toEqual(["Rao, \"Asha\"", "'+919811122233", "asha@example.com"]);
-    expect(asha[7]).toBe("'=HYPERLINK(\"http://x\")");
-    expect(asha[10]).toBe("India");
-    expect(asha[13]).toBe("2024-03-11"); // approved late evening UTC: the next day in India
+    expect(rows[0]!.slice(0, 6)).toEqual(["Name", "Phone", "Email", "Start year", "End year", "Status"]);
+    expect(asha.slice(0, 5)).toEqual(["Rao, \"Asha\"", "'+919811122233", "asha@example.com", "2009", "2013"]);
+    expect(asha[8]).toBe("'=HYPERLINK(\"http://x\")");
+    expect(asha[11]).toBe("India");
+    expect(asha[14]).toBe("2024-03-11"); // approved late evening UTC: the next day in India
     expect(asha.slice(-2)).toEqual(["Ganga; North", "Donor"]);
     expect(body).toContain('"Rao, ""Asha"""');
-    // The profile's own details come between "Last active" (column 14) and the institution's questions, a list in one cell.
+    // The profile's own details come between "Last active" (column 15) and the institution's questions, a list in one cell.
     const details = ["Headline", "Industry", "Started working", "Skills", "Degree", "Field of study", "Past roles", "Studies elsewhere", "LinkedIn", "Website", "GitHub", "Instagram", "X", "Open to"];
-    expect(rows[0]!.slice(14)).toEqual(["Last active", ...details, "House", "Admin notes"]);
-    expect(asha.slice(15, 15 + details.length)).toEqual([
+    expect(rows[0]!.slice(15)).toEqual(["Last active", ...details, "House", "Admin notes"]);
+    expect(asha.slice(16, 16 + details.length)).toEqual([
       "'@payments, at scale",
       "Banking and finance",
       "2014",
@@ -255,8 +283,8 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     ]);
     const bala = rows.find((r) => r[0] === "Bala Unconfirmed")!;
     expect(bala[2]).toBe(""); // unconfirmed addresses are left out
-    expect(bala[4]).toBe("Pending approval");
-    expect(bala.slice(15, 15 + details.length)).toEqual(details.map(() => ""));
+    expect(bala[5]).toBe("Pending approval");
+    expect(bala.slice(16, 16 + details.length)).toEqual(details.map(() => ""));
     expect(rows).toHaveLength(4);
 
     const [entry] = await ctx.db.select().from(auditLog).where(eq(auditLog.action, "export.members"));
@@ -272,7 +300,7 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     const res = await csvRequest(api().get(`/api/v1/t/${tenant.slug}/admin/exports/members.csv`).set(admin.headers));
     expect(res.status).toBe(200);
     const [header] = parseRows(res.body as string);
-    expect(header!.slice(14)).toEqual(["Last active", "Headline", "Industry", "Started working", "Skills", "Past roles", "Studies elsewhere", "LinkedIn", "Website", "GitHub", "Instagram", "X", "Open to"]);
+    expect(header!.slice(15)).toEqual(["Last active", "Headline", "Industry", "Started working", "Skills", "Past roles", "Studies elsewhere", "LinkedIn", "Website", "GitHub", "Instagram", "X", "Open to"]);
   });
 
   it("streams every member exactly once across batches", async () => {
@@ -294,7 +322,7 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
   it("exports activity per member for the chosen weeks", async () => {
     const { tenant, admin, base } = await setup();
     const r = analyticsRange(tenant.timezone, 4);
-    const a = await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { fullName: "Asha", approvedAt: new Date("2021-01-01") });
+    const a = await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { fullName: "Asha", startYear: 2009, batchYear: 2013, approvedAt: new Date("2021-01-01") });
     await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { fullName: "Never approved", status: "PENDING" });
     await ctx.db.insert(memberActivityDays).values([
       { tenantId: tenant.id, membershipId: a.id, day: r.firstWeek },
@@ -309,9 +337,22 @@ describe.skipIf(!dbAvailable)("admin analytics and exports", () => {
     const res = await csvRequest(api().get(`${base}/exports/activity.csv?weeks=4`).set(admin.headers));
     expect(res.headers["content-disposition"]).toContain(`${tenant.slug}-activity-${r.firstWeek}-to-${r.today}.csv`);
     const rows = parseRows(res.body as string);
-    expect(rows[0]).toEqual(["Name", "Phone", "Batch", "Status", "Active days", "Posts", "Comments", "Jobs", "Events", "Last active"]);
+    expect(rows[0]).toEqual(["Name", "Phone", "Start year", "End year", "Status", "Active days", "Posts", "Comments", "Jobs", "Events", "Last active"]);
     expect(rows.map((x) => x[0])).toEqual(["Name", "Admin Person", "Asha"]);
-    expect(rows[2]!.slice(4, 9)).toEqual(["2", "2", "0", "0", "0"]);
+    expect(rows[2]!.slice(2, 5)).toEqual(["2009", "2013", "Approved"]);
+    expect(rows[2]!.slice(5, 10)).toEqual(["2", "2", "0", "0", "0"]);
+  });
+
+  it("leaves the end year blank in both CSVs for a community member who still belongs", async () => {
+    const { tenant } = await createTenant(ctx, { type: "OTHER" });
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", fullName: "Samaj Admin", startYear: 2005, batchYear: null, approvedAt: new Date("2020-01-01T00:00:00Z") });
+    await createMembership(ctx, tenant.id, (await createUser(ctx)).id, { fullName: "Left Member", startYear: 1996, batchYear: 2010, approvedAt: new Date("2020-01-01T00:00:00Z") });
+    const base = `/api/v1/t/${tenant.slug}/admin/exports`;
+    const years = (text: string, columns: [number, number]) => Object.fromEntries(parseRows(text).map((r) => [r[0], r.slice(...columns)]));
+    const members = await csvRequest(api().get(`${base}/members.csv`).set(admin.headers));
+    expect(years(members.body as string, [3, 5])).toEqual({ Name: ["Start year", "End year"], "Left Member": ["1996", "2010"], "Samaj Admin": ["2005", ""] });
+    const activity = await csvRequest(api().get(`${base}/activity.csv`).set(admin.headers));
+    expect(years(activity.body as string, [2, 4])).toEqual({ Name: ["Start year", "End year"], "Left Member": ["1996", "2010"], "Samaj Admin": ["2005", ""] });
   });
 
   it("limits how often an admin can export", async () => {

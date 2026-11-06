@@ -18,7 +18,7 @@ export function directoryRoutes(ctx: AppContext): Router {
   router.get(
     "/directory/filters",
     route({}, async ({ req, res }) => {
-      ok(res, await getDirectoryFilters(ctx, req.tenantCtx!.tenant.id));
+      ok(res, await getDirectoryFilters(ctx, req.tenantCtx!.tenant));
     }),
   );
   router.get(

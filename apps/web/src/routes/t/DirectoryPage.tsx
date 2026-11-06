@@ -13,7 +13,7 @@ export function DirectoryPage() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
   const [q, setQ] = useState("");
-  const [batchYear, setBatchYear] = useState("");
+  const [year, setYear] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [professionType, setProfessionType] = useState<ProfessionType | "">("");
@@ -29,7 +29,7 @@ export function DirectoryPage() {
     .map(([k, v]) => `${k}:${v}`);
   const filters = {
     q: q || undefined,
-    batchYear: batchYear ? Number(batchYear) : undefined,
+    year: year ? Number(year) : undefined,
     city: city || undefined,
     country: country || undefined,
     professionType: professionType || undefined,
@@ -44,7 +44,7 @@ export function DirectoryPage() {
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   const reset = () => {
     setQ("");
-    setBatchYear("");
+    setYear("");
     setCity("");
     setCountry("");
     setProfessionType("");
@@ -63,6 +63,9 @@ export function DirectoryPage() {
   const industries = withChosen(facets.data?.industries, industry);
   const skills = withChosen(facets.data?.skills, skill);
   const fieldsOfStudy = withChosen(facets.data?.fieldsOfStudy, fieldOfStudy);
+  // The years run only as far as approved members' do, so a chosen year keeps its option too, in its place (newest first).
+  const chosenYear = year ? Number(year) : undefined;
+  const years = chosenYear !== undefined && !facets.data?.years.includes(chosenYear) ? [...(facets.data?.years ?? []), chosenYear].sort((a, b) => b - a) : (facets.data?.years ?? []);
 
   return (
     <div className="space-y-4">
@@ -70,11 +73,11 @@ export function DirectoryPage() {
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[var(--shadow-1)]">
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
           <Input aria-label="Search members" placeholder="Name, company, role or skill" value={q} onChange={(e) => setQ(e.target.value)} />
-          <Select aria-label="Batch" value={batchYear} onChange={(e) => setBatchYear(e.target.value)} className="sm:w-36">
-            <option value="">Any batch</option>
-            {facets.data?.batchYears.map((y) => (
+          <Select aria-label="Were there in" value={year} onChange={(e) => setYear(e.target.value)} className="sm:w-48">
+            <option value="">Any year</option>
+            {years.map((y) => (
               <option key={y} value={y}>
-                {y}
+                {`Were there in ${y}`}
               </option>
             ))}
           </Select>

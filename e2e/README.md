@@ -859,9 +859,10 @@ On the console's Analytics, as the Samaj admin, with the web console's Analytics
 - [ ] TalkBack or VoiceOver. Each column and line chart is one stop, read as its summary ("New members per week, 3 in
       total"), adjustable, with the latest week's readout as its value; swiping up and down (VoiceOver) or the volume
       keys or swipes TalkBack offers for a slider step a week at a time (Next and Previous), reading "Week of …, 1
-      approved" (each series, by name, on Activity per week; "Batch of …, … members" on Members by batch). The chart
-      drawings and the line above them aren't read on their own. The headline tiles are read as their label and
-      figure, then the change ("+12% vs the previous 12 weeks (10)"), with hints turned off too (VoiceOver's Speak
+      approved" (each series, by name, on Activity per week; "Joined in …, … members" on Members by year joined, which
+      a community such as the Samaj has in place of Members by batch's "Batch of …, … members"). The chart drawings
+      and the line above them aren't read on their own. The headline tiles are read as their label and figure, then
+      the change ("+12% vs the previous 12 weeks (10)"), with hints turned off too (VoiceOver's Speak
       Hints, TalkBack's usage hints). Table is read as a button that says whether it's on (selected while the table
       shows), its hint saying what pressing it does ("Shows New members per week as a table", then "Shows New members
       per week as a chart again"), and the table's rows and cells in order; a bar chart's rows as their label and

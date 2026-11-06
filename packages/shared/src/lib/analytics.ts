@@ -132,6 +132,12 @@ export function weekRows(weeks: readonly string[], columns: ReadonlyArray<readon
 
 const MEMBERS = plural("member", "members");
 
+/** The members-by-year card's words: by the year they finish, or at a community by the year they joined. */
+const YEARS_CARD = {
+  BATCH: { title: "Members by batch", subtitle: "Approved members by graduating year", column: "Batch", bar: (y: string) => `Batch of ${y}` },
+  JOINED: { title: "Members by year joined", subtitle: "Approved members by the year they joined", column: "Year joined", bar: (y: string) => `Joined in ${y}` },
+} as const;
+
 /** What every chart card has: its heading and the text around it, a table of its values, and what a screen reader says. */
 interface ChartFrame {
   /** Stable across ranges, for list keys. */
@@ -207,6 +213,7 @@ export function analyticsView(d: TenantAnalyticsDto, features: Pick<TenantFeatur
   const c = d.coverage.completeness;
   const completeness = completenessRows(c);
   const batches = d.coverage.batches;
+  const years = YEARS_CARD[d.coverage.yearsOf];
 
   const growth: AnalyticsChart[] = [
     {
@@ -256,15 +263,15 @@ export function analyticsView(d: TenantAnalyticsDto, features: Pick<TenantFeatur
     {
       kind: "column",
       id: "batches",
-      title: "Members by batch",
-      subtitle: "Approved members by graduating year",
+      title: years.title,
+      subtitle: years.subtitle,
       labels: batches.map((b) => b.label),
-      titles: batches.map((b) => `Batch of ${b.label}`),
+      titles: batches.map((b) => years.bar(b.label)),
       values: batches.map((b) => b.count),
       unit: MEMBERS,
-      table: { columns: ["Batch", "Members"], rows: batches.map((b) => [b.label, b.count]) },
+      table: { columns: [years.column, "Members"], rows: batches.map((b) => [b.label, b.count]) },
       empty: batches.length === 0,
-      ariaLabel: "Members by batch",
+      ariaLabel: years.title,
     },
     {
       kind: "hbar",

@@ -25,6 +25,7 @@ function analytics(over: Partial<TenantAnalyticsDto> = {}): TenantAnalyticsDto {
     kpis: { members: 1234, newMembers: 12, newMembersPrev: 10, activeMembers: 40, activeMembersPrev: 50, posts: 6, postsPrev: 0 },
     series: { joined: [2, 4, 6], registered: [3, 4, 7], active: [20, 25, 30], posts: [1, 2, 3], comments: [4, 0, 5], jobs: [0, 1, 0], events: [0, 0, 1] },
     coverage: {
+      yearsOf: "BATCH",
       batches: [
         { label: "2015", count: 4 },
         { label: "2016", count: 9 },
@@ -256,6 +257,19 @@ describe("analyticsView", () => {
     if (batches.kind !== "column") throw new Error("batches is a column chart");
     expect(batches.titles).toEqual(["Batch of 2015", "Batch of 2016"]);
     expect([unitFor(batches.unit, 1), unitFor(batches.unit, 4)]).toEqual(["member", "members"]);
+  });
+
+  it("counts a community's members by the year they joined, in the card's words, table and summary", () => {
+    const view = analyticsView(analytics({ coverage: { ...analytics().coverage, yearsOf: "JOINED", batches: [{ label: "1996", count: 3 }, { label: "2005", count: 1 }] } }), ALL_ON);
+    const card = byId(view, "batches");
+    if (card.kind !== "column") throw new Error("the years card is a column chart");
+    expect(card).toMatchObject({ title: "Members by year joined", subtitle: "Approved members by the year they joined", ariaLabel: "Members by year joined" });
+    expect(card.labels).toEqual(["1996", "2005"]);
+    expect(card.titles).toEqual(["Joined in 1996", "Joined in 2005"]);
+    expect(card.table).toEqual({ columns: ["Year joined", "Members"], rows: [["1996", 3], ["2005", 1]] });
+    // Every other card is the same as anywhere else.
+    const others = (sections: ReturnType<typeof analyticsView>) => charts(sections).filter((c) => c.id !== "batches").map((c) => c.title);
+    expect(others(view)).toEqual(others(analyticsView(analytics(), ALL_ON)));
   });
 
   it("marks a card empty when its period has nothing, with its own words where it has them", () => {

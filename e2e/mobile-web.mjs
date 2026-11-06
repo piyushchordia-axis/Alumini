@@ -759,6 +759,23 @@ try {
     await page.getByRole("button", { name: "Clear filters", exact: true }).locator("visible=true").first().click();
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
+    // Were there in: a year from a list, counted with the other filters. Priya was here 2008–2012, so not in 2013 but in
+    // 2012; "Any year" at the top of the list takes it off.
+    const thereIn = (year) => page.getByRole("button", { name: `Were there in, ${year}`, exact: true }).locator("visible=true").first();
+    const chooseYear = async (from, to) => {
+      await thereIn(from).click();
+      const row = page.getByRole("button", { name: to, exact: true });
+      await row.locator("visible=true").last().click();
+      await row.last().waitFor({ state: "hidden" });
+      await thereIn(to).waitFor();
+    };
+    await chooseYear("Any year", "2013");
+    await page.getByRole("button", { name: "Hide filters (1)", exact: true }).locator("visible=true").first().waitFor();
+    await page.getByText("No members match", { exact: true }).locator("visible=true").first().waitFor();
+    await chooseYear("2013", "2012");
+    await hit.waitFor();
+    await chooseYear("2012", "Any year");
+    await page.getByRole("button", { name: "Hide filters", exact: true }).locator("visible=true").first().waitFor();
     // A seeded mentor: her card says so, to the eye and in its name, with her headline in place of her role.
     const card = page.getByRole("button", { name: /^Priya Nair, .*Mentor/ }).locator("visible=true").first();
     await card.getByText("Mentor", { exact: true }).waitFor();
@@ -4794,6 +4811,16 @@ try {
       const rights = await activity.getByRole("row").nth(row).getByRole("cell").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
       for (let j = 1; j < heads.length; j++) if (Math.abs(rights[j] - heads[j].right) > 1) throw new Error(`row ${row}'s ${heads[j].text} isn't under its header (${rights[j]} against ${heads[j].right})`);
     }
+    // A community counts its members by the year they joined, since most have no end year: Bhavin Trivedi since 1996.
+    const joinedChart = shown(page.getByRole("slider", { name: "Members by year joined", exact: true }));
+    const joinedLatest = await joinedChart.getAttribute("aria-valuetext");
+    if (!/^Joined in \d{4}, [\d,]+ members?$/.test(joinedLatest ?? "")) throw new Error(`the Members by year joined chart's value is "${joinedLatest}"`);
+    await tableSwitch("Members by year joined").click();
+    const joined = shown(page.getByRole("table", { name: "Members by year joined", exact: true }));
+    await joined.getByRole("row").nth(1).waitFor();
+    const joinedColumns = await joined.getByRole("columnheader").allTextContents();
+    if (joinedColumns.join() !== "Year joined,Members") throw new Error(`the Members by year joined table has the columns ${joinedColumns.join(", ")}`);
+    await joined.getByRole("cell", { name: "1996", exact: true }).waitFor();
     await fitsPhone("Analytics", shown(page.getByRole("heading", { name: "Who your members are", exact: true })));
     await shot("m20-analytics");
 
@@ -4823,7 +4850,10 @@ try {
     if (csv.charCodeAt(0) !== 0xfeff) throw new Error("the members CSV has no byte order mark, so Excel would garble names");
     if (csv.charCodeAt(1) === 0xfeff) throw new Error("the members CSV has two byte order marks");
     const header = csv.slice(1).split("\r\n")[0];
-    if (!header.startsWith("Name,Phone,Email,") || !header.includes(",Chapter")) throw new Error(`the members CSV starts "${header.slice(0, 120)}"`);
+    if (!header.startsWith("Name,Phone,Email,Start year,End year,Status,") || !header.includes(",Chapter")) throw new Error(`the members CSV starts "${header.slice(0, 120)}"`);
+    // A member who still belongs has a blank end year.
+    const hetal = csv.slice(1).split("\r\n").find((l) => l.startsWith("Hetal Shah,"));
+    if (!/^Hetal Shah,[^,]*,[^,]*,2005,,Approved,/.test(hetal ?? "")) throw new Error(`Hetal Shah's years in the members CSV read "${hetal?.slice(0, 80)}"`);
     await memberButton("Members CSV").waitFor();
     if ((await memberButton("Activity CSV").getAttribute("aria-disabled")) === "true") throw new Error("Activity CSV stays disabled once the members CSV is saved");
 

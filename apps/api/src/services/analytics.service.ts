@@ -58,6 +58,9 @@ export async function getTenantAnalytics(ctx: AppContext, tenantId: string, week
 
   const inTenant = eq(memberships.tenantId, tenantId);
   const approved = and(inTenant, eq(memberships.status, "APPROVED"));
+  // Most of a community's members have no end year, so it counts the year they joined.
+  const yearsOf = tenant!.type === "OTHER" ? "JOINED" : "BATCH";
+  const year = yearsOf === "JOINED" ? memberships.startYear : memberships.batchYear;
   const [joined, registered, active, content, kpiRows, activeNow, activePrev, batches, cities, countries, professions, completeness, inviteRows] = await Promise.all([
     ctx.db
       .select({ week: weekOf(memberships.approvedAt), n: sql<number>`count(*)::int` })
@@ -96,12 +99,13 @@ export async function getTenantAnalytics(ctx: AppContext, tenantId: string, week
       .select({ n: sql<number>`count(distinct ${memberActivityDays.membershipId})::int` })
       .from(memberActivityDays)
       .where(and(eq(memberActivityDays.tenantId, tenantId), sql`${memberActivityDays.day} >= ${prevFirst}`, sql`${memberActivityDays.day} < ${firstWeek}`)),
+    // An end left blank (at an institution retyped from a community) has no batch to count.
     ctx.db
-      .select({ label: sql<string>`${memberships.batchYear}::text`, count: sql<number>`count(*)::int` })
+      .select({ label: sql<string>`${year}::text`, count: sql<number>`count(*)::int` })
       .from(memberships)
-      .where(and(approved, isNotNull(memberships.batchYear)))
-      .groupBy(memberships.batchYear)
-      .orderBy(memberships.batchYear),
+      .where(and(approved, isNotNull(year)))
+      .groupBy(year)
+      .orderBy(year),
     ctx.db
       .select({ label: sql<string>`initcap(trim(${memberships.city}))`, count: sql<number>`count(*)::int` })
       .from(memberships)
@@ -188,6 +192,7 @@ export async function getTenantAnalytics(ctx: AppContext, tenantId: string, week
     },
     series: { joined: fill(joined), registered: fill(registered), active: fill(active), posts, comments: contentSeries("COMMENT"), jobs: contentSeries("JOB"), events: contentSeries("EVENT") },
     coverage: {
+      yearsOf,
       batches,
       cities: topWithOther(cities, 10),
       countries: topWithOther(

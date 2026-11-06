@@ -1,5 +1,5 @@
-import { and, asc, eq, ilike, isNotNull, or, sql, type SQL } from "drizzle-orm";
-import { INDUSTRIES, type DirectoryQuery, type Industry } from "@illuminize/shared";
+import { and, asc, eq, gte, ilike, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { INDUSTRIES, wallPartsInZone, type DirectoryQuery, type Industry } from "@illuminize/shared";
 import type { DbClient } from "../db/client";
 import { memberFieldValues, memberships, tenantProfileFields, users } from "../db/schema";
 import { buildCursorPage, decodeCursor, keysetCondition, type CursorPage } from "../lib/pagination";
@@ -17,7 +17,8 @@ export async function searchDirectory(db: DbClient, tenant: Pick<TenantRow, "id"
     const p = `%${escapeLike(q.q)}%`;
     conds.push(or(ilike(memberships.fullName, p), ilike(memberships.companyName, p), ilike(memberships.designation, p), ilike(memberships.headline, p), hasSkill(sql`skill ilike ${p}`))!);
   }
-  if (q.batchYear) conds.push(eq(memberships.batchYear, q.batchYear));
+  // Were there in: joined by that year, and left in it or later, or are still members.
+  if (q.year !== undefined) conds.push(lte(memberships.startYear, q.year), or(isNull(memberships.batchYear), gte(memberships.batchYear, q.year))!);
   if (q.city) conds.push(ilike(memberships.city, escapeLike(q.city)));
   if (q.country) conds.push(eq(memberships.country, q.country));
   if (q.professionType) conds.push(eq(memberships.professionType, q.professionType));
@@ -53,15 +54,24 @@ export async function searchDirectory(db: DbClient, tenant: Pick<TenantRow, "id"
 /** How many of the top skills and fields of study the filters offer. */
 const TOP_TERMS = 50;
 
+/**
+ * What the directory's filters offer. "Were there in" offers every year from the first a member joined to the last anyone
+ * was there, and never one still to come: up to this year in the institution's time zone while anyone is still a member
+ * or has yet to leave.
+ */
 export async function directoryFacets(
   db: DbClient,
-  tenantId: string,
-): Promise<{ batchYears: number[]; cities: string[]; countries: string[]; companies: string[]; industries: Industry[]; skills: string[]; fieldsOfStudy: string[] }> {
-  const base = and(eq(memberships.tenantId, tenantId), eq(memberships.status, "APPROVED"));
+  tenant: Pick<TenantRow, "id" | "timezone">,
+  now = new Date(),
+): Promise<{ years: number[]; cities: string[]; countries: string[]; companies: string[]; industries: Industry[]; skills: string[]; fieldsOfStudy: string[] }> {
+  const base = and(eq(memberships.tenantId, tenant.id), eq(memberships.status, "APPROVED"));
   const field = sql`trim(${memberships.fieldOfStudy})`;
-  const [years, cities, countries, companies, industries, skills, fields] = await Promise.all([
-    // A community member who still belongs has no end year to offer.
-    db.selectDistinct({ v: memberships.batchYear }).from(memberships).where(and(base, isNotNull(memberships.batchYear))).orderBy(sql`${memberships.batchYear} desc`),
+  const thisYear = wallPartsInZone(now, tenant.timezone).year;
+  const [[span], cities, countries, companies, industries, skills, fields] = await Promise.all([
+    db
+      .select({ from: sql<number | null>`min(${memberships.startYear})`, to: sql<number | null>`least(max(coalesce(${memberships.batchYear}, ${thisYear})), ${thisYear})` })
+      .from(memberships)
+      .where(base),
     db
       .select({ v: memberships.city, n: sql<number>`count(*)::int` })
       .from(memberships)
@@ -96,8 +106,9 @@ export async function directoryFacets(
       .limit(TOP_TERMS),
   ]);
   const present = new Set(industries.map((r) => r.v));
+  const { from, to } = span ?? {};
   return {
-    batchYears: years.flatMap((r) => (r.v === null ? [] : [r.v])),
+    years: from != null && to != null ? Array.from({ length: Math.max(0, to - from + 1) }, (_, i) => to - i) : [],
     cities: cities.map((r) => r.v!).filter(Boolean),
     countries: countries.map((r) => r.v!).filter(Boolean),
     companies: companies.map((r) => r.v!).filter(Boolean),

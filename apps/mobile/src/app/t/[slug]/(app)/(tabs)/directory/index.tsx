@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { IconDirectory } from "@/components/icons";
+import { OptionPicker } from "@/components/OptionPicker";
 import { ProfileBadges, profileBadgeWords, profileTagline } from "@/components/profile/ProfileDetails";
 import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -61,7 +62,7 @@ export default function DirectoryScreen() {
   const theme = useTheme();
   const [q, setQ] = useState("");
   const search = useDebounced(q.trim());
-  const [batchYear, setBatchYear] = useState<string>("");
+  const [year, setYear] = useState<string>("");
   const [city, setCity] = useState<string>("");
   const [country, setCountry] = useState<string>("");
   const [company, setCompany] = useState<string>("");
@@ -79,7 +80,7 @@ export default function DirectoryScreen() {
   const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
   const filters = {
     q: search || undefined,
-    batchYear: batchYear ? Number(batchYear) : undefined,
+    year: year ? Number(year) : undefined,
     city: city || undefined,
     country: country || undefined,
     company: company || undefined,
@@ -90,9 +91,9 @@ export default function DirectoryScreen() {
     openTo: openTo || undefined,
     field: field.length ? field : undefined,
   };
-  const active = [batchYear, city, country, company, professionType, industry, skill, fieldOfStudy, openTo].filter(Boolean).length + field.length;
+  const active = [year, city, country, company, professionType, industry, skill, fieldOfStudy, openTo].filter(Boolean).length + field.length;
   const clear = () => {
-    setBatchYear("");
+    setYear("");
     setCity("");
     setCountry("");
     setCompany("");
@@ -109,6 +110,9 @@ export default function DirectoryScreen() {
   const industries = withChosen(facets.data?.industries, industry);
   const skills = withChosen(facets.data?.skills, skill);
   const fieldsOfStudy = withChosen(facets.data?.fieldsOfStudy, fieldOfStudy);
+  // The years run only as far as approved members' do, so a chosen year keeps its row too, in its place (newest first).
+  const chosenYear = year ? Number(year) : undefined;
+  const years = chosenYear !== undefined && !facets.data?.years.includes(chosenYear) ? [...(facets.data?.years ?? []), chosenYear].sort((a, b) => b - a) : (facets.data?.years ?? []);
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
   return (
     <SectionScreen>
@@ -130,7 +134,8 @@ export default function DirectoryScreen() {
         {showFilters && (
           // Scrolls on its own past half the screen, so the results below stay in sight.
           <ScrollView style={{ maxHeight: Math.round(height * 0.45) }} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.sm }}>
-            <ChipSelect label="Batch" options={(facets.data?.batchYears ?? []).map((y) => ({ value: String(y), label: String(y) }))} value={batchYear} onChange={setBatchYear} allowEmpty tall />
+            {/* Too many years for a row of chips, which would hide the chosen one off to the side: a list, as for an industry. */}
+            <OptionPicker label="Were there in" value={year || null} options={years.map((y) => ({ value: String(y), label: String(y) }))} onChange={(y) => setYear(y ?? "")} placeholder="Any year" clearLabel="Any year" />
             <ChipSelect label="City" options={(facets.data?.cities ?? []).map((c) => ({ value: c, label: c }))} value={city} onChange={setCity} allowEmpty tall />
             <ChipSelect label="Country" options={(facets.data?.countries ?? []).map((c) => ({ value: c, label: countryName(c) }))} value={country} onChange={setCountry} allowEmpty tall />
             <ChipSelect label="Company" options={(facets.data?.companies ?? []).map((c) => ({ value: c, label: c }))} value={company} onChange={setCompany} allowEmpty tall />

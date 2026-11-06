@@ -85,6 +85,7 @@ async function* memberPages<T>(ctx: AppContext, tenantId: string, where: ReturnT
         fullName: memberships.fullName,
         phone: users.phoneE164,
         email: sql<string | null>`case when ${users.emailVerifiedAt} is not null then ${users.email} end`,
+        startYear: memberships.startYear,
         batchYear: memberships.batchYear,
         status: memberships.status,
         role: memberships.role,
@@ -130,6 +131,8 @@ interface MemberRow {
   fullName: string;
   phone: string;
   email: string | null;
+  startYear: number;
+  /** The end year; blank for a community member who still belongs. */
   batchYear: number | null;
   status: keyof typeof MEMBERSHIP_STATUS_LABELS;
   role: MembershipRole;
@@ -171,7 +174,7 @@ export async function exportMembersCsv(ctx: AppContext, tenantCtx: TenantContext
   const tz = tenant.timezone;
   const fields = await getActiveFields(ctx, tenant.id);
   const details = profileDetailColumns(tenant.type);
-  const header = ["Name", "Phone", "Email", "Batch", "Status", "Role", "Profession", "Company", "Designation", "City", "Country", "Date of birth", "Joined", "Approved", "Last active", ...details.map(([h]) => h), ...fields.map((f) => f.label)];
+  const header = ["Name", "Phone", "Email", "Start year", "End year", "Status", "Role", "Profession", "Company", "Designation", "City", "Country", "Date of birth", "Joined", "Approved", "Last active", ...details.map(([h]) => h), ...fields.map((f) => f.label)];
   const pages = memberPages(ctx, tenant.id, undefined, async (rows) => {
     const answers = await answersFor(ctx, tenant.id, rows.map((r) => r.id), "admin");
     return rows.map((r) => {
@@ -180,6 +183,7 @@ export async function exportMembersCsv(ctx: AppContext, tenantCtx: TenantContext
         r.fullName,
         r.phone,
         r.email,
+        r.startYear,
         r.batchYear,
         MEMBERSHIP_STATUS_LABELS[r.status],
         ROLE_LABELS[r.role],
@@ -211,7 +215,7 @@ export async function exportActivityCsv(ctx: AppContext, tenantCtx: TenantContex
   const { tenant } = tenantCtx;
   const tz = tenant.timezone;
   const range = analyticsRange(tz, weeks);
-  const header = ["Name", "Phone", "Batch", "Status", "Active days", "Posts", "Comments", "Jobs", "Events", "Last active"];
+  const header = ["Name", "Phone", "Start year", "End year", "Status", "Active days", "Posts", "Comments", "Jobs", "Events", "Last active"];
   const pages = memberPages(ctx, tenant.id, and(isNotNull(memberships.approvedAt)), async (rows) => {
     const ids = rows.map((r) => r.id);
     const [days, content] = await Promise.all([
@@ -228,7 +232,7 @@ export async function exportActivityCsv(ctx: AppContext, tenantCtx: TenantContex
     ]);
     const daysBy = new Map(days.map((d) => [d.id, d.n]));
     const count = (id: string, type: string) => content.find((c) => c.id === id && c.type === type)?.n ?? 0;
-    return rows.map((r) => [r.fullName, r.phone, r.batchYear, MEMBERSHIP_STATUS_LABELS[r.status], daysBy.get(r.id) ?? 0, count(r.id, "POST"), count(r.id, "COMMENT"), count(r.id, "JOB"), count(r.id, "EVENT"), dateTimeIn(r.lastActiveAt, tz)]);
+    return rows.map((r) => [r.fullName, r.phone, r.startYear, r.batchYear, MEMBERSHIP_STATUS_LABELS[r.status], daysBy.get(r.id) ?? 0, count(r.id, "POST"), count(r.id, "COMMENT"), count(r.id, "JOB"), count(r.id, "EVENT"), dateTimeIn(r.lastActiveAt, tz)]);
   });
   await audit(ctx, tenant.id, actor, "export.activity", { from: range.firstWeek, to: range.today });
   await streamCsv(res, `${tenant.slug}-activity-${range.firstWeek}-to-${range.today}.csv`, header, pages);

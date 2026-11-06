@@ -6,7 +6,8 @@ import { cursorQuerySchema, isoCountrySchema } from "./common";
 export const directoryQuerySchema = cursorQuerySchema.extend({
   /** Matches part of a name, company, role, headline or skill. */
   q: z.string().trim().max(80).optional(),
-  batchYear: z.coerce.number().int().optional(),
+  /** Were there in: members who had joined by this year and hadn't left before it, or are still members. */
+  year: z.coerce.number().int().min(1).max(9999).optional(),
   city: z.string().trim().max(80).optional(),
   country: isoCountrySchema.optional(),
   professionType: z.enum(PROFESSION_TYPES).optional(),

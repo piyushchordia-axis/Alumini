@@ -1,7 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { wallPartsInZone } from "@illuminize/shared";
+import { and, eq, inArray } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { auditLog, memberships, tenantSettings } from "../../src/db/schema";
+import { keys } from "../../src/redis/keys";
+import { directoryFacets } from "../../src/repositories/directory.repo";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
 import { chatApi } from "../helpers/chat";
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
@@ -35,7 +38,8 @@ describe.skipIf(!dbAvailable)("member directory", () => {
 
     const all = await api().get(base).set(viewer.headers);
     expect(all.body.data.map((m: { fullName: string }) => m.fullName)).toEqual(["Anita Rao", "Bala Iyer", "Chitra Das", "Zed Viewer"]);
-    expect((await api().get(`${base}?batchYear=2010`).set(viewer.headers)).body.data).toHaveLength(2);
+    // Chitra was there 2006–2015, so in 2010 too.
+    expect((await api().get(`${base}?year=2010`).set(viewer.headers)).body.data.map((m: { fullName: string }) => m.fullName)).toEqual(["Anita Rao", "Bala Iyer", "Chitra Das"]);
     expect((await api().get(`${base}?city=mumbai`).set(viewer.headers)).body.data).toHaveLength(2);
     expect((await api().get(`${base}?country=gb`).set(viewer.headers)).body.data.map((m: { fullName: string }) => m.fullName)).toEqual(["Bala Iyer"]);
     expect((await api().get(`${base}?professionType=FOUNDER`).set(viewer.headers)).body.data).toHaveLength(1);
@@ -50,8 +54,95 @@ describe.skipIf(!dbAvailable)("member directory", () => {
     expect(p2.body.nextCursor).toBeNull();
 
     const facets = await api().get(`${base}/filters`).set(viewer.headers);
-    expect(facets.body.data).toMatchObject({ batchYears: [2015, 2010, 2001], countries: ["GB", "IN"] });
+    // Every year from the viewer's start, 2001, to the last anyone approved was there, 2015.
+    expect(facets.body.data).toMatchObject({ years: Array.from({ length: 15 }, (_, i) => 2015 - i), countries: ["GB", "IN"] });
     expect(facets.body.data.cities).toEqual(expect.arrayContaining(["Mumbai", "London", "Delhi"]));
+  });
+
+  describe("Were there in", () => {
+    const thisYearAt = (tenant: { timezone: string }) => wallPartsInZone(new Date(), tenant.timezone).year;
+    const namesIn = (slug: string, viewer: { headers: Record<string, string> }) => async (query: string) => {
+      const res = await api().get(`/api/v1/t/${slug}/directory?${query}`).set(viewer.headers);
+      expect(res.status, query).toBe(200);
+      return (res.body.data as Array<{ fullName: string }>).map((m) => m.fullName);
+    };
+    const member = async (tenantId: string, fullName: string, startYear: number, batchYear: number | null, status: "APPROVED" | "PENDING" = "APPROVED") =>
+      createMembership(ctx, tenantId, (await createUser(ctx)).id, { fullName, startYear, batchYear, status });
+
+    it("finds a member in every year from the one they joined to the one they left, or on to now while they're still a member", async () => {
+      const { tenant } = await createTenant(ctx, { type: "OTHER" });
+      const thisYear = thisYearAt(tenant);
+      const viewer = await memberSession(ctx, tenant.id, { fullName: "Viewer V", startYear: 1990, batchYear: 1995 });
+      await member(tenant.id, "Closed Range", 2010, 2014);
+      await member(tenant.id, "Still Here", 2012, null);
+      await member(tenant.id, "Pending Person", 2008, null, "PENDING");
+      const names = namesIn(tenant.slug, viewer);
+
+      // Both ends count, and nothing outside them.
+      expect(await names("year=2009")).toEqual([]);
+      expect(await names("year=2010")).toEqual(["Closed Range"]);
+      expect(await names("year=2012")).toEqual(["Closed Range", "Still Here"]);
+      expect(await names("year=2014")).toEqual(["Closed Range", "Still Here"]);
+      expect(await names("year=2015")).toEqual(["Still Here"]);
+      // A blank end is every year from the start on, and not one before it.
+      expect(await names("year=2011")).toEqual(["Closed Range"]);
+      for (const year of [2016, 2020, thisYear]) expect(await names(`year=${year}`), String(year)).toEqual(["Still Here"]);
+      expect(await names("year=1993")).toEqual(["Viewer V"]);
+      // With the other filters, and only as a year.
+      expect(await names("year=2012&q=still")).toEqual(["Still Here"]);
+      for (const bad of ["year=soon", "year=2012.5", "year=99999999999"]) expect((await api().get(`/api/v1/t/${tenant.slug}/directory?${bad}`).set(viewer.headers)).status, bad).toBe(400);
+    });
+
+    it("offers every year from the first a member joined to the last anyone was there, and none still to come", async () => {
+      const { tenant } = await createTenant(ctx);
+      const thisYear = thisYearAt(tenant);
+      const viewer = await memberSession(ctx, tenant.id, { startYear: 2008, batchYear: 2012 });
+      await member(tenant.id, "Early Alum", 2000, 2004);
+      await member(tenant.id, "Earlier Applicant", 1990, 1994, "PENDING");
+      const years = async () => (await api().get(`/api/v1/t/${tenant.slug}/directory/filters`).set(viewer.headers)).body.data.years as number[];
+      // Newest first, the years between included, and only approved members'.
+      expect(await years()).toEqual(Array.from({ length: 13 }, (_, i) => 2012 - i));
+
+      // A student who leaves in three years: up to this year, not theirs. The filters are cached for five minutes.
+      await member(tenant.id, "Student S", thisYear - 1, thisYear + 3);
+      await ctx.redis.del(keys.cacheDirectoryFilters(tenant.id));
+      const withStudent = await years();
+      expect(withStudent[0]).toBe(thisYear);
+      expect(withStudent.at(-1)).toBe(2000);
+      expect(withStudent).toHaveLength(thisYear - 2000 + 1);
+    });
+
+    it("ends the years at this year where the institution is", async () => {
+      const { tenant } = await createTenant(ctx, { type: "OTHER" });
+      await member(tenant.id, "Still Here", 2028, null);
+      // Noon on 31 December 2030 in London is already 2031 at Kiritimati (UTC+14), and still 2030 at Pago Pago (UTC-11).
+      const now = new Date("2030-12-31T12:00:00Z");
+      expect((await directoryFacets(ctx.db, { id: tenant.id, timezone: "Pacific/Kiritimati" }, now)).years).toEqual([2031, 2030, 2029, 2028]);
+      expect((await directoryFacets(ctx.db, { id: tenant.id, timezone: "Pacific/Pago_Pago" }, now)).years).toEqual([2030, 2029, 2028]);
+      // Nobody approved: nothing to offer.
+      await ctx.db.update(memberships).set({ status: "SUSPENDED" }).where(eq(memberships.tenantId, tenant.id));
+      expect((await directoryFacets(ctx.db, { id: tenant.id, timezone: "Asia/Kolkata" }, now)).years).toEqual([]);
+    });
+
+    it("at a school, takes a member with no end year (kept from when it was a community) for no pupil, in Open to as in the years", async () => {
+      const { tenant } = await createTenant(ctx, { type: "SCHOOL" });
+      const thisYear = thisYearAt(tenant);
+      const alum = await memberSession(ctx, tenant.id, { fullName: "Alum A", startYear: 1988, batchYear: 2000 });
+      const open = await member(tenant.id, "Open Ended", 2005, null);
+      const pupil = await member(tenant.id, "Pupil P", thisYear - 3, thisYear + 2);
+      await ctx.db.update(memberships).set({ openTo: ["HIRING"] }).where(inArray(memberships.id, [open.id, pupil.id]));
+      const names = namesIn(tenant.slug, alum);
+
+      // A blank end isn't a year still to come: the pupil rule leaves out the pupil, and keeps them.
+      expect(await names("openTo=HIRING")).toEqual(["Open Ended"]);
+      expect(await names(`openTo=HIRING&year=${thisYear}`)).toEqual(["Open Ended"]);
+      expect(await names(`year=${thisYear}`)).toEqual(["Open Ended", "Pupil P"]);
+      expect(await names("year=2005")).toEqual(["Open Ended"]);
+      expect(await names("year=2004")).toEqual([]);
+      expect(await names("year=2000")).toEqual(["Alum A"]);
+      const cards = (await api().get(`/api/v1/t/${tenant.slug}/directory`).set(alum.headers)).body.data as Array<{ fullName: string; openTo: string[] }>;
+      expect(Object.fromEntries(cards.map((c) => [c.fullName, c.openTo]))).toEqual({ "Alum A": [], "Open Ended": ["HIRING"], "Pupil P": [] });
+    });
   });
 
   it("finds members by their profile details: q in headlines and skills, and filters and facets for industry, skill, field of study and Open to", async () => {
