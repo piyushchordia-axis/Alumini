@@ -16,12 +16,19 @@ const ADMIN_PAYLOADS: Record<string, Record<string, string>> = {
 };
 
 describe("notificationHref in the phone app", () => {
-  it("opens the member's page from a request to join, and the console's home from every other admin notice, for an admin", () => {
+  it("opens each admin notice's section for an admin, on the item (or member) it names, and the console's home for one not in the phone app yet", () => {
     const adminTypes = NOTIFICATION_TYPES.filter(isAdminNotification);
     expect(adminTypes).toEqual(Object.keys(ADMIN_PAYLOADS));
+    // [with the payload it's sent with, with none]
+    const hrefs: Record<string, [string, string]> = {
+      NEW_MEMBER_PENDING: [`/t/demo/admin/members/${ID}`, "/t/demo/admin/members?status=PENDING"],
+      CONTENT_PENDING: [`/t/demo/admin/moderation?status=PENDING&type=POST&item=${ID}`, "/t/demo/admin/moderation?status=PENDING"],
+      REPORT_FILED: [`/t/demo/admin/reports?status=OPEN&item=${ID}`, "/t/demo/admin/reports?status=OPEN"],
+      CHAT_REPORT_FILED: ["/t/demo/admin", "/t/demo/admin"],
+    };
     for (const type of adminTypes) {
-      const href = type === "NEW_MEMBER_PENDING" ? `/t/demo/admin/members/${ID}` : "/t/demo/admin";
-      expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe(href);
+      expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe(hrefs[type]![0]);
+      expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe(hrefs[type]![1]);
     }
     expect(adminMemberHref("demo", ID)).toBe(`/t/demo/admin/members/${ID}`);
   });
@@ -30,7 +37,12 @@ describe("notificationHref in the phone app", () => {
     for (const data of [{}, { membershipId: "../settings" }, { membershipId: 42 }, null]) {
       expect(notificationHref("demo", "NEW_MEMBER_PENDING", data, { isAdmin: true }), JSON.stringify(data)).toBe("/t/demo/admin/members?status=PENDING");
     }
-    for (const type of Object.keys(ADMIN_PAYLOADS).filter((t) => t !== "NEW_MEMBER_PENDING")) expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe("/t/demo/admin");
+  });
+
+  it("names an item only when the notice's ids check out, as a push can carry anything", () => {
+    expect(notificationHref("demo", "CONTENT_PENDING", { contentType: "POST", contentId: "../members" }, { isAdmin: true })).toBe("/t/demo/admin/moderation?status=PENDING");
+    expect(notificationHref("demo", "CONTENT_PENDING", { contentType: "NOPE", contentId: ID }, { isAdmin: true })).toBe("/t/demo/admin/moderation?status=PENDING");
+    expect(notificationHref("demo", "REPORT_FILED", { reportId: "1 OR 1=1", contentType: "POST", contentId: ID }, { isAdmin: true })).toBe("/t/demo/admin/reports?status=OPEN");
   });
 
   it("opens nothing from an admin notice for someone who isn't an admin, such as one demoted since", () => {

@@ -10,7 +10,8 @@ import { colors } from "@/theme";
  * Asks for the reason or note an admin action carries, then acts (the web console's ReasonModal). With `required`, the
  * confirm button waits for a reason the API takes (3 to 500 characters). It stays open, with what was typed, while the
  * action fails, and Cancel or the backdrop keep the text for next time. An out-of-date answer (another admin acted first,
- * or it's gone) closes it, as trying again can't help: `onOutOfDate` hears it, to refetch and say why.
+ * or it's gone) closes it, as trying again can't help: `onOutOfDate` hears it, to refetch and say why. With `text` and
+ * `onTextChange` the screen holds what's typed, as one sheet serving many rows keeps a draft for each.
  */
 export function ReasonSheet({
   open,
@@ -23,6 +24,8 @@ export function ReasonSheet({
   onConfirm,
   onOutOfDate,
   onClose,
+  text: heldText,
+  onTextChange,
 }: {
   open: boolean;
   title: string;
@@ -34,8 +37,12 @@ export function ReasonSheet({
   onConfirm: (text: string) => Promise<unknown>;
   onOutOfDate?: (err: ApiClientError) => void;
   onClose: () => void;
+  text?: string;
+  onTextChange?: (text: string) => void;
 }) {
-  const [text, setText] = useState("");
+  const [ownText, setOwnText] = useState("");
+  const text = heldText ?? ownText;
+  const setText = onTextChange ?? setOwnText;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const ready = !required || memberReasonSchema.safeParse({ reason: text }).success;

@@ -2405,7 +2405,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations"];
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Chat reports", "Invitations"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2451,15 +2451,16 @@ try {
     if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
-    // Until a section is in the phone app, the home lists it as on the web console. Members is, so its tile and row link
-    // (as do the rows of Profile fields, Settings and the Audit log, which the steps after this use).
+    // Until a section is in the phone app, the home lists it as on the web console. Members, Moderation and Reports are,
+    // so their tiles and rows link (as do the rows of Profile fields, Settings and the Audit log, which the steps after
+    // this use).
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
     const listed = (await page.getByRole("list").filter({ hasText: "Invitations" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
     await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
     await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
-    await page.getByRole("link", { name: "Audit log", exact: true }).waitFor();
-    if (await page.getByRole("link", { name: /^Content to review/ }).count()) throw new Error("the Content to review tile links to a section the phone app doesn't have yet");
+    await page.getByRole("link", { name: "Content to review, 0", exact: true }).waitFor();
+    for (const section of ["Moderation", "Reports", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
     await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
@@ -3493,6 +3494,348 @@ try {
       if ((await page.evaluate(() => document.body.innerText)).includes(hash.slice(0, 8))) throw new Error("the audit log shows a phone hash");
     } finally {
       await page.unroute(url);
+    }
+  });
+
+  // The moderation and reports queues, as the Samaj admin. Samaj content is published as posted, so nothing waits: a
+  // group waiting is answered by the script, and the rest acts on the seeded posts and jobs.
+  // An item of a queue: the innermost box holding its text and its own View full content (or Hide).
+  const queueRow = (text) =>
+    page
+      .locator("div")
+      .filter({ has: page.getByText(text, typeof text === "string" ? { exact: true } : undefined) })
+      .filter({ has: page.getByRole("button", { name: /^(View full content|Hide)$/ }) })
+      .locator("visible=true")
+      .last();
+  // The API as the app's own session sees it, for ids the screens don't show.
+  const adminGet = async (path) => {
+    const token = await page.evaluate(() => localStorage.getItem("illuminize.access"));
+    const res = await fetch(`${API}/api/v1/t/shri-gujarati-samaj/admin${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`GET admin${path} answered ${res.status}`);
+    return res.json();
+  };
+  const chosenChip = async (label) => {
+    const chip = shown(page.getByRole("button", { name: label, exact: true }));
+    await chip.waitFor();
+    if ((await chip.getAttribute("aria-pressed")) !== "true") throw new Error(`the "${label}" chip isn't the chosen one`);
+  };
+  const NISHA_POST = "Any Samaj members in the New York / New Jersey area? Thinking of a small dinner before Diwali.";
+  const HETAL_POST = /^Shah Fabrics has a new range of cotton blends/;
+  let nishaPostId = null;
+  let nishaItem = null;
+
+  await step("the moderation queue opens from the console on Awaiting approval with its count, all types, saying nothing waits", async () => {
+    await page.goto(SAMAJ + "/admin");
+    await shown(page.getByRole("link", { name: "Moderation", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/moderation");
+    await shown(page.getByRole("heading", { name: "Moderation", exact: true })).waitFor();
+    const pending = memberTab("Awaiting approval");
+    await pending.waitFor();
+    if ((await pending.getAttribute("aria-selected")) !== "true") throw new Error("the moderation queue didn't open on Awaiting approval");
+    await shown(page.getByRole("tab", { name: /^Awaiting approval\s*0$/ })).waitFor();
+    await chosenChip("All types");
+    await shown(page.getByText("Nothing is waiting for review.", { exact: true })).waitFor();
+    await fitsPhone("the moderation queue", shown(page.getByText("Review what members post before (or after) it goes live", { exact: true })));
+    await shot("m17-admin-moderation");
+  });
+
+  await step("a group waiting is approved in two presses, the second sending what was shown, a change meanwhile refused in its row, and a preview changed since asking again", async () => {
+    // Answered by the script: a group whose owner renamed it after it was approved, so members still see the old name.
+    const id = "00000000-0000-4000-8000-0000000000a1";
+    const owner = { id: "00000000-0000-4000-8000-0000000000a2", fullName: "Hetal Shah", batchYear: 2012, professionType: "BUSINESS_OWNER", companyName: null, designation: null, city: "Surat", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
+    const at = new Date().toISOString();
+    const item = { contentType: "GROUP", id, title: "Surat traders", excerpt: "Buying and selling in Surat", author: owner, moderationStatus: "PENDING", moderatedAt: null, createdAt: at, reportCount: 0, isPinned: false, kind: null };
+    const group = { id, name: "Surat traders", description: "Buying and selling in Surat", approvedName: "Surat chapter", approvedDescription: "Chapter news", visibility: "OPEN", memberCount: 4, owner, archived: false, createdAt: at, updatedAt: at, moderationStatus: "PENDING", moderationNote: null, moderatedAt: null };
+    const listUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/moderation(\?|$)/;
+    const groupUrl = new RegExp(`/admin/moderation/GROUP/${id}$`);
+    const approveUrl = new RegExp(`/admin/moderation/GROUP/${id}/approve$`);
+    let loads = 0;
+    const sent = [];
+    // Renamed by its owner as the first approval is refused, so the preview fetched again says something else.
+    let current = group;
+    const renamed = { ...group, name: "Surat traders club" };
+    await page.route(listUrl, (route) => (route.request().method() === "GET" && new URL(route.request().url()).searchParams.get("status") === "PENDING" ? answer(route, 200, { data: [item], page: 1, pageSize: 20, total: 1 }) : route.fallback()));
+    await page.route(groupUrl, (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      loads += 1;
+      return answer(route, 200, { data: current });
+    });
+    await page.route(approveUrl, (route) => {
+      sent.push(route.request().postData());
+      current = renamed;
+      return answer(route, 409, { error: { code: "CONFLICT", message: "This group changed while you were looking at it. Reload it and try again." } });
+    });
+    try {
+      await page.goto(SAMAJ + "/admin/moderation");
+      const row = queueRow("Surat traders");
+      await row.getByText(/^by Hetal Shah \(batch of 2012\) · /).waitFor();
+      // The first press opens the name and description to check, and sends nothing.
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await row.getByRole("status").filter({ hasText: "Check the group's name and description, then approve it." }).waitFor();
+      await row.getByText("Until you decide, members see what was approved before:", { exact: true }).waitFor();
+      await row.getByText("Surat chapter", { exact: true }).waitFor();
+      await row.getByText("Chat messages are never shown here: only a group's name and description are reviewed.", { exact: true }).waitFor();
+      if ((await row.getByRole("button", { name: "Hide", exact: true }).getAttribute("aria-expanded")) !== "true") throw new Error("the opened row doesn't say it's expanded");
+      if (sent.length) throw new Error("the first Approve sent the approval before the group was shown");
+      await shot("m17b-moderation-group");
+      // The second sends the name and description on screen; the group changed meanwhile, so the row says so and the
+      // group is fetched again, to read before pressing once more.
+      const shownLoads = loads;
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await row.getByRole("status").filter({ hasText: "This group changed while you were looking at it. Reload it and try again." }).waitFor();
+      const body = JSON.parse(sent[0] ?? "{}");
+      if (body.reviewed?.name !== "Surat traders" || body.reviewed?.description !== "Buying and selling in Surat") throw new Error(`the second Approve sent ${sent[0]}`);
+      for (let i = 0; i < 50 && loads === shownLoads; i++) await page.waitForTimeout(100);
+      if (loads === shownLoads) throw new Error("the group wasn't fetched again after the refusal");
+      // The preview now shows the new name, which the admin hasn't read yet: the next press sends nothing and asks them
+      // to check it again, and the one after sends what it says now.
+      await row.getByText("Surat traders club", { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await row.getByRole("status").filter({ hasText: "This group changed while you were looking at it. Check its name and description again, then approve it." }).waitFor();
+      if (sent.length !== 1) throw new Error("Approve sent a name the preview had only just changed to");
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      for (let i = 0; i < 50 && sent.length < 2; i++) await page.waitForTimeout(100);
+      const again = JSON.parse(sent[1] ?? "{}");
+      if (again.reviewed?.name !== "Surat traders club" || again.reviewed?.description !== "Buying and selling in Surat") throw new Error(`the Approve after checking again sent ${sent[1]}`);
+    } finally {
+      await page.unroute(listUrl);
+      await page.unroute(groupUrl);
+      await page.unroute(approveUrl);
+    }
+  });
+
+  await step("a job's preview has the page's headings under the queue's, its contacts as text, and a closed job's parts", async () => {
+    await page.goto(SAMAJ + "/admin/moderation");
+    await memberTab("Published").click();
+    await page.waitForURL(/status=APPROVED/);
+    await shown(page.getByRole("button", { name: "Job", exact: true })).click();
+    await page.waitForURL(/type=JOB/);
+    await chosenChip("Job");
+    const job = queueRow("Export Documentation Executive");
+    await job.getByRole("button", { name: "View full content", exact: true }).click();
+    await job.getByRole("heading", { level: 2, name: "Export Documentation Executive", exact: true }).waitFor();
+    await job.getByRole("heading", { level: 3, name: "About the role", exact: true }).waitFor();
+    await job.getByText("Apply link", { exact: true }).waitFor();
+    await job.getByText("https://example.com/shah-fabrics/careers", { exact: true }).waitFor();
+    // Text to read, never something to follow: no link but the row's own Open in app, and no Apply to press.
+    const links = (await job.getByRole("link").allInnerTexts()).map((t) => t.trim());
+    if (links.join() !== "Open in app") throw new Error(`the job's row has the links ${links.join(", ")}, not Open in app alone`);
+    if (await job.getByRole("button", { name: /^Apply/ }).count()) throw new Error("the job's preview offers Apply");
+    // Its skills listed as they are, with nothing compared with the admin's own.
+    if (await job.getByText(/you have|Add your skills/i).count()) throw new Error("the admin's preview compares the job's skills with the admin's");
+    await fitsPhone("the moderation queue with a job open", job.getByText("Apply link", { exact: true }));
+    await shot("m17c-moderation-job");
+    const closed = queueRow("Store Manager – Ring Road");
+    await closed.getByRole("button", { name: "View full content", exact: true }).click();
+    await closed.getByText("Applications closed", { exact: true }).waitFor();
+    await closed.getByText("No apply link, email or phone.", { exact: true }).waitFor();
+  });
+
+  await step("Nisha's post is removed with a note, kept through Cancel, and restored from Removed", async () => {
+    nishaItem = (await adminGet("/moderation?status=APPROVED&contentType=POST&pageSize=50")).data.find((i) => i.title === NISHA_POST) ?? null;
+    nishaPostId = nishaItem?.id ?? null;
+    if (!nishaPostId) throw new Error("Nisha's post isn't among the published posts");
+    await page.goto(SAMAJ + "/admin/moderation?status=APPROVED&type=POST");
+    const row = queueRow(NISHA_POST);
+    await row.getByRole("button", { name: "Remove", exact: true }).click();
+    const sheet = shown(page.getByRole("dialog", { name: "Remove this content?", exact: true }));
+    await sheet.getByText("It disappears for members; you can restore it later.", { exact: true }).waitFor();
+    const note = sheet.getByPlaceholder("Optional note");
+    await note.fill("Off topic for the feed");
+    await shot("m17d-moderation-remove");
+    // Cancel keeps the note for next time.
+    await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+    await sheet.waitFor({ state: "hidden" });
+    await row.getByRole("button", { name: "Remove", exact: true }).click();
+    if ((await note.inputValue()) !== "Off topic for the feed") throw new Error(`the sheet opened again holding "${await note.inputValue()}", not the note typed`);
+    await sheet.getByRole("button", { name: "Remove", exact: true }).click();
+    await statusSays("Post removed").waitFor();
+    await sheet.waitFor({ state: "hidden" });
+    await row.waitFor({ state: "detached" });
+
+    await memberTab("Removed").click();
+    await page.waitForURL(/status=REMOVED/);
+    await chosenChip("Post");
+    await queueRow(NISHA_POST).getByRole("button", { name: "Restore", exact: true }).click();
+    await statusSays("Post restored").waitFor();
+    await shown(page.getByText("No removed content.", { exact: true })).waitFor();
+  });
+
+  await step("a published post is pinned and unpinned from the queue, its button saying which, with an SVG icon", async () => {
+    await memberTab("Published").click();
+    await page.waitForURL(/status=APPROVED/);
+    const row = queueRow(HETAL_POST);
+    const pin = row.getByRole("button", { name: "Pin", exact: true });
+    await pin.waitFor();
+    await expectSvgNoEmoji(pin, "the queue's Pin button");
+    await pin.click();
+    await row.getByRole("status").filter({ hasText: "Pinned to the top of the feed" }).waitFor();
+    await row.getByRole("button", { name: "Unpin", exact: true }).click();
+    await row.getByRole("status").filter({ hasText: "Unpinned" }).waitFor();
+    await row.getByRole("button", { name: "Pin", exact: true }).waitFor();
+  });
+
+  await step("a link naming an item opens it in the queue, a notice's item already handled says so, and a cached list isn't taken for the answer", async () => {
+    await page.goto(`${SAMAJ}/admin/moderation?status=APPROVED&type=POST&item=${nishaPostId}`);
+    const row = queueRow(NISHA_POST);
+    await row.getByRole("button", { name: "Hide", exact: true }).waitFor();
+    // Its words twice: the row's opening line, and the preview it opened with.
+    await row.getByText(NISHA_POST, { exact: true }).nth(1).waitFor();
+
+    const gone = "That item isn't waiting here any more. Another admin may have handled it.";
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "CONTENT_PENDING", data: { contentType: "POST", contentId: nishaPostId }, title: "A post is waiting for review" });
+    const listUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/moderation(\?|$)/;
+    try {
+      await page.goto(SAMAJ + "/profile/notifications");
+      await shown(page.getByText("A post is waiting for review", { exact: true })).click();
+      await page.waitForURL(new RegExp(`/t/shri-gujarati-samaj/admin/moderation\\?status=PENDING&type=POST&item=${nishaPostId}$`));
+      await chosenChip("Post");
+      // Published long since, so nothing of it waits.
+      await statusSays(gone).waitFor();
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
+
+      // A second notice moments later, for an item that now waits (answered by the script): the list cached by the visit
+      // just made, with nothing waiting, is fetched again rather than taken for the answer, and the item opens.
+      await page.route(listUrl, (route) => {
+        const params = new URL(route.request().url()).searchParams;
+        if (route.request().method() !== "GET" || params.get("status") !== "PENDING") return route.fallback();
+        return answer(route, 200, { data: [{ ...nishaItem, moderationStatus: "PENDING" }], page: 1, pageSize: 20, total: 1 });
+      });
+      const fetched = page.waitForResponse((r) => listUrl.test(r.url()) && new URL(r.url()).searchParams.get("status") === "PENDING");
+      await shown(page.getByText("A post is waiting for review", { exact: true })).click();
+      await page.waitForURL(new RegExp(`/t/shri-gujarati-samaj/admin/moderation\\?status=PENDING&type=POST&item=${nishaPostId}$`));
+      await fetched;
+      const waiting = queueRow(NISHA_POST);
+      await waiting.getByRole("button", { name: "Hide", exact: true }).waitFor();
+      await waiting.getByRole("button", { name: "Approve", exact: true }).waitFor();
+      if (await page.getByRole("status").filter({ hasText: gone }).locator("visible=true").count()) throw new Error("the queue said the item had gone, from the list cached before the notice");
+    } finally {
+      await page.unroute(listUrl);
+      await notice.stop();
+    }
+  });
+
+  await step("Open in app leaves the console for the post's own page, with one tab bar", async () => {
+    await page.goto(SAMAJ + "/admin/moderation?status=APPROVED&type=POST");
+    const link = queueRow(NISHA_POST).getByRole("link", { name: "Open in app", exact: true });
+    await expectSvgNoEmoji(link, "Open in app");
+    await link.click();
+    await page.waitForURL(`**/t/shri-gujarati-samaj/feed/${nishaPostId}`);
+    await shown(page.getByText(NISHA_POST, { exact: true })).waitFor();
+    // Down to the tabs underneath, not a second set of them on top of the console.
+    if ((await barTab("More").locator("visible=true").count()) !== 1) throw new Error("leaving the console for the post left more than one tab bar");
+  });
+
+  let reportId = null;
+  let openReport = null;
+  await step("Hetal's post reported from the feed is in the console's Reports, labelled, with an Open tab counting it", async () => {
+    await page.goto(SAMAJ + "/feed");
+    const card = page
+      .locator("div")
+      .filter({ has: page.getByText(HETAL_POST) })
+      .filter({ has: page.getByRole("button", { name: "Report this content", exact: true }) })
+      .locator("visible=true")
+      .last();
+    await card.getByRole("button", { name: "Report this content", exact: true }).click();
+    const sheet = shown(page.getByRole("dialog", { name: "Report content", exact: true }));
+    await sheet.getByRole("button", { name: "Spam", exact: true }).click();
+    await sheet.getByLabel("Details (optional)", { exact: true }).fill("e2e check");
+    const filed = page.waitForResponse((r) => r.request().method() === "POST" && /\/t\/shri-gujarati-samaj\/reports$/.test(r.url()));
+    await sheet.getByRole("button", { name: "Submit report", exact: true }).click();
+    if ((await filed).status() !== 201) throw new Error(`reporting the post answered ${(await filed).status()}`);
+    await sheet.waitFor({ state: "hidden" });
+
+    // Afresh, so the console's counts are asked for now.
+    await page.goto(SAMAJ + "/more");
+    await consoleRow().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin");
+    await shown(page.getByRole("link", { name: "Open reports, 1", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/reports");
+    const open = memberTab("Open");
+    await open.waitFor();
+    if ((await open.getAttribute("aria-selected")) !== "true") throw new Error("Reports didn't open on Open");
+    await shown(page.getByRole("tab", { name: /^Open\s*1$/ })).waitFor();
+    const row = page
+      .locator("div")
+      .filter({ has: page.getByText("“e2e check”", { exact: true }) })
+      .filter({ has: page.getByRole("button", { name: "Dismiss", exact: true }) })
+      .locator("visible=true")
+      .last();
+    for (const text of ["Spam", "Post", "Published"]) await row.getByText(text, { exact: true }).waitFor();
+    if (await row.getByText("APPROVED", { exact: true }).count()) throw new Error("the report's content status shows the raw APPROVED");
+    await row.getByText(/^Reported by Jignesh Patel · /).waitFor();
+    await row.getByText(HETAL_POST).waitFor();
+    await fitsPhone("the reports queue", row.getByText("“e2e check”", { exact: true }));
+    await shot("m18-admin-reports");
+    openReport = (await adminGet("/reports?status=OPEN")).data.find((r) => r.details === "e2e check") ?? null;
+    reportId = openReport?.id ?? null;
+    if (!reportId) throw new Error("the report isn't among the open ones");
+  });
+
+  await step("a report already handled elsewhere closes its sheet and says so, one resolved keeping the content lists its note, and a cached list isn't taken for a notice's answer", async () => {
+    const row = page
+      .locator("div")
+      .filter({ has: page.getByText("“e2e check”", { exact: true }) })
+      .filter({ has: page.getByRole("button", { name: "Dismiss", exact: true }) })
+      .locator("visible=true")
+      .last();
+    // Answered by the script as if another admin had dismissed it first.
+    const dismissUrl = /\/admin\/reports\/[^/]+\/dismiss$/;
+    await page.route(dismissUrl, (route) => (route.request().method() === "POST" ? answer(route, 409, { error: { code: "INVALID_TRANSITION", message: "This report has already been handled" } }) : route.fallback()));
+    try {
+      await row.getByRole("button", { name: "Dismiss", exact: true }).click();
+      const sheet = shown(page.getByRole("dialog", { name: "Dismiss this report", exact: true }));
+      await sheet.getByPlaceholder("Optional note").fill("Not worth keeping");
+      const refetched = page.waitForRequest((r) => r.method() === "GET" && /\/admin\/reports\?/.test(r.url()));
+      await sheet.getByRole("button", { name: "Dismiss", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      await statusSays("This report has already been handled").waitFor();
+      await refetched;
+    } finally {
+      await page.unroute(dismissUrl);
+    }
+
+    // It's still open in fact, so it's resolved for real.
+    await row.getByRole("button", { name: "Resolve, keep content", exact: true }).click();
+    const sheet = shown(page.getByRole("dialog", { name: "Resolve without removing", exact: true }));
+    await sheet.getByText("Add a note for the audit trail.", { exact: true }).waitFor();
+    await sheet.getByPlaceholder("Optional note").fill("Checked: not spam");
+    await sheet.getByRole("button", { name: "Resolve", exact: true }).click();
+    await statusSays("Report resolved").waitFor();
+    await shown(page.getByText("No open reports", { exact: true })).waitFor();
+    await memberTab("Resolved").click();
+    await page.waitForURL(/status=RESOLVED/);
+    await shown(page.getByText("Resolution: Checked: not spam", { exact: true })).waitFor();
+
+    // A notice of it, tapped now, finds it handled.
+    const handled = "That report has already been handled.";
+    const notice = await scriptNotification(page, "shri-gujarati-samaj", { type: "REPORT_FILED", data: { reportId }, title: "Post reported: spam" });
+    const listUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/reports(\?|$)/;
+    try {
+      await page.goto(SAMAJ + "/profile/notifications");
+      await shown(page.getByText("Post reported: spam", { exact: true })).click();
+      await page.waitForURL(new RegExp(`/t/shri-gujarati-samaj/admin/reports\\?status=OPEN&item=${reportId}$`));
+      await statusSays(handled).waitFor();
+      await backButton().click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
+
+      // Tapped again moments later, with the report open again as far as the list goes (answered by the script): the
+      // Open list cached by the visit just made, with nothing open, is fetched again rather than taken for the answer.
+      await page.route(listUrl, (route) => {
+        const params = new URL(route.request().url()).searchParams;
+        if (route.request().method() !== "GET" || params.get("status") !== "OPEN") return route.fallback();
+        return answer(route, 200, { data: [openReport], page: 1, pageSize: 20, total: 1 });
+      });
+      const fetched = page.waitForResponse((r) => listUrl.test(r.url()) && new URL(r.url()).searchParams.get("status") === "OPEN");
+      await shown(page.getByText("Post reported: spam", { exact: true })).click();
+      await page.waitForURL(new RegExp(`/t/shri-gujarati-samaj/admin/reports\\?status=OPEN&item=${reportId}$`));
+      await fetched;
+      await shown(page.getByText("“e2e check”", { exact: true })).waitFor();
+      if (await page.getByRole("status").filter({ hasText: handled }).locator("visible=true").count()) throw new Error("Reports said the report was handled, from the list cached before the notice");
+    } finally {
+      await page.unroute(listUrl);
+      await notice.stop();
     }
   });
 

@@ -7,6 +7,8 @@ import {
   applicationsLine,
   jobFacts,
   jobPlaceLabel,
+  jobSectionsShown,
+  shownAddress,
   skillMatch,
   skillMatchText,
   type JobDto,
@@ -46,30 +48,12 @@ const FACT_ICONS: Record<JobFactKey, (p: IconProps) => ReactElement> = {
   education: IconGraduationCap,
 };
 
-const SECTIONS = [
-  { key: "description", title: "About the role" },
-  { key: "responsibilities", title: "Responsibilities" },
-  { key: "requirements", title: "Requirements" },
-  { key: "benefits", title: "Benefits" },
-  { key: "howToApply", title: "How to apply" },
-] as const;
-
 /**
  * On a job's own page the title is the h1 and each part an h2; in the admin's preview, under the Moderation page's h1, an
  * h2 and h3s, so no level is skipped.
  */
 type Level = 1 | 2;
 const headings = (level: Level) => (level === 1 ? (["h1", "h2"] as const) : (["h2", "h3"] as const));
-
-/** A link's address without its scheme, as the company card shows it: what's written is where it goes. */
-function shownAddress(href: string): string {
-  try {
-    const url = new URL(href);
-    return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
-  } catch {
-    return href;
-  }
-}
 
 /** A member reading a job, so the skills on their profile that it asks for are marked. */
 export interface SkillsViewer {
@@ -164,7 +148,7 @@ export function JobDetails({
   const ended = applicationsClosed(job, now);
   // While open; once closed, the apply area says so in its place, so the line is on the page once.
   const closes = ended ? null : applicationsLine(job, now);
-  const sections = SECTIONS.filter(({ key }) => (key !== "howToApply" || !ended || showClosedSections) && job[key]?.trim());
+  const sections = jobSectionsShown(job, now, showClosedSections);
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-4">

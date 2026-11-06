@@ -100,6 +100,57 @@ export const YOU_HAVE_THIS_TEXT = "(you have this)";
 /** In place of skillMatchText when the viewer's profile lists no skills, linking to its Work section. */
 export const ADD_SKILLS_TO_MATCH_TEXT = "Add your skills to see which you match";
 
+/** A job's written parts, in the order both apps show them, each under its heading. */
+export const JOB_SECTIONS = [
+  { key: "description", title: "About the role" },
+  { key: "responsibilities", title: "Responsibilities" },
+  { key: "requirements", title: "Requirements" },
+  { key: "benefits", title: "Benefits" },
+  { key: "howToApply", title: "How to apply" },
+] as const;
+export type JobSection = (typeof JOB_SECTIONS)[number];
+
+/**
+ * The parts a job's page shows: those with text in them. Once applications have closed How to apply goes with the apply
+ * area, unless `showClosedSections` (the admin's preview, which shows whatever it's asked to approve).
+ */
+export function jobSectionsShown(job: Pick<JobDto, JobSection["key"] | "isClosed" | "expiresAt">, now: number | Date, showClosedSections = false): JobSection[] {
+  const ended = applicationsClosed(job, now);
+  return JOB_SECTIONS.filter(({ key }) => (key !== "howToApply" || !ended || showClosedSections) && !!job[key]?.trim());
+}
+
+export interface JobContactRow {
+  key: "applyUrl" | "contactEmail" | "contactPhone";
+  label: string;
+  value: string;
+}
+
+/** A job's ways to apply as the admin's preview lists them, as text: its link, email and phone, leaving out what it doesn't give. */
+export function jobContactRows(job: Pick<JobDto, JobContactRow["key"]>): JobContactRow[] {
+  const rows: JobContactRow[] = [];
+  const add = (key: JobContactRow["key"], label: string) => {
+    const value = job[key]?.trim();
+    if (value) rows.push({ key, label, value });
+  };
+  add("applyUrl", "Apply link");
+  add("contactEmail", "Email");
+  add("contactPhone", "Phone");
+  return rows;
+}
+
+/** In the admin's preview of a job that gives none of jobContactRows. */
+export const NO_JOB_CONTACTS_TEXT = "No apply link, email or phone.";
+
+/** A link's address without its scheme, as a company card shows it: what's written is where it goes. */
+export function shownAddress(href: string): string {
+  try {
+    const url = new URL(href);
+    return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
+  } catch {
+    return href;
+  }
+}
+
 /** Short English month names, January first, for dates written by hand. */
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 

@@ -391,7 +391,8 @@ export function Card({ children, style, onPress, accessibilityLabel }: { childre
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function Badge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "success" | "warning" | "danger" | "info" | "primary" }) {
+/** `icon` draws before the label in the badge's text colour (an SVG from components/icons); screen readers skip it, as the label says it all. */
+export function Badge({ label, tone = "neutral", icon }: { label: string; tone?: "neutral" | "success" | "warning" | "danger" | "info" | "primary"; icon?: (color: string) => ReactNode }) {
   const theme = useTheme();
   const map = {
     neutral: { bg: "#f1f5f9", fg: "#334155" },
@@ -402,7 +403,10 @@ export function Badge({ label, tone = "neutral" }: { label: string; tone?: "neut
     primary: { bg: theme.primarySoft, fg: theme.primaryInk },
   }[tone];
   return (
-    <View style={[styles.badge, { backgroundColor: map.bg }]}>
+    <View style={[styles.badge, icon ? styles.badgeWithIcon : null, { backgroundColor: map.bg }]}>
+      {icon ? (
+        <View aria-hidden>{icon(map.fg)}</View>
+      ) : null}
       <Text style={[styles.badgeText, { color: map.fg }]}>{label}</Text>
     </View>
   );
@@ -567,6 +571,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, alignSelf: "flex-start" },
+  badgeWithIcon: { flexDirection: "row", alignItems: "center", gap: 4 },
   badgeText: { fontSize: 11, fontWeight: "600" },
   empty: { alignItems: "center", gap: 6, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },
   emptyTitle: { fontWeight: "600", color: colors.text, fontSize: 15 },

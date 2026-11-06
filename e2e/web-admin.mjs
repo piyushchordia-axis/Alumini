@@ -313,6 +313,69 @@ try {
     await shot("a03b-moderation-business");
   });
 
+  await step("a group is approved in two presses: the first opens its name and description, the second sends what was shown, and a preview changed since asks again", async () => {
+    // Answered by the script: a group whose owner renamed it after it was approved, so members still see the old name.
+    const id = "00000000-0000-4000-8000-0000000000b1";
+    const owner = { id: "00000000-0000-4000-8000-0000000000b2", fullName: "Rohan Gupta", batchYear: 2016, professionType: "EMPLOYED", companyName: null, designation: null, city: "Pune", country: "IN", avatarUrl: null, role: "MEMBER", isOpenToWork: false, headline: null };
+    const at = new Date().toISOString();
+    const item = { contentType: "GROUP", id, title: "Pune robotics club", excerpt: "Weekend builds", author: owner, moderationStatus: "PENDING", moderatedAt: null, createdAt: at, reportCount: 0, isPinned: false, kind: null };
+    const group = { id, name: "Pune robotics club", description: "Weekend builds", approvedName: "Robotics club", approvedDescription: "Builds and talks", visibility: "OPEN", memberCount: 6, owner, archived: false, createdAt: at, updatedAt: at, moderationStatus: "PENDING", moderationNote: null, moderatedAt: null };
+    const json = (r, status, body) => r.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    const listUrl = /\/api\/v1\/t\/demo-college\/admin\/moderation(\?|$)/;
+    const groupUrl = new RegExp(`/admin/moderation/GROUP/${id}$`);
+    const approveUrl = new RegExp(`/admin/moderation/GROUP/${id}/approve$`);
+    let loads = 0;
+    const sent = [];
+    // Renamed by its owner as the first approval is refused, so the preview fetched again says something else.
+    let current = group;
+    const renamed = { ...group, name: "Pune robotics society" };
+    await page.route(listUrl, (r) => (r.request().method() === "GET" && new URL(r.request().url()).searchParams.get("contentType") === "GROUP" ? json(r, 200, { data: [item], page: 1, pageSize: 20, total: 1 }) : r.fallback()));
+    await page.route(groupUrl, (r) => {
+      if (r.request().method() !== "GET") return r.fallback();
+      loads += 1;
+      return json(r, 200, { data: current });
+    });
+    await page.route(approveUrl, (r) => {
+      sent.push(r.request().postData());
+      current = renamed;
+      return json(r, 409, { error: { code: "CONFLICT", message: "This group changed while you were looking at it. Reload it and try again." } });
+    });
+    try {
+      await page.goto(`${BASE}/t/demo-college/admin/moderation?type=GROUP`);
+      const row = page.locator("li", { hasText: "Pune robotics club" }).first();
+      await row.waitFor();
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await page.waitForSelector("text=Check the group's name and description, then approve it.");
+      await row.getByText("Until you decide, members see what was approved before:", { exact: true }).waitFor();
+      await row.getByText("Robotics club", { exact: true }).waitFor();
+      if ((await row.getByRole("button", { name: "Hide", exact: true }).getAttribute("aria-expanded")) !== "true") throw new Error("the opened row doesn't say it's expanded");
+      if (sent.length) throw new Error("the first Approve sent the approval before the group was shown");
+      const shownLoads = loads;
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await page.waitForSelector("text=This group changed while you were looking at it. Reload it and try again.");
+      const body = JSON.parse(sent[0] ?? "{}");
+      if (body.reviewed?.name !== "Pune robotics club" || body.reviewed?.description !== "Weekend builds") throw new Error(`the second Approve sent ${sent[0]}`);
+      // Refused as out of date, the page asks again for what the group says now.
+      for (let i = 0; i < 50 && loads === shownLoads; i++) await page.waitForTimeout(100);
+      if (loads === shownLoads) throw new Error("the group wasn't fetched again after the refusal");
+      await shot("a03c-moderation-group");
+      // The preview now shows the new name, which the admin hasn't read yet: the next press sends nothing and asks them
+      // to check it again, and the one after sends what it says now.
+      await row.getByText("Pune robotics society", { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      await page.waitForSelector("text=This group changed while you were looking at it. Check its name and description again, then approve it.");
+      if (sent.length !== 1) throw new Error("Approve sent a name the preview had only just changed to");
+      await row.getByRole("button", { name: "Approve", exact: true }).click();
+      for (let i = 0; i < 50 && sent.length < 2; i++) await page.waitForTimeout(100);
+      const again = JSON.parse(sent[1] ?? "{}");
+      if (again.reviewed?.name !== "Pune robotics society" || again.reviewed?.description !== "Weekend builds") throw new Error(`the Approve after checking again sent ${sent[1]}`);
+    } finally {
+      await page.unroute(listUrl);
+      await page.unroute(groupUrl);
+      await page.unroute(approveUrl);
+    }
+  });
+
   await step("an approved post's Pin and Unpin draw their icon, named by the word alone", async () => {
     // The seeded notice is pinned and the spam post (removed in the next step) isn't. Rows hold member text, so only the
     // buttons are checked for emoji.

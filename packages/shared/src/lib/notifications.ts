@@ -162,8 +162,8 @@ interface NotificationData {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Only an id that is a UUID: it goes into a route, and a push can carry anything. */
-function uuidOf(value: unknown): string | undefined {
+/** Only an id that is a UUID: it goes into a route, and a push or a link can carry anything. */
+export function uuidOf(value: unknown): string | undefined {
   return typeof value === "string" && UUID.test(value) ? value : undefined;
 }
 

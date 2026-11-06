@@ -185,18 +185,23 @@ before showing the demo.
   link, the sidebar and the More sheet show an amber count of what's waiting (pending members, content to review, open
   reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
   profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
-  the member's page, the others on the dashboard. Its pages are coming to the phone one at a time (see Known gaps);
-  the members list is there, with the same status tabs and counts, search, Approve all and row actions as the web's,
-  scrolling on through the pages, and so is a member's page: their facts and profile, their answers to the
-  institution's questions (which admins can edit), their mentor profile (Remove as mentor), Make admin or Remove admin
-  role (asked first on both apps), and their recent activity, naming who acted. So is the audit log, filtered by a
-  family of actions (Members, Content, Reports and so on) or any prefix typed, kept in the address; its rows link to the
-  member they're about and show their details as readable lines, never a private key such as a deleted account's phone
-  hash, nor a phone number (a new institution's first admin is recorded by number). On both apps an admin's notice of
-  a request to join carries Approve and Reject while the request waits (the phone asks before approving), and
-  otherwise says where it stands; a refetch that shows it decided elsewhere closes an open Reject and says so. The
-  notice and the list send the status they showed, so a screen left open can't overturn another admin's decision: the
-  API refuses (409) and the apps say where the member stands now.
+  the member's page, content waiting on the moderation queue with that item open, a report on the open reports, and a
+  chat report on the dashboard. Its pages are coming to the phone one at a time (see Known gaps); the members list,
+  moderation and reports are there, with the same status tabs and counts, search and filters, Approve all and row
+  actions as the web's, scrolling on through the pages, and so is a member's page: their facts and profile, their
+  answers to the institution's questions (which admins can edit), their mentor profile (Remove as mentor), Make admin or
+  Remove admin role (asked first on both apps), and their recent activity, naming who acted. So is the audit log,
+  filtered by a family of actions (Members, Content, Reports and so on) or any prefix typed, kept in the address; its
+  rows link to the member they're about and show their details as readable lines, never a private key such as a deleted
+  account's phone hash, nor a phone number (a new institution's first admin is recorded by number). Moderation previews
+  each item as the web console does (a job in full, its contacts as text), approves a group in two presses (the first
+  opens its name and description to check), and its "Open in app" leaves the console for the member app's own page, down
+  to the tabs rather than a second set of them. On both apps an admin's notice of a request to join carries Approve and
+  Reject while the request waits (the phone asks before approving), and otherwise says where it stands; a refetch that
+  shows it decided elsewhere closes an open Reject and says so. The notice and the list send the status they showed, so
+  a screen left open can't overturn another admin's decision: the API refuses (409) and the apps say where the member
+  stands now. A reason sheet in the queues closes the same way when another admin got there first, saying so, and the
+  list refreshes.
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
@@ -741,9 +746,10 @@ before applying, laid out the same way on both apps; the rules are in `packages/
   and in My posts), in the admin preview, or for a job with no skills. Skills match whole by `skillKey` (`skillMatch`
   and `skillsMatchedFirst` in `lib/skills.ts`), so case, spacing and full-width letters don't matter, and "SQL" isn't
   "PostgreSQL". The viewer's skills come from the membership each app already holds, so there's no extra request.
-- **The admin preview.** **Admin → Moderation** shows a job in full, as its page does, with headings that fit under the
-  Moderation page's own, its apply link, email, phone and website as text rather than links, How to apply even once
-  closed, and none of its skills marked. A member's edit still goes back for review where admins approve content.
+- **The admin preview.** **Admin → Moderation**, on the web and in the phone app, shows a job in full, as its page
+  does, with headings that fit under the Moderation page's own, its apply link, email, phone and website as text rather
+  than links, How to apply even once closed, none of its skills marked, and no admin's note for its poster. A member's
+  edit still goes back for review where admins approve content.
 
 ### Business directory
 
@@ -1324,10 +1330,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
-  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: moderation,
-    reports, chat reports, invitations and analytics. Until each
-    lands, its tile on the console's home (moderation and both kinds of report have one) opens nothing, and its admin
-    notices open the console's home.
+  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: chat reports,
+    invitations and analytics. Until each lands, its tile on the console's home (chat reports has one) opens nothing,
+    and its admin notices open the console's home.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for

@@ -1,8 +1,8 @@
 import { notificationTarget } from "@illuminize/shared";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { chatGroups, events, memberships } from "../../src/db/schema";
+import { businessListings, chatGroups, events, fundingListings, memberships, posts } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { postToGroup } from "../helpers/chat";
 import { createTenant, loginAs, memberSession, auth } from "../helpers/factories";
@@ -179,6 +179,45 @@ describe.skipIf(!dbAvailable)("content moderation (ADMIN_APPROVAL)", () => {
     await api().post(`${base}/admin/moderation/COMMENT/${comment.body.data.id}/remove`).set(admin.headers).send({}).expect(200);
     expect(await latestTarget()).toEqual({ type: "CONTENT_REMOVED", target: { kind: "post", id: post.body.data.id } });
     expect((await api().get(`${base}/posts/${post.body.data.id}`).set(author.headers)).status).toBe(200);
+  });
+
+  it("pages the queue in one fixed order, so items of any type made in the same instant each show once", async () => {
+    const { tenant } = await createTenant(ctx, { contentModerationMode: "ADMIN_APPROVAL" });
+    const base = `/api/v1/t/${tenant.slug}`;
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    const a = await memberSession(ctx, tenant.id);
+    const b = await memberSession(ctx, tenant.id);
+    const postIds: string[] = [];
+    for (let i = 0; i < 4; i++) postIds.push((await api().post(`${base}/posts`).set(a.headers).send({ body: `Waiting post ${i}` }).expect(201)).body.data.id);
+    const listing = { category: "RETAIL", description: "Ten chars plus" };
+    const businessIds = [
+      (await api().post(`${base}/businesses`).set(a.headers).send({ ...listing, name: "Shop A" }).expect(201)).body.data.id,
+      (await api().post(`${base}/businesses`).set(b.headers).send({ ...listing, name: "Shop B" }).expect(201)).body.data.id,
+    ];
+    const fundingId = (await api().post(`${base}/funding`).set(b.headers).send({ kind: "OFFERING", title: "Cheques", pitch: "Investing in alumni." }).expect(201)).body.data.id;
+    // One createdAt for all, as rows inserted by one statement have (the seed's), so only the tiebreak orders them.
+    const at = new Date("2026-01-01T00:00:00.000Z");
+    await ctx.db.update(posts).set({ createdAt: at }).where(inArray(posts.id, postIds));
+    await ctx.db.update(businessListings).set({ createdAt: at }).where(inArray(businessListings.id, businessIds));
+    await ctx.db.update(fundingListings).set({ createdAt: at }).where(eq(fundingListings.id, fundingId));
+    const all = [...postIds, ...businessIds, fundingId];
+
+    const seen: string[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const res = await api().get(`${base}/admin/moderation?status=PENDING&page=${page}&pageSize=2`).set(admin.headers);
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(all.length);
+      seen.push(...res.body.data.map((i: { id: string }) => i.id));
+    }
+    // Every item once across the pages, newest first and then by id, whatever its type and however Postgres reads the view.
+    expect(seen).toEqual([...all].sort().reverse());
+    // The same within one type.
+    const postsSeen: string[] = [];
+    for (let page = 1; page <= 2; page++) {
+      const res = await api().get(`${base}/admin/moderation?status=PENDING&contentType=POST&page=${page}&pageSize=3`).set(admin.headers);
+      postsSeen.push(...res.body.data.map((i: { id: string }) => i.id));
+    }
+    expect(postsSeen).toEqual([...postIds].sort().reverse());
   });
 
   describe("an item whose author no longer exists", () => {

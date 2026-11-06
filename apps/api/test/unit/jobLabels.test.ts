@@ -1,16 +1,21 @@
 import {
+  JOB_SECTIONS,
+  NO_JOB_CONTACTS_TEXT,
   applicationsClosed,
   applicationsLine,
   companyDetailsOf,
   companyDetailsToFill,
   companyReuseText,
   experienceLabel,
+  jobContactRows,
   jobFacts,
   jobIsOpen,
   jobPlaceLabel,
   jobSalaryText,
+  jobSectionsShown,
   latestJobAtCompany,
   sameCompany,
+  shownAddress,
   toMinor,
   type JobFactsSource,
   type ModerationStatus,
@@ -243,5 +248,43 @@ describe("company details from an earlier job", () => {
     expect(
       companyReuseText("Zylo Labs", { companyLogoUrl: "a", companyWebsite: "b", companyIndustry: "SOFTWARE_INTERNET", companySize: "SIZE_11_50", aboutCompany: "c" }),
     ).toBe("You've posted a job at Zylo Labs before. Its logo, website, industry, size and about can fill in here.");
+  });
+});
+
+describe("jobSectionsShown", () => {
+  const written = { description: "The role", responsibilities: "Shipping documents", requirements: "  ", benefits: null, howToApply: "Email the HR team" };
+  const open = { ...written, isClosed: false, expiresAt: null };
+
+  it("lists the parts with text in them, in the apps' order", () => {
+    expect(JOB_SECTIONS.map((s) => s.title)).toEqual(["About the role", "Responsibilities", "Requirements", "Benefits", "How to apply"]);
+    expect(jobSectionsShown(open, NOW).map((s) => s.key)).toEqual(["description", "responsibilities", "howToApply"]);
+  });
+
+  it("drops How to apply once applications have closed, unless the admin's preview shows every part", () => {
+    for (const closed of [{ ...open, isClosed: true }, { ...open, expiresAt: "2026-11-04T06:30:00Z" }]) {
+      expect(jobSectionsShown(closed, NOW).map((s) => s.key)).toEqual(["description", "responsibilities"]);
+      expect(jobSectionsShown(closed, NOW, true).map((s) => s.key)).toEqual(["description", "responsibilities", "howToApply"]);
+    }
+  });
+});
+
+describe("jobContactRows", () => {
+  it("lists the apply link, email and phone in that order, leaving out what the job doesn't give", () => {
+    expect(jobContactRows({ applyUrl: "https://example.com/careers", contactEmail: "hr@example.com", contactPhone: "+91 98765 43210" })).toEqual([
+      { key: "applyUrl", label: "Apply link", value: "https://example.com/careers" },
+      { key: "contactEmail", label: "Email", value: "hr@example.com" },
+      { key: "contactPhone", label: "Phone", value: "+91 98765 43210" },
+    ]);
+    expect(jobContactRows({ applyUrl: null, contactEmail: " ", contactPhone: "+91 98765 43210" }).map((r) => r.label)).toEqual(["Phone"]);
+    expect(jobContactRows({ applyUrl: null, contactEmail: null, contactPhone: null })).toEqual([]);
+    expect(NO_JOB_CONTACTS_TEXT).toBe("No apply link, email or phone.");
+  });
+});
+
+describe("shownAddress", () => {
+  it("writes a link without its scheme, and anything that isn't one as it is", () => {
+    expect(shownAddress("https://example.com/")).toBe("example.com");
+    expect(shownAddress("https://www.example.com/shah-fabrics/careers")).toBe("www.example.com/shah-fabrics/careers");
+    expect(shownAddress("not a link")).toBe("not a link");
   });
 });

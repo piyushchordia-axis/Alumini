@@ -10,7 +10,7 @@ import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { MemberRow } from "@/components/MemberRow";
-import { ModerationBadge } from "@/components/ModerationBadge";
+import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { Badge, Button, Card, ErrorText, Row, Screen, Spinner } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
@@ -87,6 +87,8 @@ function JobDetail({ jobId }: { jobId: string }) {
               </>
             ) : null
           }
+          // Only the poster and admins receive the note.
+          notice={<ModerationNote status={j.moderationStatus} note={j.moderationNote} />}
           // Closed or past its closing date: the API already keeps the contacts from other members, and nobody can apply now.
           apply={<JobApplyArea job={j} now={now} />}
           // Their skills come with the membership the app already holds, which saving their profile updates. withAnchor puts

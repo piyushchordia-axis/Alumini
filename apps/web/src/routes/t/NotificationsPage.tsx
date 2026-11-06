@@ -1,4 +1,4 @@
-import { jobsQuery, memberRequestOf, mentorsQuery, notificationTarget, type NotificationDto } from "@illuminize/shared";
+import { memberRequestOf, notificationTarget, type NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
@@ -9,43 +9,12 @@ import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { targetHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
 
 function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | null {
   const t = notificationTarget(n.type, n.data);
-  if (!t) return null;
-  const base = `/t/${slug}/app`;
-  // No default: a target kind added without a route here is a compile error, not a silent dead link.
-  switch (t.kind) {
-    case "post":
-      return `${base}/feed/${t.id}`;
-    case "event":
-      return `${base}/events/${t.id}`;
-    case "job":
-      return `${base}/jobs/${t.id}`;
-    case "funding":
-      return `${base}/funding/${t.id}`;
-    case "business":
-      return `${base}/businesses/${t.id}`;
-    case "chat":
-      return `${base}/messages/${t.conversationId}`;
-    case "chatGroup":
-      return `${base}/groups?tab=invitations`;
-    case "myContent":
-      return `${base}/my-content${t.tab ? `?tab=${t.tab}` : ""}`;
-    case "mentorship":
-      return `${base}/mentors${mentorsQuery("requests", t.box)}`;
-    case "referral":
-      return `${base}/jobs${jobsQuery("referrals", t.box)}`;
-    case "profile":
-      return `${base}/profile`;
-    case "celebrations":
-      return `${base}/feed`;
-    case "admin":
-      if (!isAdmin) return null;
-      if (t.section === "members") return t.membershipId ? `/t/${slug}/admin/members/${t.membershipId}` : `/t/${slug}/admin/members?status=PENDING`;
-      return `/t/${slug}/admin/${t.section}`;
-  }
+  return t ? targetHref(slug, t, { isAdmin }) : null;
 }
 
 export function NotificationsPage() {

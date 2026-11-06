@@ -1,20 +1,45 @@
 import {
-  BUSINESS_CATEGORY_LABELS,
-  CHAT_GROUP_VISIBILITY_INFO,
+  ADMIN_REASON_PROMPTS,
   CONTENT_TYPES,
   CONTENT_TYPE_LABELS,
+  GROUP_APPROVED_BEFORE_TEXT,
+  GROUP_PREVIEW_NOTE,
+  MODERATION_EMPTY_TITLE,
   MODERATION_STATUSES,
   MODERATION_STATUS_LABELS,
+  MODERATION_SUBTITLE,
+  adminContentTarget,
+  businessContactLines,
+  businessSummaryText,
   canPin,
+  contentPreviewKind,
+  groupApproval,
+  groupBeingEdited,
+  groupSeenNext,
+  groupSummaryText,
   moderationActionsFor,
+  moderationBylineText,
+  moderationEmptyText,
+  moderationItemKey,
+  moderationOutcomeText,
+  parseContentType,
+  parseModerationStatus,
+  pinOutcomeText,
+  queueTabCounts,
+  reportCountLabel,
+  statusTabs,
+  type BusinessDto,
   type ChatGroupContentDto,
   type ContentDto,
   type ContentType,
+  type GroupReview,
   type JobDto,
   type ModerationItemDto,
-  type ModerationStatus,
+  type PostDto,
+  type ReasonPromptKey,
+  type TenantFeatures,
 } from "@illuminize/shared";
-import { errorMessage, type ModerationAction } from "@illuminize/shared/client";
+import { errorMessage, isOutOfDate, unlessOutOfDate, type ModerationAction } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -27,91 +52,58 @@ import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { invalidateTenant } from "@/lib/invalidate";
+import { targetHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-/** Where to see the item in the app. No default: a content type added without an answer here is a compile error. */
-function contentLink(slug: string, item: ModerationItemDto): string | null {
-  const base = `/t/${slug}/app`;
-  switch (item.contentType) {
-    case "POST":
-      return `${base}/feed/${item.id}`;
-    case "JOB":
-      return `${base}/jobs/${item.id}`;
-    case "FUNDING":
-      return `${base}/funding/${item.id}`;
-    case "EVENT":
-      return `${base}/events/${item.id}`;
-    case "BUSINESS":
-      return `${base}/businesses/${item.id}`;
-    // A group's page would be its members' conversation, which admins don't get to open.
-    case "GROUP":
-    case "COMMENT":
-      return null;
-  }
-}
-
 function GroupPreview({ content }: { content: ChatGroupContentDto }) {
-  const editing = content.approvedName !== null && (content.approvedName !== content.name || content.approvedDescription !== content.description);
   return (
     <div className="space-y-1 text-sm text-slate-800">
       <p className="font-medium">{content.name}</p>
-      <p className="text-slate-500">
-        {CHAT_GROUP_VISIBILITY_INFO[content.visibility].label} · {content.memberCount} {content.memberCount === 1 ? "member" : "members"}
-        {content.owner ? ` · owned by ${content.owner.fullName}` : ""}
-      </p>
+      <p className="text-slate-500">{groupSummaryText(content)}</p>
       {content.description && <p className="whitespace-pre-line">{content.description}</p>}
-      {editing && (
+      {groupBeingEdited(content) && (
         <div className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-white p-2 text-slate-600">
-          <p className="text-xs font-medium text-slate-500">Until you decide, members see what was approved before:</p>
+          <p className="text-xs font-medium text-slate-500">{GROUP_APPROVED_BEFORE_TEXT}</p>
           <p className="font-medium">{content.approvedName}</p>
           {content.approvedDescription && <p className="whitespace-pre-line">{content.approvedDescription}</p>}
         </div>
       )}
-      <p className="text-xs text-slate-500">Chat messages are never shown here: only a group's name and description are reviewed.</p>
+      <p className="text-xs text-slate-500">{GROUP_PREVIEW_NOTE}</p>
     </div>
   );
 }
 
-function ContentPreview({ content }: { content: ContentDto }) {
-  // First: a group has a description too, and it's a different thing to review.
-  if ("visibility" in content && "memberCount" in content) return <GroupPreview content={content} />;
-  // Before the description check below: a business has one too, and an admin also needs what the list doesn't show.
-  if ("category" in content) {
-    return (
-      <div className="space-y-1 text-sm text-slate-800">
-        {content.logoUrl && <img src={content.logoUrl} alt="" className="h-16 w-16 rounded object-cover" />}
-        <p className="font-medium">{content.name}</p>
-        <p className="text-slate-500">{[BUSINESS_CATEGORY_LABELS[content.category], content.city].filter(Boolean).join(" · ")}</p>
-        <p className="whitespace-pre-line">{content.description}</p>
-        {[content.websiteUrl, content.contactEmail, content.contactPhone].filter(Boolean).map((v) => (
-          <p key={v} className="text-slate-500">
-            {v}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  if ("body" in content && "imageUrls" in content) {
-    return (
-      <div>
-        <p className="whitespace-pre-line text-sm text-slate-800">{content.body}</p>
-        {content.imageUrls.length > 0 && (
-          <div className="mt-2 flex gap-2">
-            {content.imageUrls.map((u) => (
-              <img key={u} src={u} alt="" className="h-20 w-20 rounded object-cover" />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-  if ("body" in content) return <p className="text-sm text-slate-800">{content.body}</p>;
-  if ("pitch" in content) return <p className="whitespace-pre-line text-sm text-slate-800">{content.pitch}</p>;
-  // Before the description check below: an event has one too, and an admin approving a job needs every part of it.
-  if ("companyName" in content) return <JobPreview job={content} />;
-  if ("description" in content) return <p className="whitespace-pre-line text-sm text-slate-800">{content.description}</p>;
-  return null;
+/** A listing with what the list doesn't show: its contact details, as text. */
+function BusinessPreview({ content }: { content: BusinessDto }) {
+  return (
+    <div className="space-y-1 text-sm text-slate-800">
+      {content.logoUrl && <img src={content.logoUrl} alt="" className="h-16 w-16 rounded object-cover" />}
+      <p className="font-medium">{content.name}</p>
+      <p className="text-slate-500">{businessSummaryText(content)}</p>
+      <p className="whitespace-pre-line">{content.description}</p>
+      {businessContactLines(content).map((v) => (
+        <p key={v} className="text-slate-500 [overflow-wrap:anywhere]">
+          {v}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function PostPreview({ content }: { content: PostDto }) {
+  return (
+    <div>
+      <p className="whitespace-pre-line text-sm text-slate-800">{content.body}</p>
+      {content.imageUrls.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {content.imageUrls.map((u) => (
+            <img key={u} src={u} alt="" className="h-20 w-20 rounded object-cover" />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The whole job as its page shows it, with its contacts as text and its How to apply even once closed: all of what's approved. */
@@ -125,9 +117,29 @@ function JobPreview({ job }: { job: JobDto }) {
   );
 }
 
-export function ModerationRow({ slug, item }: { slug: string; item: ModerationItemDto }) {
+/** An item as its type is previewed (contentPreviewKind): a group's name and description, a listing with its contacts, a post, a whole job, or the text. */
+function ContentPreview({ type, content }: { type: ContentType; content: ContentDto }) {
+  const preview = contentPreviewKind(type, content);
+  if (!preview) return null;
+  switch (preview.kind) {
+    case "group":
+      return <GroupPreview content={preview.content} />;
+    case "business":
+      return <BusinessPreview content={preview.content} />;
+    case "post":
+      return <PostPreview content={preview.content} />;
+    case "job":
+      return <JobPreview job={preview.content} />;
+    case "text":
+      return <p className="whitespace-pre-line text-sm text-slate-800">{preview.text}</p>;
+  }
+}
+
+type Asking = Extract<ReasonPromptKey, "reject" | "remove">;
+
+export function ModerationRow({ slug, item, features }: { slug: string; item: ModerationItemDto; features: TenantFeatures }) {
   const qc = useQueryClient();
-  const [modal, setModal] = useState<"reject" | "remove" | null>(null);
+  const [modal, setModal] = useState<Asking | null>(null);
   const [expanded, setExpanded] = useState(false);
   const full = useQuery({ queryKey: qk.admin.content(slug, item.contentType, item.id), queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
   const refresh = () => {
@@ -135,42 +147,66 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
   };
   const act = useMutation({
     mutationFn: (v: { action: ModerationAction; note?: string; reviewed?: { name: string; description: string | null } }) => api.admin.moderation.act(slug, item.contentType, item.id, v.action, v.note, v.reviewed),
-    onSuccess: (r) => {
+    onSuccess: (_r, v) => {
       refresh();
-      toast.success(`${CONTENT_TYPE_LABELS[item.contentType]} ${r.to.toLowerCase()}`);
+      toast.success(moderationOutcomeText(item.contentType, v.action));
     },
     onError: (e) => {
       toast.error(errorMessage(e));
+      // Another admin got there first, or it's gone: what the queue shows is out of date.
+      if (isOutOfDate(e)) refresh();
       // Most often a group its owner changed meanwhile: show what it says now.
-      if (expanded) void full.refetch();
+      else if (expanded) void full.refetch();
     },
   });
-  const shownGroup = full.data && "visibility" in full.data && "memberCount" in full.data ? full.data : null;
-  /**
-   * Approving a group publishes its name and description to its members, so it approves what this admin can see on screen:
-   * the first press opens the details if they're closed, and the API refuses if the group has changed since.
-   */
+  // A group's name and description as its preview first showed them since it opened: what the admin read, which a
+  // refresh of the preview meanwhile, as when its owner edits it, mustn't swap just before Approve.
+  const [seen, setSeen] = useState<GroupReview | null>(null);
+  const seenNext = groupSeenNext(seen, expanded, full.data);
+  if (seenNext !== seen) setSeen(seenNext);
   const approve = () => {
-    if (item.contentType !== "GROUP") return act.mutate({ action: "approve" });
-    if (!expanded || !shownGroup) {
+    const step = groupApproval(item.contentType, expanded ? full.data : null, seen);
+    if (!step.send) {
+      if (step.reason === "changed") setSeen(step.seen);
       setExpanded(true);
-      toast.info("Check the group's name and description, then approve it.");
+      if (step.reason === "changed") toast.error(step.hint);
+      else toast.info(step.hint);
       return;
     }
-    act.mutate({ action: "approve", reviewed: { name: shownGroup.name, description: shownGroup.description } });
+    act.mutate({ action: "approve", reviewed: step.reviewed });
   };
   const pin = useMutation({
     mutationFn: (pinned: boolean) => (pinned ? api.admin.moderation.pin(slug, item.id) : api.admin.moderation.unpin(slug, item.id)),
-    onSuccess: () => {
+    onSuccess: (_p, pinned) => {
       refresh();
-      toast.success("Updated");
+      toast.success(pinOutcomeText(pinned));
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      toast.error(errorMessage(e));
+      // Gone, or no longer published: what the queue shows is out of date.
+      if (isOutOfDate(e)) refresh();
+    },
   });
   const isPinned = item.isPinned;
   const s = item.moderationStatus;
   const can = moderationActionsFor(s);
-  const link = contentLink(slug, item);
+  const target = adminContentTarget(item.contentType, item.id, features);
+  const link = target && targetHref(slug, target, { isAdmin: true });
+  const ask = (key: Asking) => {
+    const prompt = ADMIN_REASON_PROMPTS[key];
+    return (
+      <ReasonModal
+        open={modal === key}
+        title={prompt.title}
+        label={prompt.body}
+        tone={prompt.tone}
+        confirmLabel={prompt.confirm}
+        onClose={() => setModal(null)}
+        // Out of date (another admin acted first, or it's gone): the toast says so and the modal closes, as trying again can't help.
+        onConfirm={(note) => unlessOutOfDate(() => act.mutateAsync({ action: key, note }))}
+      />
+    );
+  };
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-start gap-3">
@@ -184,19 +220,23 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
                 Announcement
               </Badge>
             )}
+            {isPinned && (
+              <Badge className="gap-1">
+                <IconPin size={12} />
+                Pinned
+              </Badge>
+            )}
             {item.reportCount > 0 && (
               <Badge tone="danger" className="gap-1">
                 <IconFlag size={12} />
-                {item.reportCount} report(s)
+                {reportCountLabel(item.reportCount)}
               </Badge>
             )}
-            <span className="text-xs text-slate-500">
-              {item.author ? `by ${item.author.fullName} (batch of ${item.author.batchYear})` : "by a deleted member"} · {timeAgo(item.createdAt)}
-            </span>
+            <span className="text-xs text-slate-500">{moderationBylineText(item, timeAgo(item.createdAt))}</span>
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-slate-800">{item.title ?? item.excerpt}</p>
           <div className="mt-1 flex gap-3 text-xs">
-            <button className="text-primary underline" onClick={() => setExpanded((e) => !e)}>
+            <button className="text-primary underline" aria-expanded={expanded} onClick={() => setExpanded((e) => !e)}>
               {expanded ? "Hide" : "View full content"}
             </button>
             {link && (
@@ -210,13 +250,14 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
           {expanded && (
             <div className="mt-2 rounded-lg bg-slate-50 p-3">
               {full.isLoading && <Loading />}
-              {full.data && <ContentPreview content={full.data} />}
+              {full.error && !full.data && <ErrorBox error={full.error} />}
+              {full.data && <ContentPreview type={item.contentType} content={full.data} />}
             </div>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           {can.includes("approve") && (
-            <Button size="sm" onClick={approve} loading={act.isPending}>
+            <Button size="sm" onClick={approve} loading={act.isPending && act.variables?.action === "approve"}>
               Approve
             </Button>
           )}
@@ -231,7 +272,7 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
             </Button>
           )}
           {can.includes("restore") && (
-            <Button size="sm" variant="outline" onClick={() => act.mutate({ action: "restore" })} loading={act.isPending}>
+            <Button size="sm" variant="outline" onClick={() => act.mutate({ action: "restore" })} loading={act.isPending && act.variables?.action === "restore"}>
               Restore
             </Button>
           )}
@@ -243,8 +284,8 @@ export function ModerationRow({ slug, item }: { slug: string; item: ModerationIt
           )}
         </div>
       </div>
-      <ReasonModal open={modal === "reject"} title="Reject this content?" label="The author sees your note and can edit and resubmit." tone="danger" confirmLabel="Reject" onClose={() => setModal(null)} onConfirm={(note) => act.mutateAsync({ action: "reject", note })} />
-      <ReasonModal open={modal === "remove"} title="Remove this content?" label="It disappears for members; you can restore it later." tone="danger" confirmLabel="Remove" onClose={() => setModal(null)} onConfirm={(note) => act.mutateAsync({ action: "remove", note })} />
+      {can.includes("reject") && ask("reject")}
+      {can.includes("remove") && ask("remove")}
     </li>
   );
 }
@@ -253,11 +294,12 @@ export function AdminModerationPage() {
   const { tenant } = useAdminTenant();
   const slug = tenant.slug;
   const [params, setParams] = useSearchParams();
-  const status = (params.get("status") as ModerationStatus) || "PENDING";
-  const contentType = (params.get("type") as ContentType) || undefined;
+  const status = parseModerationStatus(params.get("status"));
+  const contentType = parseContentType(params.get("type"));
   const page = Number(params.get("page") ?? "1");
   const query = { status, contentType, page, pageSize: 20 };
   const list = useQuery({ queryKey: qk.admin.moderation(slug, query), queryFn: () => api.admin.moderation.list(slug, query) });
+  const dashboard = useQuery({ queryKey: qk.admin.dashboard(slug), queryFn: () => api.admin.dashboard(slug) });
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(params);
     if (v) next.set(k, v);
@@ -267,9 +309,9 @@ export function AdminModerationPage() {
   };
   return (
     <div className="space-y-4">
-      <PageHeader title="Moderation" subtitle="Review what members post before (or after) it goes live" />
+      <PageHeader title="Moderation" subtitle={MODERATION_SUBTITLE} />
       <div className="flex flex-wrap items-center gap-2">
-        <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={MODERATION_STATUSES.map((s) => ({ value: s, label: MODERATION_STATUS_LABELS[s] }))} className="w-fit" />
+        <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={statusTabs(MODERATION_STATUSES, MODERATION_STATUS_LABELS, queueTabCounts(dashboard.data)?.moderation)} className="w-fit" />
         <Select aria-label="Content type" value={contentType ?? ""} onChange={(e) => setParam("type", e.target.value)} className="w-44">
           <option value="">All types</option>
           {CONTENT_TYPES.map((t) => (
@@ -281,10 +323,10 @@ export function AdminModerationPage() {
       </div>
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title="Nothing to review" description={`No ${MODERATION_STATUS_LABELS[status].toLowerCase()} content.`} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((item) => (
-          <ModerationRow key={`${item.contentType}:${item.id}`} slug={slug} item={item} />
+          <ModerationRow key={moderationItemKey(item)} slug={slug} item={item} features={tenant.settings.features} />
         ))}
       </ul>
       {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={(p) => setParam("page", String(p))} />}

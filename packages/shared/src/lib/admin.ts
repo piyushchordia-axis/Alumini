@@ -106,7 +106,15 @@ export type AdminSectionKey = AdminSection["key"];
  * The sections the phone app's console has so far (its Dashboard is the console's home). It lists the others as on the
  * web console, and README → Known gaps names them, until every page is in the phone app.
  */
-export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members", "profileFields", "settings", "audit"];
+export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = [
+  "dashboard",
+  "members",
+  "moderation",
+  "reports",
+  "profileFields",
+  "settings",
+  "audit",
+];
 
 /** A figure on the console's home, which both apps draw as a tile. */
 export interface DashboardTile {

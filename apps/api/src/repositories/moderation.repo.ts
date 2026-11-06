@@ -28,7 +28,8 @@ export async function listModerationItems(
       // A left join: an inner one would drop rows with no author, which the count below still includes.
       .leftJoin(memberships, eq(memberships.id, moderationItems.authorMembershipId))
       .where(where)
-      .orderBy(desc(moderationItems.createdAt))
+      // Then by id, so items made in the same instant (seeded or imported together) keep one order across pages.
+      .orderBy(desc(moderationItems.createdAt), desc(moderationItems.id))
       .limit(f.pageSize)
       .offset((f.page - 1) * f.pageSize),
     db.select({ count: sql<number>`count(*)::int` }).from(moderationItems).where(where),

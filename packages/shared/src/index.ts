@@ -40,6 +40,7 @@ export * from "./lib/profileFields";
 export * from "./lib/csv";
 export * from "./lib/admin";
 export * from "./lib/audit";
+export * from "./lib/moderation";
 export * from "./schemas/invitations";
 export * from "./schemas/profileFields";
 export * from "./realtime/events";

@@ -1,10 +1,32 @@
-import { jobsQuery, notificationTarget } from "@illuminize/shared";
-import { adminMemberHref } from "./admin";
+import { jobsQuery, notificationTarget, type NotificationTarget } from "@illuminize/shared";
+import { adminHomeHref, adminMemberHref, adminSectionHref } from "./admin";
 
-/** Screen for a notification (list tap or push tap). Admin notices open the console, for admins only. */
-export function notificationHref(slug: string, type: string, data: unknown, { isAdmin }: { isAdmin: boolean }): `/t/${string}` | null {
-  const t = notificationTarget(type, data);
-  if (!t) return null;
+type AdminTarget = Extract<NotificationTarget, { kind: "admin" }>;
+
+/**
+ * The console's screen for an admin target: a request to join opens the member's page (the members waiting, from a
+ * notice that didn't name them); content to review the moderation queue, on the item when the notice named it; a report
+ * the open reports, on the report; and otherwise the console's home, which shows what's waiting, until the section is in
+ * the phone app.
+ */
+function adminTargetHref(slug: string, t: AdminTarget): `/t/${string}` {
+  switch (t.section) {
+    case "members":
+      return t.membershipId ? adminMemberHref(slug, t.membershipId) : `/t/${slug}/admin/members?status=PENDING`;
+    case "moderation":
+      return adminSectionHref(slug, "moderation", { status: "PENDING", ...(t.contentType && t.contentId ? { type: t.contentType, item: t.contentId } : {}) }) ?? adminHomeHref(slug);
+    case "reports":
+      return adminSectionHref(slug, "reports", { status: "OPEN", ...(t.reportId ? { item: t.reportId } : {}) }) ?? adminHomeHref(slug);
+    case "chat-reports":
+      return adminHomeHref(slug);
+  }
+}
+
+/**
+ * The screen for a target: a notification's, or the console's "Open in app". Admin targets open the console, for admins
+ * only.
+ */
+export function targetHref(slug: string, t: NotificationTarget, { isAdmin }: { isAdmin: boolean }): `/t/${string}` | null {
   const base = `/t/${slug}` as const;
   // No default: a target kind added without a route here is a compile error, not a silent dead link.
   switch (t.kind) {
@@ -33,10 +55,12 @@ export function notificationHref(slug: string, type: string, data: unknown, { is
     case "celebrations":
       return `${base}/feed`;
     case "admin":
-      if (!isAdmin) return null;
-      // A request to join opens the member's page (the members waiting, from a notice that didn't name them); the others
-      // the console's home, which shows what's waiting, until their own section is in the phone app.
-      if (t.section === "members") return t.membershipId ? adminMemberHref(slug, t.membershipId) : `${base}/admin/members?status=PENDING`;
-      return `${base}/admin`;
+      return isAdmin ? adminTargetHref(slug, t) : null;
   }
+}
+
+/** Screen for a notification (list tap or push tap). Admin notices open the console, for admins only. */
+export function notificationHref(slug: string, type: string, data: unknown, options: { isAdmin: boolean }): `/t/${string}` | null {
+  const t = notificationTarget(type, data);
+  return t ? targetHref(slug, t, options) : null;
 }

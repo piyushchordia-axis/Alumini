@@ -143,8 +143,11 @@ Covers:
   saved ones, and the admin's own page, with its answers being edited, linking from its recent activity to Kiran's
   page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
-  nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
-  spam report by removing content;
+  nothing of the admin's), and a pending business listing whose contact details show only once opened; a group waiting
+  (answered by the script) approved in two presses, the first opening its name and description beside what members see
+  until then and sending nothing, the second sending what was shown, refused as changed meanwhile and fetched again,
+  then, with the preview showing the owner's new name, a press sending nothing and asking to check it again, and the
+  next sending the new name; resolving the spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
   Branding with Demo College's green chosen among the suggested colours (a drawn tick), a near-white colour typed
   showing the contrast warning with Save branding still enabled, and Save held, saying why, while the script holds a
@@ -302,7 +305,28 @@ Covers:
   reason, a prefix typed by hand that is no chip's ("membership.app") leaving none chosen, and one that is
   ("chat_report.") choosing that chip and finding nothing, Clear choosing All again, a membership row opening Diya's
   page with Back keeping the filter, and a row carrying a phone hash (answered by the script) showing its other details
-  and never the hash.
+  and never the hash;
+- the console's moderation and reports queues, as the Samaj admin: Moderation from the console's sections, opening on
+  Awaiting approval with its count, All types chosen, "Nothing is waiting for review." and no sideways scrolling; a
+  group waiting (answered by the script) approved in two presses, the first opening it (Hide says it's expanded) with
+  what members see until then and the note that chat messages are never shown, sending nothing, the second sending the
+  name and description shown, refused in its row as changed meanwhile, and the group fetched again, then, with the
+  preview showing the owner's new name, a press sending nothing and asking in the row to check it again, and the next
+  sending the new name; Hetal's job under Published and Job, its preview with the title an h2 and "About the role" an
+  h3, the apply link as text, no link but the row's Open in app, no Apply and no skills compared, and Kiran's closed job
+  showing its closed line and "No apply link, email or phone."; Nisha's post removed through the reason sheet, Cancel
+  keeping the note for next time, then restored from Removed; Hetal's post pinned and unpinned, the button's SVG icon
+  and its label following; a link with `item=` opening that post's preview, and a content notice (answered by the
+  script) opening Awaiting approval with Post chosen, saying the item isn't waiting any more, Back returning to
+  Notifications, and the notice tapped again once the script lists the post as waiting, the queue cached by the first
+  visit fetched again rather than taken for the answer, so the post opens with no "isn't waiting" line; Open in app
+  leaving the console for the post's own page with one tab bar; Hetal's post reported from the feed, then the console's
+  "Open reports, 1" tile opening Reports on Open with its count, the row labelled Spam, Post and Published (never the
+  raw status), with the reporter, the details and the post's words; Dismiss refused (answered by the script) as already
+  handled, closing the sheet, saying so and refetching the list; Resolve, keep content with a note, then "No open
+  reports" and the note under Resolved; and a report notice (answered by the script) for it saying it has already been
+  handled, then, tapped again once the script lists it as open, the Open list fetched again and the report shown with no
+  "already handled" line.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -614,6 +638,19 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] On that page, TalkBack or VoiceOver reads the facts as label then value ("Phone", "+91 91000 00036"), and a
       long press on the phone number offers Copy. Make admin and Remove as mentor each open a confirmation; on Android
       the back button closes it, and on both phones Cancel changes nothing.
+- [ ] Moderation → Published → Post, Remove on a post, on the smallest phone you have: with the keyboard up, the note
+      box and the sheet's Remove and Cancel stay above it. On Android the back button closes the sheet (the keyboard
+      first), and Remove again still shows the note. Cancel it, so nothing is removed.
+- [ ] Moderation → Published → Job, View full content on "Export Documentation Executive" and on a long job: the
+      preview fits the screen with nothing cut off at the sides, the apply link can be selected but not tapped, and on a
+      low-end Android a long preview scrolls smoothly. A post with photos (post one from Rahul's phone first) shows them
+      as small thumbnails that load.
+- [ ] TalkBack or VoiceOver on a queue row: its badges are read as words ("Announcement", "Pinned", "1 report"), View
+      full content says whether it's expanded, and each Approve, Remove or Pin is followed by the item's opening words,
+      so one row's can't be mistaken for the next's. Open in app says it leaves the admin console, and does: the post
+      opens with one tab bar, and More → Admin console returns.
+- [ ] Report a post from the feed, then open the push or the notice: Reports opens on Open with that report, and
+      Resolve, keep content with a note says "Report resolved" in the line above the list, read out without moving focus.
 - [ ] Settings: tap "Earliest batch year". The number pad comes up with the box still in view above it, on the iPhone
       and on Android, and only digits go in (four at most). Scroll down with the keyboard up: Save settings can be
       reached. TalkBack or VoiceOver reads Mentorship, with Messaging off, as a dimmed (disabled) checkbox and then
