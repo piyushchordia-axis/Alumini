@@ -1,4 +1,4 @@
-import { chatAvailable } from "@illuminize/shared";
+import { chatAvailable, memberYearsLine } from "@illuminize/shared";
 import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { Link } from "react-router-dom";
 import { BlockMemberButton } from "@/components/chat/BlockMemberButton";
@@ -48,7 +48,7 @@ export function BlockedMembersPage() {
                   <Avatar name={b.member.fullName} src={b.member.avatarUrl} size="md" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900">{b.member.fullName}</p>
-                    <p className="text-xs text-slate-500">Blocked {formatDate(b.createdAt)}</p>
+                    <p className="truncate text-xs text-slate-500">{memberYearsLine(b.member, `Blocked ${formatDate(b.createdAt)}`)}</p>
                   </div>
                   <BlockMemberButton slug={slug} member={b.member} blocked size="md" />
                 </li>

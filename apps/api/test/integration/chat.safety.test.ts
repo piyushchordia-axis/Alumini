@@ -646,7 +646,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       const c = await memberSession(ctx, tenant.id);
       const first = await chat(a).block(b.membership.id);
       expect(first.status).toBe(201);
-      expect(first.body.data.member).toEqual({ id: b.membership.id, fullName: b.membership.fullName, avatarUrl: null });
+      expect(first.body.data.member).toEqual({ id: b.membership.id, fullName: b.membership.fullName, avatarUrl: null, startYear: b.membership.startYear, batchYear: b.membership.batchYear });
       const again = await chat(a).block(b.membership.id);
       expect(again.body.data).toEqual(first.body.data);
       await chat(a).block(c.membership.id);

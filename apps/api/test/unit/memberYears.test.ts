@@ -9,6 +9,7 @@ import {
   memberYearsLine,
   membershipProfileSchema,
   membershipProfileUpdateSchema,
+  nameWithYears,
   type TenantType,
 } from "@illuminize/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +43,12 @@ describe("memberYearsLine", () => {
     expect(memberYearsLine({ startYear: 2020, batchYear: 2024 }, null, "", undefined, false, "Pune")).toBe("2020–2024 · Pune");
     expect(memberYearsLine({ startYear: 1996, batchYear: null })).toBe("1996–present");
     expect(memberYearsLine({}, "Infosys")).toBe("Infosys");
+  });
+
+  it("puts the years after the name in a byline, and leaves no brackets without them", () => {
+    expect(nameWithYears({ fullName: "Hetal Shah", startYear: 2008, batchYear: 2012 })).toBe("Hetal Shah (2008–2012)");
+    expect(nameWithYears({ fullName: "Nisha Modi", startYear: 1996, batchYear: null })).toBe("Nisha Modi (1996–present)");
+    expect(nameWithYears({ fullName: "Ravi Mehta" })).toBe("Ravi Mehta");
   });
 });
 

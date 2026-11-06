@@ -1083,12 +1083,12 @@ try {
     await page.locator('label:has-text("Admin mobile") input').fill(`+9177${unique}0000`.slice(0, 13));
     await page.locator('label:has-text("Admin name") input').fill("Smoke Admin");
     // The admin's years, labelled for a college, checked by the API as a member's are: an end before the start is refused
-    // on its input, and nothing is created.
+    // on its input, worded for staff rather than to the admin, and nothing is created.
     const joined = page.getByRole("spinbutton", { name: "Year you joined", exact: true });
     await joined.fill("2016");
     await page.getByRole("spinbutton", { name: "Year you left (or will leave)", exact: true }).fill("2014");
     await page.click('button:has-text("Onboard institution")');
-    await page.locator('label:has-text("Year you left (or will leave)")').getByText("Can't be before the year you joined", { exact: true }).waitFor();
+    await page.locator('label:has-text("Year you left (or will leave)")').getByText("Can't be before the start year", { exact: true }).waitFor();
     await joined.fill("2010");
     await page.click('button:has-text("Onboard institution")');
     await page.waitForURL(/\/platform\/tenants\/[0-9a-f-]+$/);

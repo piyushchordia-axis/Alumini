@@ -1,4 +1,4 @@
-import { FUNDING_STAGE_LABELS, plainExcerpt, type FundingDto } from "@illuminize/shared";
+import { FUNDING_STAGE_LABELS, nameWithYears, plainExcerpt, type FundingDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -30,7 +30,7 @@ function FundingCard({ slug, item }: { slug: string; item: FundingDto }) {
         {plainExcerpt(item.pitch, 200)}
       </Text>
       <Muted>
-        {item.author.fullName} · {timeAgo(item.createdAt)}
+        {nameWithYears(item.author)} · {timeAgo(item.createdAt)}
       </Muted>
     </Card>
   );

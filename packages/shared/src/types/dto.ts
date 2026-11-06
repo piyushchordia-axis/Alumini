@@ -562,6 +562,9 @@ export interface ChatMemberDto {
   id: string;
   fullName: string;
   avatarUrl: string | null;
+  /** Their years at the institution, as on MemberCardDto: shown with memberYearsLabel under or beside the name. */
+  startYear: number;
+  batchYear: number | null;
 }
 
 export interface ChatMessageDto {

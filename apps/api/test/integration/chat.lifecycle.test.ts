@@ -71,7 +71,8 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
 
     it("removes their participant row and blocks, keeps the blocks on them for their number, and gives those back unseen when it joins again", async () => {
       const { tenant, a, b, chat } = await setup();
-      const [c, d] = [await memberSession(ctx, tenant.id), await memberSession(ctx, tenant.id)];
+      // c sends the control message, so it has the years the returning member registers with: a message carries its sender's.
+      const [c, d] = [await memberSession(ctx, tenant.id, { startYear: PROFILE.startYear, batchYear: PROFILE.batchYear }), await memberSession(ctx, tenant.id)];
       const id = await acceptedThread(ctx, tenant.slug, a, b);
       await chat(b).block(a.membership.id);
       // One they placed, which goes with them.

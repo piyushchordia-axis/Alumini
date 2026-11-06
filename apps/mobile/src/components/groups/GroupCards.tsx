@@ -1,4 +1,4 @@
-import { CHAT_GROUP_VISIBILITY_INFO, MODERATION_STATUS_LABELS, type ChatGroupDto, type ChatGroupInviteDto } from "@illuminize/shared";
+import { CHAT_GROUP_VISIBILITY_INFO, MODERATION_STATUS_LABELS, nameWithYears, type ChatGroupDto, type ChatGroupInviteDto } from "@illuminize/shared";
 import { peerName } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -85,7 +85,7 @@ export function GroupCard({ slug, group }: { slug: string; group: ChatGroupDto }
 /** An invitation, answered here or from the group's details. Who sent it shows; whether others were invited never does. */
 export function InvitationCard({ slug, invite, busy, onAccept, onDecline }: { slug: string; invite: ChatGroupInviteDto; busy: boolean; onAccept: () => void; onDecline: () => void }) {
   const { group } = invite;
-  const invitedBy = `Invited by ${peerName(invite.invitedBy)} · ${formatDate(invite.invitedAt)}`;
+  const invitedBy = `Invited by ${invite.invitedBy ? nameWithYears(invite.invitedBy) : peerName(null)} · ${formatDate(invite.invitedAt)}`;
   return (
     <GroupRow
       slug={slug}

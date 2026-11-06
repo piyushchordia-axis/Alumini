@@ -130,6 +130,18 @@ function fallbackAdminYears(tenant: Pick<TenantRow, "type" | "timezone">, settin
 }
 
 /**
+ * memberYearsIssues speaks to members about their own years; staff giving an admin's read about the admin, in the words an
+ * invitation import uses for the person invited. The other problems name nobody.
+ */
+const STAFF_YEAR_WORDING: Readonly<Record<string, string>> = {
+  "Enter the year you joined": "Enter the year they joined",
+  "Enter the year you left, or will leave": "Enter the year they left, or will leave",
+  "Can't be before the year you joined": "Can't be before the start year",
+  "Leave this blank if you still are": "Can't be in the future; leave it blank for someone who still belongs",
+};
+const yearProblemForStaff = (issue: string) => STAFF_YEAR_WORDING[issue] ?? issue;
+
+/**
  * A new admin's years: the fallback when none are given, else the ones given, checked as a member's are. So a year
  * given alone needs the other where a member's form would, and the problem is reported on the blank one: a start alone
  * is taken only at a community, an end alone never. Neither is made up from the other.
@@ -137,7 +149,7 @@ function fallbackAdminYears(tenant: Pick<TenantRow, "type" | "timezone">, settin
 function adminYears(tenant: Pick<TenantRow, "type" | "timezone">, settings: BatchRange, input: Pick<AssignAdminInput, "startYear" | "batchYear">, errorPrefix: string) {
   const { startYear = null, batchYear = null } = input;
   if (startYear === null && batchYear === null) return fallbackAdminYears(tenant, settings);
-  assertMemberYears(tenant, settings, { startYear, batchYear }, errorPrefix);
+  assertMemberYears(tenant, settings, { startYear, batchYear }, errorPrefix, yearProblemForStaff);
   // Refused above when blank: a start is always required.
   return { startYear: startYear!, batchYear };
 }

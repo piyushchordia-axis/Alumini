@@ -316,6 +316,8 @@ try {
 
     await page.goto(`${BASE}/t/demo-university/app/feed`);
     const card = page.locator("article", { hasText: body }).first();
+    // The author's grey line leads with the years they registered with, ahead of when they posted.
+    await card.getByText(/^2011–2015 · /).waitFor();
     await card.locator('button[aria-label="Celebrate"]').click();
 
     // While connected, polling only runs every 5 minutes, so only the live update can pass within 8 seconds.
@@ -1369,6 +1371,7 @@ try {
     await pageA.getByRole("link", { name: "Message this member" }).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
     await pageA.waitForSelector("text=Your first message is a request");
+    await pageA.locator("header h2").getByText("2004–2008 · New conversation", { exact: true }).waitFor();
     const asked = `Hello Sneha, could I ask about Seattle? ${unique}`;
     await pageA.getByLabel("Write a message").fill(asked);
     await pageA.getByRole("button", { name: "Send message" }).click();
@@ -1382,7 +1385,10 @@ try {
     await pageB.locator('nav[aria-label="Main"]:visible a[aria-label="Messages, 1 unread"]').waitFor(live);
     const request = pageB.locator('[role="tabpanel"] a', { hasText: "Meera Iyer" });
     await request.waitFor(live);
+    // Her years beside her name, since the line below is the preview, and under her name in the thread's header.
+    await request.getByText("· 2014–2018", { exact: true }).waitFor();
     await request.click();
+    await pageB.locator("header h2").getByText("2014–2018", { exact: true }).waitFor();
     await log(pageB).getByText(asked).waitFor();
     await pageB.getByRole("button", { name: "Accept request" }).click();
     const boxB = pageB.getByLabel("Write a message");
@@ -1703,7 +1709,8 @@ try {
     await owner.getByRole("button", { name: "Invite members" }).click();
     const inviting = owner.locator('[role="dialog"]', { hasText: "Invite members" });
     await inviting.getByLabel("Search members").fill(LISTENER);
-    await inviting.getByRole("checkbox", { name: LISTENER }).check();
+    // Named with the years they registered with, which the row shows in grey under the name.
+    await inviting.getByRole("checkbox", { name: new RegExp(`^${LISTENER} 2011–2015$`) }).check();
     await inviting.getByRole("button", { name: "Send invitation" }).click();
     await inviting.waitFor({ state: "detached" });
 
@@ -1715,13 +1722,17 @@ try {
     await joiner.getByRole("tab", { name: "Invitations" }).click();
     await joiner.waitForURL(/\/app\/groups\?tab=invitations$/);
     const invitation = joiner.locator("article", { hasText: closedName });
-    await invitation.getByText("Invited by Smoke Tester").waitFor();
+    await invitation.getByText(/^Invited by Smoke Tester \(2008–2012\) · /).waitFor();
     await joiner.screenshot({ path: `${SHOTS}/11d-group-invitation.png` });
     await invitation.getByRole("button", { name: "Accept invitation" }).click();
     await joiner.waitForURL(new RegExp(`/app/messages/${closedId}$`));
     await log(joiner).getByText("You joined the group").waitFor();
     if (await log(joiner).getByText(early).count()) throw new Error("an invite-only group showed a new member what was said before they joined");
     await joiner.waitForFunction(() => !document.querySelector('nav[aria-label="Main"] a[href$="/app/groups"][aria-label]'), undefined, live);
+
+    // The owner's list of members: the joiner's years in grey under their name.
+    await owner.goto(`${app}/groups/${closedId}`);
+    await owner.locator("main li", { hasText: LISTENER }).getByText("2011–2015", { exact: true }).waitFor();
 
     // Leaving, through the confirm dialog. The owner sees it live, and the group is gone for the one who left.
     await owner.goto(`${app}/messages/${closedId}`);

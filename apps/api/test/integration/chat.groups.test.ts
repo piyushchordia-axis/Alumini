@@ -66,6 +66,22 @@ describe.skipIf(!dbAvailable)("groups", () => {
   }
 
   describe("creating", () => {
+    it("names its owner, an inviter, its members and invite candidates with their years", async () => {
+      const { tenant, owner, b, groups } = await setup();
+      await ctx.db.update(memberships).set({ startYear: 2001, batchYear: 2005 }).where(eq(memberships.id, owner.membership.id));
+      await ctx.db.update(memberships).set({ startYear: 2010, batchYear: 2014 }).where(eq(memberships.id, b.membership.id));
+      const ownerYears = { id: owner.membership.id, startYear: 2001, batchYear: 2005 };
+      const bYears = { id: b.membership.id, startYear: 2010, batchYear: 2014 };
+      const group = await createGroup(ctx, tenant.slug, owner, { visibility: "INVITE_ONLY" });
+      expect(group.owner).toMatchObject(ownerYears);
+      expect((await groups(owner).candidates(group.id)).body.data).toContainEqual(expect.objectContaining(bYears));
+      await groups(owner).invite(group.id, [b.membership.id]);
+      expect((await groups(b).invites()).body.data[0]).toMatchObject({ invitedBy: ownerYears, group: { owner: ownerYears } });
+      await groups(b).accept(group.id);
+      const members = (await groups(b).members(group.id)).body.data as Array<{ member: object }>;
+      expect(members.map((m) => m.member)).toEqual(expect.arrayContaining([expect.objectContaining(ownerYears), expect.objectContaining(bYears)]));
+    });
+
     it("under auto-approval is live at once: in Discover, owned by its creator, its only member", async () => {
       const { owner, b, groups } = await setup();
       const res = await groups(owner).create({ name: "  Weekend runners  ", description: "Saturday 7am at the lake.", visibility: "OPEN" });

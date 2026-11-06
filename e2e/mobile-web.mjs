@@ -301,6 +301,8 @@ try {
     await page.locator('img[src*="/uploads/"]').first().waitFor();
     await tap("Post");
     await page.getByText(`Hello from the mobile smoke ${unique}`).waitFor();
+    // The author's grey line leads with the years they registered with, ahead of when they posted, and so does their row's name.
+    await page.getByRole("link", { name: /^Mobile Smoke, 2010–2014 · / }).locator("visible=true").first().getByText(/^2010–2014 · /).waitFor();
   });
 
   await step("edit your own post", async () => {
@@ -1083,6 +1085,7 @@ try {
     await shown(pageA.getByRole("link", { name: "Message this member" })).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
     await shown(pageA.getByText("Your first message is a request")).waitFor();
+    await shown(pageA.getByText("2016–2020 · New conversation", { exact: true })).waitFor();
     const asked = `Hello Vikram, could I ask about IIM? ${unique}`;
     await send(pageA, asked);
     await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -1098,10 +1101,13 @@ try {
     const labelBottom = (name) => tabBar(pageB).filter({ hasText: name }).first().getByText(name, { exact: true }).evaluate((el) => el.getBoundingClientRect().bottom);
     const [withBadge, without] = [await labelBottom("Messages"), await labelBottom("Jobs")];
     if (Math.abs(withBadge - without) > 1) throw new Error(`the badge moves the Messages label: ${withBadge} against ${without}`);
-    const request = shown(pageB.getByRole("link", { name: /^Arjun Singh/ }));
+    const request = shown(pageB.getByRole("link", { name: /^Arjun Singh, 2011–2015, / }));
     await request.waitFor(live);
+    // His years beside his name, since the line below is the preview, and under his name in the thread's header.
+    await request.getByText("· 2011–2015", { exact: true }).waitFor();
     await pageB.screenshot({ path: `${SHOTS}/m10b-chat-request-arrived.png` });
     await request.click();
+    await shown(pageB.getByText("2011–2015", { exact: true })).waitFor();
     await log(pageB).getByText(asked).waitFor();
     await shown(pageB.getByRole("button", { name: "Accept request" })).click();
     const boxB = shown(pageB.getByLabel("Write a message"));
@@ -1275,6 +1281,12 @@ try {
     const JOINER = "+91931000007";
     const nameOf = async (phone) => (await apiSession(phone)).memberships.find((m) => m.tenant.slug === "demo-university").fullName;
     const [ownerName, joinerName] = [await nameOf(OWNER), await nameOf(JOINER)];
+    // Their years as both apps write them, from the same sessions.
+    const yearsOf = async (phone) => {
+      const { startYear, batchYear } = (await apiSession(phone)).memberships.find((m) => m.tenant.slug === "demo-university");
+      return batchYear == null ? `${startYear}–present` : startYear === batchYear ? String(startYear) : `${startYear}–${batchYear}`;
+    };
+    const [ownerYears, joinerYears] = [await yearsOf(OWNER), await yearsOf(JOINER)];
     const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
     const ownerContext = await signedInMobileContext(browser, BASE, OWNER, phone);
     const joinerContext = await signedInMobileContext(browser, BASE, JOINER, phone);
@@ -1366,7 +1378,8 @@ try {
     await shown(owner.getByRole("button", { name: "Invite members" })).click();
     const inviting = shown(owner.getByRole("dialog", { name: "Invite members" }));
     await inviting.getByLabel("Search members").fill(joinerName);
-    const candidate = inviting.getByRole("checkbox", { name: joinerName, exact: true });
+    // Named with their years, which the row shows in grey under the name.
+    const candidate = inviting.getByRole("checkbox", { name: new RegExp(`^${joinerName}, ${joinerYears}$`) });
     await candidate.click();
     if ((await candidate.getAttribute("aria-checked")) !== "true") throw new Error("the chosen member doesn't show as chosen");
     await owner.screenshot({ path: `${SHOTS}/m11d-group-invite.png` });
@@ -1381,13 +1394,19 @@ try {
     await joiner.waitForURL(/\/groups$/);
     await shown(joiner.locator('[role="tab"]').getByText("Invitations", { exact: true })).click();
     await joiner.waitForURL(/\/groups\?tab=invitations$/);
-    await shown(joiner.getByText(`Invited by ${ownerName}`, { exact: false })).waitFor();
+    await shown(joiner.getByText(`Invited by ${ownerName} (${ownerYears}) · `, { exact: false })).waitFor();
     await joiner.screenshot({ path: `${SHOTS}/m11e-group-invitation.png` });
     await shown(joiner.getByRole("button", { name: "Accept invitation" })).click();
     await joiner.waitForURL(new RegExp(`/messages/${closedId}$`));
     await log(joiner).getByText("You joined the group").waitFor();
     if (await log(joiner).getByText(early).count()) throw new Error("an invite-only group showed a new member what was said before they joined");
     await joiner.waitForFunction(() => !document.querySelector('a[role="tab"][aria-label^="More, Groups"]'), undefined, live);
+
+    // The owner's list of members: the joiner's years in grey, the line under their name.
+    await owner.goto(`${app}/groups/${closedId}`);
+    const joinerLine = shown(owner.getByText(joinerName, { exact: true })).locator("xpath=following-sibling::*[1]");
+    const joinerLineText = await joinerLine.textContent();
+    if (joinerLineText !== joinerYears) throw new Error(`the joiner's row in the group's members reads "${joinerLineText}" under the name, not "${joinerYears}"`);
 
     // Leaving, through the confirm sheet. The owner sees it live, and the group is gone for the one who left.
     await owner.goto(`${app}/messages/${closedId}`);

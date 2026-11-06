@@ -1,4 +1,4 @@
-import { CHAT_GROUP_INVITES_PER_CALL, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
+import { CHAT_GROUP_INVITES_PER_CALL, memberYearsLabel, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -116,7 +116,10 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
                     <span aria-hidden>
                       <Avatar name={m.fullName} src={m.avatarUrl} size="sm" />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{m.fullName}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-slate-900">{m.fullName}</span>
+                      <span className="block truncate text-xs text-slate-500">{memberYearsLabel(m)}</span>
+                    </span>
                   </label>
                 </li>
               );

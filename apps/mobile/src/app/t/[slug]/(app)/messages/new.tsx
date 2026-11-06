@@ -1,3 +1,4 @@
+import { memberYearsLine } from "@illuminize/shared";
 import { chatKeys, newClientKey, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -99,7 +100,7 @@ function NewConversation({ to }: { to: string }) {
   const waiting = existing.isLoading || profile.isLoading;
   return (
     <ChatScreen>
-      <ChatHeader title={profile.data?.fullName ?? "New message"} member={profile.data ?? undefined} subtitle="New conversation" />
+      <ChatHeader title={profile.data?.fullName ?? "New message"} member={profile.data ?? undefined} subtitle={memberYearsLine(profile.data ?? {}, "New conversation")} />
       {waiting ? (
         <View style={{ flex: 1 }}>
           <Spinner />

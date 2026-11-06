@@ -1,4 +1,4 @@
-import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
+import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, memberYearsLabel, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
 import { errorMessage, fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -91,6 +91,7 @@ function MentorRequest({ id }: { id: string }) {
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>{name}</Text>
               <Text style={{ fontSize: 13, color: "#475569" }}>{memberRoleLine(m.member)}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted }}>{memberYearsLabel(m.member)}</Text>
             </View>
           </View>
           <MentorAreas areas={m.areas} />

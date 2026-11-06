@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMuted } from "@illuminize/shared/chat";
+import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMuted, peerYears } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
@@ -14,11 +14,12 @@ import { colors, radius, spacing, useTheme } from "@/theme";
 function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Date; onPress: () => void }) {
   const theme = useTheme();
   const name = conversationTitle(c);
+  const years = peerYears(c);
   const unread = c.unread > 0;
   const muted = isMuted(c, now);
   const preview = conversationPreview(c);
   const time = formatChatTime(c.lastMessageAt, now);
-  const label = [c.group ? `Group: ${name}` : name, unread ? `${c.unread} unread` : null, muted ? "muted" : null, c.group?.archived ? "archived" : null, preview || null, time].filter(Boolean).join(", ");
+  const label = [c.group ? `Group: ${name}` : name, years || null, unread ? `${c.unread} unread` : null, muted ? "muted" : null, c.group?.archived ? "archived" : null, preview || null, time].filter(Boolean).join(", ");
   return (
     <Pressable
       onPress={onPress}
@@ -38,6 +39,7 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm }}>
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: unread ? "700" : "600", color: colors.text }}>
             {name}
+            {years ? <Text style={{ fontWeight: "400", color: colors.muted }}> · {years}</Text> : null}
           </Text>
           <Text style={{ fontSize: 12, fontWeight: unread ? "700" : "400", color: unread ? theme.primary : colors.faint }}>{time}</Text>
         </View>

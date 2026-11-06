@@ -52,6 +52,20 @@ describe.skipIf(!dbAvailable)("direct conversations", () => {
       expect(await ctx.db.select().from(chatParticipants).where(eq(chatParticipants.conversationId, conversation.id))).toHaveLength(2);
     });
 
+    it("names each member with their years, in the thread, its messages and the inbox", async () => {
+      const { tenant } = await createTenant(ctx);
+      const a = await memberSession(ctx, tenant.id, { startYear: 2008, batchYear: 2012 });
+      const b = await memberSession(ctx, tenant.id, { startYear: 2015, batchYear: 2019 });
+      const chat = (m: Session) => chatApi(ctx, tenant.slug, m);
+      const { conversation, message } = (await chat(a).direct(b.membership.id, "Hello")).body.data as { conversation: ChatConversationDto; message: ChatMessageDto };
+      const aYears = { id: a.membership.id, startYear: 2008, batchYear: 2012 };
+      expect(message.sender).toMatchObject(aYears);
+      expect(conversation.peer).toMatchObject({ id: b.membership.id, startYear: 2015, batchYear: 2019 });
+      expect(((await chat(b).list("REQUESTS")).body.data as ChatConversationDto[])[0]!.peer).toMatchObject(aYears);
+      expect(((await chat(b).get(conversation.id)).body.data as ChatConversationDto).peer).toMatchObject(aYears);
+      expect(((await chat(b).messages(conversation.id)).body.data as ChatMessageDto[])[0]!.sender).toMatchObject(aYears);
+    });
+
     it("refuses messaging yourself and an unknown member", async () => {
       const { a, chat } = await setup();
       expect((await chat(a).direct(a.membership.id)).status).toBe(400);

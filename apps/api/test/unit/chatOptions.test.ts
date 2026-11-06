@@ -1,4 +1,4 @@
-import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, groupsBadgeLabel, chatMuteUntil, conversationPreview, conversationTitle, formatChatTime, isMuted, isMutedUntilTurnedOn, messageSenderName, peerName, systemLineText, unsentRemainder } from "@illuminize/shared/chat";
+import { CHAT_MUTE_OPTIONS, chatBadgeLabel, chatKeys, groupsBadgeLabel, chatMuteUntil, conversationPreview, conversationTitle, directThreadSubtitle, formatChatTime, isMuted, isMutedUntilTurnedOn, messageSenderName, peerName, peerYears, systemLineText, unsentRemainder } from "@illuminize/shared/chat";
 import { BLOCKED_MEMBER_NAME, DELETED_MEMBER_NAME, chatMuteSchema, type ChatConversationGroupDto, type ChatLastMessageDto } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
@@ -58,7 +58,7 @@ describe("groupsBadgeLabel", () => {
 });
 
 describe("thread labels shared by both apps", () => {
-  const member = { id: "m1", fullName: "Meera Iyer", avatarUrl: null };
+  const member = { id: "m1", fullName: "Meera Iyer", avatarUrl: null, startYear: 2008, batchYear: 2012 };
 
   it("names a member who deleted their account as a Deleted member", () => {
     expect(peerName(member)).toBe("Meera Iyer");
@@ -93,13 +93,13 @@ describe("thread labels shared by both apps", () => {
 
   describe("in a group", () => {
     const group: ChatConversationGroupDto = { name: "Weekend runners", visibility: "OPEN", memberCount: 3, archived: false, isOwner: false };
-    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null };
+    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null, startYear: 2010, batchYear: 2014 };
     const last = (overrides: Partial<ChatLastMessageDto>): ChatLastMessageDto => ({ seq: 4, kind: "TEXT", body: "See you at seven", mine: false, sender: priya, redacted: false, createdAt: NOW.toISOString(), ...overrides });
     const preview = (overrides: Partial<ChatLastMessageDto>) => conversationPreview({ state: "ACCEPTED", group, lastMessage: last(overrides) });
 
     it("says who wrote it, and You for the member's own", () => {
       expect(preview({})).toBe("Priya Sharma: See you at seven");
-      expect(preview({ mine: true, sender: { id: "m-me", fullName: "Me", avatarUrl: null } })).toBe("You: See you at seven");
+      expect(preview({ mine: true, sender: { id: "m-me", fullName: "Me", avatarUrl: null, startYear: 2009, batchYear: null } })).toBe("You: See you at seven");
       expect(preview({ sender: null })).toBe(`${DELETED_MEMBER_NAME}: See you at seven`);
       expect(preview({ body: null })).toBe("This message was removed");
     });
@@ -130,13 +130,28 @@ describe("thread labels shared by both apps", () => {
   });
 
   it("names a thread and a message's sender, standing in for members who are gone or blocked", () => {
-    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null };
+    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null, startYear: 2010, batchYear: 2014 };
     expect(conversationTitle({ peer: priya, group: null })).toBe("Priya Sharma");
     expect(conversationTitle({ peer: null, group: null })).toBe(DELETED_MEMBER_NAME);
     expect(conversationTitle({ peer: null, group: { name: "Weekend runners", visibility: "OPEN", memberCount: 2, archived: false, isOwner: true } })).toBe("Weekend runners");
     expect(messageSenderName({ sender: priya, redacted: false })).toBe("Priya Sharma");
     expect(messageSenderName({ sender: null, redacted: false })).toBe(DELETED_MEMBER_NAME);
     expect(messageSenderName({ sender: null, redacted: true })).toBe(BLOCKED_MEMBER_NAME);
+  });
+
+  it("gives the other member's years in a direct thread, for the inbox row and under the header's name with Muted", () => {
+    const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null, startYear: 2010, batchYear: 2014 };
+    const nisha = { ...priya, id: "m-nisha", fullName: "Nisha Modi", startYear: 1996, batchYear: null };
+    const group: ChatConversationGroupDto = { name: "Weekend runners", visibility: "OPEN", memberCount: 2, archived: false, isOwner: true };
+    expect(peerYears({ peer: priya, group: null })).toBe("2010–2014");
+    expect(peerYears({ peer: nisha, group: null })).toBe("1996–present");
+    expect(peerYears({ peer: null, group: null })).toBe("");
+    // A group's last sender is never its peer: a group has none, and its header says how many are in it instead.
+    expect(peerYears({ peer: priya, group })).toBe("");
+    expect(directThreadSubtitle({ peer: priya, group: null }, false)).toBe("2010–2014");
+    expect(directThreadSubtitle({ peer: priya, group: null }, true)).toBe("2010–2014 · Muted");
+    expect(directThreadSubtitle({ peer: null, group: null }, true)).toBe("Muted");
+    expect(directThreadSubtitle({ peer: null, group: null }, false)).toBe("");
   });
 });
 

@@ -109,14 +109,14 @@ async function applyPupilRules(tx: DbClient, tenant: TenantRow, row: MembershipR
 
 /**
  * Refuses years the institution doesn't take (memberYearsIssues), each problem on its own field, under `prefix` where the
- * body nests them ("initialAdmin.").
+ * body nests them ("initialAdmin."). `word` rewords a problem for someone giving another person's years.
  */
-export function assertMemberYears(tenant: Pick<TenantRow, "type">, settings: Pick<TenantSettingsRow, "minBatchYear" | "maxBatchYear">, years: MemberYears, prefix = ""): void {
+export function assertMemberYears(tenant: Pick<TenantRow, "type">, settings: Pick<TenantSettingsRow, "minBatchYear" | "maxBatchYear">, years: MemberYears, prefix = "", word = (issue: string) => issue): void {
   const issues = Object.entries(memberYearsIssues({ type: tenant.type, settings }, years));
   if (issues.length === 0) return;
   throw AppError.badRequest(
     "Check the years you've given",
-    issues.map(([path, message]) => ({ path: `${prefix}${path}`, message })),
+    issues.map(([path, message]) => ({ path: `${prefix}${path}`, message: word(message) })),
   );
 }
 

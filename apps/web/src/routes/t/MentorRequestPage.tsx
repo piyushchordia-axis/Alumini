@@ -1,4 +1,4 @@
-import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
+import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, memberYearsLabel, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
 import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
@@ -80,6 +80,7 @@ function MentorRequestPage({ id }: { id: string }) {
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900 [overflow-wrap:anywhere]">{name}</p>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(m.member)}</p>
+            <p className="text-xs text-slate-500">{memberYearsLabel(m.member)}</p>
             <div className="mt-2">
               <MentorAreas areas={m.areas} />
             </div>

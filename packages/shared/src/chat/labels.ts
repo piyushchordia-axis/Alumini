@@ -1,4 +1,5 @@
 import { BLOCKED_MEMBER_NAME, DELETED_MEMBER_NAME } from "../constants";
+import { memberYearsLabel } from "../lib/memberYears";
 import type { ChatConversationDto, ChatGroupDto, ChatMemberDto, ChatMessageDto } from "../types/dto";
 
 /** Who a thread or a message is with. Null means they deleted their account. */
@@ -55,6 +56,15 @@ export function groupLeaveText(g: Pick<ChatGroupDto, "visibility" | "archived" |
 
 /** What an inbox row or a thread header is called: a group's name, or the other member's. */
 export const conversationTitle = (c: Pick<ChatConversationDto, "peer" | "group">) => c.group?.name ?? peerName(c.peer);
+
+/**
+ * The other member's years in a direct thread, which an inbox row shows after their name, since the preview has the line
+ * below. Nothing for a group, or for a member who deleted their account.
+ */
+export const peerYears = (c: Pick<ChatConversationDto, "peer" | "group">) => (c.group || !c.peer ? "" : memberYearsLabel(c.peer));
+
+/** The grey line under the other member's name in a direct thread's header: their years, and Muted while it is. */
+export const directThreadSubtitle = (c: Pick<ChatConversationDto, "peer" | "group">, muted: boolean) => [peerYears(c), muted && "Muted"].filter(Boolean).join(" · ");
 
 /** Muted right now. "Until I turn it back on" is a far-future date, so it reads as muted like any other. */
 export const isMuted = (conversation: Pick<ChatConversationDto, "mutedUntil">, now: Date) => !!conversation.mutedUntil && new Date(conversation.mutedUntil) > now;

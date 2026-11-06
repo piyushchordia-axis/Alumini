@@ -34,7 +34,7 @@ function message(seq: number, overrides: Partial<ChatMessageDto> = {}): ChatMess
     conversationId: CONVERSATION,
     seq,
     kind: "TEXT",
-    sender: { id: THEM, fullName: "Them", avatarUrl: null },
+    sender: { id: THEM, fullName: "Them", avatarUrl: null, startYear: 2008, batchYear: 2012 },
     body: `Message ${seq}`,
     removed: false,
     redacted: false,
@@ -203,7 +203,7 @@ describe("threadItems", () => {
 
   it("keys a row on its client key so a bubble keeps its identity when confirmed", () => {
     const before = threadItems(pages([[1]]), [entry("k1")]);
-    const data = upsertLiveMessage(pages([[1]]), message(2, { clientKey: "k1", sender: { id: ME, fullName: "Me", avatarUrl: null } }));
+    const data = upsertLiveMessage(pages([[1]]), message(2, { clientKey: "k1", sender: { id: ME, fullName: "Me", avatarUrl: null, startYear: 2010, batchYear: 2014 } }));
     const after = threadItems(data, [entry("k1")]);
     expect(before.at(-1)!.key).toBe("k1");
     expect(after.at(-1)!.key).toBe("k1");

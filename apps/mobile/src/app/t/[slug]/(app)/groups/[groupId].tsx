@@ -1,4 +1,4 @@
-import { CHAT_GROUP_VISIBILITY_INFO, CHAT_INVITE_DECLINE_DAYS, type ChatGroupDto, type ChatGroupMemberDto } from "@illuminize/shared";
+import { CHAT_GROUP_VISIBILITY_INFO, CHAT_INVITE_DECLINE_DAYS, memberYearsLine, type ChatGroupDto, type ChatGroupMemberDto } from "@illuminize/shared";
 import { chatKeys, groupLeaveText } from "@illuminize/shared/chat";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -66,6 +66,7 @@ function ReviewNotice({ group }: { group: ChatGroupDto }) {
 
 function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: () => void }) {
   const { member } = row;
+  const line = memberYearsLine(member, row.blockedByMe && "You blocked them");
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
       <Avatar name={member.fullName} src={member.avatarUrl} size={36} />
@@ -74,7 +75,11 @@ function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: ()
           {member.fullName}
           {row.isMe && <Text style={{ fontWeight: "400", color: colors.muted }}> (you)</Text>}
         </Text>
-        {row.blockedByMe && <Text style={{ fontSize: 12, color: colors.muted }}>You blocked them</Text>}
+        {line ? (
+          <Text numberOfLines={1} style={{ fontSize: 12, color: colors.muted }}>
+            {line}
+          </Text>
+        ) : null}
       </View>
       {row.role === "OWNER" && (
         // In a box, because a badge sits at the top of whatever holds it.

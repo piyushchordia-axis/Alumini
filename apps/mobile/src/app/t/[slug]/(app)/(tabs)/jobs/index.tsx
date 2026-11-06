@@ -43,7 +43,7 @@ const emptyIcon = (Icon: typeof IconJobs) => <Icon size={32} color={colors.faint
 function SeekerCard({ slug, seeker }: { slug: string; seeker: JobSeekerDto }) {
   return (
     <Card>
-      <MemberRow slug={slug} member={seeker.member} />
+      <MemberRow slug={slug} member={seeker.member} meta={seeker.member.headline ?? [seeker.member.designation, seeker.member.companyName].filter(Boolean).join(" · ")} />
       <Text style={{ color: "#1e293b" }}>{seeker.note}</Text>
       {seeker.preferredRoles && <Muted>Roles: {seeker.preferredRoles}</Muted>}
       {seeker.preferredLocations && <Muted>Locations: {seeker.preferredLocations}</Muted>}

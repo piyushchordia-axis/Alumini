@@ -1,3 +1,4 @@
+import { memberYearsLine } from "@illuminize/shared";
 import { chatKeys, newClientKey, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -101,7 +102,7 @@ export function NewConversationPage() {
     <ChatPane>
       {(keyboardOpen) => (
         <>
-          <ChatPaneHeader backTo={inbox} title={profile.data?.fullName ?? "New message"} member={profile.data} profileHref={profile.data ? `/t/${slug}/app/directory/${to}` : null} subtitle="New conversation" />
+          <ChatPaneHeader backTo={inbox} title={profile.data?.fullName ?? "New message"} member={profile.data} profileHref={profile.data ? `/t/${slug}/app/directory/${to}` : null} subtitle={memberYearsLine(profile.data ?? {}, "New conversation")} />
           {waiting ? (
             <div className="flex-1">
               <Loading />

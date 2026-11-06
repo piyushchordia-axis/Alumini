@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import { chatKeys, conversationTitle, directThreadSubtitle, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -190,7 +190,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   const muted = isMuted(c, now);
   const profileHref = c.peer && tenant.settings.features.directory ? `/t/${slug}/app/directory/${c.peer.id}` : null;
   const composer = (keyboardOpen: boolean, intro?: string) => <ChatComposer draftKey={dk} onSend={send} notice={notice ?? intro} keyboardOpen={keyboardOpen} autoFocus />;
-  const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : muted ? "Muted" : undefined;
+  const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : directThreadSubtitle(c, muted);
 
   const footer = (keyboardOpen: boolean): ReactNode => {
     if (c.group) {

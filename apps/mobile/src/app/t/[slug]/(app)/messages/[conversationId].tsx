@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, groupMessages, isMuted, newClientKey, sendLimitNotice, threadItems, type ChatRow, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import { chatKeys, conversationTitle, directThreadSubtitle, groupMessages, isMuted, newClientKey, sendLimitNotice, threadItems, type ChatRow, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
@@ -229,7 +229,7 @@ function Thread({ id }: { id: string }) {
   const name = conversationTitle(c);
   const muted = isMuted(c, now);
   const composer = (intro?: string) => <ChatComposer draftKey={dk} onSend={send} notice={notice ?? intro} />;
-  const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : muted ? "Muted" : undefined;
+  const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : directThreadSubtitle(c, muted);
 
   const footer = (): ReactNode => {
     if (c.group) {

@@ -1,4 +1,4 @@
-import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, memberRoleLine, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
+import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, memberRoleLine, memberYearsLabel, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
 import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
@@ -94,6 +94,7 @@ function ReferralRequestPage({ jobId }: { jobId: string }) {
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900 [overflow-wrap:anywhere]">Posted by {poster}</p>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(j.author)}</p>
+            <p className="text-xs text-slate-500">{memberYearsLabel(j.author)}</p>
           </div>
         </div>
         <div className="mt-5 border-t border-slate-100 pt-5">

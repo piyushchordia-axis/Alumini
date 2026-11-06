@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, type EventDto } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, nameWithYears, type EventDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
@@ -25,7 +25,7 @@ export function EventCard({ slug, event }: { slug: string; event: EventDto }) {
         </p>
         <p className="mt-1 text-xs text-slate-500">
           {EVENT_KIND_LABELS[event.kind]} · {event.yesCount} going{event.maybeCount ? `, ${event.maybeCount} maybe` : ""}
-          {event.maxAttendees ? ` · ${event.maxAttendees} spots` : ""} · hosted by {event.author.fullName}
+          {event.maxAttendees ? ` · ${event.maxAttendees} spots` : ""} · hosted by {nameWithYears(event.author)}
         </p>
         <ModerationCardNote status={event.moderationStatus} note={event.moderationNote} />
       </div>

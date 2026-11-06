@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, memberYearsLabel, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, nameWithYears, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
 import clsx from "clsx";
 import { IconCheck, IconClock, IconJobs, IconWallet } from "@/components/icons";
 import { CompanyLogo } from "@/components/jobs/CompanyLogo";
@@ -85,7 +85,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
         </>
       )}
       <p className="mt-2 text-xs text-slate-500">
-        Posted by {job.author.fullName} ({memberYearsLabel(job.author)}) · {timeAgo(job.createdAt)}
+        Posted by {nameWithYears(job.author)} · {timeAgo(job.createdAt)}
       </p>
     </ContentCard>
   );

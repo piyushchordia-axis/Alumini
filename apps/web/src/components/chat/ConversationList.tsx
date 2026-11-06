@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle } from "@illuminize/shared/chat";
+import { chatKeys, conversationPreview, conversationTitle, peerYears } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
@@ -12,6 +12,7 @@ import { groupsPath } from "@/lib/groups";
 
 function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConversationDto; now: Date; query: string }) {
   const name = conversationTitle(c);
+  const years = peerYears(c);
   const unread = c.unread > 0;
   const muted = isMuted(c, now);
   return (
@@ -35,6 +36,7 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
             <span className={clsx("truncate text-sm", unread ? "font-semibold text-slate-900" : "font-medium text-slate-800")}>
               {c.group && <span className="sr-only">Group: </span>}
               {name}
+              {years && <span className="font-normal text-slate-500"> · {years}</span>}
             </span>
             <span className={clsx("shrink-0 text-xs", unread ? "font-semibold text-primary" : "text-slate-400")}>{formatChatTime(c.lastMessageAt, now)}</span>
           </span>

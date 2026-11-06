@@ -1,4 +1,4 @@
-import { CHAT_GROUP_VISIBILITY_INFO, CHAT_INVITE_DECLINE_DAYS, type ChatGroupDto, type ChatGroupMemberDto } from "@illuminize/shared";
+import { CHAT_GROUP_VISIBILITY_INFO, CHAT_INVITE_DECLINE_DAYS, memberYearsLine, type ChatGroupDto, type ChatGroupMemberDto } from "@illuminize/shared";
 import { chatKeys, groupLeaveText } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -113,6 +113,7 @@ function MemberOptions({
 
 function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: () => void }) {
   const { member } = row;
+  const line = memberYearsLine(member, row.blockedByMe && "You blocked them");
   return (
     <li className="flex min-h-14 items-center gap-3 px-4 py-2">
       <Avatar name={member.fullName} src={member.avatarUrl} size="sm" />
@@ -121,7 +122,7 @@ function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: ()
           {member.fullName}
           {row.isMe && <span className="font-normal text-slate-500"> (you)</span>}
         </span>
-        {row.blockedByMe && <span className="block text-xs text-slate-500">You blocked them</span>}
+        {line && <span className="block truncate text-xs text-slate-500">{line}</span>}
       </span>
       {row.role === "OWNER" && <Badge tone="primary">Owner</Badge>}
       {onOptions && (

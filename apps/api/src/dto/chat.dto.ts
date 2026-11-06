@@ -2,7 +2,7 @@ import type { AdminChatReportDto, AdminChatReportViewDto, ChatBlockDto, ChatLast
 import type { ChatBlockRow, ChatMessageRow, ChatSender, MessageWithSender } from "../repositories/chat.repo";
 import type { ChatReportQueueRow, ChatReportRow, EscalatedChatReportRow, FoundChatReport } from "../repositories/chatReports.repo";
 
-export const toChatMemberDto = (m: ChatSender): ChatMemberDto => ({ id: m.id, fullName: m.fullName, avatarUrl: m.avatarUrl });
+export const toChatMemberDto = (m: ChatSender): ChatMemberDto => ({ id: m.id, fullName: m.fullName, avatarUrl: m.avatarUrl, startYear: m.startYear, batchYear: m.batchYear });
 
 /**
  * What a message's sender shows as, and what of its text: a sender this member blocked in a group loses their name, and

@@ -13,14 +13,15 @@ export type ChatMessageRow = typeof chatMessages.$inferSelect;
 export type ChatMessageInsert = typeof chatMessages.$inferInsert;
 export type ChatBlockRow = typeof chatBlocks.$inferSelect;
 export type ChatGroupRow = typeof chatGroups.$inferSelect;
-export type ChatSender = Pick<MembershipRow, "id" | "fullName" | "avatarUrl">;
+/** A member as chat names them: their name, photo and years. */
+export type ChatSender = Pick<MembershipRow, "id" | "fullName" | "avatarUrl" | "startYear" | "batchYear">;
 
 /** What an institution's switches turn on: direct threads, and each kind of group, which need different switches. */
 export type ChatThreadKind = "DIRECT" | "OPEN_GROUP" | "INVITE_ONLY_GROUP";
 
 export const GROUP_KIND_OF: Record<ChatGroupVisibility, ChatThreadKind> = { OPEN: "OPEN_GROUP", INVITE_ONLY: "INVITE_ONLY_GROUP" };
 
-export const senderColumns = { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl };
+export const senderColumns = { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, startYear: memberships.startYear, batchYear: memberships.batchYear };
 
 /** A group members may see: an admin approved it and hasn't since rejected or removed it. An edit waiting for review leaves it so. */
 export const groupLive = (): SQL => and(isNotNull(chatGroups.approvedAt), inArray(chatGroups.moderationStatus, ["APPROVED", "PENDING"]))!;
@@ -375,7 +376,7 @@ export async function listBlocks(db: DbClient, tenantId: string, blockerMembersh
 export interface ThreadRow {
   conversation: ConversationRow;
   participant: ParticipantRow;
-  peer: Pick<MembershipRow, "id" | "fullName" | "avatarUrl" | "status" | "batchYear" | "dateOfBirth"> | null;
+  peer: Pick<MembershipRow, "id" | "fullName" | "avatarUrl" | "status" | "startYear" | "batchYear" | "dateOfBirth"> | null;
   blockedByMe: boolean;
   group: ChatGroupRow | null;
 }
@@ -383,7 +384,7 @@ export interface ThreadRow {
 const threadColumns = (viewerMembershipId: string) => ({
   conversation: chatConversations,
   participant: chatParticipants,
-  peer: { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, status: memberships.status, batchYear: memberships.batchYear, dateOfBirth: memberships.dateOfBirth },
+  peer: { id: memberships.id, fullName: memberships.fullName, avatarUrl: memberships.avatarUrl, status: memberships.status, startYear: memberships.startYear, batchYear: memberships.batchYear, dateOfBirth: memberships.dateOfBirth },
   blockedByMe: sql<boolean>`exists (select 1 from ${chatBlocks} where ${chatBlocks.blockerMembershipId} = ${viewerMembershipId} and ${chatBlocks.blockedMembershipId} = ${memberships.id})`,
   group: chatGroups,
 });

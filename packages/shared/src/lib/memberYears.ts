@@ -33,6 +33,12 @@ export function memberYearsLine(m: MemberYears, ...parts: Array<string | null | 
   return [memberYearsLabel(m), ...parts].filter(Boolean).join(" · ");
 }
 
+/** A member's name in a one-line byline, the years after it: "Hetal Shah (2008–2012)", or the name alone with no years. */
+export function nameWithYears(m: MemberYears & { fullName: string }): string {
+  const years = memberYearsLabel(m);
+  return years ? `${m.fullName} (${years})` : m.fullName;
+}
+
 export interface MemberYearField {
   label: string;
   /** What a year picker shows when nothing is chosen. */

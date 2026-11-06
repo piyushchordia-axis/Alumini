@@ -29,8 +29,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 const ID = "3f2b8a4e-9c1d-4e5f-8a7b-0c1d2e3f4a5b";
-const hetal = { id: "m1", fullName: "Hetal Shah", avatarUrl: null };
-const ravi = { id: "m2", fullName: "Ravi Mehta", avatarUrl: null };
+const hetal = { id: "m1", fullName: "Hetal Shah", avatarUrl: null, startYear: 2008, batchYear: 2012 };
+const ravi = { id: "m2", fullName: "Ravi Mehta", avatarUrl: null, startYear: 2010, batchYear: 2014 };
 
 describe("a chat report's names", () => {
   it("names a member who deleted their account as a deleted member", () => {

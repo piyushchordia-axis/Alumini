@@ -1,4 +1,4 @@
-import { CHAT_GROUP_VISIBILITY_INFO, type ChatGroupDto, type ChatGroupInviteDto } from "@illuminize/shared";
+import { CHAT_GROUP_VISIBILITY_INFO, nameWithYears, type ChatGroupDto, type ChatGroupInviteDto } from "@illuminize/shared";
 import { peerName } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import type { ReactNode } from "react";
@@ -95,7 +95,7 @@ export function InvitationCard({ slug, invite, busy, onAccept, onDecline }: { sl
     >
       <Description text={group.description} />
       <p className="mt-2 text-xs text-slate-500">
-        Invited by {peerName(invite.invitedBy)} · {formatDate(invite.invitedAt)}
+        Invited by {invite.invitedBy ? nameWithYears(invite.invitedBy) : peerName(null)} · {formatDate(invite.invitedAt)}
       </p>
     </GroupRow>
   );

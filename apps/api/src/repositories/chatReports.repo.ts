@@ -93,8 +93,8 @@ const inScope = ({ viewerUserId, escalatedOnly }: ChatReportScope) => and(sql`no
 
 const reporter = alias(memberships, "reporter");
 const reported = alias(memberships, "reported");
-const reporterColumns = { id: reporter.id, fullName: reporter.fullName, avatarUrl: reporter.avatarUrl };
-const reportedColumns = { id: reported.id, fullName: reported.fullName, avatarUrl: reported.avatarUrl };
+const reporterColumns = { id: reporter.id, fullName: reporter.fullName, avatarUrl: reporter.avatarUrl, startYear: reporter.startYear, batchYear: reporter.batchYear };
+const reportedColumns = { id: reported.id, fullName: reported.fullName, avatarUrl: reported.avatarUrl, startYear: reported.startYear, batchYear: reported.batchYear };
 
 /** What a queue may show. Nothing anyone wrote is selected, so nothing a queue serves can quote a message. */
 const queueColumns = {

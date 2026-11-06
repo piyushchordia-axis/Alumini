@@ -5,12 +5,12 @@ import { Avatar } from "@/components/ui";
 import { colors } from "@/theme";
 
 /**
- * A member's photo and name, linking to their profile, with `meta` under the name. Without it, their headline, or else
- * their years and company. The line stays one line, so a long headline doesn't make the row taller.
+ * A member's photo and name, linking to their profile, with a grey line under the name: their years, then `meta`, or
+ * without it their headline or company. The line stays one line, so a long headline doesn't make the row taller.
  */
 export function MemberRow({ slug, member, meta, size = 36 }: { slug: string; member: MemberCardDto; meta?: string; size?: number }) {
   const router = useRouter();
-  const line = meta ?? member.headline ?? memberYearsLine(member, member.companyName);
+  const line = memberYearsLine(member, meta ?? member.headline ?? member.companyName);
   return (
     <Pressable onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityRole="link" accessibilityLabel={`${member.fullName}, ${line}`} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
       <Avatar name={member.fullName} src={member.avatarUrl} size={size} />

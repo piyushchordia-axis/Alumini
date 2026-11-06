@@ -1,4 +1,4 @@
-import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, memberRoleLine, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
+import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, memberRoleLine, memberYearsLabel, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
 import { errorMessage, fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -115,6 +115,7 @@ function ReferralRequest({ jobId }: { jobId: string }) {
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>Posted by {poster}</Text>
             <Text style={{ fontSize: 13, color: "#475569" }}>{memberRoleLine(j.author)}</Text>
+            <Text style={{ fontSize: 12, color: colors.muted }}>{memberYearsLabel(j.author)}</Text>
           </View>
         </View>
         <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.md }}>

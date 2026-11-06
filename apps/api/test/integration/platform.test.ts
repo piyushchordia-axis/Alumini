@@ -81,7 +81,7 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
       api()
         .post("/api/v1/platform/tenants")
         .set(H)
-        .send({ slug, name: `Institution ${slug}`, type, initialAdmin: { phone: `+91981100000${++phones}`, fullName: "First Admin", ...years } });
+        .send({ slug, name: `Institution ${slug}`, type, initialAdmin: { phone: `+9198110000${String(++phones).padStart(2, "0")}`, fullName: "First Admin", ...years } });
     const thisYear = (res: request.Response) => wallPartsInZone(new Date(), res.body.data.tenant.timezone).year;
 
     const given = await create("given-college", "COLLEGE", { startYear: 2001, batchYear: 2005 });
@@ -98,13 +98,16 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
       expect(res.status).toBe(400);
       return Object.fromEntries((res.body.error.details as Array<{ path: string; message: string }>).map((d) => [d.path, d.message]));
     };
-    expect(pathsOf(await create("backwards", "COLLEGE", { startYear: 2010, batchYear: 2005 }))).toEqual({ "initialAdmin.batchYear": "Can't be before the year you joined" });
-    expect(pathsOf(await create("no-end", "UNIVERSITY", { startYear: 2010 }))).toEqual({ "initialAdmin.batchYear": "Enter the year you left, or will leave" });
+    // Worded for the member of staff giving them, about the admin rather than to them.
+    expect(pathsOf(await create("backwards", "COLLEGE", { startYear: 2010, batchYear: 2005 }))).toEqual({ "initialAdmin.batchYear": "Can't be before the start year" });
+    expect(pathsOf(await create("no-end", "UNIVERSITY", { startYear: 2010 }))).toEqual({ "initialAdmin.batchYear": "Enter the year they left, or will leave" });
     // An end alone is never taken as the start too, even one ahead, which no start may be: the blank start is asked for.
     const ahead = new Date().getFullYear() + 2;
-    expect(pathsOf(await create("no-start", "SCHOOL", { batchYear: ahead }))).toEqual({ "initialAdmin.startYear": "Enter the year you joined" });
-    expect(pathsOf(await create("left-samaj", "OTHER", { batchYear: 2015 }))).toEqual({ "initialAdmin.startYear": "Enter the year you joined" });
-    expect(pathsOf(await create("null-end", "COLLEGE", { startYear: 2010, batchYear: null }))).toEqual({ "initialAdmin.batchYear": "Enter the year you left, or will leave" });
+    expect(pathsOf(await create("no-start", "SCHOOL", { batchYear: ahead }))).toEqual({ "initialAdmin.startYear": "Enter the year they joined" });
+    expect(pathsOf(await create("left-samaj", "OTHER", { batchYear: 2015 }))).toEqual({ "initialAdmin.startYear": "Enter the year they joined" });
+    expect(pathsOf(await create("null-end", "COLLEGE", { startYear: 2010, batchYear: null }))).toEqual({ "initialAdmin.batchYear": "Enter the year they left, or will leave" });
+    const future = new Date().getFullYear() + 1;
+    expect(pathsOf(await create("future-samaj", "OTHER", { startYear: 2010, batchYear: future }))).toEqual({ "initialAdmin.batchYear": "Can't be in the future; leave it blank for someone who still belongs" });
     // Refused before anything is kept: the institution isn't created either.
     expect((await api().get("/api/v1/tenants/backwards")).status).toBe(404);
 
@@ -113,6 +116,8 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
     expect(assigned.body.data).toMatchObject({ startYear: 2003, batchYear: 2007 });
     const refused = await api().post(`/api/v1/platform/tenants/${tenantId}/admins`).set(H).send({ phone: "+919844444444", fullName: "Third Admin", startYear: 2030 });
     expect(Object.keys(pathsOf(refused))).toContain("startYear");
+    const backwards = await api().post(`/api/v1/platform/tenants/${tenantId}/admins`).set(H).send({ phone: "+919844444444", fullName: "Third Admin", startYear: 2007, batchYear: 2003 });
+    expect(pathsOf(backwards)).toEqual({ batchYear: "Can't be before the start year" });
   });
 
   it("gives a community's admin no start past the server's year, even when it's already New Year's Day at the institution", async () => {

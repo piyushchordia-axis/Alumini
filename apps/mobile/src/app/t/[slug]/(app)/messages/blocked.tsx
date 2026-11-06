@@ -1,3 +1,4 @@
+import { memberYearsLine } from "@illuminize/shared";
 import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { FlatList, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -49,7 +50,9 @@ function BlockedMembers() {
               <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
                 {b.member.fullName}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.muted }}>Blocked {formatDate(b.createdAt)}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 12, color: colors.muted }}>
+                {memberYearsLine(b.member, `Blocked ${formatDate(b.createdAt)}`)}
+              </Text>
             </View>
             <BlockMemberButton slug={slug} member={b.member} blocked />
           </View>

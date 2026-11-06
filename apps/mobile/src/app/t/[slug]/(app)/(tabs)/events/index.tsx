@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, type EventDto } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, nameWithYears, type EventDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
@@ -37,7 +37,7 @@ function EventCard({ slug, event }: { slug: string; event: EventDto }) {
             <ModerationBadge status={event.moderationStatus} />
           </Row>
           <Muted>
-            {event.yesCount} going{event.maybeCount ? `, ${event.maybeCount} maybe` : ""} · by {event.author.fullName}
+            {event.yesCount} going{event.maybeCount ? `, ${event.maybeCount} maybe` : ""} · hosted by {nameWithYears(event.author)}
           </Muted>
         </View>
       </Row>

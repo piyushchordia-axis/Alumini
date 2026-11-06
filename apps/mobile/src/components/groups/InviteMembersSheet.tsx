@@ -1,4 +1,4 @@
-import { CHAT_GROUP_INVITES_PER_CALL, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
+import { CHAT_GROUP_INVITES_PER_CALL, memberYearsLabel, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -12,13 +12,14 @@ import { colors, radius, spacing, useTheme } from "@/theme";
 
 function Candidate({ member, on, disabled, onPress }: { member: ChatMemberDto; on: boolean; disabled: boolean; onPress: () => void }) {
   const theme = useTheme();
+  const years = memberYearsLabel(member);
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="checkbox"
-      // Just the name: the avatar's initials would only repeat it.
-      accessibilityLabel={member.fullName}
+      // The name and years: the avatar's initials would only repeat the name.
+      accessibilityLabel={[member.fullName, years].filter(Boolean).join(", ")}
       aria-checked={on}
       aria-disabled={disabled}
       style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, opacity: disabled ? 0.5 : 1, backgroundColor: pressed ? colors.bg : colors.card })}
@@ -27,9 +28,16 @@ function Candidate({ member, on, disabled, onPress }: { member: ChatMemberDto; o
         {on && <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>✓</Text>}
       </View>
       <Avatar name={member.fullName} src={member.avatarUrl} size={32} />
-      <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, color: colors.text }}>
-        {member.fullName}
-      </Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ fontSize: 15, color: colors.text }}>
+          {member.fullName}
+        </Text>
+        {years ? (
+          <Text numberOfLines={1} style={{ fontSize: 12, color: colors.muted }}>
+            {years}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

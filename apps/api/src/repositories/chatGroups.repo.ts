@@ -23,7 +23,7 @@ export interface GroupViewRow {
 const owners = alias(memberships, "group_owner");
 const inviters = alias(memberships, "group_inviter");
 
-const viewColumns = { group: chatGroups, participant: chatParticipants, owner: { id: owners.id, fullName: owners.fullName, avatarUrl: owners.avatarUrl } };
+const viewColumns = { group: chatGroups, participant: chatParticipants, owner: { id: owners.id, fullName: owners.fullName, avatarUrl: owners.avatarUrl, startYear: owners.startYear, batchYear: owners.batchYear } };
 
 const viewerJoin = (viewerMembershipId: string) => and(eq(chatParticipants.conversationId, chatGroups.conversationId), eq(chatParticipants.membershipId, viewerMembershipId));
 
@@ -247,7 +247,7 @@ export async function listInvites(
   const keyset = keysetCondition(sql`${chatParticipants.invitedAt}`, chatParticipants.conversationId, decodeCursor(q.cursor), "desc");
   if (keyset) conds.push(keyset);
   const rows = await db
-    .select({ ...viewColumns, participant: chatParticipants, inviter: { id: inviters.id, fullName: inviters.fullName, avatarUrl: inviters.avatarUrl } })
+    .select({ ...viewColumns, participant: chatParticipants, inviter: { id: inviters.id, fullName: inviters.fullName, avatarUrl: inviters.avatarUrl, startYear: inviters.startYear, batchYear: inviters.batchYear } })
     .from(chatParticipants)
     .innerJoin(chatGroups, eq(chatGroups.conversationId, chatParticipants.conversationId))
     .leftJoin(owners, eq(owners.id, chatGroups.ownerMembershipId))
