@@ -59,6 +59,10 @@ describe.skipIf(!dbAvailable)("platform admin", () => {
     const adminSession = await loginAs(ctx, "+919811111111");
     const dashboard = await api().get("/api/v1/t/new-college/admin/dashboard").set(auth(adminSession.accessToken));
     expect(dashboard.status).toBe(200);
+    // Staff made them; the institution is empty and their work is the console, so no first-entry walk-through is owed.
+    const own = (await api().get("/api/v1/t/new-college/memberships/me").set(auth(adminSession.accessToken))).body.data;
+    expect(own).toMatchObject({ status: "APPROVED", welcomeDoneAt: expect.any(String) });
+    expect(res.body.data.admins[0]).not.toHaveProperty("welcomeDoneAt");
 
     const list = await api().get("/api/v1/platform/tenants?q=new").set(H);
     expect(list.body.total).toBe(1);

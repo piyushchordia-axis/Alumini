@@ -237,10 +237,11 @@ describe.skipIf(!dbAvailable)("member directory", () => {
     // Cards stay compact: the rest is the profile's.
     expect(card).not.toHaveProperty("skills");
     expect(card).not.toHaveProperty("linkedinUrl");
+    expect(card).not.toHaveProperty("welcomeDoneAt");
 
     const profile = (await api().get(`${base}/directory/${target.membership.id}`).set(viewer.headers)).body.data;
     expect(profile).toMatchObject({ ...details, isMentor: false });
-    for (const key of ["maritalStatus", "kidsCount", "profileNudgeDismissedAt", "dateOfBirth"]) expect(profile, key).not.toHaveProperty(key);
+    for (const key of ["maritalStatus", "kidsCount", "profileNudgeDismissedAt", "welcomeDoneAt", "dateOfBirth"]) expect(profile, key).not.toHaveProperty(key);
   });
 
   it("shows nobody but the pupil themself a current pupil's links or Open to", async () => {

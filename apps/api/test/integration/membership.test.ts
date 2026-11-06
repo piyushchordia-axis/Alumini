@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { eq, inArray } from "drizzle-orm";
@@ -678,6 +679,104 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
       const pending = await dismiss(applicant);
       expect(pending.status).toBe(403);
       expect(pending.body.error.code).toBe("MEMBERSHIP_PENDING");
+    });
+  });
+
+  describe("first-entry walk-through", () => {
+    type Headers = Record<string, string>;
+    const own = async (slug: string, headers: Headers) => (await api().get(`/api/v1/t/${slug}/memberships/me`).set(headers)).body.data;
+    const signedIn = async () => auth((await loginAs(ctx, (await createUser(ctx)).phoneE164)).accessToken);
+
+    it("owes it to everyone who registers, approved straight away or later, and to nobody made another way", async () => {
+      const { tenant: open } = await createTenant(ctx, { memberApprovalMode: "AUTO_APPROVE" });
+      const joiner = await signedIn();
+      expect((await api().post(`/api/v1/t/${open.slug}/memberships`).set(joiner).send(PROFILE)).body.data).toMatchObject({ status: "APPROVED", welcomeDoneAt: null });
+      expect(await own(open.slug, joiner)).toMatchObject({ status: "APPROVED", welcomeDoneAt: null });
+
+      // Held for approval: owed once approved, as they haven't been in yet.
+      const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+      const base = `/api/v1/t/${tenant.slug}`;
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const applicant = await signedIn();
+      const applied = await api().post(`${base}/memberships`).set(applicant).send(PROFILE);
+      expect(applied.body.data).toMatchObject({ status: "PENDING", welcomeDoneAt: null });
+      const approved = await api().post(`${base}/admin/members/${applied.body.data.id}/approve`).set(admin.headers);
+      expect(approved.status).toBe(200);
+      expect(approved.body.data).not.toHaveProperty("welcomeDoneAt");
+      expect(await own(tenant.slug, applicant)).toMatchObject({ status: "APPROVED", welcomeDoneAt: null });
+
+      // Rejected, registering again, then approved: still owed.
+      const again = await signedIn();
+      const first = await api().post(`${base}/memberships`).set(again).send(PROFILE);
+      await api().post(`${base}/admin/members/${first.body.data.id}/reject`).set(admin.headers).send({ reason: "Batch could not be verified" });
+      expect((await api().post(`${base}/memberships`).set(again).send(PROFILE)).body.data).toMatchObject({ id: first.body.data.id, status: "PENDING", welcomeDoneAt: null });
+      await api().post(`${base}/admin/members/${first.body.data.id}/approve`).set(admin.headers);
+      expect(await own(tenant.slug, again)).toMatchObject({ status: "APPROVED", welcomeDoneAt: null });
+
+      // Invited, so approved straight away even here.
+      const invitee = await createUser(ctx);
+      await ctx.db.insert(invitations).values({ tenantId: tenant.id, phoneE164: invitee.phoneE164, token: randomUUID(), expiresAt: new Date(Date.now() + 86_400_000) });
+      const invited = auth((await loginAs(ctx, invitee.phoneE164)).accessToken);
+      expect((await api().post(`${base}/memberships`).set(invited).send(PROFILE)).body.data).toMatchObject({ status: "APPROVED", welcomeDoneAt: null });
+
+      // Made another way (the factory here; the seed and staff's new admins too), they count as done.
+      expect((await own(tenant.slug, admin.headers)).welcomeDoneAt).toEqual(expect.any(String));
+    });
+
+    it("records it once, for every device, without counting as a profile change", async () => {
+      const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+      const done = (headers: Headers) => api().post(`/api/v1/t/${tenant.slug}/memberships/me/welcome/done`).set(headers);
+      const member = await memberSession(ctx, tenant.id, { welcomeDoneAt: null });
+      const before = await own(tenant.slug, member.headers);
+      expect(before.welcomeDoneAt).toBeNull();
+
+      const started = Date.now();
+      const res = await done(member.headers);
+      expect(res.status).toBe(200);
+      const at = Date.parse(res.body.data.welcomeDoneAt);
+      expect(at).toBeGreaterThanOrEqual(started - 1000);
+      expect(at).toBeLessThanOrEqual(Date.now() + 1000);
+      expect(res.body.data.updatedAt).toBe(before.updatedAt);
+      expect((await own(tenant.slug, member.headers)).welcomeDoneAt).toBe(res.body.data.welcomeDoneAt);
+
+      // Another device finishing it too keeps the first time.
+      expect((await done(member.headers)).body.data.welcomeDoneAt).toBe(res.body.data.welcomeDoneAt);
+      const earlier = new Date("2026-01-02T03:04:05.678Z");
+      const veteran = await memberSession(ctx, tenant.id, { welcomeDoneAt: earlier });
+      const kept = await done(veteran.headers);
+      expect(kept.status).toBe(200);
+      expect(kept.body.data.welcomeDoneAt).toBe(earlier.toISOString());
+
+      // Only for approved members.
+      const applicant = await signedIn();
+      expect((await done(applicant)).body.error.code).toBe("NOT_A_MEMBER");
+      const applied = await api().post(`/api/v1/t/${tenant.slug}/memberships`).set(applicant).send(PROFILE);
+      const pending = await done(applicant);
+      expect(pending.status).toBe(403);
+      expect(pending.body.error.code).toBe("MEMBERSHIP_PENDING");
+      expect((await ctx.db.select().from(memberships).where(eq(memberships.id, applied.body.data.id)))[0]!.welcomeDoneAt).toBeNull();
+    });
+
+    it("keeps it to the member's own view: admins' views and the account's summaries leave it out", async () => {
+      const { tenant } = await createTenant(ctx);
+      const base = `/api/v1/t/${tenant.slug}`;
+      const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+      const member = await memberSession(ctx, tenant.id, { welcomeDoneAt: null });
+      expect(await own(tenant.slug, member.headers)).toHaveProperty("welcomeDoneAt", null);
+
+      const detail = await api().get(`${base}/admin/members/${member.membership.id}`).set(admin.headers);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data).not.toHaveProperty("welcomeDoneAt");
+      const rows = (await api().get(`${base}/admin/members`).set(admin.headers)).body.data as object[];
+      expect(rows).toHaveLength(2);
+      for (const row of rows) expect(row).not.toHaveProperty("welcomeDoneAt");
+      const edited = await api().patch(`${base}/admin/members/${member.membership.id}/profile`).set(admin.headers).send({ city: "Pune" });
+      expect(edited.status).toBe(200);
+      expect(edited.body.data).not.toHaveProperty("welcomeDoneAt");
+
+      const summaries = (await api().get("/api/v1/me").set(member.headers)).body.data.memberships as object[];
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0]).not.toHaveProperty("welcomeDoneAt");
     });
   });
 

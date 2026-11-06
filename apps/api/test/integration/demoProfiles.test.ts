@@ -186,4 +186,15 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     const hostel = (await questions("demo-university")).find((f) => f.key === "hostel")!;
     expect(hostel.options.map((o) => o.value)).toContain("raman");
   });
+
+  it("owes the first-entry walk-through to no seeded approved member, and to each one never approved once they are", async () => {
+    const { rows } = await seed();
+    const approved = rows.filter(({ m }) => m.status === "APPROVED");
+    expect(approved.length).toBeGreaterThan(100);
+    for (const { m, phone } of approved) expect(m.welcomeDoneAt, phone).toBeInstanceOf(Date);
+    // As migration 0036 leaves a database seeded before it: nobody waiting or rejected has had a first entry.
+    const never = rows.filter(({ m }) => m.status !== "APPROVED");
+    expect(new Set(never.map(({ m }) => m.status))).toEqual(new Set(["PENDING", "REJECTED"]));
+    for (const { m, phone } of never) expect(m.welcomeDoneAt, phone).toBeNull();
+  });
 });

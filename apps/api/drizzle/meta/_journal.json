@@ -253,6 +253,13 @@
       "when": 1793968239878,
       "tag": "0035_member_years_required",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793993407521,
+      "tag": "0036_member_welcome",
+      "breakpoints": true
     }
   ]
 }

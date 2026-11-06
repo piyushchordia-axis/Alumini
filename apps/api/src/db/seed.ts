@@ -428,6 +428,9 @@ async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed, profile
       interests: m.interests ?? [],
       ...seedProfileValues(profile),
       lastActiveAt: status === "APPROVED" ? new Date() : null,
+      // Owed the first-entry walk-through once approved, as migration 0036 leaves a never-approved row. The column's
+      // default (done) covers everyone else.
+      ...(status === "APPROVED" ? {} : { welcomeDoneAt: null }),
     })
     .onConflictDoUpdate({
       target: [memberships.tenantId, memberships.userId],

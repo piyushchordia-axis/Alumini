@@ -68,6 +68,8 @@ export function membershipEndpoints(core: ApiCore) {
     updateMe: (slug: string, input: MembershipProfileUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me", tenantSlug: slug, body: input }),
     /** Keeps the feed's profile-strength card away for PROFILE_NUDGE_SNOOZE_DAYS, on every device. */
     dismissProfileNudge: (slug: string) => core.data<MembershipDto>({ method: "POST", path: "/memberships/me/profile-nudge/dismiss", tenantSlug: slug }),
+    /** Records that the member has had the first-entry walk-through (see welcomeDue), on every device. Keeps the first time. */
+    finishWelcome: (slug: string) => core.data<MembershipDto>({ method: "POST", path: "/memberships/me/welcome/done", tenantSlug: slug }),
     /** Changes the member's background here, on every device. Keys left out stay as they are. */
     updateAppearance: (slug: string, input: MemberAppearanceUpdate) => core.data<MembershipDto>({ method: "PATCH", path: "/memberships/me/appearance", tenantSlug: slug, body: input }),
   };

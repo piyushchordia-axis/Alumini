@@ -347,6 +347,11 @@ export interface MembershipDto {
   chatEligible: boolean;
   /** When they last dismissed the feed's profile-strength card (see showProfileNudge). */
   profileNudgeDismissedAt: string | null;
+  /**
+   * When they finished or skipped the first-entry walk-through, or null while it's owed (see welcomeDue). Only their own
+   * membership carries it.
+   */
+  welcomeDoneAt: string | null;
   /** The background they chose for the app here. Only they see it, so only their own membership carries it. */
   appearance: MemberAppearanceDto;
   createdAt: string;
@@ -464,7 +469,7 @@ export interface MemberProfileDto extends MemberCardDto {
   canMessage: boolean;
 }
 
-export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt" | "appearance"> {
+export interface AdminMemberDto extends Omit<MembershipDto, "chatEligible" | "profileNudgeDismissedAt" | "welcomeDoneAt" | "appearance"> {
   userId: string;
   phone: string;
   lastActiveAt: string | null;

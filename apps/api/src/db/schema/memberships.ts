@@ -75,6 +75,12 @@ export const memberships = pgTable(
     education: jsonValue<ProfileEducationDto[]>("education").notNull().default(sql`'[]'::jsonb`),
     /** When they last dismissed the feed's profile-strength card, which then stays away for PROFILE_NUDGE_SNOOZE_DAYS. */
     profileNudgeDismissedAt: timestamp("profile_nudge_dismissed_at", { withTimezone: true, precision: 3 }),
+    /**
+     * When they finished or skipped the first-entry walk-through; null while it's owed. The default counts a membership as
+     * done, so only registerMembership owes it (a new way of making owed members must write null too). Only the member's
+     * own membership carries it, never admins' or other members' views.
+     */
+    welcomeDoneAt: timestamp("welcome_done_at", { withTimezone: true, precision: 3 }).defaultNow(),
     /** The background they chose for the app here. Keys may be missing: read it through resolveAppearance. */
     appearance: jsonValue<MemberAppearance>("appearance").notNull().default(sql`'{}'::jsonb`),
     avatarUrl: text("avatar_url"),

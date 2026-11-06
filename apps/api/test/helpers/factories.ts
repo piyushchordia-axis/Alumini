@@ -90,6 +90,8 @@ export interface MembershipFactoryOptions {
   professionType?: MembershipRow["professionType"];
   dateOfBirth?: string | null;
   approvedAt?: Date;
+  /** Done by default, as the column is. Null for a member still owed the first-entry walk-through. */
+  welcomeDoneAt?: Date | null;
 }
 
 export async function createMembership(ctx: TestContext, tenantId: string, userId: string, opts: MembershipFactoryOptions = {}) {
@@ -111,6 +113,7 @@ export async function createMembership(ctx: TestContext, tenantId: string, userI
       country: opts.country ?? "IN",
       dateOfBirth: opts.dateOfBirth ?? null,
       statusChangedAt: new Date(),
+      ...(opts.welcomeDoneAt !== undefined ? { welcomeDoneAt: opts.welcomeDoneAt } : {}),
     })
     .returning();
   if (opts.approvedAt) {

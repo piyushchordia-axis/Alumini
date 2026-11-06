@@ -33,6 +33,7 @@ import {
   lockMembershipAppearance,
   setMembershipAppearance,
   setProfileNudgeDismissedAt,
+  setWelcomeDoneAt,
   updateMembership,
 } from "../repositories/memberships.repo";
 import { findUserById, updateUser } from "../repositories/users.repo";
@@ -197,6 +198,9 @@ export async function registerMembership(ctx: AppContext, tenantCtx: TenantConte
         ...profileColumns(input, tenant),
         ...years,
         ...(held.suspendedAt ? heldSuspensionColumns() : { status, statusChangedAt: status === "APPROVED" ? new Date() : null }),
+        // The first-entry walk-through is owed, whenever they're approved. Registering again after a rejection (above) leaves
+        // it as stored: a rejected membership was never approved, so it's owed already.
+        welcomeDoneAt: null,
       });
       await restoreHeldSanctions(tx, row, held, { actorUserId: actor.userId, actorMembershipId: row.id, ip: actor.ip });
       action = "membership.create";
@@ -262,6 +266,13 @@ export async function updateMyProfile(
 /** Puts off the feed's profile-strength card for PROFILE_NUDGE_SNOOZE_DAYS, on every device. */
 export async function dismissProfileNudge(ctx: AppContext, tenantCtx: TenantContext, membership: MembershipRow): Promise<MembershipDto> {
   const row = await setProfileNudgeDismissedAt(ctx.db, tenantCtx.tenant.id, membership.id, new Date());
+  if (!row) throw AppError.notFound("Membership not found");
+  return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
+}
+
+/** Records that the member has had the first-entry walk-through, on every device. Not audited, like the card above. */
+export async function finishWelcome(ctx: AppContext, tenantCtx: TenantContext, membership: MembershipRow): Promise<MembershipDto> {
+  const row = await setWelcomeDoneAt(ctx.db, tenantCtx.tenant.id, membership.id, new Date());
   if (!row) throw AppError.notFound("Membership not found");
   return toMembershipDto(row, tenantCtx.tenant, await answersForOne(ctx, tenantCtx.tenant.id, row.id, "self"));
 }

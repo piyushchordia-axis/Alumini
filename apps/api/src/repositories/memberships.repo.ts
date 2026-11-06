@@ -151,6 +151,16 @@ export async function setProfileNudgeDismissedAt(db: DbClient, tenantId: string,
   return row;
 }
 
+/** Keeps the first time, so a second device finishing it too changes nothing, and leaves updated_at alone as above. */
+export async function setWelcomeDoneAt(db: DbClient, tenantId: string, id: string, at: Date): Promise<MembershipRow | undefined> {
+  const [row] = await db
+    .update(memberships)
+    .set({ welcomeDoneAt: sql`coalesce(${memberships.welcomeDoneAt}, ${at})` })
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.id, id)))
+    .returning();
+  return row;
+}
+
 /**
  * Clears every member's degree and field of study here, for an institution that becomes a school: schools don't ask,
  * so nobody there could see or remove them. Leaves updated_at alone, as the members changed nothing. Returns how many
