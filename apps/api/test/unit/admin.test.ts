@@ -15,7 +15,6 @@ import {
   MEMBER_STATUS_TONE,
   MESSAGE_CHANNELS,
   MESSAGE_CHANNEL_LABELS,
-  MOBILE_ADMIN_SECTIONS,
   MODERATION_STATUSES,
   MODERATION_STATUS_TONE,
   NOTIFICATION_CATEGORY,
@@ -290,19 +289,16 @@ describe("approvalSummary", () => {
   });
 });
 
-describe("MOBILE_ADMIN_SECTIONS", () => {
+describe("ADMIN_SECTIONS in the phone app", () => {
   const consoleRoutes = resolve(ROOT, "apps/mobile/src/app/t/[slug]/(app)/admin");
 
-  it("are sections of the console, each once, with the Dashboard (the phone console's home) among them", () => {
-    const keys = new Set(ADMIN_SECTIONS.map((s) => s.key));
-    for (const key of MOBILE_ADMIN_SECTIONS) expect(keys.has(key), key).toBe(true);
-    expect(new Set(MOBILE_ADMIN_SECTIONS).size).toBe(MOBILE_ADMIN_SECTIONS.length);
-    expect(MOBILE_ADMIN_SECTIONS).toContain("dashboard");
+  it("are each once, the Dashboard first (the phone console's home)", () => {
+    expect(new Set(ADMIN_SECTIONS.map((s) => s.key)).size).toBe(ADMIN_SECTIONS.length);
+    expect(ADMIN_SECTIONS[0]?.key).toBe("dashboard");
   });
 
   it("each have a screen in the phone app, at the web console's path", () => {
-    for (const key of MOBILE_ADMIN_SECTIONS) {
-      const { path } = ADMIN_SECTIONS.find((s) => s.key === key)!;
+    for (const { key, path } of ADMIN_SECTIONS) {
       const files = key === "dashboard" ? ["index.tsx"] : [`${path}.tsx`, `${path}/index.tsx`];
       expect(
         files.some((f) => existsSync(resolve(consoleRoutes, f))),

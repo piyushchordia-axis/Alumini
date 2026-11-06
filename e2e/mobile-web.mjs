@@ -2403,10 +2403,8 @@ try {
     await membership.stop();
   });
 
-  // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
-  // until then the console's home lists them as on the web console.
+  // The admin console, as the Samaj admin signed in by the step before.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2452,17 +2450,16 @@ try {
     if (await page.locator('[aria-label^="Open reports, "], [aria-label^="Open chat reports, "]').count()) throw new Error("the console's home shows report tiles with no report open");
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
-    // Until a section is in the phone app, the home lists it as on the web console. Members, Moderation, Reports and Chat
-    // reports are, so their tiles and rows link (as do the rows of Invitations, Profile fields, Settings and the Audit
-    // log, which the steps after this use). Analytics, the one left, is in no other list on the screen, which finds this
-    // one by it.
-    await page.getByText("On the web console for now:", { exact: true }).waitFor();
-    const listed = (await page.getByRole("list").filter({ hasText: "Analytics" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
-    if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
+    // Every section is in the phone app, so the tiles and every row link, and nothing is left for the web console.
     await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
     await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
     await page.getByRole("link", { name: "Content to review, 0", exact: true }).waitFor();
-    for (const section of ["Moderation", "Reports", "Chat reports", "Invitations", "Audit log"]) await page.getByRole("link", { name: section, exact: true }).waitFor();
+    const sections = page.getByRole("navigation", { name: "Admin sections" }).locator("visible=true").last();
+    const rows = (await sections.getByRole("link").evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")))).join(", ");
+    const expected = "Analytics, Members, 2 waiting, Moderation, Reports, Chat reports, Invitations, Profile fields, Settings, Audit log";
+    if (rows !== expected) throw new Error(`the console's home lists ${rows}, expected ${expected}`);
+    await page.getByRole("link", { name: "Growth and activity charts", exact: true }).waitFor();
+    if (await page.getByText(/web console/).locator("visible=true").count()) throw new Error("the console's home still sends something to the web console");
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
     await fitsPhone("the console's home", page.getByRole("heading", { name: "Needs you", exact: true }).locator("visible=true").last());
@@ -4675,6 +4672,148 @@ try {
       await page.unroute(summaryUrl);
       await page.unroute(sendUrl);
     }
+  });
+
+  await step("the console's analytics: the headline figures' changes, a chart stepped from the keyboard, 26 weeks in the address with the old charts up while it loads, a chart's table with a row a week and whole headers, the invitations funnel, and the members CSV with its BOM, one export at a time", async () => {
+    // The 12 weeks' headline figures with the period before scripted, so each direction shows (the seed may have none).
+    const twelveUrl = "**/api/v1/t/shri-gujarati-samaj/admin/analytics?weeks=12";
+    await page.route(twelveUrl, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.data.kpis = { ...body.data.kpis, newMembers: 12, newMembersPrev: 10, activeMembers: 6, activeMembersPrev: 8, posts: 4, postsPrev: 4 };
+      await route.fulfill({ response, json: body });
+    });
+    await page.goto(SAMAJ + "/admin");
+    await shown(page.getByRole("link", { name: "Analytics", exact: true })).click();
+    await page.waitForURL((url) => url.pathname.endsWith("/t/shri-gujarati-samaj/admin/analytics"));
+    const newMembers = shown(page.getByRole("slider", { name: /^New members per week, \d+ in total$/ }));
+    await newMembers.waitFor();
+    await shown(page.getByRole("heading", { name: "Who your members are", exact: true })).waitFor();
+    if ((await memberButton("Last 12 weeks").getAttribute("aria-pressed")) !== "true") throw new Error("Analytics doesn't open on the last 12 weeks");
+    await shown(page.getByText(/previous 12 weeks/)).waitFor();
+    await expectSvgNoEmoji(memberButton("Members CSV"), "the Members CSV button");
+    // Each compared tile is named with its change, not only hinted (hints can be off, and the web build has none), and
+    // draws its direction as an SVG arrow beside the words, never a text arrow.
+    for (const [label, change] of [
+      ["New members, 12", "+20% vs the previous 12 weeks (10)"],
+      ["Active members, 6", "-25% vs the previous 12 weeks (8)"],
+      ["Posts, 4", "0% vs the previous 12 weeks (4)"],
+    ]) {
+      const tile = shown(page.locator(`[aria-label="${label}. ${change}"]`));
+      await tile.waitFor();
+      await expectSvgNoEmoji(tile, `the "${label}" tile`);
+      const text = await tile.innerText();
+      if (!text.includes(change) || /[\u2190-\u21ff\u2b00-\u2bff]/.test(text)) throw new Error(`the "${label}" tile shows "${text}"`);
+    }
+    await page.unroute(twelveUrl);
+
+    // An adjustable chart: its value is the chosen week's readout, the latest until another is chosen, and the arrow keys
+    // step through the weeks (as a screen reader's swipes do on a phone).
+    const week = /^Week of \d{1,2} [A-Z][a-z]{2} \d{4}, [\d,]+ approved$/;
+    const latest = await newMembers.getAttribute("aria-valuetext");
+    if (!week.test(latest ?? "")) throw new Error(`the New members chart's value is "${latest}"`);
+    await newMembers.focus();
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForFunction(
+      (was) => [...document.querySelectorAll('[role="slider"][aria-label^="New members per week"]')].some((el) => el.getBoundingClientRect().height > 0 && el.getAttribute("aria-valuetext") !== was),
+      latest,
+    );
+    const earlier = await newMembers.getAttribute("aria-valuetext");
+    if (!week.test(earlier ?? "")) throw new Error(`after ArrowLeft the New members chart's value is "${earlier}"`);
+
+    // Six months, in the address and asked of the API, with the 12 weeks' charts kept up (and said to be updating) while
+    // the script holds the answer.
+    const rangeUrl = "**/api/v1/t/shri-gujarati-samaj/admin/analytics?weeks=26";
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(rangeUrl, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    try {
+      const asked = page.waitForRequest((r) => r.method() === "GET" && /\/t\/shri-gujarati-samaj\/admin\/analytics\?weeks=26$/.test(r.url()));
+      await memberButton("Last 6 months").click();
+      await asked;
+      await page.waitForURL(/[?&]weeks=26/);
+      await statusSays("Updating…").waitFor();
+      await newMembers.waitFor();
+    } finally {
+      release();
+    }
+    await shown(page.getByText(/previous 6 months/)).waitFor();
+    // Only once the request is answered: a handler still waiting would find its route gone.
+    await page.unroute(rangeUrl);
+    if (await page.getByRole("status").filter({ hasText: "Updating…" }).locator("visible=true").count()) throw new Error(`"Updating…" stays once the new period has loaded`);
+    if ((await memberButton("Last 6 months").getAttribute("aria-pressed")) !== "true") throw new Error("Last 6 months isn't chosen");
+
+    // A chart's table: the switch keeps its name and says it's on, and lists a row a week under its header.
+    const tableSwitch = (title) =>
+      shown(page.locator("div").filter({ has: page.getByRole("heading", { name: title, exact: true }) }).filter({ has: page.getByRole("button", { name: "Table", exact: true }) })).getByRole("button", { name: "Table", exact: true });
+    await tableSwitch("New members per week").click();
+    if ((await tableSwitch("New members per week").getAttribute("aria-pressed")) !== "true") throw new Error("the Table switch doesn't say it's on");
+    const weeks = shown(page.getByRole("table", { name: "New members per week", exact: true }));
+    await weeks.getByRole("row").first().waitFor();
+    const rows = await weeks.getByRole("row").count();
+    if (rows !== 27) throw new Error(`the New members table has ${rows} rows, expected 27 (a header and 26 weeks)`);
+    if (await page.getByRole("slider", { name: /^New members per week/ }).locator("visible=true").count()) throw new Error("the New members chart still shows beside its table");
+    // The two the invitations step imported, one since revoked.
+    await tableSwitch("Invitations").click();
+    // A table draws once its columns are measured, a frame after the switch is pressed.
+    const importedRow = shown(page.getByRole("table", { name: "Invitations", exact: true })).getByRole("row").filter({ hasText: "Imported" });
+    await importedRow.waitFor();
+    const imported = await importedRow.getByRole("cell").allInnerTexts();
+    if (imported.map((c) => c.trim()).join() !== "Imported,2") throw new Error(`the invitations funnel says ${imported.join(" ")}`);
+    // Activity's five columns on a phone: each header whole on one line (as tall as the others), and every row's figures
+    // right under their header.
+    await tableSwitch("Activity per week").click();
+    const activity = shown(page.getByRole("table", { name: "Activity per week", exact: true }));
+    await activity.getByRole("row").nth(1).waitFor();
+    const heads = await activity.getByRole("columnheader").evaluateAll((els) => els.map((el) => ({ text: el.textContent, height: el.getBoundingClientRect().height, right: el.getBoundingClientRect().right })));
+    if (heads.map((h) => h.text).join() !== "Week,Posts,Comments,Jobs,Events") throw new Error(`Activity's table has the columns ${heads.map((h) => h.text).join(", ")}`);
+    const heights = heads.map((h) => h.height);
+    if (Math.max(...heights) - Math.min(...heights) > 1) throw new Error(`a header of Activity's table wraps: ${heads.map((h) => `${h.text} ${h.height}px`).join(", ")}`);
+    for (const row of [1, 26]) {
+      const rights = await activity.getByRole("row").nth(row).getByRole("cell").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+      for (let j = 1; j < heads.length; j++) if (Math.abs(rights[j] - heads[j].right) > 1) throw new Error(`row ${row}'s ${heads[j].text} isn't under its header (${rights[j]} against ${heads[j].right})`);
+    }
+    await fitsPhone("Analytics", shown(page.getByRole("heading", { name: "Who your members are", exact: true })));
+    await shot("m20-analytics");
+
+    // The members CSV: "Preparing…" while the script holds it, then downloaded with one byte order mark.
+    const exportUrl = "**/api/v1/t/shri-gujarati-samaj/admin/exports/members.csv";
+    let releaseExport;
+    const exportHeld = new Promise((resolve) => (releaseExport = resolve));
+    await page.route(exportUrl, async (route) => {
+      await exportHeld;
+      await route.fallback();
+    });
+    let saved;
+    try {
+      const download = page.waitForEvent("download");
+      await memberButton("Members CSV").click();
+      await memberButton("Preparing…").waitFor();
+      // One export at a time: a phone shares one file at a time, and the next save deletes the file before it.
+      if ((await memberButton("Activity CSV").getAttribute("aria-disabled")) !== "true") throw new Error("Activity CSV can start while the members CSV is being prepared");
+      releaseExport();
+      saved = await download;
+    } finally {
+      releaseExport();
+    }
+    await page.unroute(exportUrl);
+    if (!/^shri-gujarati-samaj-members-\d{4}-\d{2}-\d{2}\.csv$/.test(saved.suggestedFilename())) throw new Error(`the members CSV downloads as ${saved.suggestedFilename()}`);
+    const csv = readFileSync(await saved.path(), "utf8");
+    if (csv.charCodeAt(0) !== 0xfeff) throw new Error("the members CSV has no byte order mark, so Excel would garble names");
+    if (csv.charCodeAt(1) === 0xfeff) throw new Error("the members CSV has two byte order marks");
+    const header = csv.slice(1).split("\r\n")[0];
+    if (!header.startsWith("Name,Phone,Email,") || !header.includes(",Chapter")) throw new Error(`the members CSV starts "${header.slice(0, 120)}"`);
+    await memberButton("Members CSV").waitFor();
+    if ((await memberButton("Activity CSV").getAttribute("aria-disabled")) === "true") throw new Error("Activity CSV stays disabled once the members CSV is saved");
+
+    // A reload keeps the period.
+    await page.reload();
+    await page.waitForURL(/[?&]weeks=26/);
+    await shown(page.getByRole("slider", { name: /^New members per week/ })).waitFor();
+    if ((await memberButton("Last 6 months").getAttribute("aria-pressed")) !== "true") throw new Error("a reload lost the period");
   });
 
   console.log(results.join("\n"));

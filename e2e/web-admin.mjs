@@ -859,7 +859,15 @@ try {
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
-  await step("analytics charts render and the members CSV downloads", async () => {
+  await step("analytics charts render, with SVG trend arrows, day-first weeks, a Table switch and 'Updating…' while a new range loads, and the members CSV downloads", async () => {
+    // The 12 weeks' headline figures with the period before scripted, so each direction shows (the seed may have none).
+    const twelveUrl = "**/api/v1/t/demo-university/admin/analytics?weeks=12";
+    await page.route(twelveUrl, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.data.kpis = { ...body.data.kpis, newMembers: 12, newMembersPrev: 10, activeMembers: 6, activeMembersPrev: 8, posts: 4, postsPrev: 4 };
+      await route.fulfill({ response, json: body });
+    });
     await page.goto(`${BASE}/t/demo-university/admin/dashboard`);
     await page.click("text=Growth and activity charts");
     await page.waitForSelector("svg[aria-label^='New members per week']");
@@ -867,6 +875,47 @@ try {
     await page.waitForSelector("text=Who your members are");
     await shot("a09-analytics");
     await expectSvgNoEmoji(page.locator('button:has-text("Members CSV")'), "the Members CSV button");
+    // Each change is in words, with an SVG arrow beside it, never a text arrow.
+    for (const change of ["+20% vs the previous 12 weeks (10)", "-25% vs the previous 12 weeks (8)", "0% vs the previous 12 weeks (4)"]) {
+      const delta = page.getByText(change, { exact: true }).locator("xpath=..");
+      await expectSvgNoEmoji(delta, `the "${change}" change`);
+      const text = await delta.innerText();
+      if (/[\u2190-\u21ff\u2b00-\u2bff]/.test(text)) throw new Error(`the "${change}" change shows a text arrow: "${text}"`);
+    }
+    await page.unroute(twelveUrl);
+    // The weeks under a chart are written by hand, day first in any browser locale ("2 Nov", never "Nov 2").
+    const axis = (await page.locator("svg[aria-label^='New members per week'] text").allTextContents()).filter((t) => /[A-Za-z]/.test(t));
+    if (!axis.length || !axis.every((t) => /^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(t))) throw new Error(`the New members chart's weeks read ${axis.join(", ")}`);
+    // The Table switch keeps its name and says whether it's on, with a row a week under the header in place of the chart.
+    const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "New members per week", exact: true }) });
+    const tableSwitch = card.getByRole("button", { name: "Table", exact: true });
+    if ((await tableSwitch.getAttribute("aria-pressed")) !== "false") throw new Error("the Table switch doesn't say it's off");
+    await tableSwitch.click();
+    if ((await tableSwitch.getAttribute("aria-pressed")) !== "true") throw new Error("the Table switch doesn't say it's on");
+    const rows = await card.getByRole("table", { name: "New members per week", exact: true }).getByRole("row").count();
+    if (rows !== 13) throw new Error(`the New members table has ${rows} rows, expected 13 (a header and 12 weeks)`);
+    if (await card.locator("svg[aria-label^='New members per week']").count()) throw new Error("the New members chart still shows beside its table");
+    await tableSwitch.click();
+    await card.locator("svg[aria-label^='New members per week']").waitFor();
+    // Six months, with the 12 weeks' charts kept up and "Updating…" said while the script holds the answer.
+    const rangeUrl = "**/api/v1/t/demo-university/admin/analytics?weeks=26";
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(rangeUrl, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    const updating = page.getByRole("status").filter({ hasText: "Updating…" });
+    try {
+      await page.selectOption("#analytics-range", "26");
+      await updating.waitFor();
+      await page.waitForSelector("svg[aria-label^='New members per week']");
+    } finally {
+      release();
+    }
+    await page.getByText(/previous 6 months/).first().waitFor();
+    await page.unroute(rangeUrl);
+    if (await updating.count()) throw new Error(`"Updating…" stays once the new range has loaded`);
     const csv = await download(() => page.click('button:has-text("Members CSV")'));
     if (!/^demo-university-members-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.name)) throw new Error(`unexpected file name ${csv.name}`);
     if (!csv.text.startsWith("\uFEFFName,Phone,Email,")) throw new Error("members CSV is missing its BOM or header");

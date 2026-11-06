@@ -186,12 +186,12 @@ before showing the demo.
   reports and chat reports). In the phone app, admins open it from More, whose row carries the same count, or from My
   profile: a stack of its own above the tabs, opening on the dashboard. Admin notices open it too: a request to join on
   the member's page, content waiting on the moderation queue with that item open, a report on the open reports, and a
-  chat report on the open chat reports, scrolled to it but never opened. Its pages are coming to the phone one at a
-  time, and only analytics is still to come (see Known gaps); the members list, moderation and reports are there, with
-  the same status tabs and counts, search and filters, Approve all and row actions as the web's, scrolling on through
-  the pages, and so is a member's page: their facts and profile, their answers to the institution's questions (which
-  admins can edit), their mentor profile (Remove as mentor), Make admin or Remove admin role (asked first on both apps),
-  and their recent activity, naming who acted. So is the audit log, filtered by a family of actions (Members, Content,
+  chat report on the open chat reports, scrolled to it but never opened. Every page of the web console is in the phone
+  app too: the members list, moderation and reports are there, with the same status tabs and counts, search and
+  filters, Approve all and row actions as the web's, scrolling on through the pages, and so is a member's page: their
+  facts and profile, their answers to the institution's questions (which admins can edit), their mentor profile
+  (Remove as mentor), Make admin or Remove admin role (asked first on both apps), and their recent activity, naming who
+  acted. So is the audit log, filtered by a family of actions (Members, Content,
   Reports and so on) or any prefix typed, kept in the address; its rows link to the member they're about and show their
   details as readable lines, never a private key such as a deleted account's phone hash, nor a phone number (a new
   institution's first admin is recorded by number). So are the invitations (see **Invitations**): their figures, Send
@@ -205,7 +205,8 @@ before showing the demo.
   and says so. The notice and the list send the status they showed, so a screen left open can't overturn another admin's
   decision: the API refuses (409) and the apps say where the member stands now. A reason sheet in the queues closes the
   same way when another admin got there first, saying so, and the list refreshes. Chat reports are in the phone app too,
-  as on the web (see "Chat reports and admin access"), with the phone's own care for the text a view shows.
+  as on the web (see "Chat reports and admin access"), with the phone's own care for the text a view shows. So is
+  Analytics (see **Analytics and exports**).
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
@@ -700,6 +701,15 @@ studies elsewhere, each link and Open to (a list in one cell; no degree columns 
 active days and content per member for the chosen period. Exports stream in batches of 1000,
 start with a UTF-8 BOM so Excel reads them correctly, prefix cells starting with `= + - @` with `'` so spreadsheets
 don't run them as formulas (this includes `+91…` phone numbers), and are audited and rate-limited.
+
+Both apps draw the page from the same data: `packages/shared/src/lib/analytics.ts` turns the API's answer into the
+headline figures and the chart cards (titles, tables, what a screen reader says), and `lib/charts.ts` holds the palette,
+the axis ticks, where every mark goes, and the number and week text, written by hand rather than with `Intl`, which
+Hermes lacks parts of ("1,234", "10K", "2 Nov"). The web draws SVG (`apps/web/src/components/charts`) and the phone
+app `react-native-svg` (`apps/mobile/src/components/charts`). On the phone the period is a row of chips kept in the
+address (`?weeks=26`), the charts stay up while another period loads, a finger scrubs through a column or line
+chart's weeks (or batches) with the chosen one named on a line above it, and a screen reader finds each such chart as
+one adjustable control whose value is that line. The exports go to the share sheet, with their BOM (`lib/files.ts`).
 
 ### Jobs
 
@@ -1361,10 +1371,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
-- The admin console in the phone app:
-  - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: analytics. It
-    has no tile on the console's home and no admin notice.
-  - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
+- The admin console in the phone app: Illuminize staff who aren't members of an institution can't use its console in
+  the phone app; they use the web.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
@@ -1374,7 +1382,7 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls on both
-    apps and in the consoles (close, back, send, checkmarks, the analytics arrows) rather than the shared SVG set.
+    apps and in the consoles (close, back, send, checkmarks) rather than the shared SVG set.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

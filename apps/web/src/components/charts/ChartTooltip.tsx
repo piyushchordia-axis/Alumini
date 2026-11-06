@@ -1,23 +1,14 @@
-import type { ReactNode } from "react";
+import { tooltipLeft, type ReadoutRow } from "./chartUtils";
 
-export interface TooltipRow {
-  value: ReactNode;
-  label: ReactNode;
-  /** Series colour, drawn as a short line key (never as text colour). */
-  color?: string;
-}
+const BOX_WIDTH = 176;
 
 /**
  * Hover/focus readout, positioned inside the chart's relative container. Values lead (strong), labels follow. Content
  * is rendered as React text, so names from the API are never parsed as HTML.
  */
-export function ChartTooltip({ x, y, width, title, rows, beside }: { x: number; y: number; width: number; title: ReactNode; rows: TooltipRow[]; beside?: boolean }) {
-  const boxWidth = 176;
-  // Beside a crosshair (so it never hides the hovered week), otherwise centred over the mark; kept inside the chart.
-  const want = beside ? (x + 12 + boxWidth <= width ? x + 12 : x - 12 - boxWidth) : x - boxWidth / 2;
-  const left = Math.max(0, Math.min(want, width - boxWidth));
+export function ChartTooltip({ x, y, width, title, rows, beside }: { x: number; y: number; width: number; title: string; rows: ReadoutRow[]; beside?: boolean }) {
   return (
-    <div role="status" className="pointer-events-none absolute z-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg" style={{ left, top: Math.max(0, y), width: boxWidth }}>
+    <div role="status" className="pointer-events-none absolute z-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg" style={{ left: tooltipLeft(x, width, BOX_WIDTH, beside), top: Math.max(0, y), width: BOX_WIDTH }}>
       <div className="mb-1 text-slate-500">{title}</div>
       <ul className="space-y-0.5">
         {rows.map((r, i) => (

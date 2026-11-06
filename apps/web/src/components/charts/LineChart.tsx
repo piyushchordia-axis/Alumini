@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { ChartTooltip } from "./ChartTooltip";
-import { edgeAnchor, formatCount, INK, niceTicks, spreadLabels, tickFormatter, useElementWidth } from "./chartUtils";
+import { INK, lineLayout, lineReadoutRows, nearestIndex, stepIndex, useElementWidth } from "./chartUtils";
 
 export interface LineSeries {
   name: string;
@@ -15,51 +15,29 @@ export interface LineSeries {
  */
 export function LineChart({
   labels,
+  titles = labels,
   series,
-  formatLabel = (l) => l,
-  describe,
   ariaLabel,
   height = 220,
 }: {
+  /** Each category's axis label. */
   labels: string[];
+  /** Each category's readout title (defaults to its axis label). */
+  titles?: string[];
   series: LineSeries[];
-  formatLabel?: (label: string) => string;
-  describe?: (label: string) => string;
   ariaLabel: string;
   height?: number;
 }) {
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
-  const n = labels.length;
-  const single = series.length === 1;
-  const max = Math.max(0, ...series.flatMap((s) => s.values));
-  const ticks = niceTicks(max);
-  const top = ticks[ticks.length - 1]!;
-  const fmt = tickFormatter(top);
-  const endLabel = (s: LineSeries) => (single ? formatCount(s.values[n - 1] ?? 0) : `${s.name} ${formatCount(s.values[n - 1] ?? 0)}`);
-  const right = Math.min(120, Math.max(...series.map((s) => endLabel(s).length * 6.5)) + 14);
-  const m = { top: 12, right, bottom: 22, left: Math.max(24, fmt(top).length * 7 + 10) };
-  const innerW = Math.max(0, width - m.left - m.right);
-  const innerH = height - m.top - m.bottom;
-  const x = (i: number) => m.left + (n > 1 ? (i / (n - 1)) * innerW : innerW / 2);
-  const y = (v: number) => m.top + innerH - (v / top) * innerH;
-  const every = Math.max(1, Math.ceil((n * 48) / Math.max(1, innerW)));
-  const path = (vals: number[]) => vals.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join("");
-  const labelYs = spreadLabels(
-    series.map((s) => y(s.values[n - 1] ?? 0)),
-    13,
-    m.top + 4,
-    m.top + innerH,
-  );
+  const layout = lineLayout({ series, n: labels.length, width, height });
+  const { m, n, x, y } = layout;
 
-  const indexAt = (e: PointerEvent<SVGRectElement>) => {
-    const box = e.currentTarget.getBoundingClientRect();
-    return n > 1 ? Math.max(0, Math.min(n - 1, Math.round(((e.clientX - box.left) / box.width) * (n - 1)))) : 0;
-  };
+  const indexAt = (e: PointerEvent<SVGRectElement>) => nearestIndex(m.left + e.clientX - e.currentTarget.getBoundingClientRect().left, layout);
   const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault();
-      setActive((a) => Math.max(0, Math.min(n - 1, (a ?? (e.key === "ArrowRight" ? -1 : n)) + (e.key === "ArrowRight" ? 1 : -1))));
+      setActive((a) => stepIndex(a, n, e.key === "ArrowRight" ? 1 : -1));
     } else if (e.key === "Escape") setActive(null);
   };
 
@@ -67,54 +45,46 @@ export function LineChart({
     <div ref={ref} className="relative">
       {width > 0 && (
         <svg width={width} height={height} role="img" aria-label={ariaLabel} tabIndex={0} onKeyDown={onKey} onFocus={() => setActive((a) => a ?? n - 1)} onBlur={() => setActive(null)} className="block rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-          {ticks.map((t) => (
-            <g key={t}>
-              <line x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} stroke={t === 0 ? INK.baseline : INK.grid} strokeWidth={1} shapeRendering="crispEdges" />
-              <text x={m.left - 6} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={INK.muted}>
-                {fmt(t)}
+          {layout.ticks.map((t) => (
+            <g key={t.value}>
+              <line x1={m.left} x2={m.left + layout.innerW} y1={t.y} y2={t.y} stroke={t.value === 0 ? INK.baseline : INK.grid} strokeWidth={1} shapeRendering="crispEdges" />
+              <text x={m.left - 6} y={t.y} dy="0.32em" textAnchor="end" fontSize={11} fill={INK.muted}>
+                {t.text}
               </text>
             </g>
           ))}
-          {labels.map((l, i) =>
-            i % every === (n - 1) % every ? (
-              <text key={l} x={edgeAnchor(x(i), width).x} y={height - 6} textAnchor={edgeAnchor(x(i), width).anchor} fontSize={11} fill={INK.muted}>
-                {formatLabel(l)}
-              </text>
-            ) : null,
-          )}
-          {single && series[0] && <path d={`${path(series[0].values)}L${x(n - 1)},${y(0)}L${x(0)},${y(0)}Z`} fill={series[0].color} fillOpacity={0.1} />}
+          {layout.axisLabels.map((l) => (
+            <text key={l.index} x={l.x} y={layout.axisLabelY} textAnchor={l.anchor} fontSize={11} fill={INK.muted}>
+              {labels[l.index]}
+            </text>
+          ))}
+          {layout.area && series[0] && <path d={layout.area} fill={series[0].color} fillOpacity={0.1} />}
           {series.map((s) => (
-            <path key={s.name} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+            <path key={s.name} d={layout.path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           ))}
-          {series.map((s, k) => (
-            <g key={s.name}>
-              <circle cx={x(n - 1)} cy={y(s.values[n - 1] ?? 0)} r={4} fill={s.color} stroke={INK.surface} strokeWidth={2} />
-              <text x={x(n - 1) + 8} y={labelYs[k]} dy="0.32em" fontSize={11} fill={INK.secondary}>
-                {endLabel(s)}
-              </text>
-            </g>
-          ))}
+          {series.map((s, k) => {
+            const end = layout.ends[k]!;
+            return (
+              <g key={s.name}>
+                <circle cx={end.x} cy={end.y} r={4} fill={s.color} stroke={INK.surface} strokeWidth={2} />
+                <text x={end.labelX} y={end.labelY} dy="0.32em" fontSize={11} fill={INK.secondary}>
+                  {end.text}
+                </text>
+              </g>
+            );
+          })}
           {active !== null && (
             <g pointerEvents="none">
-              <line x1={x(active)} x2={x(active)} y1={m.top} y2={m.top + innerH} stroke={INK.baseline} strokeWidth={1} />
+              <line x1={x(active)} x2={x(active)} y1={m.top} y2={m.top + layout.innerH} stroke={INK.baseline} strokeWidth={1} />
               {series.map((s) => (
                 <circle key={s.name} cx={x(active)} cy={y(s.values[active] ?? 0)} r={4} fill={s.color} stroke={INK.surface} strokeWidth={2} />
               ))}
             </g>
           )}
-          <rect x={m.left} y={m.top} width={innerW} height={innerH} fill="transparent" onPointerMove={(e) => setActive(indexAt(e))} onPointerLeave={() => setActive(null)} />
+          <rect x={m.left} y={m.top} width={layout.innerW} height={layout.innerH} fill="transparent" onPointerMove={(e) => setActive(indexAt(e))} onPointerLeave={() => setActive(null)} />
         </svg>
       )}
-      {active !== null && labels[active] !== undefined && (
-        <ChartTooltip
-          x={x(active)}
-          y={m.top}
-          width={width}
-          beside
-          title={(describe ?? formatLabel)(labels[active]!)}
-          rows={series.map((s) => ({ value: formatCount(s.values[active] ?? 0), label: s.name, color: series.length > 1 ? s.color : undefined }))}
-        />
-      )}
+      {active !== null && titles[active] !== undefined && <ChartTooltip x={x(active)} y={m.top} width={width} beside title={titles[active]} rows={lineReadoutRows(series, active)} />}
     </div>
   );
 }

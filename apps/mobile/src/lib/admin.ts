@@ -1,4 +1,4 @@
-import { ADMIN_SECTIONS, MOBILE_ADMIN_SECTIONS, type AdminSectionKey, type MembershipDto, type MembershipSummaryDto, type UserDto } from "@illuminize/shared";
+import { ADMIN_SECTIONS, type AdminSectionKey, type MembershipDto, type MembershipSummaryDto, type UserDto } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
 import { qk } from "./queryKeys";
 
@@ -8,13 +8,12 @@ export function adminHomeHref(slug: string): `/t/${string}` {
 }
 
 /**
- * A section of the console, opened with `query`, or null while the section is only on the web console. The routes
- * are the web console's, below `/t/{slug}/admin`, but for the Dashboard, which is the console's home.
+ * A section of the console, opened with `query`. The routes are the web console's, below `/t/{slug}/admin`, but for the
+ * Dashboard, which is the console's home.
  */
-export function adminSectionHref(slug: string, key: AdminSectionKey, query?: Readonly<Record<string, string>>): `/t/${string}` | null {
+export function adminSectionHref(slug: string, key: AdminSectionKey, query?: Readonly<Record<string, string>>): `/t/${string}` {
   const section = ADMIN_SECTIONS.find((s) => s.key === key);
-  if (!section || !MOBILE_ADMIN_SECTIONS.includes(key)) return null;
-  const path: `/t/${string}` = key === "dashboard" ? adminHomeHref(slug) : `/t/${slug}/admin/${section.path}`;
+  const path: `/t/${string}` = !section || key === "dashboard" ? adminHomeHref(slug) : `/t/${slug}/admin/${section.path}`;
   // By hand: React Native's URLSearchParams is incomplete.
   const search = Object.entries(query ?? {})
     .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)

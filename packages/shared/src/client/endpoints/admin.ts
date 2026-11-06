@@ -19,7 +19,7 @@ import type {
 import type { ContentType, MembershipStatus, ModerationStatus } from "../../constants";
 import type { ContentAction } from "../../lib/admin";
 import type { AdminChatReportDto, AdminChatReportViewDto, AdminMemberDetailDto, AdminMemberDto, AdminReportDto, MentorProfileDto, AdminSettingsDto, AnnouncementAudienceDto, AuditDto, TenantAnalyticsDto, InvitationDto, InvitationImportResultDto, InvitationSummaryDto, ProfileFieldDto, ContentDto, DashboardDto, ModerationItemDto, Page, PostDto, ReportDto, TenantPublicDto, TenantSettingsDto } from "../../types/dto";
-import type { ApiCore, QueryParams } from "../core";
+import type { ApiCore, DownloadAs, QueryParams } from "../core";
 
 const q = (v: Record<string, unknown> | undefined): QueryParams | undefined => v as QueryParams | undefined;
 
@@ -77,10 +77,10 @@ export function adminEndpoints(core: ApiCore) {
       remove: (slug: string, membershipId: string) => core.data<MentorProfileDto>({ method: "POST", ...p(slug, `/mentors/${membershipId}/remove`) }),
     },
     analytics: (slug: string, weeks = 12) => core.data<TenantAnalyticsDto>({ ...p(slug, "/analytics"), query: { weeks } }),
-    /** CSV downloads (streamed by the server; saved by the caller). */
+    /** CSV downloads (streamed by the server; saved by the caller), as a Blob or, with `{ as: "text" }`, as text. */
     exports: {
-      members: (slug: string) => core.download(p(slug, "/exports/members.csv")),
-      activity: (slug: string, weeks = 12) => core.download({ ...p(slug, "/exports/activity.csv"), query: { weeks } }),
+      members: <A extends DownloadAs = "blob">(slug: string, read?: { as: A }) => core.download(p(slug, "/exports/members.csv"), read),
+      activity: <A extends DownloadAs = "blob">(slug: string, weeks = 12, read?: { as: A }) => core.download({ ...p(slug, "/exports/activity.csv"), query: { weeks } }, read),
     },
     announcements: {
       audience: (slug: string) => core.data<AnnouncementAudienceDto>(p(slug, "/announcements/audience")),

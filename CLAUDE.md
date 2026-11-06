@@ -30,7 +30,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `pageBackdrop` and the tiles both apps offer); `lib/branding.ts` the console's Branding form (`brandingSave`,
   `BRAND_SWATCHES`, `brandContrastWarnings`) and the time zones a picker offers (`timeZoneOptions`);
   `lib/invitations.ts` the console's invitations: an imported CSV read (`readInvitationCsv`), the template, the import
-  in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`.
+  in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`;
+  `lib/charts.ts` the charts' palette, ticks, layouts and hand-written number and week text; `lib/analytics.ts` the
+  Analytics page's figures and chart cards.
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -126,8 +128,7 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `routes/t/admin`, mobile `(app)/admin`), ships on **web and mobile** in the same change — including visual design.
   Logic both consoles need (labels, state machines, query keys, tiles, counts and formatters) lives in
   `packages/shared` (`lib/admin.ts` and its siblings), not in either app. Only the platform (Illuminize staff) console
-  is web only; staff who aren't members of an institution use its admin console on the web. While the console's pages
-  come to the phone one at a time, `MOBILE_ADMIN_SECTIONS` lists those it has, and README → Known gaps the rest.
+  is web only; staff who aren't members of an institution use its admin console on the web.
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
   full glassmorphism. Prefer opaque high-contrast content; soft blur only on sticky chrome (header / tab bar).
   - **Icons.** Chrome uses the shared SVG stroke set (`components/icons.tsx` on web and mobile). Do not use emoji as
@@ -236,8 +237,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   code requests, the whole per-IP hour (refused ones count), so `e2e/lib.mjs` signs each phone in once per run: reuse
   `apiSession`, don't add logins. mobile-web's admin journey signs in the Samaj admin (`+919000000004`) as the forced
   sign-out's next person, in place of a fresh number, so a full run stays at 20.
-- Charts are hand-built SVG in `apps/web/src/components/charts`. Series colours come from the validated palette in
-  `chartUtils.ts` (fixed order, colour-blind checked), never from tenant brand colours.
+- Charts are hand-built SVG in `apps/web/src/components/charts` and `react-native-svg` in
+  `apps/mobile/src/components/charts`. Their palette, ticks, number and week text and mark layouts are in
+  `packages/shared/src/lib/charts.ts` (the Analytics cards in `lib/analytics.ts`), which web `chartUtils.ts` re-exports,
+  so both apps place every mark alike. Series colours come from its validated `SERIES` (fixed order, colour-blind
+  checked), never from tenant brand colours.
 - After adding a native Expo module (e.g. `react-native-svg`), restart Metro (`pnpm mobile`); a server started before
   the install will fail to resolve the package. Prefer `npx expo install <pkg>` inside `apps/mobile`.
 - Do not declare React components inside another component's render body (e.g. a local `NavLabel`): ESLint
@@ -288,8 +292,6 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
-  - admin pages not yet in the phone app, which show there as on the web console for now: analytics (README → Known
-    gaps lists it too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

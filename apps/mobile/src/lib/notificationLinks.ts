@@ -1,25 +1,24 @@
 import { jobsQuery, notificationTarget, type NotificationTarget } from "@illuminize/shared";
-import { adminHomeHref, adminMemberHref, adminSectionHref } from "./admin";
+import { adminMemberHref, adminSectionHref } from "./admin";
 
 type AdminTarget = Extract<NotificationTarget, { kind: "admin" }>;
 
 /**
  * The console's screen for an admin target: a request to join opens the member's page (the members waiting, from a
  * notice that didn't name them); content to review the moderation queue, on the item when the notice named it; a report
- * the open reports, on the report; and a chat report the open chat reports, on the report. The console's home, which
- * shows what's waiting, is the fallback while a section isn't in the phone app.
+ * the open reports, on the report; and a chat report the open chat reports, on the report.
  */
 function adminTargetHref(slug: string, t: AdminTarget): `/t/${string}` {
   switch (t.section) {
     case "members":
       return t.membershipId ? adminMemberHref(slug, t.membershipId) : `/t/${slug}/admin/members?status=PENDING`;
     case "moderation":
-      return adminSectionHref(slug, "moderation", { status: "PENDING", ...(t.contentType && t.contentId ? { type: t.contentType, item: t.contentId } : {}) }) ?? adminHomeHref(slug);
+      return adminSectionHref(slug, "moderation", { status: "PENDING", ...(t.contentType && t.contentId ? { type: t.contentType, item: t.contentId } : {}) });
     case "reports":
-      return adminSectionHref(slug, "reports", { status: "OPEN", ...(t.reportId ? { item: t.reportId } : {}) }) ?? adminHomeHref(slug);
+      return adminSectionHref(slug, "reports", { status: "OPEN", ...(t.reportId ? { item: t.reportId } : {}) });
     case "chat-reports":
       // Scrolled to the report but never opened: opening its messages writes an audit row.
-      return adminSectionHref(slug, "chatReports", { status: "OPEN", ...(t.chatReportId ? { item: t.chatReportId } : {}) }) ?? adminHomeHref(slug);
+      return adminSectionHref(slug, "chatReports", { status: "OPEN", ...(t.chatReportId ? { item: t.chatReportId } : {}) });
   }
 }
 

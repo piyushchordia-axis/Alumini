@@ -5,7 +5,7 @@ import { useState, type ComponentRef, type Ref } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { CustomFieldInputs, type FieldAnswers } from "@/components/CustomFieldInputs";
 import { StatusLine } from "@/components/Sheet";
-import { Badge, Button, Card, ErrorText, Muted, headingRole } from "@/components/ui";
+import { Badge, Button, Card, ErrorText, headingRole } from "@/components/ui";
 import { useStatus } from "@/hooks/useStatus";
 import { adminSectionHref } from "@/lib/admin";
 import { api } from "@/lib/api";
@@ -58,8 +58,6 @@ export function AdminFieldAnswers({ slug, member, onEdit, cardRef }: { slug: str
     save.reset();
     setEditing(false);
   };
-  // Profile fields, where the questions are managed: its screen here, or its name on the web console if it's only there.
-  const fieldsHref = adminSectionHref(slug, "profileFields");
   // A failure that isn't about one answer, shown under the buttons.
   const failure = save.error && Object.keys(fieldErrorsFrom(save.error, "fields.")).length === 0 ? save.error : null;
   return (
@@ -97,13 +95,10 @@ export function AdminFieldAnswers({ slug, member, onEdit, cardRef }: { slug: str
           </View>
         )}
         <StatusLine text={said} flush />
-        {fieldsHref ? (
-          <Pressable onPress={() => router.push(fieldsHref)} accessibilityRole="link" style={({ pressed }) => [styles.manage, pressed ? { opacity: 0.6 } : null]}>
-            <Text style={{ fontSize: 13, color: theme.primaryInk }}>Manage the questions under Profile fields</Text>
-          </Pressable>
-        ) : (
-          <Muted>Manage the questions under Profile fields on the web console.</Muted>
-        )}
+        {/* Profile fields, where the questions are managed. */}
+        <Pressable onPress={() => router.push(adminSectionHref(slug, "profileFields"))} accessibilityRole="link" style={({ pressed }) => [styles.manage, pressed ? { opacity: 0.6 } : null]}>
+          <Text style={{ fontSize: 13, color: theme.primaryInk }}>Manage the questions under Profile fields</Text>
+        </Pressable>
       </Card>
     </View>
   );

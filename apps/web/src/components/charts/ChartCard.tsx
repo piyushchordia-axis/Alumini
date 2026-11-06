@@ -1,22 +1,11 @@
 import clsx from "clsx";
 import { useId, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui";
-
-export interface LegendItem {
-  label: string;
-  color: string;
-  /** Mirrors the mark: a line key for line charts, a block for bars. */
-  kind: "line" | "rect";
-}
-
-export interface ChartTable {
-  columns: string[];
-  rows: Array<Array<string | number>>;
-}
+import { CHART_EMPTY_TEXT, tableCellText, type ChartTableData, type LegendItem } from "./chartUtils";
 
 /**
- * Frame for one chart: title, optional subtitle and legend (two or more series), and a Chart/Table switch so every
- * value is reachable without hovering.
+ * Frame for one chart: title, optional subtitle and legend (two or more series), and a Table switch so every value is
+ * reachable without hovering. The switch keeps its name and says whether it is on (pressed), as on the phone.
  */
 export function ChartCard({
   title,
@@ -24,14 +13,14 @@ export function ChartCard({
   legend,
   table,
   empty,
-  emptyText = "Nothing to show for this period yet.",
+  emptyText = CHART_EMPTY_TEXT,
   className,
   children,
 }: {
   title: string;
   subtitle?: ReactNode;
   legend?: LegendItem[];
-  table: ChartTable;
+  table: ChartTableData;
   empty?: boolean;
   emptyText?: string;
   className?: string;
@@ -54,9 +43,12 @@ export function ChartCard({
               type="button"
               aria-pressed={showTable}
               onClick={() => setShowTable((v) => !v)}
-              className="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className={clsx(
+                "shrink-0 rounded-md border px-2 py-1 text-xs font-medium",
+                showTable ? "border-slate-300 bg-slate-100 text-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50",
+              )}
             >
-              {showTable ? "Chart" : "Table"}
+              Table
             </button>
           )}
         </div>
@@ -90,7 +82,7 @@ export function ChartCard({
                   <tr key={i}>
                     {r.map((cell, j) => (
                       <td key={j} className={clsx("px-3 py-1.5", j > 0 && "text-right tabular-nums")}>
-                        {typeof cell === "number" ? cell.toLocaleString() : cell}
+                        {tableCellText(cell)}
                       </td>
                     ))}
                   </tr>

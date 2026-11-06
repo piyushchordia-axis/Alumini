@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withBom } from "@illuminize/shared";
 import { ApiCore, MemoryTokenStorage } from "@illuminize/shared/client";
 
 describe("ApiCore.download", () => {
@@ -25,6 +26,33 @@ describe("ApiCore.download", () => {
     ]);
     expect(calls[0]!.accept).toBe("*/*");
     expect(await storage.getRefreshToken()).toBe("r2");
+  });
+
+  it("hands the file over as text when asked, without its byte order mark, which withBom puts back once", async () => {
+    const storage = new MemoryTokenStorage();
+    await storage.setTokens({ accessToken: "a", refreshToken: "r" });
+    const csv = "\uFEFFName,Phone\r\nÅsa Nørby,+919100000031\r\n";
+    const fetchImpl = (async () =>
+      new Response(new TextEncoder().encode(csv), {
+        headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="shri-gujarati-samaj-members-2026-11-06.csv"' },
+      })) as unknown as typeof fetch;
+    const core = new ApiCore({ baseUrl: "", storage, fetch: fetchImpl });
+
+    const { text, filename } = await core.download({ path: "/admin/exports/members.csv", tenantSlug: "shri-gujarati-samaj" }, { as: "text" });
+    expect(filename).toBe("shri-gujarati-samaj-members-2026-11-06.csv");
+    expect(text).toBe("Name,Phone\r\nÅsa Nørby,+919100000031\r\n");
+    expect(withBom(text)).toBe(csv);
+    expect(withBom(withBom(text))).toBe(csv);
+  });
+
+  it("drops a byte order mark that the decoder kept", async () => {
+    const storage = new MemoryTokenStorage();
+    // A decoder that keeps the mark, as some platforms' fetch does.
+    const keeps = { ok: true, status: 200, headers: new Headers(), text: async () => "\uFEFFName\r\n" } as unknown as Response;
+    const core = new ApiCore({ baseUrl: "", storage, fetch: (async () => keeps) as unknown as typeof fetch });
+    const { text, filename } = await core.download({ path: "/x.csv" }, { as: "text" });
+    expect(text).toBe("Name\r\n");
+    expect(filename).toBeNull();
   });
 
   it("turns an error response into an ApiClientError", async () => {

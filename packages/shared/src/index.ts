@@ -42,6 +42,8 @@ export * from "./lib/csv";
 export * from "./lib/invitations";
 export * from "./lib/admin";
 export * from "./lib/announcements";
+export * from "./lib/charts";
+export * from "./lib/analytics";
 export * from "./lib/audit";
 export * from "./lib/moderation";
 export * from "./schemas/invitations";

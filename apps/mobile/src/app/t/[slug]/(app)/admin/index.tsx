@@ -1,4 +1,4 @@
-import { ADMIN_SECTIONS, MOBILE_ADMIN_SECTIONS, approvalSummary, dashboardTiles, type DashboardTile } from "@illuminize/shared";
+import { ADMIN_SECTIONS, approvalSummary, dashboardTiles, type DashboardTile } from "@illuminize/shared";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -7,7 +7,7 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from "react-native"
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { StatGrid, StatTile } from "@/components/admin/StatTile";
 import { HubRow } from "@/components/HubRow";
-import { IconChevronRight, NavIcon } from "@/components/icons";
+import { IconChevronRight } from "@/components/icons";
 import { Button, Card, ErrorText, Muted, Spinner, headingRole } from "@/components/ui";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { useMembership } from "@/hooks/useMembership";
@@ -36,14 +36,11 @@ export default function AdminHomeScreen() {
   };
   const tiles = dashboard.data ? dashboardTiles(dashboard.data) : null;
   const tile = (t: DashboardTile) => {
-    const href = t.section ? adminSectionHref(slug, t.section, t.query) : null;
-    return <StatTile key={t.key} label={t.label} value={t.value} hint={t.hint} attention={t.attention} onPress={href ? () => router.push(href) : undefined} />;
+    const section = t.section;
+    return <StatTile key={t.key} label={t.label} value={t.value} hint={t.hint} attention={t.attention} onPress={section ? () => router.push(adminSectionHref(slug, section, t.query)) : undefined} />;
   };
   // The Dashboard is this screen.
   const sections = ADMIN_SECTIONS.filter((s) => s.key !== "dashboard");
-  const onPhone = sections.filter((s) => MOBILE_ADMIN_SECTIONS.includes(s.key));
-  const onWeb = sections.filter((s) => !MOBILE_ADMIN_SECTIONS.includes(s.key));
-  const settingsHref = adminSectionHref(slug, "settings");
   return (
     <AdminScreen title={tenant.shortName ?? tenant.name} home refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primary} colors={[theme.primary]} />}>
       <Muted size={13}>Admin console for {tenant.name}</Muted>
@@ -57,6 +54,8 @@ export default function AdminHomeScreen() {
             At a glance
           </Text>
           <StatGrid>{tiles.glance.map(tile)}</StatGrid>
+          {/* The figures over time, as the web Dashboard links to them. */}
+          <ConsoleLink label="Growth and activity charts" onPress={() => router.push(adminSectionHref(slug, "analytics"))} />
         </>
       ) : error ? (
         <>
@@ -75,41 +74,31 @@ export default function AdminHomeScreen() {
           ))}
         </Text>
         {/* Where the approval modes change, as the web Dashboard's card links. */}
-        {settingsHref && (
-          <Pressable onPress={() => router.push(settingsHref)} accessibilityRole="link" accessibilityLabel="Settings" style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}>
-            <Text style={[styles.linkText, { color: theme.primaryInk }]}>Settings</Text>
-            <IconChevronRight size={16} color={theme.primaryInk} />
-          </Pressable>
-        )}
+        <ConsoleLink label="Settings" onPress={() => router.push(adminSectionHref(slug, "settings"))} />
       </Card>
       <Text {...headingRole(2)} style={styles.heading}>
         Sections
       </Text>
       <Card>
-        {onPhone.length > 0 && (
-          <View role="navigation" aria-label="Admin sections">
-            {onPhone.map((s) => {
-              const href = adminSectionHref(slug, s.key);
-              const count = s.countKey ? (dashboard.data?.[s.countKey] ?? 0) : 0;
-              return href && <HubRow key={s.key} icon={s.icon} label={s.label} dense count={count} countTone="warning" countLabel={`${s.label}, ${count} waiting`} onPress={() => router.push(href)} />;
-            })}
-          </View>
-        )}
-        {onWeb.length > 0 && (
-          <View style={{ gap: spacing.xs }}>
-            <Muted size={13}>On the web console for now:</Muted>
-            <View role="list">
-              {onWeb.map((s) => (
-                <View key={s.key} role="listitem" style={styles.webRow}>
-                  <NavIcon name={s.icon} size={18} color={colors.muted} />
-                  <Text style={styles.webLabel}>{s.label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        <View role="navigation" aria-label="Admin sections">
+          {sections.map((s) => {
+            const count = s.countKey ? (dashboard.data?.[s.countKey] ?? 0) : 0;
+            return <HubRow key={s.key} icon={s.icon} label={s.label} dense count={count} countTone="warning" countLabel={`${s.label}, ${count} waiting`} onPress={() => router.push(adminSectionHref(slug, s.key))} />;
+          })}
+        </View>
       </Card>
     </AdminScreen>
+  );
+}
+
+/** A 44-point text link to another part of the console, in the institution's colour. */
+function ConsoleLink({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="link" accessibilityLabel={label} style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}>
+      <Text style={[styles.linkText, { color: theme.primaryInk }]}>{label}</Text>
+      <IconChevronRight size={16} color={theme.primaryInk} />
+    </Pressable>
   );
 }
 
@@ -119,6 +108,4 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700", color: colors.text },
   link: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 4, minHeight: 44 },
   linkText: { fontSize: 14, fontWeight: "600" },
-  webRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 32 },
-  webLabel: { fontSize: 14, color: colors.muted },
 });

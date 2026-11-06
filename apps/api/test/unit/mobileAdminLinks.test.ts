@@ -1,4 +1,4 @@
-import { ADMIN_SECTIONS, MOBILE_ADMIN_SECTIONS, NOTIFICATION_TYPES, adminKeys, isAdminNotification } from "@illuminize/shared";
+import { ADMIN_SECTIONS, NOTIFICATION_TYPES, adminKeys, isAdminNotification } from "@illuminize/shared";
 import { ApiClientError } from "@illuminize/shared/client";
 import { describe, expect, it } from "vitest";
 import { adminHomeHref, adminMemberHref, adminSectionHref, isPushAdminOf, isStoredAdminOf, membershipToRefetch, opensInPlace } from "../../../mobile/src/lib/admin";
@@ -66,18 +66,17 @@ describe("notificationHref in the phone app", () => {
 });
 
 describe("the phone console's links", () => {
-  it("open the console's home for the Dashboard, and nothing for a section that is only on the web console", () => {
+  it("open the console's home for the Dashboard", () => {
     expect(adminHomeHref("demo")).toBe("/t/demo/admin");
     expect(adminSectionHref("demo", "dashboard")).toBe("/t/demo/admin");
-    for (const { key } of ADMIN_SECTIONS.filter((s) => !MOBILE_ADMIN_SECTIONS.includes(s.key))) expect(adminSectionHref("demo", key), key).toBeNull();
   });
 
-  it("put a section at the web console's path, with its query", () => {
-    for (const { key, path } of ADMIN_SECTIONS.filter((s) => s.key !== "dashboard" && MOBILE_ADMIN_SECTIONS.includes(s.key))) {
+  it("put every other section at the web console's path, with its query", () => {
+    for (const { key, path } of ADMIN_SECTIONS.filter((s) => s.key !== "dashboard")) {
       expect(adminSectionHref("demo", key), key).toBe(`/t/demo/admin/${path}`);
     }
     expect(adminSectionHref("demo", "dashboard", { status: "PENDING", q: "a b&c" })).toBe("/t/demo/admin?status=PENDING&q=a%20b%26c");
-    // The console home's Pending members tile, now that Members is in the phone app.
+    // The console home's Pending members tile.
     expect(adminSectionHref("demo", "members", { status: "PENDING" })).toBe("/t/demo/admin/members?status=PENDING");
   });
 });

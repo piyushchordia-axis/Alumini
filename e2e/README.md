@@ -169,8 +169,11 @@ Covers:
   and the console's Audit log link then showing the whole log again, with no filter written back, the messages
   discarded on leaving the page, a report another admin just handled, removing the reported message, and the page on a
   phone;
-- analytics charts and the members CSV, with the profile's own columns after "Last active" and Rahul's seeded headline
-  and skills in them;
+- analytics: the headline figures' changes (the period before scripted, so each direction shows) in words beside SVG
+  arrows, never text arrows; the New members chart's weeks day first ("2 Nov") in an en-US browser; its Table switch
+  keeping its name, pressed, with a row a week in place of the chart; "Updating…" with the 12 weeks' charts still up
+  while the script holds the 26 weeks' answer; and the members CSV, with the profile's own columns after "Last active"
+  and Rahul's seeded headline and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
   console's dashboard counts it, the count in amber, and the sidebar's row named the same on a wider screen), and
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
@@ -264,8 +267,9 @@ Covers:
   forced sign-out leaving nothing cached;
 - the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", and My profile's link; the
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
-  review, 0" not, no report tiles with none open, the four figures at a glance, the approval sentence, and the sections
-  still on the web console; Back to More and to My profile; a chat report's notice tapped in Notifications opening the
+  review, 0" not, no report tiles with none open, the four figures at a glance, the Growth and activity charts link,
+  the approval sentence, and a row for every section, Analytics first, with nothing left for the web console; Back to
+  More and to My profile; a chat report's notice tapped in Notifications opening the
   open chat reports (saying the report isn't there, as Samaj has none), with Back returning to the list;
   Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
   tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
@@ -376,7 +380,19 @@ Covers:
   Revoked, listed under the Revoked tab, which a reload keeps; and, with the plan said to send by WhatsApp (answered by
   the script, so nothing is billed), Send 1 pending asking first and saying it's billed (Cancel sends nothing), a
   refusal (as for a plan that stopped sending) closing the sheet and saying why on the list, then "Sending 1
-  invitation", and a row's Send saying "Invitation sent".
+  invitation", and a row's Send saying "Invitation sent";
+- the console's analytics, as the Samaj admin: opened from the console's Analytics row on the last 12 weeks, the
+  compared headline tiles (the period before scripted, so each direction shows) named with their change ("New members,
+  12. +20% vs the previous 12 weeks (10)") and drawing it as an SVG arrow beside the words, never a text arrow; the New
+  members chart a slider named by its summary whose value is the latest week's readout ("Week of …, N approved"), the
+  left arrow key stepping it a week back; "Last 6 months" putting `weeks=26` in the address and asking the API for 26
+  weeks, the 12 weeks' charts staying up with "Updating…" while the script holds the answer, and the headline figures
+  then compared with "the previous 6 months"; the New members card's Table switch keeping its name, pressed, and listing
+  27 rows (its header and 26 weeks) in place of the chart; the invitations funnel's table saying Imported 2; Activity's
+  table with its five headers whole on one line and every row's figures right under them; no sideways scrolling; the
+  members CSV saying "Preparing…" while the script holds it, with Activity CSV disabled until it's saved (one export
+  at a time), then downloaded as shri-gujarati-samaj-members-<date>.csv with one byte order mark and the Samaj's
+  Chapter among its columns; and a reload keeping 6 months.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -660,8 +676,8 @@ waiting for approval. Sign Rahul back in afterwards.
       My profile has an Admin console link too. Each opens the console, with no tab bar, and Back (and, on the iPhone,
       the swipe back; on Android, the back button) returns to where it was opened.
 - [ ] TalkBack or VoiceOver, on the console's home: each tile is one stop, read as its label and count ("Pending
-      members, 2"), then its hint; "Needs you", "At a glance" and "Sections" are read as headings; and the icons in the
-      list of sections on the web console are silent.
+      members, 2"), then its hint; "Needs you", "At a glance" and "Sections" are read as headings; and the sections'
+      icons are silent.
 - [ ] Pulling the console's home down refreshes it.
 - [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
       number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the new
@@ -780,6 +796,31 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] TalkBack or VoiceOver on Invitations: each tile is read as its label and count, Can send today as "none" on a plan
       that sends nothing; each row's buttons with the person ("Copy link for …", "Revoke the invitation for …"); Revoke
       asks in a sheet, which Android's back button closes, changing nothing.
+- [ ] Analytics (the console's Analytics row), with the phone set to another language and region (Hindi, India, then
+      English, United States): the figures are grouped with commas ("1,234"), an axis that reaches 10,000 reads "10K",
+      the weeks under the charts read "2 Nov" and the readout "Week of 2 Nov 2026", never "Nov 2" or a date a day out.
+      These are written by hand, as Hermes lacks parts of `Intl`.
+- [ ] Analytics: drag a finger along New members per week and Activity per week: the line above each chart follows the
+      week under the finger, the chosen column stands out (a crosshair and dots on the lines), and the choice stays when
+      the finger lifts. A drag up or down that starts on a chart scrolls the page instead, and leaves the week that chart
+      had chosen as it was (scroll the whole page with a finger on the charts: no week is chosen in any of them).
+- [ ] Analytics, TalkBack or VoiceOver: each week chart is one stop, read as its summary ("New members per week, 3 in
+      total"), adjustable, with the latest week's readout as its value; swiping up and down (VoiceOver) or the volume keys
+      or swipes TalkBack offers for a slider step a week at a time, reading "Week of …, 1 approved" (each series, by
+      name, on Activity). The chart drawings and the line above them aren't read on their own. The headline tiles are
+      read as their label and figure, then the change ("+12% vs the previous 12 weeks (10)"), with hints turned off too
+      (VoiceOver's Speak Hints, TalkBack's usage hints); Table is read as a button that says whether it's on, its hint
+      saying what pressing it does (shows the table, or the chart again), and a bar chart's rows as "Mumbai, 12
+      members". Choosing Last 6 months says "Updating…" on both (VoiceOver is told it; TalkBack reads a live region).
+- [ ] Analytics: choose Last 12 months and open New members per week's Table: on Android its 53 rows scroll inside
+      the card, and the page scrolls once the table reaches its end.
+- [ ] Analytics on a narrow phone (320 to 360 points wide), then with the largest text size: Activity per week's
+      Table shows every header whole ("Comments" never broken inside the word) with each figure under its header; where
+      the five columns don't fit, the table scrolls sideways inside its frame, and the page doesn't.
+- [ ] Analytics: Members CSV says "Preparing…" (Activity CSV can't be pressed meanwhile), then opens the share sheet
+      with shri-gujarati-samaj-members-<date>.csv (not .csv.csv). Closing the sheet without choosing anything shows no
+      error. Save it to Files (iPhone) or Drive or Downloads (Android) and open it in Excel or Google Sheets: the names
+      read correctly, Gujarati ones too, and the Chapter column is there. Do the same with Activity CSV.
 
 **Appearance**
 

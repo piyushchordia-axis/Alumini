@@ -27,6 +27,10 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** How ApiCore.download hands a file over. */
+export type DownloadAs = "blob" | "text";
+export type Downloaded<A extends DownloadAs> = A extends "text" ? { text: string; filename: string | null } : { blob: Blob; filename: string | null };
+
 export function buildQuery(query?: QueryParams): string {
   if (!query) return "";
   const parts: string[] = [];
@@ -121,12 +125,17 @@ export class ApiCore {
     }
   }
 
-  /** Fetches a file (a CSV export) with the same sign-in and refresh handling; the file name comes from the server. */
-  async download(opts: RequestOptions): Promise<{ blob: Blob; filename: string | null }> {
+  /**
+   * Fetches a file (a CSV export) with the same sign-in and refresh handling; the file name comes from the server. It
+   * comes as a Blob, or with `{ as: "text" }` as text, for the phone app, which writes files from text. The text never
+   * starts with a byte order mark (decoders differ on whether they keep one), so add it back with withBom to save a CSV.
+   */
+  async download<A extends DownloadAs = "blob">(opts: RequestOptions, read?: { as: A }): Promise<Downloaded<A>> {
     const res = await this.send(opts, "*/*");
     const disposition = res.headers.get("Content-Disposition") ?? "";
     const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? null;
-    return { blob: await res.blob(), filename };
+    if (read?.as === "text") return { text: (await res.text()).replace(/^\uFEFF/, ""), filename } as Downloaded<A>;
+    return { blob: await res.blob(), filename } as Downloaded<A>;
   }
 
   async data<T>(opts: RequestOptions): Promise<T> {

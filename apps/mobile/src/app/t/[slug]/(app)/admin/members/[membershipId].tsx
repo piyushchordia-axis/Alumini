@@ -17,7 +17,7 @@ import { Badge, Button, Card, EmptyState, ErrorText, Muted, Spinner, headingRole
 import { useMemberActions, type MemberActionOutcome } from "@/hooks/useMemberActions";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
-import { adminHomeHref, adminMemberHref, adminSectionHref } from "@/lib/admin";
+import { adminMemberHref, adminSectionHref } from "@/lib/admin";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -76,7 +76,7 @@ function AdminMember({ id }: { id: string }) {
     return (
       <AdminScreen title="Member">
         <EmptyState icon={<IconDirectory size={32} color={colors.faint} />} title="This member isn't here" description="They may have deleted their account, or the link is wrong." />
-        <Button title="Back to members" variant="outline" accessibilityRole="link" onPress={() => router.dismissTo(adminSectionHref(slug, "members") ?? adminHomeHref(slug))} />
+        <Button title="Back to members" variant="outline" accessibilityRole="link" onPress={() => router.dismissTo(adminSectionHref(slug, "members"))} />
       </AdminScreen>
     );
   }
