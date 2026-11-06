@@ -29,9 +29,10 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   offer (`memberStartYearOptions`, `memberEndYearOptions`) and their rules (`memberYearsIssues`); `lib/jobs.ts` a job's
   facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
-  of an institution colour (`brandTones`); `lib/appearance.ts` a member's background (`resolveAppearance`,
-  `pageBackdrop` and the tiles both apps offer); `lib/branding.ts` the console's Branding form (`brandingSave`,
-  `BRAND_SWATCHES`, `brandContrastWarnings`) and the time zones a picker offers (`timeZoneOptions`);
+  of an institution colour (`brandTones`); `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
+  `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
+  `lib/branding.ts` the console's Branding form (`brandingSave`, `BRAND_SWATCHES`, `brandContrastWarnings`) and the
+  time zones a picker offers (`timeZoneOptions`);
   `lib/invitations.ts` the console's invitations: an imported CSV read (`readInvitationCsv`), the template, the import
   in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`;
   `lib/charts.ts` the charts' palette, ticks, layouts and hand-written number and week text; `lib/analytics.ts` the
@@ -159,6 +160,20 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which a pale brand loses
     in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where they can't outrank
     it.
+  - **Greys and tones.** Greys and status colours come from shared `lib/tones.ts`, and `tones.test.ts` pins their
+    contrast. `GREYS`, darkest first: text, body (labels), secondary `#475569` (excerpts, and every grey on a tinted
+    surface), meta `#5b6b80` (times, places, counts, bylines, hints, placeholders: the lightest grey text, 4.97:1 on
+    the page) and faint `#748297` (icons, control borders and tag edges, never text). The web's `index.css` `@theme`
+    redraws Tailwind's `slate-500` and `slate-400` as meta and faint, so they aren't Tailwind's values (`text-slate-500`
+    is the meta grey) and `[data-backdrop]` steps each one shade darker; the phone has `colors.secondary`,
+    `colors.muted` (meta) and `colors.faint`. `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an
+    edge (3:1), an ink (4.5:1 on the fill, white and the page) and a solid (under white text): web
+    `bg-tone-success-fill`, `border-tone-success-edge`, `text-tone-success-ink`, `bg-tone-success-solid` and so on; the
+    phone reads `STATUS_TONES`. `brandTones` also gives `edge`, the brand as a line at 3:1 on white and the plain page
+    (web `primary-edge`, mobile `theme.primaryEdge`; a member's Institution colour page can take it under 3:1, so a line
+    drawn on the page itself, not in a card, needs its own check against `pageBackdrop`), and `tint`, its 12% tint as a
+    solid colour (web `primary-tint`, mobile `theme.primaryTint`). A new value goes in `tones.ts` and, written out, in
+    `index.css`, which the test checks against it.
   - **Elevation.** Page background (web `--surface-page`, mobile `useTheme().page.color`) is quieter than content.
     Level 1: posts and list modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write
     surfaces (`elevation={2}`). Do not flatten feed cards into the page.
@@ -167,9 +182,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `StackScreen`, which draw `PageBackdrop`), not `colors.bg`, and a view inside a shell leaves its background clear
     rather than painting the plain colour over it (one that is sometimes the whole screen wraps in `PageFill`). On a
     tint or a photo, grey text on the page is one shade darker (web `[data-backdrop]`; mobile `Muted` or
-    `theme.pageMuted`, never `colors.muted` on the page) and brand text on it takes `pageInk` (web `text-page-ink`,
-    mobile `theme.pageInk`). Cards, chrome and chats stay white or plain. The admin console and chats stay plain: web
-    `AdminLayout` is outside `HomeLayout`; mobile `AdminScreen` / `AdminListScreen` and `ChatScreen` wrap in `PlainPage`.
+    `theme.pageMuted`, never `colors.muted` on the page), and brand text on the page, plain or not, takes `pageInk` (web
+    `text-page-ink`, mobile `theme.pageInk`). Cards, chrome and chats stay white or plain. The admin console and chats
+    stay plain: web `AdminLayout` is outside `HomeLayout`; mobile `AdminScreen` / `AdminListScreen` and `ChatScreen`
+    wrap in `PlainPage`.
   - **Typography.** Web: Manrope (display) + Source Sans 3 (body) via `index.html` / CSS vars. Keep page titles from
     dwarfing body copy (`PageHeader` uses a locked scale).
   - **Landing / auth.** Brand-first full-bleed cover in `AuthShell` (web) and the tenant landing screen (mobile);

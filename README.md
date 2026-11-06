@@ -534,9 +534,10 @@ Only they see it: their own membership carries it, and no admin, directory or "U
   save fails.
 - **Institution colour** is a light tint of the brand (`pageTint`, 8% of it). **A cover or a photo** lies under a veil
   of the plain page colour at 85%, so only a soft wash of it shows. On either, grey text on the page itself steps one
-  shade darker (slate-500 to slate-600: the web's `[data-backdrop]` rule, the phone's `theme.pageMuted` and `Muted`), so
-  it reads at least as well as on the plain page, and brand-coloured text on the page (the web sidebar's current link,
-  the phone's Filters toggles) takes `pageInk`, the brand darkened as far as it must be to read at 4.5:1 on the darkest
+  shade darker (the meta grey to the secondary one, `#5b6b80` to `#475569`: the web's `[data-backdrop]` rule, the
+  phone's `theme.pageMuted` and `Muted`), so it reads at least as well as on the plain page. Brand-coloured text on the
+  page (the web sidebar's current link, the phone's Filters toggles) takes `pageInk` on any background, the plain one
+  included: the brand's ink, darkened as far as it must be to read at 4.5:1 under a current link's wash on the darkest
   the page gets. Without its photo (an institution that took its cover away) the page is plain, and the choice comes
   back with the photo.
 - **Where it's drawn.** The rules are in `packages/shared/src/lib/appearance.ts`: `resolveAppearance` reads a missing or
@@ -1168,7 +1169,8 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   memberYears.ts: a member's start and end years, their text and their rules; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
                   phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
-                  appearance.ts: a member's background; admin.ts and its siblings: what both admin consoles share)
+                  tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); appearance.ts: a member's
+                  background; admin.ts and its siblings: what both admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 

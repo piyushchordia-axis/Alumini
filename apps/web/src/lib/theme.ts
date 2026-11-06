@@ -11,7 +11,8 @@ function hexToRgbTriplet(hex: string): string {
 /**
  * Applies a tenant's colours to the CSS variables consumed by Tailwind's `primary`/`secondary` colours, and the tones
  * derived from the primary (`brandTones`): `primary-ink` (the brand as text or a chosen icon, darkened if it's too light
- * to read), `primary-wash` and `primary-ring` (behind and around something chosen) and `on-primary` (text on the brand
+ * to read), `primary-wash` and `primary-ring` (behind and around something chosen), `primary-edge` (the brand as a
+ * line, such as a tag's edge), `primary-tint` (its soft tint as a solid colour) and `on-primary` (text on the brand
  * colour).
  */
 export function applyTenantTheme(tenant?: Pick<TenantSummaryDto, "primaryColor"> & { secondaryColor?: string }): void {
@@ -22,6 +23,8 @@ export function applyTenantTheme(tenant?: Pick<TenantSummaryDto, "primaryColor">
   root.style.setProperty("--c-primary-ink", hexToRgbTriplet(tones.ink));
   root.style.setProperty("--c-primary-wash", hexToRgbTriplet(tones.wash));
   root.style.setProperty("--c-primary-ring", hexToRgbTriplet(tones.ring));
+  root.style.setProperty("--c-primary-edge", hexToRgbTriplet(tones.edge));
+  root.style.setProperty("--c-primary-tint", hexToRgbTriplet(tones.tint));
   root.style.setProperty("--c-on-primary", hexToRgbTriplet(tones.onPrimary));
   root.style.setProperty("--c-secondary", hexToRgbTriplet(tenant?.secondaryColor ?? DEFAULT_SECONDARY));
 }

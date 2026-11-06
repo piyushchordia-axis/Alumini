@@ -268,7 +268,7 @@ try {
     // Chosen, the chip is a brand tint with its icon filled in the brand's ink, and the pointer still resting on it
     // after the click doesn't repaint it. Demo University's tones are pinned in color.test.ts; read from the page's
     // inline style, they were written by applyTenantTheme, not the stylesheet's defaults (which are the same blue).
-    const tones = { "--c-primary-ink": "29 78 216", "--c-primary-wash": "223 230 250", "--c-primary-ring": "153 175 237", "--c-on-primary": "255 255 255" };
+    const tones = { "--c-primary-ink": "29 78 216", "--c-primary-wash": "223 230 250", "--c-primary-ring": "153 175 237", "--c-primary-edge": "120 139 190", "--c-primary-tint": "228 234 250", "--c-on-primary": "255 255 255" };
     const written = await page.evaluate((names) => Object.fromEntries(names.map((n) => [n, document.documentElement.style.getPropertyValue(n).trim()])), Object.keys(tones));
     if (JSON.stringify(written) !== JSON.stringify(tones)) throw new Error(`the theme wrote ${JSON.stringify(written)}, not Demo University's tones ${JSON.stringify(tones)}`);
     const chosen = card.locator('button[aria-label="Celebrate"][aria-pressed="true"]');

@@ -260,18 +260,115 @@ export async function expectChosenChip(chip, where) {
   // the seeded brands' washes are 32 to 35 apart from it.
   if (Math.max(...look.chip.map((c) => 255 - c)) < 20) throw new Error(`${where} (rgb ${look.chip.join(" ")}) is all but white`);
   if (look.fill === "none") throw new Error(`${where} has an unfilled icon`);
-  // WCAG relative luminance. Slate-700 is 0.051 and slate-800 0.022: below 0.04 a 16-18px icon reads as black.
-  const linear = (c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
-  const luminance = (rgb) => {
-    const [r, g, b] = rgb.map(linear);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const icon = luminance(look.icon);
-  if (icon < 0.04) throw new Error(`${where} draws its icon near-black (rgb ${look.icon.join(" ")})`);
-  const chipLuminance = luminance(look.chip);
-  const contrast = (Math.max(icon, chipLuminance) + 0.05) / (Math.min(icon, chipLuminance) + 0.05);
+  // Slate-700 is 0.051 and slate-800 0.022: below 0.04 a 16-18px icon reads as black.
+  if (luminanceOf(look.icon) < 0.04) throw new Error(`${where} draws its icon near-black (rgb ${look.icon.join(" ")})`);
+  const contrast = contrastOf(look.icon, look.chip);
   if (contrast < 3) throw new Error(`${where}'s icon (rgb ${look.icon.join(" ")}) is ${contrast.toFixed(2)}:1 on the chip (rgb ${look.chip.join(" ")}), under 3:1`);
   return { icon: look.icon, chip: look.chip };
+}
+
+/** A colour's channels from "r g b", as the helpers here give colours, or from [r, g, b]. */
+const channelsOf = (rgb) => (Array.isArray(rgb) ? rgb : rgb.split(" ").map(Number));
+
+/** WCAG 2 relative luminance of a colour ("r g b" or [r, g, b]): 0 for black, 1 for white. */
+export function luminanceOf(rgb) {
+  const [r, g, b] = channelsOf(rgb).map((c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG 2 contrast of two colours ("r g b" or [r, g, b]), 1 to 21, as the shared contrastRatio gives it. */
+export function contrastOf(a, b) {
+  const [x, y] = [luminanceOf(a), luminanceOf(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/**
+ * What the eye gets from `locator` (one element) once any transition on it or around it ends, each as "r g b": `colour`,
+ * the element's `property` ("color" for text, an SVG's "stroke" or "fill", "backgroundColor", "borderTopColor" or
+ * another side's, or "outlineColor"), laid over what's behind it; and `behind`, the surface that sits against it. Text
+ * and icons sit on the element's own background and those behind it; a background, border or outline sits on what's
+ * behind the element (a border over the element's own background, as browsers paint it). The backgrounds are those of
+ * the element's boxes, painted from the nearest opaque one (a colour that comes out the same over black and over white)
+ * inwards, so translucent washes count. It sees no photo or gradient and not what scrolls under a see-through header,
+ * and it refuses a faded element (an opacity under 1, as a disabled control has), whose styles say a darker colour than
+ * the eye gets. The one place both apps paint colours this way: build other colour checks on it and contrastOf.
+ */
+export async function paintedColour(locator, property = "color") {
+  const look = await locator.evaluate(async (el, property) => {
+    const boxes = [];
+    for (let box = el; box; box = box.parentElement) boxes.push(box);
+    const running = [...el.getAnimations({ subtree: true }), ...boxes.slice(1).flatMap((box) => box.getAnimations())];
+    // A spinner's endless animation never finishes, and doesn't change the colours being read.
+    await Promise.all(running.filter((a) => a.effect?.getComputedTiming().endTime !== Infinity).map((a) => a.finished));
+    const faded = boxes.find((box) => Number(getComputedStyle(box).opacity) < 1);
+    if (faded) return { problem: `it is faded (opacity ${getComputedStyle(faded).opacity}), so its colours aren't what the eye gets` };
+    const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    const paint = (base, colours) => {
+      g.fillStyle = base;
+      g.fillRect(0, 0, 1, 1);
+      for (const c of colours) {
+        g.fillStyle = "#010203";
+        g.fillStyle = c;
+        if (g.fillStyle === "#010203") throw new Error(`the canvas can't read the colour ${c}`);
+        g.fillRect(0, 0, 1, 1);
+      }
+      return [...g.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    };
+    const style = getComputedStyle(el);
+    const onOwnBackground = ["color", "stroke", "fill"].includes(property);
+    // The boxes behind, nearest first, up to and including the nearest opaque one; the page's white past the last.
+    const behind = [];
+    for (const box of onOwnBackground ? boxes : boxes.slice(1)) {
+      const colour = getComputedStyle(box).backgroundColor;
+      behind.unshift(colour);
+      if (paint("#000000", [colour]).join() === paint("#ffffff", [colour]).join()) break;
+    }
+    const surface = paint("#ffffff", behind);
+    const value = style[property];
+    if (!value || value === "none") return { problem: `it has no ${property}` };
+    let colour;
+    if (/^border\w*Color$/.test(property)) {
+      const width = style[property.replace(/Color$/, "Width")];
+      if (!(parseFloat(width) > 0)) return { problem: `it draws no such border (its width is ${width})` };
+      colour = paint("#ffffff", [...behind, style.backgroundColor, value]);
+    } else if (property === "outlineColor") {
+      if (style.outlineStyle === "none" || !(parseFloat(style.outlineWidth) > 0)) return { problem: "it draws no outline" };
+      colour = paint("#ffffff", [...behind, value]);
+    } else {
+      colour = paint("#ffffff", [...behind, value]);
+    }
+    return { colour: colour.join(" "), behind: surface.join(" ") };
+  }, property);
+  if (look.problem) throw new Error(`paintedColour can't read its ${property}: ${look.problem}`);
+  return look;
+}
+
+/**
+ * Fails unless the text of `locator` (one element) reads at `min` contrast (WCAG 1.4.3: 4.5:1, or 3:1 for large text)
+ * on what's behind it, as paintedColour sees them. Gives { colour, behind, contrast }.
+ */
+export async function expectReadable(locator, where, min = 4.5) {
+  return expectContrast(locator, "color", where, min, "reads at");
+}
+
+/**
+ * Fails unless the top border of `locator` (one element), such as a tag's edge, shows at `min` contrast (WCAG 1.4.11:
+ * 3:1) on what's behind the element. Gives { colour, behind, contrast }.
+ */
+export async function expectEdge(locator, where, min = 3) {
+  return expectContrast(locator, "borderTopColor", where, min, "has an edge at");
+}
+
+async function expectContrast(locator, property, where, min, says) {
+  let look;
+  try {
+    look = await paintedColour(locator, property);
+  } catch (error) {
+    throw new Error(`${where}: ${error.message}`);
+  }
+  const contrast = contrastOf(look.colour, look.behind);
+  if (contrast < min) throw new Error(`${where} ${says} ${contrast.toFixed(2)}:1, under ${min}:1 (rgb ${look.colour} on rgb ${look.behind})`);
+  return { ...look, contrast };
 }
 
 /**
@@ -282,10 +379,10 @@ export const PAGE_COLOURS = { plain: "241 245 249", demoUniversity: "230 236 249
 /** A card's own background, as pageColours reads it. */
 export const WHITE = "255 255 255";
 /**
- * The phone app's grey text as textColour reads it: slate-500 on the plain page, slate-600 on a tint or a photo. (The
- * web app's Tailwind greys are oklch() and read a little differently, so the web journey compares before and after.)
+ * Grey text as textColour reads it in both apps, which draw the shared greys (GREYS in lib/tones.ts): the meta grey on
+ * the plain page, the secondary grey on a tint or a photo.
  */
-export const GREY_TEXT = { plain: "100 116 139", dim: "71 85 105" };
+export const GREY_TEXT = { plain: "91 107 128", dim: "71 85 105" };
 
 /** The text colour of `locator`, as "r g b" (painted over white and read back, as pageColours does). */
 export async function textColour(locator) {

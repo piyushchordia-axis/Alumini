@@ -42,7 +42,7 @@ export default function MemberProfileScreen() {
           )}
           {m.fields.map((f) => (
             <Text key={f.key} style={{ color: "#334155" }}>
-              <Text style={{ color: "#64748b" }}>{f.label}: </Text>
+              <Text style={{ color: colors.muted }}>{f.label}: </Text>
               {f.display}
             </Text>
           ))}

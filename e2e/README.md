@@ -42,6 +42,15 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   counters.
 - `pnpm demo` and the scripts share these counters, so signing in by hand during a run uses up codes too.
 
+### Colour checks
+
+- `lib.mjs` reads colours as the eye gets them: `paintedColour(locator, property)` lays an element's text, icon,
+  background, border or outline colour over the backgrounds behind it, and `contrastOf` gives their WCAG contrast.
+  `expectReadable` (text at 4.5:1) and `expectEdge` (an edge at 3:1) are built on them, and a new colour check should
+  be too. They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
+- `GREY_TEXT` is both apps' grey text as `textColour` reads it: the meta grey (`91 107 128`) on the plain page and the
+  secondary grey (`71 85 105`) on a tint or a photo.
+
 ## Web (member journey)
 
 ```bash
@@ -187,9 +196,9 @@ Covers:
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
   status tabs, a member's page and the Branding tab;
 - Appearance on My profile, as the Demo University admin: Plain chosen and no Cover tile without a cover; Institution
-  colour saved and tinting the page (Demo University's tint) with its grey text a shade darker, on the feed after a
-  reload too, with post cards painting their own white; the console's dashboard and Branding tab staying on the plain
-  page; and Plain putting the page and its grey text back;
+  colour saved and tinting the page (Demo University's tint) with its grey text a shade darker (the meta grey, then the
+  secondary one, readable on each), on the feed after a reload too, with post cards painting their own white; the
+  console's dashboard and Branding tab staying on the plain page; and Plain putting the page and its grey text back;
 - the platform console: login, onboarding an institution with its first admin, whose years are asked under a
   college's labels, an end before the start refused on its box with nothing created, and the admin then listed with
   2010–2014 on the Admins tab; a billing plan and usage, stats and user search, the institution comparison and its CSV,
@@ -287,8 +296,10 @@ Covers:
   open chat reports (saying the report isn't there, as Samaj has none), with Back returning to the list;
   Appearance from My profile (a 44px link with an SVG icon; Plain chosen, no Cover
   tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
-  darker, and the feed after a reload with its post cards painting their own white, the console's home staying on the
-  plain page, and Plain putting the page and its grey text back; the console's Settings, reached from the approval
+  darker (the meta grey, then the secondary one; Notification settings' first line, written on the page itself rather
+  than in a card, readable on the plain page and on the tint), and the feed after a reload with its post cards painting
+  their own white, the console's home staying on the plain page, and Plain putting the page and its grey text back; the
+  console's Settings, reached from the approval
   sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, a blank batch year
   refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing

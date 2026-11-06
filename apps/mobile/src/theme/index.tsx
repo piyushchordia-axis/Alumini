@@ -1,14 +1,19 @@
-import { brandTones, DIM_PAGE_TEXT, pageBackdrop, pageInk, parseHex, type MemberAppearance, type PageBackdropSpec, type TenantPublicDto } from "@illuminize/shared";
+import { brandTones, DIM_PAGE_TEXT, GREYS, pageBackdrop, pageInk, parseHex, PLAIN_PAGE_COLOR, type MemberAppearance, type PageBackdropSpec, type TenantPublicDto } from "@illuminize/shared";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
+/** The plain colours. The greys are the shared ones (GREYS), each with its job: see lib/tones.ts. */
 export const colors = {
-  bg: "#f1f5f9",
+  bg: PLAIN_PAGE_COLOR,
   card: "#ffffff",
   border: "#e2e8f0",
   borderStrong: "#cbd5e1",
-  text: "#0f172a",
-  muted: "#64748b",
-  faint: "#94a3b8",
+  text: GREYS.text,
+  /** Excerpts, and grey text on a tinted surface (an unread row, a tray). Not the institution's secondary colour (`Theme.secondary`). */
+  secondary: GREYS.secondary,
+  /** Grey text: times, places, counts, bylines, hints and placeholders. On the page itself, `theme.pageMuted` (`Muted`). */
+  muted: GREYS.meta,
+  /** Icons, borders and tag edges, never text. */
+  faint: GREYS.faint,
   danger: "#dc2626",
   success: "#059669",
   warning: "#d97706",
@@ -48,6 +53,10 @@ export interface Theme {
   primaryWash: string;
   /** The thin ring around `primaryWash`. */
   primaryRing: string;
+  /** The brand as a line, such as a brand tag's edge: 3:1 on white and the plain page, not always on a member's tinted `page`. */
+  primaryEdge: string;
+  /** The brand's soft tint as a solid colour, which the page doesn't show through: `primaryInk` reads on it at 4.5:1. */
+  primaryTint: string;
   /** Text on the brand colour: white, or near-black on a light brand. */
   onPrimary: string;
   /**
@@ -57,7 +66,7 @@ export interface Theme {
   page: PageBackdropSpec;
   /** Grey text written on the page itself, not in a card: `colors.muted`, one shade darker on a tint or a photo (`Muted` uses it). */
   pageMuted: string;
-  /** The brand as text written on the page itself (a Filters toggle): the brand, darkened on a tint or a photo (pageInk). */
+  /** The brand as text written on the page itself (a Filters toggle): the ink, darkened where the page or a current link's wash needs it (pageInk). */
   pageInk: string;
 }
 
@@ -80,6 +89,8 @@ function build(primary: string, secondary: string, page: PageBackdropSpec): Them
     primaryInk: tones.ink,
     primaryWash: tones.wash,
     primaryRing: tones.ring,
+    primaryEdge: tones.edge,
+    primaryTint: tones.tint,
     onPrimary: tones.onPrimary,
     page,
     pageMuted: page.dimText ? DIM_PAGE_TEXT : colors.muted,

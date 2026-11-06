@@ -2,11 +2,14 @@
 
 :root {
   --c-primary: 29 78 216;
-  /* From brandTones (lib/theme.ts): the primary as text or a chosen icon, the wash and ring of something chosen, and
-     text on the primary. */
+  /* From brandTones (lib/theme.ts): the primary as text or a chosen icon, the wash and ring of something chosen, the
+     primary as a line (a tag's edge), its soft tint as a solid colour, and text on the primary. tones.test.ts checks
+     these are the default primary's. */
   --c-primary-ink: 29 78 216;
   --c-primary-wash: 223 230 250;
   --c-primary-ring: 153 175 237;
+  --c-primary-edge: 120 139 190;
+  --c-primary-tint: 228 234 250;
   --c-on-primary: 255 255 255;
   --c-secondary: 15 23 42;
 
@@ -38,12 +41,45 @@
   --color-primary-ink: rgb(var(--c-primary-ink));
   --color-primary-wash: rgb(var(--c-primary-wash));
   --color-primary-ring: rgb(var(--c-primary-ring));
+  --color-primary-edge: rgb(var(--c-primary-edge));
+  --color-primary-tint: rgb(var(--c-primary-tint));
   --color-on-primary: rgb(var(--c-on-primary));
-  /* The brand as text on the member app's page (pageInk): HomeLayout sets --c-page-ink on a tint or a photo. */
-  --color-page-ink: rgb(var(--c-page-ink, var(--c-primary)));
+  /* The brand as text on the member app's page (pageInk), which HomeLayout sets as --c-page-ink. */
+  --color-page-ink: rgb(var(--c-page-ink, var(--c-primary-ink)));
   --color-secondary: rgb(var(--c-secondary));
   --font-sans: var(--font-body);
   --font-family-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The shared greys and status tones (packages/shared lib/tones.ts), written out because CSS can't import them;
+   tones.test.ts checks they match. slate-500 and slate-400 are redrawn as the meta and faint greys, so they aren't
+   Tailwind's values: text-slate-500 is the meta grey (times, bylines, hints) and slate-400 the faint one, for icons,
+   borders and tag edges, not text. Each tone gives bg-tone-success-fill, border-tone-success-edge,
+   text-tone-success-ink and bg-tone-success-solid, and the same for neutral, warning, danger and info. */
+@theme {
+  --color-slate-400: #748297;
+  --color-slate-500: #5b6b80;
+
+  --color-tone-neutral-fill: #f1f5f9;
+  --color-tone-neutral-edge: #748297;
+  --color-tone-neutral-ink: #334155;
+  --color-tone-neutral-solid: #475569;
+  --color-tone-success-fill: #d1fae5;
+  --color-tone-success-edge: #059669;
+  --color-tone-success-ink: #065f46;
+  --color-tone-success-solid: #047857;
+  --color-tone-warning-fill: #fef3c7;
+  --color-tone-warning-edge: #b45309;
+  --color-tone-warning-ink: #92400e;
+  --color-tone-warning-solid: #b45309;
+  --color-tone-danger-fill: #fee2e2;
+  --color-tone-danger-edge: #dc2626;
+  --color-tone-danger-ink: #991b1b;
+  --color-tone-danger-solid: #dc2626;
+  --color-tone-info-fill: #e0f2fe;
+  --color-tone-info-edge: #0284c7;
+  --color-tone-info-ink: #075985;
+  --color-tone-info-solid: #0369a1;
 }
 
 html,
@@ -53,12 +89,12 @@ body,
 }
 
 /* On a member's Institution colour tint or background photo (HomeLayout's data-backdrop, "tint" or "image"), grey text
-   steps one shade darker, slate-500 to slate-600 and slate-400 to slate-500, so it reads at least as well as on the
-   plain page, even where the veil lets a dark photo through. Tailwind's own values, written out: here
+   steps one shade darker, the meta grey to the secondary one and the faint grey to the meta one, so it reads at least
+   as well as on the plain page, even where the veil lets a dark photo through. The values are written out: here
    var(--color-slate-500) would read the darker one set on the line above. */
 [data-backdrop] {
-  --color-slate-500: oklch(44.6% 0.043 257.281);
-  --color-slate-400: oklch(55.4% 0.046 257.417);
+  --color-slate-500: #475569;
+  --color-slate-400: #5b6b80;
 }
 
 body {

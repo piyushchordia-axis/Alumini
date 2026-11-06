@@ -1,8 +1,8 @@
-import { brandTones, contrastRatio, inkOn, mixHex, onColor, pageTint, parseHex, relativeLuminance, toHex } from "@illuminize/shared";
+import { GREYS, brandTones, contrastRatio, inkOn, mixHex, onColor, pageTint, parseHex, relativeLuminance, toHex } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
+import { sampledColours } from "../helpers/colours";
 
 const WHITE = "#ffffff";
-const SLATE_500 = "#64748b";
 /** The plain page, and the tray a reaction chip sits in on the phone. */
 const PAGE = "#f1f5f9";
 /** The four seeded institutions' colours (seed.ts): Demo University, Demo College, Demo School and the Samaj. */
@@ -12,12 +12,6 @@ const NEAR_BLACK = "#111827";
 /** Brands so pale that their own tints would vanish into the tray: sky-100, cyan-400, and white itself. */
 const PALE = ["#e0f2fe", "#22d3ee", WHITE];
 const ALL = [...SEEDED, NEAR_WHITE, NEAR_BLACK, ...PALE];
-
-/** Every 17th level of each channel, 0 to 255: 4096 colours, the cube's corners and edges included. */
-function sampledColours(): string[] {
-  const levels = Array.from({ length: 16 }, (_, i) => i * 17);
-  return levels.flatMap((r) => levels.flatMap((g) => levels.map((b) => toHex({ r, g, b }))));
-}
 
 describe("parseHex and toHex", () => {
   it("read #rrggbb in any case, with or without the #, and write it back in lower case", () => {
@@ -105,7 +99,7 @@ describe("onColor", () => {
 
 describe("brandTones", () => {
   it("pins Demo University's tones, which e2e checks the web and phone apps draw", () => {
-    expect(brandTones("#1d4ed8")).toEqual({ ink: "#1d4ed8", wash: "#dfe6fa", ring: "#99afed", onPrimary: WHITE });
+    expect(brandTones("#1d4ed8")).toEqual({ ink: "#1d4ed8", wash: "#dfe6fa", ring: "#99afed", edge: "#788bbe", tint: "#e4eafa", onPrimary: WHITE });
   });
 
   it("keeps the seeded institutions' colour as their ink, or a shade so close it can't be told apart, with white on their buttons", () => {
@@ -172,16 +166,45 @@ describe("brandTones", () => {
     }
   });
 
+  it("draws the edge from the ring, darkened only as far as it takes to read at 3:1 on the plain page, and so on white", () => {
+    // Black's ring (#8c8c8c) already shows at 3.07:1, so it is kept as it is; every other colour here darkens its ring.
+    let kept = 0;
+    for (const c of [...ALL, "#000000"]) {
+      const { ring, edge } = brandTones(c);
+      expect(contrastRatio(edge, PAGE), `${c}'s edge on the page`).toBeGreaterThanOrEqual(3);
+      if (contrastRatio(ring, PAGE) >= 3) {
+        expect(edge, c).toBe(ring);
+        kept++;
+      } else expect(contrastRatio(edge, PAGE), `${c}'s edge is darker than it needs to be`).toBeLessThan(3.3);
+    }
+    expect(brandTones("#000000").edge).toBe("#8c8c8c");
+    expect(kept, "a colour whose ring already shows keeps it").toBeGreaterThan(0);
+    for (const c of sampledColours()) {
+      const { edge } = brandTones(c);
+      expect(contrastRatio(edge, WHITE), c).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(edge, PAGE), c).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("draws the tint as 12% of the brand on white, a solid colour the ink reads on at 4.5:1, across the colour cube", () => {
+    expect(brandTones("#000000").tint).toBe(mixHex("#000000", WHITE, 0.12));
+    for (const c of ALL) expect(brandTones(c).tint, c).toBe(mixHex(c, WHITE, 0.12));
+    for (const c of sampledColours()) {
+      const { ink, tint } = brandTones(c);
+      expect(contrastRatio(ink, tint), c).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it("falls back to the default institution colour for one it can't read", () => {
     expect(brandTones("navy")).toEqual(brandTones("#1d4ed8"));
   });
 });
 
 describe("pageTint", () => {
-  const plain = contrastRatio(SLATE_500, "#f1f5f9");
+  const plain = contrastRatio(GREYS.meta, "#f1f5f9");
 
-  it("never makes slate-500 text less readable than on the plain page", () => {
-    for (const c of [...SEEDED, NEAR_WHITE, NEAR_BLACK, "#000000", WHITE]) expect(contrastRatio(SLATE_500, pageTint(c)), c).toBeGreaterThanOrEqual(plain);
+  it("never makes the meta grey less readable than on the plain page", () => {
+    for (const c of [...SEEDED, NEAR_WHITE, NEAR_BLACK, "#000000", WHITE]) expect(contrastRatio(GREYS.meta, pageTint(c)), c).toBeGreaterThanOrEqual(plain);
   });
 
   it("mixes in at most 8% of the brand, all of it when that stays readable", () => {

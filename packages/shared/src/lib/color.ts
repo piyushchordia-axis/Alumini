@@ -3,6 +3,7 @@
  * by hand, with no Intl and no dependency, so the phone app (Hermes) runs the same code as the web app. Colours are
  * "#rrggbb", as `hexColorSchema` stores them.
  */
+import { GREYS } from "./tones";
 
 export interface Rgb {
   r: number;
@@ -13,9 +14,8 @@ export interface Rgb {
 const WHITE = "#ffffff";
 const BLACK = "#000000";
 /** The apps' text colour. Inks darken toward it rather than toward black, which looks muddy next to it. */
-const SLATE_900 = "#0f172a";
-/** The apps' secondary text, and the plain page it has to stay readable on. */
-const SLATE_500 = "#64748b";
+const SLATE_900 = GREYS.text;
+/** The plain page, which grey text and the brand's ink and edge have to stay readable on. */
 const PLAIN_PAGE = "#f1f5f9";
 /** The default institution colour, used when a stored one can't be read, as both apps' themes do. */
 const FALLBACK_PRIMARY = "#1d4ed8";
@@ -24,7 +24,7 @@ const INK_STEPS = 50;
 /** WCAG 2 contrast for text, and for icons and other graphics. */
 const TEXT_CONTRAST = 4.5;
 const ICON_CONTRAST = 3;
-/** The share of the brand in the soft tint a badge sits on: mobile `primarySoft` (12%), web `bg-primary/10`. */
+/** The share of the brand in the soft tint a badge sits on (mobile `primarySoft`; web `bg-primary/10`), and in `tint`. */
 const SOFT_TINT = 0.12;
 
 /** "#rrggbb" (the # optional, any case) as channels from 0 to 255; null for anything else, "#fff" included. */
@@ -118,6 +118,17 @@ export interface BrandTones {
   wash: string;
   /** A stronger tint (45% of the ink), for the thin ring around the wash. */
   ring: string;
+  /**
+   * The brand as a line, such as a brand tag's edge: the ring, darkened only as far as it takes to show at 3:1 on the
+   * plain page, and so on white. Not on a member's Institution colour page (pageBackdrop), which is darker and can take
+   * it under 3:1: a line drawn on the page itself, not in a card, needs its own check there.
+   */
+  edge: string;
+  /**
+   * The brand's soft tint (12% of it on white) as a solid colour, for a surface the page mustn't show through, such as
+   * the circle behind an institution's initials. The ink reads on it at 4.5:1.
+   */
+  tint: string;
   /** Text on the brand colour itself: white, or near-black on a light brand. */
   onPrimary: string;
 }
@@ -131,23 +142,27 @@ export function brandTones(primary: string): BrandTones {
   const brand = parseHex(primary) ? primary : FALLBACK_PRIMARY;
   const text = inkOn(inkOn(brand, PLAIN_PAGE, TEXT_CONTRAST), mixHex(brand, WHITE, SOFT_TINT), TEXT_CONTRAST);
   const wash = mixHex(text, WHITE, 0.14);
+  const ring = mixHex(text, WHITE, 0.45);
   return {
     ink: inkOn(text, wash, ICON_CONTRAST),
     wash,
-    ring: mixHex(text, WHITE, 0.45),
+    ring,
+    edge: inkOn(ring, PLAIN_PAGE, ICON_CONTRAST),
+    tint: mixHex(brand, WHITE, SOFT_TINT),
     onPrimary: onColor(brand),
   };
 }
 
 /**
- * `base` with as much of the brand colour mixed in, up to 8%, as keeps `text` (grey text on the page, slate-500 unless
- * the page darkens it) at least as readable as slate-500 on the plain page (#f1f5f9, about 4.34:1), so a page tinted
- * with the brand is never harder to read than a plain one. With slate-500 that leaves only a trace of the brand; a page
- * that writes its grey text in slate-600 (a member's Institution colour background) gets the whole 8%.
+ * `base` with as much of the brand colour mixed in, up to 8%, as keeps `text` (grey text on the page, the meta grey
+ * unless the page darkens it) at least as readable as the meta grey on the plain page (#f1f5f9, about 4.97:1), so a page
+ * tinted with the brand is never harder to read than a plain one. With the meta grey that leaves only a trace of the
+ * brand; a page that writes its grey text in the secondary grey (a member's Institution colour background) gets the
+ * whole 8%.
  */
-export function pageTint(primary: string, base = "#f8fafc", text = SLATE_500): string {
+export function pageTint(primary: string, base = "#f8fafc", text = GREYS.meta): string {
   const brand = parseHex(primary) ? primary : FALLBACK_PRIMARY;
-  const floor = contrastRatio(SLATE_500, PLAIN_PAGE);
+  const floor = contrastRatio(GREYS.meta, PLAIN_PAGE);
   for (let percent = 8; percent > 0; percent -= 0.5) {
     const tint = mixHex(brand, base, percent / 100);
     if (contrastRatio(text, tint) >= floor) return tint;

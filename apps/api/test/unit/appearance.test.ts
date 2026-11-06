@@ -2,9 +2,11 @@ import {
   BACKDROP_LABELS,
   BACKDROP_SCRIM,
   DIM_PAGE_TEXT,
+  GREYS,
   MEMBER_BACKDROPS,
   PLAIN_PAGE_COLOR,
   backdropChoices,
+  brandTones,
   chosenBackdrop,
   contrastRatio,
   memberAppearanceUpdateSchema,
@@ -14,9 +16,11 @@ import {
   pageTint,
   parseHex,
   photoRemoval,
+  relativeLuminance,
   resolveAppearance,
 } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
+import { sampledColours } from "../helpers/colours";
 
 const PHOTO = "https://cdn.example.com/backdrops/me.jpg";
 const COVER = "https://cdn.example.com/covers/campus.jpg";
@@ -78,7 +82,7 @@ describe("pageBackdrop", () => {
   });
 
   it("makes Institution colour visibly different from Plain, with grey text reading at least as well as on Plain", () => {
-    const plainGrey = contrastRatio("#64748b", PLAIN_PAGE_COLOR);
+    const plainGrey = contrastRatio(GREYS.meta, PLAIN_PAGE_COLOR);
     for (const primary of [...SEEDED, "#111111", "#000000", "#fde047"]) {
       const { color } = pageBackdrop({ backdrop: "BRAND" }, { primaryColor: primary, coverImageUrl: null });
       // The faint tint this replaced moved one channel by 2 of 255 (#f1f5fb for Demo University), which nobody could see.
@@ -108,26 +112,53 @@ describe("pageBackdrop", () => {
 });
 
 describe("pageInk", () => {
-  it("is the brand as it is on the plain page", () => {
-    for (const primary of SEEDED) expect(pageInk(primary, pageBackdrop(undefined, { primaryColor: primary, coverImageUrl: null }))).toBe(primary);
+  it("is the brand's ink on the plain page, darkened only a shade where a current link's wash needs it", () => {
+    expect(pageInk("#1d4ed8", pageBackdrop(undefined, UNIVERSITY))).toBe("#1d4ed8");
+    for (const primary of SEEDED) {
+      const ink = pageInk(primary, pageBackdrop(undefined, { primaryColor: primary, coverImageUrl: null }));
+      const tones = brandTones(primary);
+      expect(relativeLuminance(ink), primary).toBeLessThanOrEqual(relativeLuminance(tones.ink));
+      expect(contrastRatio(ink, tones.ink), primary).toBeLessThan(1.25);
+    }
   });
 
-  it("reads at 4.5:1, under a current link's wash, on a tint and over the darkest photo the veil lets through", () => {
-    for (const primary of [...SEEDED, "#111111", "#fde047", "#ffffff"]) {
+  it("reads at 4.5:1, under a current link's wash, on the plain page, a tint and over the darkest photo the veil lets through", () => {
+    // The last three are brands whose own wash (bg-primary/12) is darker than their ink's, on the plain page, the tint
+    // and a photo in turn, which the colour cube's 17 steps pass between.
+    for (const primary of [...SEEDED, "#111111", "#fde047", "#ffffff", "#dc0f41", "#d20a64", "#007d55"]) {
       const institution = { primaryColor: primary, coverImageUrl: COVER };
       for (const [page, darkest] of [
+        [pageBackdrop({ backdrop: "PLAIN" }, institution), null],
         [pageBackdrop({ backdrop: "BRAND" }, institution), null],
         [pageBackdrop({ backdrop: "COVER" }, institution), mixHex(PLAIN_PAGE_COLOR, "#000000", BACKDROP_SCRIM)],
       ] as const) {
         const ink = pageInk(primary, page);
         // The web sidebar's current link: the brand at 12% (bg-primary/12) on the page.
         const under = mixHex(primary, darkest ?? page.color, 0.12);
-        expect(contrastRatio(ink, under), `${primary} on ${page.imageUrl ? "a photo" : "its tint"}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(ink, under), `${primary} on ${page.imageUrl ? "a photo" : page.dimText ? "its tint" : "the plain page"}`).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(ink, darkest ?? page.color)).toBeGreaterThanOrEqual(4.5);
       }
     }
     // A brand that already reads keeps its colour on the tint.
     expect(pageInk("#1d4ed8", pageBackdrop({ backdrop: "BRAND" }, UNIVERSITY))).toBe("#1d4ed8");
+    // A colour it can't read is the default institution colour, as brandTones takes it.
+    expect(pageInk("navy", PLAIN)).toBe(pageInk("#1d4ed8", PLAIN));
+  });
+
+  it("reads at 4.5:1 under a current link's wash on the plain page, a tint and a photo for any colour, a pale one included", () => {
+    const plain = pageBackdrop(null, null);
+    const darkPhoto = mixHex(PLAIN_PAGE_COLOR, "#000000", BACKDROP_SCRIM);
+    for (const primary of sampledColours()) {
+      const institution = { primaryColor: primary, coverImageUrl: COVER };
+      const tint = pageBackdrop({ backdrop: "BRAND" }, institution);
+      for (const [page, darkest, where] of [
+        [plain, PLAIN_PAGE_COLOR, "the plain page"],
+        [tint, tint.color, "its tint"],
+        [pageBackdrop({ backdrop: "COVER" }, institution), darkPhoto, "a photo"],
+      ] as const) {
+        expect(contrastRatio(pageInk(primary, page), mixHex(primary, darkest, 0.12)), `${primary} on ${where}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 });
 

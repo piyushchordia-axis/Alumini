@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -2545,6 +2545,17 @@ try {
   });
 
   await step("Appearance: Institution colour tints the member app, saved, but not the console, and Plain puts it back", async () => {
+    // Muted written on the page itself, not in a card (Notification settings' first line): the page's grey, readable on
+    // the page behind it, as it is measured there.
+    const pageGrey = async (grey, pageColour, where) => {
+      await page.goto(SAMAJ + "/profile/notification-settings");
+      const line = page.getByText(/^For .+\. Account notices /).locator("visible=true").last();
+      await line.waitFor();
+      if ((await textColour(line)) !== grey) throw new Error(`${where} is rgb ${await textColour(line)}, not rgb ${grey}`);
+      const { behind } = await expectReadable(line, where);
+      if (behind !== pageColour) throw new Error(`${where} is measured on rgb ${behind}, not the page (rgb ${pageColour})`);
+    };
+    await pageGrey(GREY_TEXT.plain, PAGE_COLOURS.plain, "Muted text on the plain page");
     await page.goto(SAMAJ + "/profile");
     const link = page.getByRole("link", { name: "Appearance", exact: true }).locator("visible=true").last();
     await expectSvgNoEmoji(link, "My profile's Appearance link");
@@ -2563,9 +2574,10 @@ try {
       if (!tileBox || tileBox.height < 44) throw new Error(`the ${name} tile is ${tileBox?.height}px tall, under 44px`);
     }
     if ((await pageColours(group)).page !== PAGE_COLOURS.plain) throw new Error("the Appearance screen isn't on the plain page before a background is chosen");
-    // Grey text (Muted), one shade darker on a tint.
+    // Grey text (Muted): the meta grey, one shade darker on a tint. This line is on the screen's white card, so its
+    // readability on the page is measured on Notification settings (pageGrey).
     const greyLine = page.getByText(/^Your background for /).locator("visible=true").last();
-    if ((await textColour(greyLine)) !== GREY_TEXT.plain) throw new Error(`grey text on the plain page is rgb ${await textColour(greyLine)}, not slate-500`);
+    if ((await textColour(greyLine)) !== GREY_TEXT.plain) throw new Error(`grey text on the plain page is rgb ${await textColour(greyLine)}, not the meta grey`);
     const choose = async (name) => {
       const saved = page.waitForResponse((r) => /\/t\/shri-gujarati-samaj\/memberships\/me\/appearance$/.test(r.url()) && r.request().method() === "PATCH");
       await tile(name).click();
@@ -2575,8 +2587,9 @@ try {
     await choose("Institution colour");
     const tinted = (await pageColours(group)).page;
     if (tinted !== PAGE_COLOURS.samaj) throw new Error(`with Institution colour chosen the Appearance screen is rgb ${tinted}, not the Samaj's tint ${PAGE_COLOURS.samaj}`);
-    if ((await textColour(greyLine)) !== GREY_TEXT.dim) throw new Error(`grey text on the tint is rgb ${await textColour(greyLine)}, not slate-600`);
+    if ((await textColour(greyLine)) !== GREY_TEXT.dim) throw new Error(`grey text on the tint is rgb ${await textColour(greyLine)}, not the secondary grey`);
     await shot("m10b-appearance-colour");
+    await pageGrey(GREY_TEXT.dim, PAGE_COLOURS.samaj, "Muted text on the Samaj's tint");
     // Saved on the membership, so a fresh load has it, on the feed's own shell, where post cards stay white: each paints
     // white itself, so the tint can't show through one.
     await page.goto(SAMAJ + "/feed");

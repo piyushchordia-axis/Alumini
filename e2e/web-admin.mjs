@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { PAGE_COLOURS, WHITE, bigPhoto, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1012,9 +1012,12 @@ try {
     if (await tile("Institution cover").count()) throw new Error("an institution without a cover offers the Institution cover tile");
     const main = page.locator("main").first();
     if ((await pageColours(main)).page !== PAGE_COLOURS.plain) throw new Error("My profile isn't on the plain page before a background is chosen");
-    // Grey text on the page itself (the header's "Signed in as …"), which steps one shade darker on a tint.
+    // Grey text on the page itself (the header's "Signed in as …"): the meta grey, one shade darker on a tint, and
+    // readable on each.
     const greyLine = page.locator("main h1 + p").first();
     const plainGrey = await textColour(greyLine);
+    if (plainGrey !== GREY_TEXT.plain) throw new Error(`grey text on the plain page is rgb ${plainGrey}, not the meta grey (${GREY_TEXT.plain})`);
+    await expectReadable(greyLine, "grey text on the plain page");
     const choose = async (name) => {
       const saved = page.waitForResponse((r) => /\/t\/demo-university\/memberships\/me\/appearance$/.test(r.url()) && r.request().method() === "PATCH");
       await tile(name).click();
@@ -1027,6 +1030,8 @@ try {
     const tintGrey = await textColour(greyLine);
     const lightness = (rgb) => rgb.split(" ").reduce((sum, c) => sum + Number(c), 0);
     if (!(lightness(tintGrey) < lightness(plainGrey))) throw new Error(`grey text on the tint is rgb ${tintGrey}, not darker than on the plain page (${plainGrey})`);
+    if (tintGrey !== GREY_TEXT.dim) throw new Error(`grey text on the tint is rgb ${tintGrey}, not the secondary grey (${GREY_TEXT.dim})`);
+    await expectReadable(greyLine, "grey text on Demo University's tint");
     // Saved on the membership, so a fresh load has it, on the feed too, where post cards stay white: each paints white
     // itself, so the tint can't show through one.
     await page.goto(`${BASE}/t/demo-university/app/feed`);

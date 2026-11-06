@@ -86,9 +86,10 @@ export function HomeLayout() {
   const sheetLinkClass = ({ isActive }: { isActive: boolean }) => clsx(sheetRow, isActive ? "bg-primary/12 font-semibold text-primary" : "text-slate-700 hover:bg-slate-100");
   // The member's own background. Set here, on the member app's root, and not on the document, so the admin console and
   // the platform console (other layouts) stay plain. On a tint or a photo (dimText), grey text on the page steps one
-  // shade darker (index.css) and brand text on it takes pageInk.
+  // shade darker (index.css). Brand text on the page takes pageInk on every page, the plain one included, where a pale
+  // brand's ink still needs darkening under a current link's wash.
   const backdrop = pageBackdrop(membership.appearance, tenant);
-  const ink = backdrop.dimText ? parseHex(pageInk(tenant.primaryColor, backdrop)) : null;
+  const ink = parseHex(pageInk(tenant.primaryColor, backdrop));
   const rootStyle = { "--surface-page": backdrop.color, ...(ink ? { "--c-page-ink": `${ink.r} ${ink.g} ${ink.b}` } : {}) } as CSSProperties;
 
   return (
