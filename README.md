@@ -107,8 +107,8 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 | Tenant admin, Demo University (`demo-university`) | `+919000000001` | members auto-approved, content published immediately; an open chat report and a reported business listing |
 | Tenant admin, Demo College (`demo-college`) | `+919000000002` | admin approves members **and** content; has pending members, pending posts/job/event/business listing and an open spam report |
 | Tenant admin, Demo School (`demo-school`) | `+919000000003` | admin approves members, content published immediately; messaging, groups and mentorship start off, as at any school |
-| Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
-| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` pending approval |
+| Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | Jignesh Patel; type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
+| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` (Parth Joshi, Diya Raval) pending approval |
 | Members | `+9191000000xx` | see `apps/api/src/db/seed.ts` |
 | Current pupil, Demo School | `+919100000026` | Naina Sen, batch two years from now: never sees messages, groups, mentors or referrals |
 | Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months |
@@ -1094,19 +1094,22 @@ apps/api/src
   routes/         public, auth, me, tenant (member + admin), platform
   services/otp/   console / WhatsApp Cloud / MSG91 senders behind one interface
 apps/api/drizzle  SQL migrations (generated; some hand-written parts: pg_trgm, the moderation_items view, the
-                  content_type rebuilds in 0019 and 0023, the LinkedIn clean-up in 0028 and the jobs backfill in 0029)
+                  content_type rebuilds in 0019 and 0023, the LinkedIn clean-up in 0028, the jobs backfill in 0029 and
+                  the deletion audit rows' phone numbers removed in 0032)
 apps/api/test     vitest unit + integration tests (real Postgres, in-memory Redis; helpers/images.ts makes real images)
 apps/web/src      routes/ (member app, t/admin, platform), components/ (ui, icons, feed, layout, profile, jobs,
                   common/RichText…), hooks/, stores/; design tokens in index.css (Manrope + Source Sans 3,
                   elevation ladder)
-apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and other stacked screens above them),
-                  components/ (ui, icons via react-native-svg, profile, jobs, RichText…), hooks/, stores/, theme/
+apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and other stacked screens above them, the
+                  admin console under (app)/admin), components/ (ui, icons via react-native-svg, profile, jobs,
+                  RichText…), hooks/, lib/ (files.ts: picking and sharing files), stores/, theme/
 packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client, upload
                   helpers), realtime/ (events and client), chat/ (chat cache and live sync, no React),
                   lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections;
                   profile.ts: profile sections, registration steps, strength and "Use details from"; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
-                  phone.ts: national-number lengths)
+                  phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
+                  appearance.ts: a member's background; admin.ts and its siblings: what both admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 
@@ -1192,7 +1195,8 @@ after the other branch's rather than renumbering them: Drizzle applies only migr
 database has.
 
 `e2e/README.md` explains how to run the Playwright smoke scripts that walk the member, admin and platform journeys,
-and how to export the Expo app for the web to exercise the mobile screens in a browser.
+and how to export the Expo app for the web to exercise the mobile screens in a browser. It also holds the checks only a
+real phone can make, as one ordered pass with a table of the runs.
 
 ### Mobile
 
@@ -1287,21 +1291,15 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   reporter's other reports.
 - **The retaliation rule leaks a little.** Its refusal tells an admin, roughly, when a report about them opened
   (refusals are audited, and the actions limited to 60 an hour).
-- **Nothing has been checked on a real phone** beyond what the web export shows: see "Checks that need a real phone" in
-  `e2e/README.md`. Profiles and jobs added more of them: the native square crop and the photo-library permission,
-  cancelling an upload and its timeout, the keyboard on the long edit form, the list editors and each registration
-  step, Android's back button and iOS's swipe back going to the registration step before (and asking on Basics),
-  VoiceOver and TalkBack focus after removing or finishing a list row, on the copy banner and its Undo, and on the "Not
-  now" note,
-  links opening the browser, the chip rows keeping the chosen chip in view, VoiceOver and TalkBack on a job's matched
-  skills and its card, a job's add-skills link bringing back a profile editor already open, and the edit screen's
-  scroll to a section (`measureLayout`) on the new architecture. Photo preparation added HEIC from an iPhone and HEIF
-  from Android, 48 and 50 megapixel photos, transparent PNG and GIF logos and a large cut-out PNG, cancelling while a
-  photo is prepared and iPhone Safari's own HEIC conversion. Appearance added picking a background photo and
-  scrolling over one on a low-end Android.
-  The keyboard fix for Android's edge-to-edge windows needs the long forms checked. Chat reports added whether the app
-  switcher's and Recents' picture of the phone console is taken before it clears a report's text, or a note in its
-  closing sheet.
+- **Nothing has been checked on a real phone yet** beyond what the web export shows. "Checks that need a real phone" in
+  `e2e/README.md` is one ordered pass for an iPhone and an Android phone, in Expo Go but for its last part (pushes and
+  `illuminize://` links, which need a development build), with a Runs table that has no run in it yet. Only a phone can
+  show much of it: the keyboard's autofill of a number, iOS's swipe back and Android's back button between registration
+  steps, HEIC and HEIF photos and 48-megapixel ones, the file pickers (Files, iCloud Drive, Google Drive) and the
+  share sheet, CSV files in Excel, Hermes's number and date text on the charts and their scrubbing and screen-reader
+  stepping, whether the app switcher's picture of the phone console is taken before it clears a chat report's text,
+  scrolling over a background photo on a low-end Android, and the keyboard on the long forms under Android's
+  edge-to-edge windows.
 - **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
 **Smaller follow-ups.**
@@ -1336,8 +1334,6 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Deleting a post, job, funding listing or event leaves its open reports in the queue with no content (business
     listings resolve theirs). A report filed while a listing is being deleted can still slip in the same way.
   - `CONTENT_REMOVED` pushes include the admin's note, which chat removals keep in the app.
-  - **Admin → Reports** shows only an error when another admin has just handled a report; Chat reports closes the
-    dialog and refreshes the list.
   - Illuminize staff reach only escalated chat reports, even in an institution where they are genuine admins.
 - Uploads:
   - A CDN in front of S3 may keep serving a deleted profile or background photo until its cached copy expires.
@@ -1371,18 +1367,25 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
-- The admin console in the phone app: Illuminize staff who aren't members of an institution can't use its console in
-  the phone app; they use the web.
+- The admin console in the phone app:
+  - Illuminize staff who aren't members of an institution can't use its console in the phone app, which needs an
+    approved membership there; they use the web console.
+  - A chat report's notice opens Chat reports and looks for its report in the list the app has cached, if that is under
+    30 seconds old, where Moderation and Reports first fetch theirs again (`chatReportLinkStep`, unlike
+    `linkedRowStep`, doesn't wait for `isFetchedAfterMount`). A report handled by another admin in those seconds can
+    then still be scrolled to, or one filed in them said not to be in the list, until the list is fetched again.
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
-  - UI follow-ups: deeper tenant theming / branding preview in admin, and skeleton loaders and purposeful motion.
+  - UI follow-ups: deeper tenant theming (Branding previews a gradient card, not the landing page or the app), and
+    skeleton loaders and purposeful motion.
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls on both
-    apps and in the consoles (close, back, send, checkmarks) rather than the shared SVG set.
+    apps and in the consoles (close, back, send, checkmarks, a chat's options and details, and a few arrows) rather
+    than the shared SVG set.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

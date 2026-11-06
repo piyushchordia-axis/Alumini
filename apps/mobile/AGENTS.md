@@ -21,7 +21,7 @@ npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
 ```
 
-Run lint and typecheck before declaring any task done.
+Run lint and typecheck before declaring any task done. Typed routes (`.expo/types`, gitignored) are written by the dev server or an export (`pnpm e2e:mobile:export` from the repo root): regenerate them after adding a route, or the typecheck checks pushes against the old list. CI has none and doesn't lint this app, so run the root `pnpm lint` too.
 
 ## Navigation & Routing
 

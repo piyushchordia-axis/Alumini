@@ -406,216 +406,80 @@ auto-approve off, as no seeded institution is set up that way.
 
 ## Checks that need a real phone
 
-Everything below has only run on the web export or in unit tests, so nobody has seen it on a device yet. Work through
-it on one Android phone and one iPhone, and do each check on both unless it says otherwise.
+Everything below has only run on the web export or in unit tests, so nobody has seen it on a device yet. It is one
+pass, in order: work through it on one Android phone and one iPhone, and do each check on both unless it says otherwise.
+Where a check uses something up (sends a request, accepts an invitation, rejects a member), the first phone does all of
+it but that last step, and the second phone the whole check, unless the check gives each phone its own. Record each run
+under "Runs" at the end.
 
-**Getting set up**
+### Getting set up
+
+**Expo Go, then a development build.** Expo Go on one iPhone and one Android phone covers almost all of this pass: it
+already has every native module the app uses, including the five added for photo preparation and the admin console's
+files (`expo-image-manipulator`, `expo-file-system`, `expo-document-picker`, `expo-sharing` and `expo-clipboard`). Only
+part 20, pushes and `illuminize://` links, needs a development build, as Expo Go can't receive the app's pushes or open
+its links; a development build made before those five modules were added lacks them and must be rebuilt (part 20 says
+how). After installing (`pnpm install`, or a rebuild), restart Metro (`pnpm mobile`): a server started before the
+install can't find the new modules.
 
 1. With the phones on the same Wi-Fi as this computer, run `node scripts/setup-local.mjs --lan` so they reach the API
    here, then `pnpm db:reset` and `pnpm demo`. `pnpm demo` starts the API and the web app, not the phone app's Expo
-   server: the next step starts that.
-2. Install a development build on each phone, as Expo Go can't receive pushes or open `illuminize://` links. First
-   create the Expo project (README → Mobile → Push notifications), or no pushes arrive. Then, in a second terminal,
-   `cd apps/mobile` and:
-   - Android, plugged in with USB debugging on: `npx expo run:android`.
-   - iPhone, on a Mac with Xcode: `npx expo run:ios --device`. Without a Mac, use EAS Build, which needs a paid Apple
-     developer account: the repo has no `eas.json` yet, so run `npx expo install expo-dev-client` and
-     `eas build:configure` once, register the iPhone with `eas device:create`, then
-     `eas build --profile development --platform ios` and install what it gives you.
-
-   `expo run` starts the Expo server when it's done. Another day, start it with `pnpm mobile`. If you use Expo Go
-   instead, run `pnpm mobile` and scan its QR code: everything works except pushes and the link checks.
-3. Allow notifications when the app asks.
-4. On each phone, sign in to Demo University as Rahul (`+91 91000 00001`). On a computer, open the web app as Priya
-   (`+91 91000 00002`) to send messages to the phones, and in a private window as the Demo University admin
-   (`+91 90000 00001`) for the admin steps.
+   server: start that with `pnpm mobile` in a second terminal.
+2. Install Expo Go from the App Store or Google Play (or update it, so it runs SDK 58), and scan the QR code that
+   `pnpm mobile` shows: with the camera on the iPhone, or from inside Expo Go on Android.
+3. From part 3 on, each phone is signed in to Demo University as Rahul (`+91 91000 00001`) unless a part says
+   otherwise. On a computer, open the web app as Priya (`+91 91000 00002`) to send messages to the phones, and in a
+   private window as the Demo University admin (`+91 90000 00001`) for the admin steps.
+4. Parts 1 and 2 sign each phone in with a number that isn't in the demo data, such as `+91 98765 43210` on the iPhone
+   and `+91 98765 43211` on Android. Part 18 deletes those two accounts, and part 19 uses them once they've joined
+   again; never confirm Delete account as Rahul.
 5. Turn on TalkBack (Android) or VoiceOver (iPhone) only for the checks that ask for it.
-6. A push about a chat comes 5 to 10 seconds after the message, and one about a group 30 to 60 seconds after. After a
-   push, that chat sends you no other for 2 minutes (a group for 10) unless you open it or write in it, so wait between
-   checks that need one.
+6. Sign-in codes are limited, and the pass is laid out to stay inside the limits in a day: each number may ask for 5
+   codes an hour and 10 a day (the day counted from its first code), a minute apart, and each phone, or this computer
+   for all its browser windows, 20 an hour. Rahul, the number used most, asks for 7 in parts 1 to 19. Signing the
+   second phone in as the same person straight after the first, the code screen says "Resend code in …s": wait for
+   it, then choose Resend code. Past a limit, sign-in says "Too many codes requested for this number. Please try again
+   later." (for a phone or the computer, "Too many codes requested. Please try again later."): wait an hour, or until
+   the next day, or carry on as another demo member. `pnpm db:reset` clears the counters too, but it also puts the
+   demo data back as it started, losing the accounts from parts 1 and 2 and what later parts build on, so after a
+   reset start again from part 1. Part 20 is the exception: it works after a reset, on another day.
 
-**Messages**
+### 1. Sign-in and phone entry
 
-- [ ] Open Rahul's chat with Priya and tap the message box. The box and the newest message stay above the keyboard,
-      with no gap and nothing hidden behind it, and closing the keyboard puts the screen back.
-- [ ] Type several lines. The box grows to its limit and then scrolls inside itself, and Send stays reachable.
-- [ ] In a long thread (send 30 messages from the browser), scroll up to load older messages: what you're reading
-      doesn't jump. While you're scrolled up, a new message from the browser doesn't drag you down: a New messages
-      button appears, and tapping it takes you to the newest. In "London & UK alumni", each run of messages shows the
-      sender's name.
-- [ ] With the chat with Priya open and the phone unlocked, a message from her in "London & UK alumni" shows a banner
-      (up to a minute later).
-- [ ] A push for the chat on screen shows no banner. The API sends none while you're reading the chat, so send one
-      yourself. The phones' tokens are what
-      `docker compose exec postgres psql -U postgres -d illuminize -c "select platform, token from push_tokens"` lists,
-      and the chat's id is the end of its address when Priya opens it in the web app. With that chat open on the
-      phone, send its token a push from Expo's push tool (expo.dev/notifications) with the data
-      `{"type": "CHAT_MESSAGE", "tenantSlug": "demo-university", "conversationId": "<the id>"}`: no banner. Go back to
-      Messages and send it again: the banner shows.
-- [ ] Force-quit the app, send a message from the browser, and tap the push. The app opens on that chat, and Back
-      goes to Messages.
-- [ ] With the chat with Priya open, put the app in the background, have Priya send a message, and tap its push. The
-      app comes back on that chat, with no second copy of it: Back goes straight to Messages (and so does the iPhone's
-      swipe back).
-- [ ] Put the app in the background for a minute while Priya sends two messages, then bring it back. They appear
-      without pulling to refresh, and new ones keep arriving live.
-- [ ] Sign Rahul in on the web app too. On the phone, open the chat with Priya and put the app in the background, then
-      send to that chat as Priya. The phone gets a push, and Rahul's web app counts the chat unread until the phone is
-      back in front on that chat, which marks it read.
-- [ ] Lock-screen text: a message from Priya shows "New message from Priya Nair"; a first message from someone with no
-      chat with Rahul (sign in on the web as Sneha, `+91 91000 00006`) shows only "New message request". No message
-      text appears anywhere on the lock screen.
-- [ ] Turn on flight mode and send a message: it offers Try again. Turn flight mode off and tap Try again: it arrives
-      once.
-- [ ] Disconnect the computer running the API from the network, so the phone's request hangs instead of failing, and
-      send a message: after about 20 seconds it offers Try again. Reconnect and tap Try again: it arrives once. (On
-      Android this checks that the app's fetch honours its abort signal.)
-- [ ] The message box and the search boxes offer no saved passwords or autofill suggestions on either keyboard.
-- [ ] Tap one of Priya's messages and choose Report message: the sheet opens. In Conversation options, choose Block
-      member: the confirm sheet opens once the first one has closed (iPhone especially). Unblock her afterwards under
-      Messages → Blocked members.
-- [ ] As the admin, remove a message the phone member sent (Admin → Chat reports, after reporting it from the
-      browser). The push says only "A message you sent was removed", and the admin's note shows only in the app.
+On each phone, open Demo University (signing out first under More → Sign out, if someone is signed in) and choose "Sign
+in / Join with mobile number": India (+91) is chosen. Write `+91 98765 43210` in Notes first, to copy it from there:
+the paste checks use it on both phones and send nothing. Only the fourth check sends a code, each phone for its own
+new number.
 
-**Navigation**
+- [ ] Paste "+91 98765 43210" into Mobile number: the box shows 98765 43210, with no 91 in front, India stays chosen,
+      and Send code is enabled. Clear it and paste "+919876543210", then "919876543210": each time the box holds the ten
+      digits once. Five digits leave Send code dimmed; the sixth enables it.
+- [ ] Autofill. iPhone, with the phone's own number on its contact card (Contacts → My Card): tap the box, and the bar
+      above the keyboard offers the number; choose it. Android: choose the number if the keyboard or Google's autofill
+      offers it. Either way the box gets it once, with India chosen, and nothing is sent until Send code.
+- [ ] Paste a UK number, "+44 7700 900123": the country changes to United Kingdom +44 and the box holds 7700 900123.
+      With TalkBack or VoiceOver on, "Country code set to United Kingdom +44" is read out while focus stays in the box.
+      Choose India again and clear the box, sending nothing.
+- [ ] Type the phone's own new number with a 0 in front ("09876543210" on the iPhone, "09876543211" on Android): the 0
+      stays in the box and Send code is enabled. Send it: the next screen says "Enter the code sent to" and that number
+      without the 0 (+91 98765 43210 on the iPhone, +91 98765 43211 on Android). Sign in with `123456`: registration
+      opens on "Step 1 of 3 · Basics" (part 2 carries on from there).
+- [ ] The web app in iPhone Safari and Android Chrome, on Demo University's sign-in page: the browser's AutoFill of the
+      phone's number, and a pasted "+91 98765 43210", each put the number in the box once, with India chosen. Don't
+      send it.
 
-- [ ] The tab bar fits Feed, Messages, Jobs, Directory and More, with a number on Messages, on the narrowest phone
-      you have and with the largest text size. No label is cut off.
-- [ ] Android: Back from a section behind More (Events, Groups, Mentors, Businesses, Funding) returns to the More
-      hub, not out of the app. Back from a chat returns to Messages.
-- [ ] With the app closed, open a job, business or mentor from a push or a link (for example
-      `illuminize://t/demo-university/jobs/<id>`, with an id from the web app's address bar). Back (and, on the iPhone,
-      the swipe back) goes to that section's list.
-- [ ] Open such a link while the app is on another section: Back goes somewhere sensible, never to a duplicate screen.
-- [ ] Sign out from More: you land on Demo University's own page, with "Sign in / Join with mobile number".
-- [ ] My posts has seven tabs at Demo University (Posts, Jobs, Funding, Businesses, Groups, Events, Past events): they
-      scroll sideways, the selected one scrolls into view, and no label is clipped.
-- [ ] The web app in iPhone Safari and Android Chrome: open a chat, tap the message box, and the box stays in view
-      above the keyboard.
-- [ ] Bell notifications of each kind open their screen, a chat message's time and day labels look right, and a group
-      whose name starts with an emoji (create "🏃 Morning runners") shows the initials "MR". These check `Object.hasOwn`,
-      `Intl` and Unicode handling on Hermes.
+### 2. Registration: Back, swipe and Android back
 
-**Groups**
+Still the new number, joining Demo University. Leave Work empty with Skip for now when you finish, for the last checks.
 
-- [ ] Create a group and edit it: the keyboard leaves the fields and the save button reachable. The invitation
-      sheet's search box does too.
-- [ ] TalkBack or VoiceOver reads the open and invite-only choices as radio buttons with their checked state, and a
-      disabled choice as disabled.
-- [ ] Have Priya create an invite-only group in the browser and invite Rahul. With the invitation waiting, More reads
-      "Groups, 1 invitation" with TalkBack or VoiceOver, and long group names on cards are read in full.
-- [ ] Android: Back from Groups (behind More), from a group's details and from its chat goes one step back each time.
-- [ ] In "Batch of 2012 reunion committee", which Rahul owns, open Group details, tap Aisha Qureshi and choose Remove
-      from group, then tap Priya and choose Block member. Each confirm sheet opens once the member's sheet has closed
-      (iPhone especially). Cancel both, so the checks below still work.
-
-In the next four checks, each button opens its screen once: Back (and, on the iPhone, the swipe back) never leads to a
-second copy of a screen, or back to the page the button was on.
-
-- [ ] Open a group's chat, then Group details, and choose Open chat: you're back on the chat, and Back goes to where
-      you opened the chat from. On a member's sheet in Group details, View profile opens their profile in Directory.
-- [ ] Have Priya create an open group in the browser. On the phone, find it in Groups → Discover, open it and choose
-      Join group: its chat opens in place of the group's page, and Back goes to Discover.
-- [ ] Before accepting the invitation from Priya (above), open `illuminize://t/demo-university/messages/<id>`, with
-      the id from the end of that group's address in Priya's browser. The app offers See invitation, which opens
-      Groups → Invitations.
-- [ ] In Groups → Invitations, tap that group's name to open its page, and choose Accept invitation there: its chat
-      opens in place of the group's page, and Back goes to Groups.
-- [ ] Tap an invitation push (Priya invites Rahul again, to another new group), with the app closed and with it open:
-      it opens Groups → Invitations, and Back works. With the app open, the invitation shows a banner.
-- [ ] A push about a group's moderation opens My posts → Groups: have the phone member create a group, and the admin
-      remove it under Admin → Moderation → Published.
-
-**Mentorship**
-
-- [ ] The request note and the Be a mentor fields stay above the keyboard.
-- [ ] TalkBack or VoiceOver: a request row's name link is easy to hit, and after Accept, Decline or Withdraw the row's
-      new status is announced.
-- [ ] Android: Back from Mentors (behind More) and from a mentor's page and request form.
-- [ ] Sign one phone in as Arjun (`+91 91000 00003`), who has no mentorship or request. Have the admin switch
-      Mentorship off under Admin → Settings, then reopen the app: Mentors has gone from More. Switch it back on and it
-      returns. Rahul, who has a mentorship under way, keeps Mentors behind More while it's off.
-- [ ] Mentorship pushes. Have Priya ask Rahul for mentoring from the browser: tapping the push opens Mentors →
-      Requests. Then have Sneha (`+91 91000 00006`, in the browser) offer to mentor under Be a mentor, ask her from the
-      phone, and accept in the browser: tapping that push opens the chat.
-- [ ] Sending a request (to Sneha, above) lands on Mentors → Requests → Sent, and going back never returns to the form
-      or her page. While it waits, See your request on her page does the same. View full profile on a mentor's page
-      opens their profile in Directory, and Edit mentor profile on Rahul's own mentor page opens Be a mentor, each once.
-      Rahul's own page is `illuminize://t/demo-university/mentors/<id>`, with the id from the end of his profile's
-      address in the web app's Directory.
-
-**Referrals**
-
-- [ ] On a job that takes referrals, Ask for a referral: the note field stays above the keyboard under the header
-      (Android draws edge to edge on SDK 58), and on the iPhone dragging the page down closes the keyboard.
-- [ ] Type a long note: the box grows and nothing is cut off.
-- [ ] Have Priya ask for a referral on Rahul's "Backend Engineer (Node.js)" from the browser, with the app closed:
-      tapping the push opens Jobs → Referrals. With the app open, referral pushes show a banner.
-- [ ] Android: Back from the request form returns to the job.
-- [ ] Sending a request (on Priya's "Associate Product Manager") lands on Jobs → Referrals → Sent, and Back doesn't go
-      back to the form or the job. Back on the job, See your requests does the same.
-- [ ] TalkBack or VoiceOver reads the "I can refer people for this job" checkbox with its state and its hint.
-
-**Businesses and shared screens**
-
-- [ ] On the feed, press and hold a reaction on a post: the chip shrinks a little while held. Once chosen it is a light
-      brand tint with a thin ring and a filled icon, and the count beside it turns the brand colour; Like again takes it
-      back. Check it at Demo University (blue), and at Shri Gujarati Samaj (orange) as Hetal (`+91 91000 00031`).
-- [ ] TalkBack or VoiceOver reads the chosen reaction as selected and the other three as not.
-- [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
-      picker and shows the logo once it's uploaded.
-- [ ] Tab labels on screens with tabs (My posts, Jobs, Mentors, Groups) aren't clipped.
-- [ ] TalkBack or VoiceOver, on Zylo Labs in Businesses: the contact buttons read "Website" (with a hint that it opens
-      in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
-      his Zylo Labs listing in Funding to add an email address and a phone number: its buttons read "Website", "Get in
-      touch" and "Call …" the same way.
-- [ ] TalkBack or VoiceOver, on the waiting screen: sign one phone out, join Demo College with a number that isn't in
-      the demo data, and submit for approval. The screen reads "Awaiting approval" and its text, with nothing read for
-      the icon above them. Sign Rahul back in afterwards.
-
-**Photos**
-
-Every photo is prepared on the phone before it goes up (README → Photos and uploads). Take the photos below with the
-phone's own camera first, so they are in its library. Each one should upload, with no message under the button, and
-show in its preview and, once saved, on its card or page the right way up.
-
-- [ ] iPhone, with Settings → Camera → Formats → High Efficiency on (photos saved as HEIC): a photo as a post's image,
-      an event's cover, a business's logo and a job's logo.
-- [ ] iPhone 15 Pro or later, a 48-megapixel photo (Settings → Camera → Formats → Resolution Control on, then 48 MP in
-      the Camera app), or a panorama: as a profile photo (the system editor crops it, then the round preview shows it)
-      and as a post's image.
-- [ ] Android: a HEIF photo (on a Samsung, Camera settings → Picture formats → High efficiency pictures; or a .heic
-      sent from an iPhone and saved to the gallery) and a full-resolution photo of 50 megapixels or more, each as a
-      post's image. On a phone with little memory, the app doesn't close while preparing it.
-- [ ] A PNG logo and a GIF logo with see-through backgrounds (save them from a browser to the library), and a large
-      cut-out PNG (a 3000 × 3000 photo of a person on a clear background) as a post's image: on the business's card
-      and page and in the post, the background stays see-through, not black or white.
-- [ ] Pick a large photo as a profile photo and choose Cancel upload at once, while it is still being prepared: the
-      button goes back to Add photo with "Upload cancelled." read out, and nothing is uploaded (no photo appears).
-- [ ] The web app in iPhone Safari: a HEIC photo as a post's image uploads and shows, the right way up.
-
-**Profiles and registration**
-
-For the registration checks, sign one phone out (More → Sign out) and join Demo University with a number that isn't in
-the demo data, then sign Rahul back in. For the copy banner, Rahul opens Demo College under More → Switch institution:
-leave without sending, or he'll be waiting for approval there.
-
-- [ ] On "Step 1 of 3 · Basics", choose Add photo: the first time, the phone asks for access to your photos. Allow it
-      and pick a photo: the system editor crops it square, and the round preview shows it once it's uploaded. On the
-      other phone, deny access (or turn it off in Settings first): "Allow photo access to choose an image." shows under
-      the buttons.
-- [ ] Disconnect the computer running the API from the network, so the upload hangs, and pick a photo: Cancel upload
-      stops it, the button goes back to Add photo, and focus stays there. Pick again and wait: after 90 seconds, "The
-      upload is taking too long. Check your connection and try again." shows. Reconnect, and Add photo works again.
-- [ ] On each registration step, tap the last box: it and the step's buttons (Continue, Skip for now, Back, Join the
-      network) stay above the keyboard, with nothing hidden behind it. On Work, choose Add a past role and type in each
-      of its boxes, the years too: Done and Remove stay reachable. Do the same on My profile → Edit profile, down to the
-      links in About you, and in Add a place of study.
-- [ ] Android especially: the long forms (Edit profile, Post a job, Add a business, Plan a gathering, New post) move up
-      with the keyboard, so the box being typed in and the button at the bottom can be reached, with no blank band
-      above the keyboard and nothing hidden under it. Closing the keyboard puts the form back, with no gap left at the
-      bottom. These screens now make room for the keyboard on Android too, as the chats do, since an edge-to-edge window
-      no longer shrinks for it.
+- [ ] TalkBack or VoiceOver, on Basics: Back is read as a button on every step, and "Signed in as" and the number,
+      written once (+91 98765 43210 on the iPhone), are read before "Use a different number", a button. With a name
+      typed, Use a different number opens the sheet, read as an alert named "Use a different number?", and Cancel (or
+      Android's back button) closes it, still signed in.
+- [ ] On Basics, choose Add photo: the first time, the phone asks for access to your photos. Allow it and pick a photo:
+      the system editor crops it square, and the round preview shows it once it's uploaded. On the other phone, deny
+      access (or turn it off in Settings first): "Allow photo access to choose an image." shows under the buttons.
+      Turn access back on in Settings afterwards, for part 4.
 - [ ] Android's back button and the iPhone's swipe from the left edge: on Work and About you they go to the step before,
       keeping what was typed (on the iPhone the screen springs back into place, with no flicker of the screen under
       it). On an untouched Basics they leave for the institution's landing screen, which shows Join and "Use a different
@@ -623,15 +487,21 @@ leave without sending, or he'll be waiting for approval there.
       back button on the sheet) stays with the name kept, and Leave goes to the landing screen. While Join the network
       is spinning (turn on airplane mode first, so it fails), they do nothing; the failure leaves them on About you with
       everything kept, and back works again. When the profile is sent, Join the network goes straight to the feed.
-- [ ] Android, with registration the only screen: force-quit the app, open a link to `/t/<slug>/register` (or, as a
-      member, be removed by an admin while the app is closed, then open it), fill in Basics, Continue, and press the
-      back button: it goes to Basics, not out of the app. Back on Basics with a name typed asks "Leave registration?",
-      and Leave opens the landing screen.
 - [ ] Signed in at an institution they aren't a member of, whose landing screen is the one the app opened (as after
       being removed): Choose a different institution opens the list of institutions, not the same landing screen again.
-- [ ] TalkBack or VoiceOver, on Basics: Back is read as a button on every step, and "Signed in as" and the number are
-      read before "Use a different number", a button. With a name typed, Use a different number opens the sheet, read as
-      an alert named "Use a different number?", and Cancel (or Android's back button) closes it, still signed in.
+- [ ] With the profile sent (Work skipped, so it lists no skills): on My profile choose Edit profile and type a headline
+      without saving, then open Jobs → "Backend Engineer (Node.js)" and choose Add your skills to see which you match.
+      The Profile tab comes back with that same editor, scrolled to Work and the headline still typed, and Back (and, on
+      the iPhone, the swipe back) goes to My profile, never to a second editor.
+- [ ] TalkBack or VoiceOver, on the waiting screen: under More → Switch institution, join Demo College and submit for
+      approval. The screen reads "Awaiting approval" and its text, with nothing read for the icon above them. Sign
+      Rahul back in afterwards; the new number stays a member of Demo University, waiting at Demo College, for part 18.
+
+### 3. Profiles
+
+As Rahul. For the copy banner, Rahul opens Demo College under More → Switch institution: leave without sending, or he'll
+be waiting for approval there.
+
 - [ ] TalkBack or VoiceOver, in Edit profile: Remove on a past role says "Removed" and its name, and focus moves to
       Add a past role; Done folds a row and moves focus to its Edit button; Done on a row whose end year is before its
       start says the problem and moves focus to that year.
@@ -642,16 +512,121 @@ leave without sending, or he'll be waiting for approval there.
       heading. This checks the scroll to a section (`measureLayout`) on the new architecture.
 - [ ] TalkBack or VoiceOver, on Rahul's feed: Not now on "Complete your profile" moves focus to "Hidden for 14 days. My
       profile always shows what's left to add." The card stays away on the other phone and after restarting the app.
-- [ ] TalkBack or VoiceOver, on Rahul's My profile: Delete my account opens the confirm sheet (it used to be a system
-      alert). It's read as an alert named "Delete your account?", then the whole explanation, including "If you were
-      suspended at an institution, or members there had blocked you, that still applies if you join again with this
-      number.", then Delete account and Cancel, and focus stays in the sheet until it closes. Cancel (and Android's
-      back button) closes it and leaves the account. Don't confirm it as Rahul.
 - [ ] Links open the phone's browser, and coming back finds the app where it was: LinkedIn on Priya's profile
       (Directory), Apply and the address in How to apply on "Backend Engineer (Node.js)", its website under About the
       company, and the map link in the Mumbai alumni coffee meetup. The meetup's email address opens the mail app.
 
-**Jobs**
+### 4. Photos
+
+Every photo is prepared on the phone before it goes up (README → Photos and uploads). Take the photos below with the
+phone's own camera first, so they are in its library. Each one should upload, with no message under the button, and
+show in its preview and, once saved, on its card or page the right way up. Branding's logo and cover are checked with
+the console (part 14).
+
+- [ ] iPhone, with Settings → Camera → Formats → High Efficiency on (photos saved as HEIC): a photo as a post's image,
+      an event's cover, a business's logo and a job's logo.
+- [ ] iPhone 15 Pro or later, a 48-megapixel photo (Settings → Camera → Formats → Resolution Control on, then 48 MP in
+      the Camera app), or a panorama: as a profile photo (the system editor crops it, then the round preview shows it)
+      and as a post's image.
+- [ ] Android: a HEIF photo (on a Samsung, Camera settings → Picture formats → High efficiency pictures; or a .heic
+      sent from an iPhone and saved to the gallery) and a full-resolution photo of 50 megapixels or more, each as a
+      post's image and as a profile photo (cropped square, then round in the preview). On a phone with little memory,
+      the app doesn't close while preparing it.
+- [ ] A PNG logo and a GIF logo with see-through backgrounds (save them from a browser to the library), and a large
+      cut-out PNG (a 3000 × 3000 photo of a person on a clear background) as a post's image: on the business's card
+      and page and in the post, the background stays see-through, not black or white.
+- [ ] Pick a large photo as a profile photo and choose Cancel upload at once, while it is still being prepared: the
+      button goes back to Add photo with "Upload cancelled." read out, and nothing is uploaded (no photo appears).
+- [ ] Disconnect the computer running the API from the network, so the upload hangs, and pick a profile photo: Cancel
+      upload stops it, the button goes back to Add photo, and focus stays there. Pick again and wait: after 90 seconds,
+      "The upload is taking too long. Check your connection and try again." shows. Reconnect, and Add photo works again.
+- [ ] The web app in iPhone Safari: a HEIC photo as a post's image uploads and shows, the right way up.
+
+### 5. Reactions and brand colours
+
+- [ ] On the feed, press and hold a reaction on a post: the chip shrinks a little while held. Once chosen it is a light
+      brand tint with a thin ring and a filled icon, and the count beside it turns the brand colour; Like again takes it
+      back. Check it here at Demo University (blue); part 13 checks it at Shri Gujarati Samaj (orange).
+- [ ] TalkBack or VoiceOver reads the chosen reaction as selected and the other three as not.
+
+### 6. Navigation
+
+- [ ] The tab bar fits Feed, Messages, Jobs, Directory and More, with a number on Messages, on the narrowest phone
+      you have and with the largest text size. No label is cut off.
+- [ ] Android: Back from a section behind More (Events, Groups, Mentors, Businesses, Funding) returns to the More
+      hub, not out of the app. Back from a chat returns to Messages.
+- [ ] My posts has seven tabs at Demo University (Posts, Jobs, Funding, Businesses, Groups, Events, Past events): they
+      scroll sideways, the selected one scrolls into view, and no label is clipped. Nor are the tab labels on Jobs,
+      Mentors and Groups.
+- [ ] Bell notifications of each kind open their screen, a chat message's time and day labels look right, and a group
+      whose name starts with an emoji (create "🏃 Morning runners") shows the initials "MR". These check `Object.hasOwn`,
+      `Intl` and Unicode handling on Hermes.
+
+### 7. Messages
+
+- [ ] Open Rahul's chat with Priya and tap the message box. The box and the newest message stay above the keyboard,
+      with no gap and nothing hidden behind it, and closing the keyboard puts the screen back.
+- [ ] Type several lines. The box grows to its limit and then scrolls inside itself, and Send stays reachable.
+- [ ] In a long thread (send 30 messages from the browser), scroll up to load older messages: what you're reading
+      doesn't jump. While you're scrolled up, a new message from the browser doesn't drag you down: a New messages
+      button appears, and tapping it takes you to the newest. In "London & UK alumni", each run of messages shows the
+      sender's name.
+- [ ] Put the app in the background for a minute while Priya sends two messages, then bring it back. They appear
+      without pulling to refresh, and new ones keep arriving live.
+- [ ] Turn on flight mode and send a message: it offers Try again. Turn flight mode off and tap Try again: it arrives
+      once.
+- [ ] Disconnect the computer running the API from the network, so the phone's request hangs instead of failing, and
+      send a message: after about 20 seconds it offers Try again. Reconnect and tap Try again: it arrives once. (On
+      Android this checks that the app's fetch honours its abort signal.)
+- [ ] The message box and the search boxes offer no saved passwords or autofill suggestions on either keyboard.
+- [ ] Tap one of Priya's messages and choose Report message: the sheet opens. In Conversation options, choose Block
+      member: the confirm sheet opens once the first one has closed (iPhone especially). Unblock her afterwards under
+      Messages → Blocked members.
+- [ ] The web app in iPhone Safari and Android Chrome: open a chat, tap the message box, and the box stays in view
+      above the keyboard.
+
+### 8. Groups
+
+- [ ] TalkBack or VoiceOver reads the open and invite-only choices as radio buttons with their checked state, and a
+      disabled choice as disabled.
+- [ ] Have Priya create an invite-only group in the browser and invite Rahul. With the invitation waiting, More reads
+      "Groups, 1 invitation" with TalkBack or VoiceOver, and long group names on cards are read in full.
+- [ ] Android: Back from Groups (behind More), from a group's details and from its chat goes one step back each time.
+- [ ] In "Batch of 2012 reunion committee", which Rahul owns, open Group details, tap Aisha Qureshi and choose Remove
+      from group, then tap Priya and choose Block member. Each confirm sheet opens once the member's sheet has closed
+      (iPhone especially). Cancel both, so the checks below still work.
+
+In the next three checks, each button opens its screen once: Back (and, on the iPhone, the swipe back) never leads to a
+second copy of a screen, or back to the page the button was on.
+
+- [ ] Open a group's chat, then Group details, and choose Open chat: you're back on the chat, and Back goes to where
+      you opened the chat from. On a member's sheet in Group details, View profile opens their profile in Directory.
+- [ ] Have Priya create an open group in the browser. On the phone, find it in Groups → Discover, open it and choose
+      Join group: its chat opens in place of the group's page, and Back goes to Discover.
+- [ ] In Groups → Invitations, tap the name of the group Priya invited Rahul to (above) to open its page, and choose
+      Accept invitation there: its chat opens in place of the group's page, and Back goes to Groups.
+
+### 9. Mentorship
+
+- [ ] TalkBack or VoiceOver: a request row's name link is easy to hit, and after Accept, Decline or Withdraw the row's
+      new status is announced.
+- [ ] Android: Back from Mentors (behind More) and from a mentor's page and request form.
+- [ ] Sign one phone in as Arjun (`+91 91000 00003`), who has no mentorship or request. Have the admin switch
+      Mentorship off under Admin → Settings, then reopen the app: Mentors has gone from More. Switch it back on and it
+      returns. Rahul, who has a mentorship under way, keeps Mentors behind More while it's off.
+- [ ] Have Sneha (`+91 91000 00006`, in the browser) offer to mentor under Be a mentor. Sending her a request from the
+      phone lands on Mentors → Requests → Sent, and going back never returns to the form or her page. While it waits,
+      See your request on her page does the same. View full profile on a mentor's page opens their profile in
+      Directory, once. (Rahul's own mentor page, reached by a link, is in part 20.)
+
+### 10. Referrals
+
+- [ ] Android: Back from the request form returns to the job.
+- [ ] Sending a request (on Priya's "Associate Product Manager") lands on Jobs → Referrals → Sent, and Back doesn't go
+      back to the form or the job. Back on the job, See your requests does the same.
+- [ ] TalkBack or VoiceOver reads the "I can refer people for this job" checkbox with its state and its hint.
+
+### 11. Jobs
 
 - [ ] On Post a job, the chip rows too wide for the screen (Type, Seniority, Currency and Company size, at least)
       scroll sideways. Tapping a chip partly off the screen scrolls its row until the chip is whole on the screen, and
@@ -661,40 +636,58 @@ leave without sending, or he'll be waiting for approval there.
       the card for Priya's "Associate Product Manager" is read in full, title first, with its skills as "SQL (you have
       this), Product management, A/B testing, 1 more". On its page, the SQL chip is one stop read as "SQL (you have
       this)", the other skills are read by name alone, and "You have 1 of 4 skills" follows them.
-- [ ] Sign in with a number that isn't in the demo data and join with Skip for now on Work, as in the registration
-      checks above, so the profile lists no skills. On My profile choose Edit profile and type a headline without
-      saving, then open Jobs → "Backend Engineer (Node.js)" and choose Add your skills to see which you match. The
-      Profile tab comes back with that same editor, scrolled to Work and the headline still typed, and Back (and, on
-      the iPhone, the swipe back) goes to My profile, never to a second editor.
 
-**Admin console**
+### 12. Businesses and other screens
 
-For these, sign one phone in to Shri Gujarati Samaj as its admin, Jignesh Patel (`+91 90000 00004`), who has two members
-waiting for approval. Sign Rahul back in afterwards.
+- [ ] Add a business: the form opens as a modal and closes cleanly, and choosing a logo opens the phone's own photo
+      picker and shows the logo once it's uploaded.
+- [ ] TalkBack or VoiceOver, on Zylo Labs in Businesses: the contact buttons read "Website" (with a hint that it opens
+      in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
+      his Zylo Labs listing in Funding to add an email address and a phone number: its buttons read "Website", "Get in
+      touch" and "Call …" the same way.
 
-- [ ] More shows Admin console with an amber 2, and TalkBack or VoiceOver reads the row as "Admin console, 2 waiting".
-      My profile has an Admin console link too. Each opens the console, with no tab bar, and Back (and, on the iPhone,
-      the swipe back; on Android, the back button) returns to where it was opened.
-- [ ] TalkBack or VoiceOver, on the console's home: each tile is one stop, read as its label and count ("Pending
-      members, 2"), then its hint; "Needs you", "At a glance" and "Sections" are read as headings; and the sections'
-      icons are silent.
-- [ ] Pulling the console's home down refreshes it.
-- [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
-      number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the new
-      member's page in the console, with the console's home under it. Back (and the iPhone's swipe back) goes to the
-      console's home, then to the Samaj feed, with one tab bar, never a blank screen; on Android one more Back leaves
-      the app rather than showing the Samaj feed again (the phone remembers the Samaj, so the start screen redirects
-      there as the push opens: one Samaj, not two). Do it again with the app open on another tab: Back returns there, by
-      way of the console's home. Then once more with the console's home already open: the push opens the member's page
-      above it, and a single Back returns to the console's home.
+### 13. Notices with Approve and Reject
+
+For parts 13 to 16, both phones are Shri Gujarati Samaj's admin, Jignesh Patel (`+91 90000 00004`), who has two
+members waiting for approval (Parth Joshi and Diya Raval). Two checks on the way there:
+
+- [ ] Sign Rahul out from More: you land on Demo University's own page, with "Sign in / Join with mobile number". Choose
+      a different institution, then Shri Gujarati Samaj, and sign in as Jignesh.
+- [ ] On the Samaj feed, press and hold a reaction on a post, as in part 5: once chosen, the chip is a light orange tint
+      with a thin ring and a filled icon, and the count beside it turns orange. Like again takes it back.
+
+Then, on a computer, join Shri Gujarati Samaj in the web app with another number that isn't in the demo data
+(`+91 98765 43212`, say) and submit for approval: the admin's Notifications get a new-member notice.
+
 - [ ] In Notifications, that member's notice has Approve and Reject under its text, and TalkBack or VoiceOver reads
       them with the member's name ("Approve …", "Reject …"). Approve asks first; Cancel. Tapping the notice's text opens
-      the member's page, and Back returns to Notifications.
-- [ ] On the members list, choose Reject on that member: with the keyboard up, the reason box and the sheet's Reject
-      and Cancel stay above it on both phones, and Reject stays disabled until the reason has 3 characters. On Android
-      the back button closes the sheet (the keyboard first, if it's up), and opening Reject again still shows what was
-      typed. Reject with a reason: the line above the list says so, and TalkBack or VoiceOver reads it out without
-      moving focus.
+      the member's page in the console, and Back returns to Notifications.
+
+### 14. The admin console, page by page
+
+Still the Samaj admin on both phones, except for Chat reports. Sign Rahul back in after part 16.
+
+**Dashboard**
+
+- [ ] More shows Admin console with an amber 3 (Parth, Diya and the request from part 13), and TalkBack or VoiceOver
+      reads the row as "Admin console, 3 waiting". My profile has an Admin console link too. Each opens the console,
+      with no tab bar, and Back (and, on the iPhone, the swipe back; on Android, the back button) returns to where it
+      was opened.
+- [ ] TalkBack or VoiceOver, on the console's home: each tile is one stop, read as its label and count ("Pending
+      members, 3"), then its hint; "Needs you", "At a glance" and "Sections" are read as headings; the sections' icons
+      are silent; and every section in the list opens its page in the app.
+- [ ] Pulling the console's home down refreshes it.
+- [ ] Under My profile → Appearance, choose Institution colour: the member screens take the Samaj's tint, and the
+      console's screens stay on the plain page. Choose Plain again.
+
+**Members and a member's page**
+
+- [ ] On the members list, choose Reject on the member from part 13: with the keyboard up, the reason box and the
+      sheet's Reject and Cancel stay above it on both phones, and Reject stays disabled until the reason has 3
+      characters. On Android the back button closes the sheet (the keyboard first, if it's up), and opening Reject again
+      still shows what was typed. Cancel on the first phone; on the second, Reject with a reason: the line above the
+      list says so, and TalkBack or VoiceOver reads it out without moving focus. Their notice in Notifications, on both
+      phones, then says where they stand, with no Approve or Reject.
 - [ ] TalkBack or VoiceOver on the members list: the status tabs are read as tabs with their counts, and each row's
       buttons with the member's name ("Approve Parth Joshi", "Reject Parth Joshi"), so one row's can't be mistaken for
       the next's. The admin's own row (search Jignesh under Approved) says "You" and has no buttons.
@@ -705,26 +698,65 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] On that page, TalkBack or VoiceOver reads the facts as label then value ("Phone", "+91 91000 00036"), and a
       long press on the phone number offers Copy. Make admin and Remove as mentor each open a confirmation; on Android
       the back button closes it, and on both phones Cancel changes nothing.
+
+**Moderation and reports**
+
 - [ ] Moderation → Published → Post, Remove on a post, on the smallest phone you have: with the keyboard up, the note
       box and the sheet's Remove and Cancel stay above it. On Android the back button closes the sheet (the keyboard
       first), and Remove again still shows the note. Cancel it, so nothing is removed.
 - [ ] Moderation → Published → Job, View full content on "Export Documentation Executive" and on a long job: the
       preview fits the screen with nothing cut off at the sides, the apply link can be selected but not tapped, and on a
-      low-end Android a long preview scrolls smoothly. A post with photos (post one from Rahul's phone first) shows them
-      as small thumbnails that load.
-- [ ] New post, as the Samaj admin: TalkBack or VoiceOver reads Announce as a button, not selected, and once pressed
-      as "Undo announce", selected; Pin to the top of the feed as a checked checkbox, and the line saying the plan has no
-      channels.
-      Post announcement goes back to the feed with "Announcement posted; members are being notified", the post first
-      with its Announcement and Pinned badges. A member's phone gets the push. Unpin it from the console's Moderation
-      afterwards. (On Demo University, whose plan includes email, as `+91 90000 00001`: ticking Also email it and posting
-      asks first in a sheet; Cancel it.)
+      low-end Android a long preview scrolls smoothly. A post with photos (post one with two photos from New post first)
+      shows them as small thumbnails that load.
 - [ ] TalkBack or VoiceOver on a queue row: its badges are read as words ("Announcement", "Pinned", "1 report"), View
       full content says whether it's expanded, and each Approve, Remove or Pin is followed by the item's opening words,
       so one row's can't be mistaken for the next's. Open in app says it leaves the admin console, and does: the post
       opens with one tab bar, and More → Admin console returns.
-- [ ] Report a post from the feed, then open the push or the notice: Reports opens on Open with that report, and
-      Resolve, keep content with a note says "Report resolved" in the line above the list, read out without moving focus.
+- [ ] Report two posts from the feed (as Hetal, `+91 91000 00031`, in the browser), one for each phone. On each phone,
+      open its own report's notice in Notifications: Reports opens on Open with that report, and Resolve, keep content
+      with a note says "Report resolved" in the line above the list, read out without moving focus. Then, on the first
+      phone, open the other report's notice, which the second phone has resolved: Reports opens on Open, and the line
+      above the list says "That report has already been handled."
+
+**Chat reports**
+
+Sign one phone in as Demo University's admin (`+91 90000 00001`), which has a seeded open report, for these four.
+
+- [ ] Chat reports: the row says who reported whom and why, and no words. View messages, then open the app switcher
+      (iPhone: swipe up and hold; Android: Recents): the app's picture there shows no message text, and back in the app
+      the report is closed again (View messages). Do the same by switching to another app and back. Until this passes
+      on both phones, README only says the app means to keep the text out of that picture.
+- [ ] The same with the note sheet open: View messages, Remove message, type a note, then open the app switcher or
+      Recents at once: the picture shows neither the note nor the messages, not even part way through the sheet sliding
+      away. If it does, the sheet has to close without its animation when the app goes inactive. Back in the app, the
+      report is closed, and View messages then Remove message opens an empty note.
+- [ ] With the messages open, VoiceOver or TalkBack reads each message's sender and time, "Reported message" on the
+      reported one, then its words; a long press on the words offers no Copy.
+- [ ] From an open report, open "…'s member page", then go back (iPhone swipe back, Android back button): the report
+      is closed, with no words. Remove message: with the keyboard up, the note box and Remove stay above it on both
+      phones; on Android the back button closes the sheet. Cancel, and Hide.
+
+**Invitations** (importing a list and the template are in part 15)
+
+- [ ] Copy link on a row, then paste it into WhatsApp or Notes: the whole link. WhatsApp on a row opens WhatsApp at
+      that number with the invitation written in; with WhatsApp not installed, the wa.me page in the browser.
+- [ ] TalkBack or VoiceOver on Invitations: each tile is read as its label and count, Can send today as "none" on a plan
+      that sends nothing; each row's buttons with the person ("Copy link for …", "Revoke the invitation for …"); Revoke
+      asks in a sheet, which Android's back button closes, changing nothing.
+
+**Profile questions**
+
+- [ ] Profile fields → Add field: the editor opens as a modal sheet (swiping it down, on the iPhone, closes it and
+      keeps nothing). Type a question: the box stays above the keyboard and the key fills in. Choose "Choose one" in
+      Answer type (its list opens over the sheet). In "Add an option…", type an option and press Return: it's added,
+      the box stays focused and the keyboard stays up; add a second the same way, then remove it with its cross.
+      Scroll to Add field with the keyboard up and save.
+- [ ] Profile fields, TalkBack or VoiceOver: the arrows are read as "Move … up" and "Move … down", the first field's up
+      and the last's down as dimmed; after a move the new place is read out ("… moved up: 2 of 3"), and focus stays
+      on the arrow pressed.
+
+**Settings**
+
 - [ ] Settings: tap "Earliest batch year". The number pad comes up with the box still in view above it, on the iPhone
       and on Android, and only digits go in (four at most). Scroll down with the keyboard up: Save settings can be
       reached. TalkBack or VoiceOver reads Mentorship, with Messaging off, as a dimmed (disabled) checkbox and then
@@ -733,6 +765,9 @@ waiting for approval. Sign Rahul back in afterwards.
       form starts over from the saved settings). Back to More: Funding has gone without a pull to refresh. Switch it back
       on. (Signed in as the demo-school admin, `+91 90000 00003`, the last paragraph under the switches reads
       "Messaging, Groups and Mentorship start off for schools…" on the phone as on the web.)
+
+**Branding**
+
 - [ ] Settings → Branding, on the smallest phone you have: tap each box down the form in turn (Tagline, Welcome
       message, Website, City, the colour codes). Each stays in view above the keyboard while you type, Website brings up
       the keyboard for web addresses, and Save branding can be reached with the keyboard up. Country and Time zone open
@@ -750,36 +785,42 @@ waiting for approval. Sign Rahul back in afterwards.
       the suggested colours as radio buttons by name and code ("Teal, #0f766e"), saying which is checked. Type #fef9c3
       in Primary colour: the warning under it is read when you reach it, and Save branding stays enabled (leave with
       Back, without saving).
-- [ ] Profile fields → Add field: the editor opens as a modal sheet (swiping it down, on the iPhone, closes it and
-      keeps nothing). Type a question: the box stays above the keyboard and the key fills in. Choose "Choose one" in
-      Answer type (its list opens over the sheet). In "Add an option…", type an option and press Return: it's added,
-      the box stays focused and the keyboard stays up; add a second the same way, then remove it with its cross.
-      Scroll to Add field with the keyboard up and save.
-- [ ] Profile fields, TalkBack or VoiceOver: the arrows are read as "Move … up" and "Move … down", the first field's up
-      and the last's down as dimmed; after a move the new place is read out ("… moved up: 2 of 3"), and focus stays
-      on the arrow pressed.
+
+**Analytics** (its exports are in part 15, its charts in part 16)
+
+- [ ] Analytics, from the console's Analytics row: the period choices (Last 12 weeks, Last 6 months, Last 12 months),
+      the headline figures, each compared with the period before, and every chart fit the screen with no sideways
+      scrolling. Choosing another period keeps the old charts up under "Updating…" until the new ones arrive. Table on
+      a chart shows its figures in place of the chart (part 16 checks the tables).
+
+**Audit log**
+
 - [ ] Audit log (from the console's home): the chips scroll sideways and each is read as a button with its state;
       Members fills the field with "membership." and TalkBack or VoiceOver reads each row's action, time, who acted and
       its details. A row's "membership …" link opens that member's page, and Back returns to the log with Members still
       chosen. Scroll fast to the end: more rows load with no repeats, and the line under them counts what's shown.
-- [ ] Chat reports, signed in as Demo University's admin (`+91 90000 00001`), which has a seeded open report: the row
-      says who reported whom and why, and no words. View messages, then open the app switcher (iPhone: swipe up and
-      hold; Android: Recents): the app's picture there shows no message text, and back in the app the report is closed
-      again (View messages). Do the same by switching to another app and back. Until this passes on both phones,
-      README only says the app means to keep the text out of that picture.
-- [ ] The same with the note sheet open: View messages, Remove message, type a note, then open the app switcher or
-      Recents at once: the picture shows neither the note nor the messages, not even part way through the sheet sliding
-      away. If it does, the sheet has to close without its animation when the app goes inactive. Back in the app, the
-      report is closed, and View messages then Remove message opens an empty note.
-- [ ] With the messages open, VoiceOver or TalkBack reads each message's sender and time, "Reported message" on the
-      reported one, then its words; a long press on the words offers no Copy.
-- [ ] From an open report, open "…'s member page", then go back (iPhone swipe back, Android back button): the report
-      is closed, with no words. Remove message: with the keyboard up, the note box and Remove stay above it on both
-      phones; on Android the back button closes the sheet. Cancel, and Hide.
+
+**Announcements**
+
+- [ ] New post, as the Samaj admin: TalkBack or VoiceOver reads Announce as a button, not selected, and once pressed
+      as "Undo announce", selected; Pin to the top of the feed as a checked checkbox, and the line saying the plan has no
+      channels. Post announcement goes back to the feed with "Announcement posted; members are being notified", the
+      post first with its Announcement and Pinned badges. Unpin it from the console's Moderation afterwards. (On Demo
+      University, whose plan includes email, as `+91 90000 00001`: ticking Also email it and posting asks first in a
+      sheet; Cancel it.)
+
+### 15. Files
+
+The console's file pickers and the share sheet, as the Samaj admin.
+
 - [ ] Invitations → Import a list → Choose CSV file: on the iPhone pick a CSV from Files (On My iPhone, then iCloud
       Drive), on Android from Downloads and then from Google Drive. Each shows its first rows and the columns used. A
       CSV that Excel saved with ";" between the columns reads the same, and one saved as "CSV UTF-8" with Gujarati
       names shows them correctly in the preview and, once imported, on the list.
+- [ ] Import a long list (a CSV of a few thousand rows, picked the same way): while "Importing … of …" counts up, the
+      bar's Back, the iPhone's swipe down and Android's back button leave the screen where it is, and "Keep this screen
+      open until the import finishes." shows (VoiceOver or TalkBack says it on a blocked Back). Done then returns to the
+      list, which says how many were invited.
 - [ ] Import's Template opens the share sheet with invitations-template.csv (not .csv.csv). Save it to Files (iPhone) or
       Drive or Downloads (Android). Opened in a text editor (Files' preview, or Notes), the example row's phone reads
       +919876543210 with no ' in front, and the Samaj's question keys are columns. Opened in Excel or Google Sheets, the
@@ -787,44 +828,55 @@ waiting for approval. Sign Rahul back in afterwards.
       Sheets), as both read a leading + as a sign: so the import's hint says to format the phone column as Text before
       typing numbers. Do that in Excel, type +919876543210, save as CSV UTF-8 and import it: the row is new, not refused
       as scientific notation.
-- [ ] Import a long list (a few thousand rows): while "Importing … of …" counts up, the bar's Back, the iPhone's swipe
-      down and Android's back button leave the screen where it is, and "Keep this screen open until the import
-      finishes." shows (VoiceOver or TalkBack says it on a blocked Back). Done then returns to the list, which says how
-      many were invited.
-- [ ] Copy link on a row, then paste it into WhatsApp or Notes: the whole link. WhatsApp on a row opens WhatsApp at
-      that number with the invitation written in; with WhatsApp not installed, the wa.me page in the browser.
-- [ ] TalkBack or VoiceOver on Invitations: each tile is read as its label and count, Can send today as "none" on a plan
-      that sends nothing; each row's buttons with the person ("Copy link for …", "Revoke the invitation for …"); Revoke
-      asks in a sheet, which Android's back button closes, changing nothing.
-- [ ] Analytics (the console's Analytics row), with the phone set to another language and region (Hindi, India, then
-      English, United States): the figures are grouped with commas ("1,234"), an axis that reaches 10,000 reads "10K",
-      the weeks under the charts read "2 Nov" and the readout "Week of 2 Nov 2026", never "Nov 2" or a date a day out.
-      These are written by hand, as Hermes lacks parts of `Intl`.
-- [ ] Analytics: drag a finger along New members per week and Activity per week: the line above each chart follows the
-      week under the finger, the chosen column stands out (a crosshair and dots on the lines), and the choice stays when
-      the finger lifts. A drag up or down that starts on a chart scrolls the page instead, and leaves the week that chart
-      had chosen as it was (scroll the whole page with a finger on the charts: no week is chosen in any of them).
-- [ ] Analytics, TalkBack or VoiceOver: each week chart is one stop, read as its summary ("New members per week, 3 in
-      total"), adjustable, with the latest week's readout as its value; swiping up and down (VoiceOver) or the volume keys
-      or swipes TalkBack offers for a slider step a week at a time, reading "Week of …, 1 approved" (each series, by
-      name, on Activity). The chart drawings and the line above them aren't read on their own. The headline tiles are
-      read as their label and figure, then the change ("+12% vs the previous 12 weeks (10)"), with hints turned off too
-      (VoiceOver's Speak Hints, TalkBack's usage hints); Table is read as a button that says whether it's on, its hint
-      saying what pressing it does (shows the table, or the chart again), and a bar chart's rows as "Mumbai, 12
-      members". Choosing Last 6 months says "Updating…" on both (VoiceOver is told it; TalkBack reads a live region).
-- [ ] Analytics: choose Last 12 months and open New members per week's Table: on Android its 53 rows scroll inside
-      the card, and the page scrolls once the table reaches its end.
-- [ ] Analytics on a narrow phone (320 to 360 points wide), then with the largest text size: Activity per week's
-      Table shows every header whole ("Comments" never broken inside the word) with each figure under its header; where
-      the five columns don't fit, the table scrolls sideways inside its frame, and the page doesn't.
-- [ ] Analytics: Members CSV says "Preparing…" (Activity CSV can't be pressed meanwhile), then opens the share sheet
-      with shri-gujarati-samaj-members-<date>.csv (not .csv.csv). Closing the sheet without choosing anything shows no
-      error. Save it to Files (iPhone) or Drive or Downloads (Android) and open it in Excel or Google Sheets: the names
-      read correctly, Gujarati ones too, and the Chapter column is there. Do the same with Activity CSV.
+- [ ] First set Jignesh's city on My profile to અમદાવાદ. Then Analytics → Members CSV: it says "Preparing…", and
+      Activity CSV is dimmed and can't be pressed meanwhile (one export at a time), then the share sheet opens with
+      shri-gujarati-samaj-members-<date>.csv (not .csv.csv), and closing the sheet without choosing anything shows no
+      error. Do the same with Activity CSV (shri-gujarati-samaj-activity-<first week>-to-<today>.csv). Save both to
+      Files (iPhone) or Drive or Downloads (Android) and open them in Excel or Google Sheets: the columns line up, the
+      first header reads "Name" with nothing in front of it, the names read correctly, the Members CSV has a Chapter
+      column and its city reads અમદાવાદ (not "àª…": the file is UTF-8 with a byte order mark), and each phone number
+      keeps all its digits, behind a ' that stops a spreadsheet reading it as a sum. Put Ahmedabad back.
 
-**Appearance**
+### 16. Charts
 
-On Rahul's phone, under My profile → Appearance. Choose Plain again at the end, so the other checks see the plain page.
+On the console's Analytics, as the Samaj admin, with the web console's Analytics open beside it on a computer.
+
+- [ ] Hermes number and date text. Choose each period in turn and compare it with the web's: the week labels read like
+      "2 Nov" (day, then month), the line above a chart (its readout) like "Week of 2 Nov 2026", figures are grouped
+      with commas ("1,234"), an axis that reaches 10,000 reads "10K", and each change reads like "+12% vs the previous
+      12 weeks (10)", the same as the web shows. Nothing reads "NaN", "Invalid Date", "undefined" or a raw date such as
+      "2026-11-02". These are written by hand, as Hermes lacks parts of `Intl`. Dates and counts elsewhere in the
+      console (a member's page, the audit log's times, the invitations) read as on the web console too.
+- [ ] Another language, region and time zone. Set the phone to Hindi (India), then to English (United States) with
+      the time zone New York (Date & Time, with setting it automatically off), and open Analytics each time: the weeks
+      under the charts read "2 Nov" and the readout "Week of 2 Nov 2026", never "Nov 2" or a date a day out, and figures
+      keep their commas ("1,234") and the same digits. Put the language, region and time zone back afterwards.
+- [ ] Scrubbing. Drag a finger along "New members per week" and "Activity per week": the line above each chart follows
+      the week under the finger, the chosen week stands out (the column under the finger stays solid while the others
+      fade; on the lines, a crosshair and dots), and the choice stays when the finger lifts. A drag up or down that
+      starts on a chart scrolls the page instead, and leaves the week that chart had chosen as it was (scroll the whole
+      page with a finger on the charts: no week is chosen in any of them).
+- [ ] TalkBack or VoiceOver. Each column and line chart is one stop, read as its summary ("New members per week, 3 in
+      total"), adjustable, with the latest week's readout as its value; swiping up and down (VoiceOver) or the volume
+      keys or swipes TalkBack offers for a slider step a week at a time (Next and Previous), reading "Week of …, 1
+      approved" (each series, by name, on Activity per week; "Batch of …, … members" on Members by batch). The chart
+      drawings and the line above them aren't read on their own. The headline tiles are read as their label and
+      figure, then the change ("+12% vs the previous 12 weeks (10)"), with hints turned off too (VoiceOver's Speak
+      Hints, TalkBack's usage hints). Table is read as a button that says whether it's on (selected while the table
+      shows), its hint saying what pressing it does ("Shows New members per week as a table", then "Shows New members
+      per week as a chart again"), and the table's rows and cells in order; a bar chart's rows as their label and
+      count ("Mumbai, 12 members"). Choosing Last 6 months says "Updating…" on both (VoiceOver is told it; TalkBack
+      reads a live region).
+- [ ] A year's table. Choose Last 12 months and open New members per week's Table: on Android its 53 rows scroll
+      inside the card, and the page scrolls once the table reaches its end.
+- [ ] Narrow phones and large text. On a narrow phone (320 to 360 points wide), then with the largest text size,
+      Activity per week's Table shows every header whole ("Comments" never broken inside the word) with each figure
+      under its header; where the five columns don't fit, the table scrolls sideways inside its frame, and the page
+      doesn't.
+
+### 17. Appearance
+
+As Rahul, under My profile → Appearance. Choose Plain again at the end, so the other checks see the plain page.
 
 - [ ] Choose Your photo and pick a photo (on the iPhone, a HEIC one): it uploads, its tile shows it under the veil, and
       Feed, Jobs, a job's page and My profile show it faintly behind white cards, the right way up. Rahul's web app shows
@@ -838,4 +890,146 @@ On Rahul's phone, under My profile → Appearance. Choose Plain again at the end
       tile.
 - [ ] TalkBack or VoiceOver: the tiles are read as radio buttons in a "Background" group, saying which is checked, and
       Your photo, with no photo yet, says it opens your photos.
-- [ ] As the Samaj admin (above), with Institution colour chosen: the console's screens stay on the plain page.
+
+### 18. Delete account and rejoining
+
+- [ ] TalkBack or VoiceOver, on Rahul's My profile: Delete my account opens the confirm sheet (it used to be a system
+      alert). It's read as an alert named "Delete your account?", then the whole explanation, including "If you were
+      suspended at an institution, or members there had blocked you, that still applies if you join again with this
+      number.", then Delete account and Cancel, and focus stays in the sheet until it closes. Cancel (and Android's
+      back button) closes it and leaves the account. Don't confirm it as Rahul.
+- [ ] With the number from parts 1 and 2, signed in on the phone: message Priya (Directory → Priya Nair → Message this
+      member), and in the browser, as Priya, open the request and choose Block member. As Demo College's admin
+      (`+91 90000 00002`, web), approve the number's request under Admin → Members; as Demo University's admin, suspend
+      it there with a reason. The phone shows "Membership suspended" at Demo University (reopen the app if it hasn't
+      yet). Choose another institution → Demo College → More → My profile → Delete my account → Delete account: the app
+      opens the list of institutions. Sign in with the same number at Demo University and register again: after Join the
+      network the screen says "Membership suspended" and "Reason given: Suspended before this account was deleted".
+      As the admin, find the member under Suspended and Reinstate them: within half a minute the phone opens the feed.
+      Message Priya again: it says the request was sent, as before, but Priya's Messages show nothing new, and her
+      Blocked members list the new account.
+
+### 19. Keyboard on long forms
+
+Still the number from part 18, a member of Demo University again, which saves signing Rahul in once more (on another
+day, Rahul does as well). Every screen built on `Screen` now makes room for the keyboard on Android too (its
+KeyboardAvoidingView pads there, as the chats do), since Android's edge-to-edge window on SDK 58 no longer shrinks for
+it. Look for room made twice (a blank band above the keyboard) as well as none.
+
+- [ ] Android especially: the long forms (Edit profile, Post a job, Add a business, Plan a gathering, New post) move up
+      with the keyboard, so the box being typed in and the button at the bottom can be reached, with no blank band
+      above the keyboard and nothing hidden under it. Closing the keyboard puts the form back, with no gap left at the
+      bottom.
+- [ ] Registration at Demo College (More → Switch institution, as in part 3; leave without sending): on each
+      step, tap the last box: it and the step's buttons (Continue, Skip for now, Back, Submit for approval) stay above
+      the keyboard, with nothing hidden behind it. On Work, choose Add a past role and type in each of its boxes, the
+      years too: Done and Remove stay reachable. Do the same on My profile → Edit profile, down to the links in About
+      you, and in Add a place of study.
+- [ ] Create a group and edit it: the keyboard leaves the fields and the save button reachable. The invitation
+      sheet's search box does too.
+- [ ] The mentorship request note and the Be a mentor fields stay above the keyboard.
+- [ ] On a job that takes referrals, Ask for a referral: the note field stays above the keyboard under the header, and
+      on the iPhone dragging the page down closes the keyboard. Type a long note: the box grows and nothing is cut off.
+
+### 20. Pushes and links (development build only)
+
+Expo Go can't receive the app's pushes or open `illuminize://` links, so these need a development build on each phone,
+made after the five native modules above were added.
+
+1. Create the Expo project first (README → Mobile → Push notifications), or no pushes arrive. Then, in a second
+   terminal, `cd apps/mobile` and:
+   - Android, plugged in with USB debugging on: `npx expo run:android`. It builds with the Android SDK, so install
+     Android Studio first and set ANDROID_HOME to the SDK (on Windows `%LOCALAPPDATA%\Android\Sdk`; in PowerShell,
+     `$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"`), or the build stops, unable to find it. Use a phone on USB,
+     not an emulator, unless the computer has emulator images.
+   - iPhone, on a Mac with Xcode: `npx expo run:ios --device`. Without a Mac, use EAS Build, which needs a paid Apple
+     developer account: the repo has no `eas.json` yet, so run `npx expo install expo-dev-client` and
+     `eas build:configure` once, register the iPhone with `eas device:create`, then
+     `eas build --profile development --platform ios` and install what it gives you.
+
+   `expo run` starts the Expo server when it's done. Another day, start it with `pnpm mobile`.
+2. Allow notifications when the app asks, and sign Rahul in again on each phone.
+3. A push about a chat comes 5 to 10 seconds after the message, and one about a group 30 to 60 seconds after. After a
+   push, that chat sends you no other for 2 minutes (a group for 10) unless you open it or write in it, so wait between
+   checks that need one.
+
+**Messages**
+
+- [ ] With the chat with Priya open and the phone unlocked, a message from her in "London & UK alumni" shows a banner
+      (up to a minute later).
+- [ ] A push for the chat on screen shows no banner. The API sends none while you're reading the chat, so send one
+      yourself. The phones' tokens are what
+      `docker compose exec postgres psql -U postgres -d illuminize -c "select platform, token from push_tokens"` lists,
+      and the chat's id is the end of its address when Priya opens it in the web app. With that chat open on the
+      phone, send its token a push from Expo's push tool (expo.dev/notifications) with the data
+      `{"type": "CHAT_MESSAGE", "tenantSlug": "demo-university", "conversationId": "<the id>"}`: no banner. Go back to
+      Messages and send it again: the banner shows.
+- [ ] Force-quit the app, send a message from the browser, and tap the push. The app opens on that chat, and Back
+      goes to Messages.
+- [ ] With the chat with Priya open, put the app in the background, have Priya send a message, and tap its push. The
+      app comes back on that chat, with no second copy of it: Back goes straight to Messages (and so does the iPhone's
+      swipe back).
+- [ ] Sign Rahul in on the web app too. On the phone, open the chat with Priya and put the app in the background, then
+      send to that chat as Priya. The phone gets a push, and Rahul's web app counts the chat unread until the phone is
+      back in front on that chat, which marks it read.
+- [ ] Lock-screen text: a message from Priya shows "New message from Priya Nair"; a first message from someone with no
+      chat with Rahul (sign in on the web as Sneha, `+91 91000 00006`) shows only "New message request". No message
+      text appears anywhere on the lock screen.
+- [ ] As the admin, remove a message the phone member sent (Admin → Chat reports, after reporting it from the
+      browser). The push says only "A message you sent was removed", and the admin's note shows only in the app.
+
+**Links**
+
+- [ ] With the app closed, open a job, business or mentor from a push or a link (for example
+      `illuminize://t/demo-university/jobs/<id>`, with an id from the web app's address bar). Back (and, on the iPhone,
+      the swipe back) goes to that section's list.
+- [ ] Open such a link while the app is on another section: Back goes somewhere sensible, never to a duplicate screen.
+- [ ] Open Rahul's own mentor page, `illuminize://t/demo-university/mentors/<id>`, with the id from the end of his
+      profile's address in the web app's Directory: Edit mentor profile opens Be a mentor, once, and Back never returns
+      to a second copy of either.
+- [ ] Android, with registration the only screen: force-quit the app, then, as Rahul (no member of Demo College), open
+      `illuminize://t/demo-college/register`, fill in Basics, Continue, and press the back button: it goes to Basics,
+      not out of the app. Back on Basics with a name typed asks "Leave registration?", and Leave opens the landing
+      screen. Nothing is sent.
+
+**Groups, mentorship and referrals**
+
+- [ ] Have Priya create another invite-only group in the browser and invite Rahul, with the app closed: tapping the
+      push opens Groups → Invitations, and Back works. Then, with the app open, have her create one more and invite him
+      to it: that invitation shows a banner. Before accepting either, open
+      `illuminize://t/demo-university/messages/<id>` with the id from the end of the first one's address in Priya's
+      browser: the app offers See invitation, which opens Groups → Invitations, once.
+- [ ] A push about a group's moderation opens My posts → Groups: have the phone member create a group, and the admin
+      remove it under Admin → Moderation → Published.
+- [ ] Mentorship pushes. Have Priya ask Rahul for mentoring from the browser: tapping the push opens Mentors →
+      Requests. Then have Sneha accept, in the browser, the request Rahul sent her in part 9 (after a reset, first have
+      her offer to mentor under Be a mentor and Rahul ask her from the phone): tapping that push opens the chat.
+- [ ] Have Priya ask for a referral on Rahul's "Backend Engineer (Node.js)" from the browser, with the app closed:
+      tapping the push opens Jobs → Referrals. With the app open, referral pushes show a banner.
+
+**Admin console**
+
+Sign one phone in to Shri Gujarati Samaj as its admin (`+91 90000 00004`) for these.
+
+- [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
+      number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the new
+      member's page in the console, with the console's home under it. Back (and the iPhone's swipe back) goes to the
+      console's home, then to the Samaj feed, with one tab bar, never a blank screen; on Android one more Back leaves
+      the app rather than showing the Samaj feed again (the phone remembers the Samaj, so the start screen redirects
+      there as the push opens: one Samaj, not two). Do it again with the app open on another tab: Back returns there, by
+      way of the console's home. Then once more with the console's home already open: the push opens the member's page
+      above it, and a single Back returns to the console's home.
+- [ ] Report a post from the feed in the browser (as Hetal, `+91 91000 00031`), and tap the push: Reports opens on Open
+      with that report.
+- [ ] Post an announcement from the phone (part 14, Announcements): a member's phone (Hetal's, signed in on the other
+      phone) gets its push, and tapping it opens the post.
+
+### Runs
+
+One row per run, newest first: the phones and their OS versions, whether it was Expo Go or a development build (part
+20 needs the latter), the commit (`git rev-parse --short HEAD`), how it went, and what failed, filed as follow-ups
+(README → Known gaps until they're fixed).
+
+| Date | Phones and OS | Expo Go or development build | Commit | Result | Follow-ups |
+| --- | --- | --- | --- | --- | --- |
+| | | | | | |

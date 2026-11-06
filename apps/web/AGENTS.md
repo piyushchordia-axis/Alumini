@@ -10,7 +10,7 @@ Follow root `CLAUDE.md` → **UI / UX**:
 - SVG icons in `src/components/icons.tsx`. Section links use icon *names* in `src/lib/sections.ts`, not emoji. No emoji in nav, empty states, or chrome badges; reactions may keep emoji inside framed controls only.
 - `Card` supports `elevation={1|2}` — feed posts level 1, composer level 2. Do not flatten content into the page background.
 - Landing / auth: `AuthShell` is brand-first (full-bleed cover, institution as hero).
-- Member visual changes ship on web and mobile in the same change. Admin stays denser and more tool-like.
+- Feature parity: every member-facing and institution-admin change (`routes/t/admin`), visual design included, ships on web and mobile in the same change, logic both need living in `packages/shared`; the platform (staff) console (`routes/platform`) is web only. Admin stays denser and more tool-like.
 
 ## Layout map
 

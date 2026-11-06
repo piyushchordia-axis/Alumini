@@ -79,9 +79,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   live in `FEATURE_PREREQUISITES`, school defaults in `SCHOOL_OFF_FEATURES`. Anything that sends reads settings fresh,
   not from the five-minute tenant cache. Private contact also checks `isCurrentPupil` (`requireChatEligible`).
 - **Chat.** `appendMessage(ctx, tx, …)` takes `tx`: only the outermost caller opens a transaction, and nothing inside
-  uses `ctx.db` (nested ones can freeze the pool). Lock in this order: the report subject (`lockReportSubject`, shared
-  to file a chat report, exclusive in `assertNoOpenReportAboutActor`; `adminTransition` takes the actor's before the
-  target membership row), the member (per-member limits), the pair (`lockPair`, which blocks take too), mentorship or
+  uses `ctx.db` (nested ones can freeze the pool). Lock in this order: the report subject (`lockReportSubject`, an
+  advisory lock, shared to file a chat report, exclusive in `assertNoOpenReportAboutActor`), then a membership row
+  (`lockMembership`: the target's in `adminTransition`, which takes the actor's report subject first whichever check
+  applies; the member's own for per-member limits), the pair (`lockPair`, which blocks take too), mentorship or
   referral rows, the conversation, a participant. Every emit and push goes to `chatRecipients()` (or `chatRecipientOf`
   for a badge). Chat writes go over REST only; the socket stays server to client. Message bodies and request notes never
   go into pushes, notifications, audit metadata, job payloads or logs. In the consoles, a chat report's audited view
@@ -279,19 +280,32 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Richer profiles and job posts are done:** guided registration, profile details and strength, photos and uploads,
   rich text, and structured jobs with matching skills. README "Profiles and onboarding", "Photos and uploads", "Rich
   text" and "Jobs" describe them.
+- **The twelve fixes and the admin console in the phone app are done:** phone entry that reads a pasted or autofilled
+  number, chosen reactions that show in any institution colour, photos prepared on the device, Back on every
+  registration step, the whole institution admin console in the phone app (Approve and Reject on the new-member notice
+  on both apps), a background each member chooses, SVG icons in place of emoji, suspensions and blocks kept when an
+  account is deleted, staff alerts for escalated chat reports, and another member of staff for a report that their
+  change of admins escalated. README "Profiles and onboarding", "Photos and uploads", "Appearance", "Tenants and
+  membership", "Chat reports and admin access" and "Account deletion and suspension" describe them.
 - **Wave 3 is next:** event upgrades (tickets, reminders) and giving campaigns, on the payments layer
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
-  - the gaps to close before launch and the smaller follow-ups in README → "Known gaps / next steps";
-  - the device-only checks in `e2e/README.md` → "Checks that need a real phone" (profiles, registration, jobs, photo
-    preparation and the admin console added more), none run yet;
+  - the gaps to close before launch and the smaller follow-ups in README → "Known gaps / next steps", including the
+    unchosen safety items (reporting a blocked member, holding back a reported admin, capping refusals) and the
+    privacy policy's cover for the deleted accounts' phone hash, kept with no expiry;
+  - the device pass in `e2e/README.md` → "Checks that need a real phone": one ordered pass for an iPhone and an Android
+    phone, in Expo Go but for its last part (pushes and links need a development build), not run yet; record each run
+    in its Runs table;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
   - uploads: only a profile or background photo must be the member's own upload (job and business logos, post images
     and event covers take any http(s) address), only those are ever deleted, and a CDN may serve a deleted one until it
     expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
-  - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
+  - typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls (close, back, send, checkmarks) rather than
+    the SVG set;
+  - UI polish still open: deeper tenant theming (Branding previews only a gradient card), skeleton loaders and
+    purposeful motion tokens;
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

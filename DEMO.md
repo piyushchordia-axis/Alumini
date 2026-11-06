@@ -33,10 +33,12 @@ shown on screen.
 | Admin of Demo University | `+91 90000 00001` | Members and posts are approved automatically; a reported chat message is waiting |
 | Admin of Demo College | `+91 90000 00002` | Approval is required for members **and** posts; pending items and a spam report are waiting |
 | Admin of Demo School | `+91 90000 00003` | Members need approval, posts publish immediately; messaging, groups and mentorship start off |
+| Admin of Shri Gujarati Samaj | `+91 90000 00004` (Jignesh Patel) | Members need approval (Parth Joshi and Diya Raval are waiting), posts publish immediately; a good one for the admin console in the phone app |
 | Pupil at Demo School | `+91 91000 00026` (Naina Sen) | Still at school, so never sees messages, groups, mentors or referrals |
 | Illuminize staff | `+91 99999 99999` | The platform console at `/platform` |
 
-The phone field has a country picker. Choose **IN +91**, then type the 10 digits.
+The phone field has a country picker. Choose **IN +91**, then type the 10 digits, or paste the whole number: a pasted
+"+91 98765 43210" keeps one +91, and a pasted "+44…" switches the country.
 
 ## 3. Things to try
 
@@ -82,6 +84,29 @@ No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (80
 phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
+
+**The admin console on the phone, and twelve fixes** (run `pnpm db:reset` first)
+
+- **The admin console in the phone app.** Sign in to **Shri Gujarati Samaj** in the phone app as its admin, Jignesh
+  Patel (`+91 90000 00004`), and open **More → Admin console** (its amber badge shows 2): the dashboard, members
+  (approve Parth Joshi, or reject Diya Raval with a reason), a member's page, moderation and reports, chat reports,
+  invitations (import a CSV, copy a link), profile fields, settings and branding, analytics and the audit log, as on
+  the web. A new member's notice under the bell has **Approve** and **Reject** on both apps. On the web, the header's
+  **Admin** link now shows at every width, with the count of what's waiting. Illuminize staff who aren't members of an
+  institution use the web.
+- **Your background.** **My profile → Appearance**: **Plain**, **Institution colour**, **Institution cover** (where
+  there is one) or **Your photo**, chosen per institution and the same on the web and the phone. The admin console
+  stays plain.
+- **Joining.** A pasted or autofilled number keeps one +91. Every registration step has **Back**, and on Basics, "Signed
+  in as" with **Use a different number**. The institution's page no longer sends a signed-in newcomer straight back into
+  the form: it offers **Join**.
+- **Photos** from an iPhone (HEIC) and very large ones are made smaller on the device before they go up, the right way
+  up.
+- **A chosen reaction** is a tint of the institution's colour with a ring and a filled icon, readable in any colour.
+- **Deleting an account** keeps a suspension, and the blocks other members placed on it, for when the number joins
+  again: the confirmation says so.
+- **Staff** get an email when a chat report becomes theirs, and the platform console's **Chat reports** counts the
+  open ones and says why each is theirs.
 
 **Richer profiles and job posts** (run `pnpm db:reset` first: the seeded profiles and job posts load only into fresh
 demo data)
@@ -142,8 +167,8 @@ apps match.
 - **Bullet points and links** in long descriptions (jobs, events, businesses, funding and bios): open the Mumbai coffee
   meetup in **Events**, or Zylo Labs in **Businesses**. A line starting with "- " is a bullet, "1. " starts a numbered
   list, and web and email addresses become links. Posts, comments and chat stay plain text.
-- **On the phone app** all of this works the same. While registering, Android's back button goes to the step before,
-  and on an iPhone swiping back is off after the first step, so nothing typed is lost.
+- **On the phone app** all of this works the same. While registering, Android's back button and an iPhone's swipe back
+  go to the step before, keeping what was typed.
 
 **Wave 2: connect one to one** (run `pnpm db:reset` first, so the demo data for these is fresh)
 
@@ -211,7 +236,7 @@ profile and sign out.
   "Deleted member", and that groups you own pass to the member who has been in them longest.
 - **On the phone app** everything members do above works the same: Messages is a tab, and you tap a message to report
   it. The admin steps above (Chat reports, Reports, Moderation, Settings and the Audit log) are in the phone app's admin
-  console too (More → **Admin console**); README → Known gaps lists what isn't on the phone yet.
+  console too (More → **Admin console**), as is every other page of the web console.
 
 **Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)
 - **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed shows today's birthday (Meera) and Rahul's own
