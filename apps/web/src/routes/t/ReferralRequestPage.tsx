@@ -90,7 +90,7 @@ function ReferralRequestPage({ jobId }: { jobId: string }) {
           {j.location ? ` · ${j.location}` : ""}
         </p>
         <div className="mt-3 flex items-center gap-3">
-          <Avatar name={poster} src={j.author.avatarUrl} size="md" />
+          <Avatar name={poster} src={j.author.avatarUrl} size="md" toneKey={j.author.id} />
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900 [overflow-wrap:anywhere]">Posted by {poster}</p>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(j.author)}</p>

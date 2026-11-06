@@ -134,7 +134,7 @@ export function EventDetailPage() {
           {attendees.items.map((m) => (
             <li key={m.id}>
               <Link to={`/t/${slug}/app/directory/${m.id}`} className="flex items-center gap-2">
-                <Avatar name={m.fullName} src={m.avatarUrl} size="sm" />
+                <Avatar name={m.fullName} src={m.avatarUrl} size="sm" toneKey={m.id} />
                 <span className="text-sm">
                   <span className="font-medium text-slate-900">{m.fullName}</span>
                   <span className="text-slate-500"> · {memberYearsLabel(m)}</span>

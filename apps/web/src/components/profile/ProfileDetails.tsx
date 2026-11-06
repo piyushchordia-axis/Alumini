@@ -23,6 +23,7 @@ import { Avatar, Badge } from "@/components/ui";
  */
 export type ProfileView = Pick<
   MembershipDto,
+  | "id"
   | "fullName"
   | "avatarUrl"
   | "startYear"
@@ -96,7 +97,7 @@ export function ProfileSummary({
   const badges = !!profile.isOpenToWork || !!profile.isMentor || profile.openTo.length > 0;
   return (
     <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-      <Avatar name={profile.fullName} src={profile.avatarUrl} size="xl" />
+      <Avatar name={profile.fullName} src={profile.avatarUrl} size="xl" toneKey={profile.id} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <Name className={clsx("font-semibold text-slate-900 [overflow-wrap:anywhere]", Name === "h1" ? "text-2xl" : "text-xl")}>{profile.fullName}</Name>

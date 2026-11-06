@@ -114,7 +114,7 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
                     <ChoiceInput type="checkbox" checked={on} disabled={!on && full} onChange={() => toggle(m)} />
                     {/* The name says who it is: initials or a photo's alt text would only repeat it in the checkbox's name. */}
                     <span aria-hidden>
-                      <Avatar name={m.fullName} src={m.avatarUrl} size="sm" />
+                      <Avatar name={m.fullName} src={m.avatarUrl} size="sm" toneKey={m.id} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-slate-900">{m.fullName}</span>

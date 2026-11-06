@@ -24,7 +24,7 @@ function Candidate({ member, on, disabled, onPress }: { member: ChatMemberDto; o
       style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, opacity: disabled ? 0.5 : 1, backgroundColor: pressed ? colors.bg : colors.card })}
     >
       <ChoiceMark kind="checkbox" checked={on} size={22} />
-      <Avatar name={member.fullName} src={member.avatarUrl} size={32} />
+      <Avatar name={member.fullName} src={member.avatarUrl} size={32} toneKey={member.id} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, color: colors.text }}>
           {member.fullName}

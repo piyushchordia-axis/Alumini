@@ -64,6 +64,11 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   its label instead.
 - `fitsPhone(where, content)` fails when a screen of the phone app's web build is wider than the phone: the page, or
   any scrolling area around `content`, which react-native-web clips rather than widening the page.
+- `expectInitials` reads a photo's stand-in initials the same way (4.5:1 on a circle or tile of their own, or one
+  filling a rounded frame that clips it, as a company's tile does), and `expectSameTone` compares two of them: one
+  member's tone in two places. `INSTITUTION_INITIALS` is the seeded institutions' initials (their ink on their tint,
+  `brandAvatarTone`, read from `BRAND_TONES`), and the pale yellow both Branding steps type, which
+  `expectInstitutionInitials` checks for.
 - `GREY_TEXT` is both apps' grey text as `textColour` reads it: the meta grey (`91 107 128`) on the plain page and the
   secondary grey (`71 85 105`) on a tint or a photo.
 
@@ -90,19 +95,21 @@ Covers:
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
   and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
-  announcement, its Announcement badge's ink readable and its edge at 3:1, and a poll vote, marked with a drawn check
+  announcement, its Announcement badge's ink readable and its edge at 3:1, its author's initials in the same tone,
+  readable and not the institution's tint, on the pinned welcome post she also wrote, and a poll vote, marked with a drawn check
   (read as "your vote") rather than a ✓; a poll with several choices, its drawn boxes saying which are chosen
   (`aria-pressed`) before the vote; the celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
   digest (run through the platform job endpoint, see `lib.mjs`);
-- jobs: seeded cards with pay, experience and "+1 more" skills; the Work mode and experience filters behind More
-  filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend Engineer page offering
-  a member with no skills "Add your skills to see which you match" in place of a count, its link landing on My
-  profile's Work (`#work`) near the top of the screen; posting a job with work mode, seniority, experience, skills
-  (Enter adding one without posting the form), pay previewed as it will show, bullet points, a How to apply address and
-  an Apply link opening in a new tab with noopener, its page offering its poster nothing to match; an edit of the title
-  alone keeping every other field; Mark closed swapping the contacts and How to apply for "Applications closed"; a new
-  job at the same company, typed in lower case with a double space, offered Use details from your last job at Smoke
-  Labs, filling the website; deleting a job through the confirm dialog;
+- jobs: seeded cards with pay, experience and "+1 more" skills, and with no logo, Zylo Labs's and Deloitte's initials in
+  a tone from each company's name, readable, two tones apart and not the institution's; the Work mode and experience
+  filters behind More filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend
+  Engineer page offering a member with no skills "Add your skills to see which you match" in place of a count, its link
+  landing on My profile's Work (`#work`) near the top of the screen; posting a job with work mode, seniority,
+  experience, skills (Enter adding one without posting the form), pay previewed as it will show, bullet points, a How to
+  apply address and an Apply link opening in a new tab with noopener, its page offering its poster nothing to match; an
+  edit of the title alone keeping every other field; Mark closed swapping the contacts and How to apply for
+  "Applications closed"; a new job at the same company, typed in lower case with a double space, offered Use details
+  from your last job at Smoke Labs, filling the website; deleting a job through the confirm dialog;
 - rich text: the seeded meetup's bullets, its link opening in a new tab, and its email opening in place with nofollow;
   the Zylo Labs listing's bullets as one list with no dash left, its link, and a numbered list keeping its start;
 - an RSVP, the chosen answer in its tone (the success fill, its ink readable, an edge at 3:1, a drawn check and no ✓)
@@ -114,7 +121,8 @@ Covers:
 - businesses: search and filters, contact details only on a listing's own page; add (its logo a 4000 × 3000 photo of
   over 5 MB, made smaller in the browser before it goes up), edit, find it in My posts and delete it;
 - My profile: the photo picker refusing a text file beside it, Cancel upload pressed while a photo is still being
-  prepared sending nothing, a saved photo served as a 512-pixel square JPEG, and initials when a photo can't load; a
+  prepared sending nothing, a saved photo served as a 512-pixel square JPEG, and initials when a photo can't load, in
+  the member's own tone in the header and the picker alike, beside Demo University's initials in its ink on its tint; a
   headline, skills, a GitHub handle turned into its address and a past role, saved together, with an end year before
   the start refused in its row and a server error on `experiences.0.endYear` shown there; the meter moving to 75 with
   four skills, a link and a past role saved, asking for neither skills nor a link,
@@ -178,7 +186,7 @@ Covers:
   says where she stands once the API's live notice of a change refetches the list showing her decided elsewhere, and
   not opening again by itself when she waits again; Approve sending the status the notice showed, and the notice then
   showing Approved); a member's page showing Kiran Joshi's whole profile (headline, skills, past role, studies
-  elsewhere, Open to), and Make admin and Remove admin role each asking first (Cancel sending nothing), each toast
+  elsewhere, Open to), his initials in the same tone of his own in the list and on his page, and Make admin and Remove admin role each asking first (Cancel sending nothing), each toast
   naming Kiran, and both changes in the recent activity by the admin's name; his answers' Cancel putting back the
   saved ones, and the admin's own page, with its answers being edited, linking from its recent activity to Kiran's
   page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
@@ -192,16 +200,18 @@ Covers:
 - settings, saving only the switches that changed: every checkbox row 44px tall, a ticked switch's box in Demo
   College's ink with a drawn tick and a cleared one's grey edge at 3:1 (`expectChoiceLook`), and unchecking Messaging
   unchecking Mentorship and holding it (its label in the meta grey, unfaded), both coming back on;
-  Branding with Demo College's green chosen among the suggested colours (a drawn tick), a near-white colour typed
-  showing the contrast warning with Save branding still enabled, and Save held, saying why, while the script holds a
+  Branding with Demo College's green chosen among the suggested colours (a drawn tick) and the preview's initials in
+  its ink on its tint, a near-white colour typed showing the contrast warning with Save branding still enabled and the
+  initials following it, readable, and Save held, saying why, while the script holds a
   large logo's preparation, then free once the logo is in, with nothing saved;
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
   confirm dialog (Cancel first); importing an invitation CSV (once the profile questions are in) whose "Year Joined" and
   "Batch" columns are read as the start and end years ("Using phone, name, start year, end year.", 2011–2015 in the
-  preview's Years and on the row once imported), and joining through its link in a second browser, with the name and
-  both years filled in and the three steps; another invitation revoked through its confirm dialog (Cancel first sends
+  preview's Years and on the row once imported), and joining through its link in a second browser, the invitation
+  page's logo initials in Demo College's ink on its tint though no theme colours the page, with the name and both
+  years filled in and the three steps; another invitation revoked through its confirm dialog (Cancel first sends
   nothing); an announcement that also goes by email, asked first in the app's dialog with the email box's count and
   the billing line, Cancel posting nothing, then Post and send; Demo University's Send pending asking first in a dialog
   that says it's billed (Cancel sends nothing), a refusal (answered by the script, as for a plan that stopped sending)
@@ -227,7 +237,8 @@ Covers:
   colour saved and tinting the page (Demo University's tint) with its grey text a shade darker (the meta grey, then the
   secondary one, readable on each), on the feed after a reload too, with post cards painting their own white; the
   console's dashboard and Branding tab staying on the plain page; and Plain putting the page and its grey text back;
-- the platform console: login, onboarding an institution with its first admin, whose years are asked under a
+- the platform console: login, the Institutions list drawing each institution's initials in its own colour (Demo
+  University's blue, Demo College's green), onboarding an institution with its first admin, whose years are asked under a
   college's labels, an end before the start refused on its box with nothing created, and the admin then listed with
   2010–2014 on the Admins tab; a billing plan and usage, stats and user search, the institution comparison and its CSV,
   the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
@@ -271,9 +282,11 @@ Covers:
   and the card gone after a reload;
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
-  taking it back, the celebrations card (a birthday row and an anniversary row with years) and a poll vote, marked with
-  a drawn check rather than a ✓, with "your vote" in the row's hidden text; a poll with several choices, its drawn boxes
-  saying which are chosen (`aria-checked`) before the vote;
+  taking it back, the author's initials on the post in the member's own tone, not the institution's colours, the same as
+  on the app bar's My profile, beside the app bar's Demo University initials in its ink on its tint, the celebrations
+  card (a birthday row and an anniversary row with years) and a poll vote, marked with a drawn check rather than a ✓,
+  with "your vote" in the row's hidden text; a poll with several choices, its drawn boxes saying which are chosen
+  (`aria-checked`) before the vote;
 - Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
   nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
@@ -282,7 +295,8 @@ Covers:
   confirm sheet, saying a suspension or blocks come back with the number, cancelled with the account still there;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; My posts from the More
   hub, its tabs scrolling rather than truncating;
-- jobs: seeded cards with place, pay, experience and "+1 more" skills; the Work mode and experience filters behind
+- jobs: seeded cards with place, pay, experience and "+1 more" skills, and Zylo Labs's and Deloitte's initials in a
+  tone from each company's name, two tones apart and not the institution's; the Work mode and experience filters behind
   Filters, and Clear filters; the Backend Engineer page, its title the only heading holding it, with its facts, section
   headings, About the company, a How to apply link opening in a new tab with noopener, and Apply;
 - matching skills: before the member has any, the Backend Engineer card marking none and its page offering "Add your
@@ -341,8 +355,9 @@ Covers:
   Mentorship and holding it with "Needs Messaging" (its label in the meta grey), and Funding saved off (sending only
   that switch) with More dropping it at once, then back on;
   Branding, from Settings' 44px row: the Samaj's orange chosen among the suggested colours, the tagline saved with the
-  preview following it, Save held (saying why) while the script holds a large logo's preparation and free again once
-  it's cancelled, with nothing uploaded, a near-white colour showing the contrast warning without holding Save, "#12"
+  preview following it and its initials in the orange's ink on its tint, Save held (saying why) while the script holds
+  a large logo's preparation and free again once it's cancelled, with nothing uploaded, a near-white colour showing the
+  contrast warning without holding Save and the preview's initials following it, readable, "#12"
   refused under its box (and by Save) with nothing sent, Teal (a 44px radio) chosen and saved, the screen's and
   Settings' buttons taking it at once, and the Samaj's colour and tagline put back;
   Profile fields, adding "Seva team …" in the modal editor (the key following the question,
@@ -649,6 +664,10 @@ the console (part 14).
 - [ ] An empty list (Messages → Requests): its icon sits in a round, light tint of the brand colour and is drawn in the
       brand colour (blue at Demo University; part 14 checks it at the Samaj), and TalkBack or VoiceOver reads the title
       as a heading and doesn't stop on the icon.
+- [ ] A member without a photo has the same initials colour on their post, in the directory, on their profile, in a
+      chat with them and in the console's members list, and a different one from most other members; the institution's
+      own initials (the app bar, Businesses, a group) are its colour on a pale tint, and on the start screen each
+      institution's are in its own colour.
 - [ ] Tags have a thin edge in their colour that you can see outdoors, at Demo University and at Shri Gujarati Samaj:
       a post's Announcement badge, a job card's skills and a pending member's badge in the console. On an event, the
       chosen RSVP is its colour (green for I'm going) with a check, the label not cut off at the largest text size, and

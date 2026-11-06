@@ -40,7 +40,7 @@ export function TenantPickerPage() {
           {tenants.data?.length === 0 && <EmptyState title="No institutions found" description="Try a different search, or ask your alumni office to join Illuminize." />}
           {tenants.data?.map((t) => (
             <Link key={t.id} to={`/t/${t.slug}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow">
-              <Avatar name={t.shortName ?? t.name} src={t.logoUrl} />
+              <Avatar name={t.shortName ?? t.name} src={t.logoUrl} brandColor={t.primaryColor} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-slate-900">{t.name}</div>
                 <div className="text-sm text-slate-500">

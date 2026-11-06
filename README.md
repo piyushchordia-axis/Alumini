@@ -520,6 +520,18 @@ count it.
   photo**, the photo prepared as above, progress, and cancel. Errors show inline and are announced. Saving waits while
   a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop. An avatar
   shows initials until its photo loads, and falls back to them if it fails.
+- **Initials have colours.** A member's initials take one of 8 tones (`AVATAR_TONES` in
+  `packages/shared/src/lib/avatar.ts`: a light circle with a dark shade of its hue, 5.4:1 or more), hashed from their
+  membership id (`avatarTone`), so they have the same colour on the feed, comments, the directory, their profile, chats,
+  celebrations, mentors, referrals, groups and both admin consoles, on the web and the phone. A person has a tone per
+  institution, since each membership is its own. Registering, before there is a membership, the photo picker shows the
+  institution's colours. Institutions, businesses and groups keep the brand: its ink on its solid 12% tint
+  (`brandAvatarTone`, from `brandTones`), 4.5:1 for any colour, the cover included. A list of several institutions (the
+  tenant picker and start screen, My profile's institutions, the platform's Institutions, Compare and institution
+  pages) draws each in its own colour, the web invitation page, which no institution's theme colours, the invited
+  institution's, and the Branding previews the colour being chosen. A job's company tile takes
+  a tone from the company's name. The palette is separate from the charts' `SERIES`; `avatar.test.ts` checks every
+  tone's contrast, how evenly ids spread and that a key keeps its tone.
 
 ### Appearance
 
@@ -1206,6 +1218,7 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   memberYears.ts: a member's start and end years, their text and their rules; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
                   phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
+                  avatar.ts: the colours of initials (avatarTone, brandAvatarTone);
                   tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
                   buttons, tones and open state; appearance.ts: a member's background; admin.ts and its siblings:
                   what both admin consoles share)

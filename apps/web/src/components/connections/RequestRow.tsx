@@ -41,7 +41,7 @@ export function RequestRow({
     // so focus has somewhere to land when an action takes away the button that had it.
     <article id={id} tabIndex={-1} aria-labelledby={nameId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
       <div className="flex items-start gap-3">
-        <Avatar name={name} src={member?.avatarUrl} size="md" />
+        <Avatar name={name} src={member?.avatarUrl} size="md" toneKey={member?.id} />
         <div className="min-w-0 flex-1">
           {/* The status follows the name, and wraps under it on a phone rather than squeezing it. */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

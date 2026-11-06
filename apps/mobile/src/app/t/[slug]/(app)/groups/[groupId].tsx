@@ -69,7 +69,7 @@ function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: ()
   const line = memberYearsLine(member, row.blockedByMe && "You blocked them");
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
-      <Avatar name={member.fullName} src={member.avatarUrl} size={36} />
+      <Avatar name={member.fullName} src={member.avatarUrl} size={36} toneKey={member.id} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
           {member.fullName}

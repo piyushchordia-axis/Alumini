@@ -3,7 +3,7 @@ import { useId } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Defs, LinearGradient, Rect, Stop, Svg } from "react-native-svg";
 import { Avatar } from "@/components/ui";
-import { colors, radius, spacing, ThemeProvider } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 
 /**
  * The institution's look as the Branding form has it, before it's saved: the logo, name and tagline on a gradient from
@@ -41,9 +41,7 @@ export function BrandPreview({
       </Svg>
       {/* On white, so the initials' brand tint doesn't vanish into the brand gradient; in the colours being chosen. */}
       <View style={styles.logo}>
-        <ThemeProvider tenant={{ primaryColor: colours.from, secondaryColor: colours.to }}>
-          <Avatar name={initialsOf} src={logoUrl} size={56} />
-        </ThemeProvider>
+        <Avatar name={initialsOf} src={logoUrl} size={56} brandColor={colours.from} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[styles.caption, { color: colours.text }]}>Preview</Text>

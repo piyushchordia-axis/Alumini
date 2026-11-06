@@ -39,7 +39,7 @@ export function MemberAppBar() {
           )}
         </Pressable>
         <Pressable onPress={() => router.push(`/t/${slug}/profile`)} hitSlop={8} accessibilityRole="button" accessibilityLabel="My profile" style={{ padding: 4 }}>
-          <Avatar name={membership.fullName} src={membership.avatarUrl} size={30} />
+          <Avatar name={membership.fullName} src={membership.avatarUrl} size={30} toneKey={membership.id} />
         </Pressable>
       </View>
     </View>

@@ -47,7 +47,7 @@ export function RequestRow({
   return (
     <View style={[card, { padding: spacing.lg, gap: spacing.md }]}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
-        <Avatar name={name} src={member?.avatarUrl} size={44} />
+        <Avatar name={name} src={member?.avatarUrl} size={44} toneKey={member?.id} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           {/* The status follows the name, and wraps under it rather than squeezing it. */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: spacing.sm, rowGap: 4 }}>

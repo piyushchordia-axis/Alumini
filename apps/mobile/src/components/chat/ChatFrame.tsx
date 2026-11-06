@@ -49,7 +49,7 @@ export function ChatHeader({ title, member, subtitle, actions }: { title: string
             {Platform.OS === "ios" ? "‹" : "←"}
           </Text>
         </Pressable>
-        {member !== undefined && <Avatar name={title} src={member?.avatarUrl} size={36} />}
+        {member !== undefined && <Avatar name={title} src={member?.avatarUrl} size={36} toneKey={member?.id} />}
         <View style={{ flex: 1, minWidth: 0, paddingHorizontal: spacing.xs }}>
           <Text role="heading" numberOfLines={1} style={{ fontSize: 16, fontWeight: "700", color: colors.text }}>
             {title}

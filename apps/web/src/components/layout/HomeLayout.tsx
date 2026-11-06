@@ -118,7 +118,7 @@ export function HomeLayout() {
               {!!unreadCount && <NavBadge count={unreadCount} className="absolute -right-0.5 -top-0.5" />}
             </NavLink>
             <NavLink to={`${base}/profile`} className="rounded-full" aria-label="My profile">
-              <Avatar name={membership.fullName} src={membership.avatarUrl} size="sm" />
+              <Avatar name={membership.fullName} src={membership.avatarUrl} size="sm" toneKey={membership.id} />
             </NavLink>
           </div>
         </div>

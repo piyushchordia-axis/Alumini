@@ -25,6 +25,7 @@ import { colors, radius, spacing, useTheme } from "@/theme";
  */
 export type ProfileView = Pick<
   MembershipDto,
+  | "id"
   | "fullName"
   | "avatarUrl"
   | "startYear"
@@ -89,7 +90,7 @@ export function ProfileSummary({ profile, nameExtras, children }: { profile: Pro
   const badges = !!profile.isOpenToWork || !!profile.isMentor || profile.openTo.length > 0;
   return (
     <View style={styles.summary}>
-      <Avatar name={profile.fullName} src={profile.avatarUrl} size={88} />
+      <Avatar name={profile.fullName} src={profile.avatarUrl} size={88} toneKey={profile.id} />
       <Row style={{ justifyContent: "center", marginTop: spacing.xs }}>
         <Text {...headingRole(2)} style={styles.name}>
           {profile.fullName}

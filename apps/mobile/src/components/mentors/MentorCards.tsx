@@ -41,7 +41,7 @@ export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardD
       style={({ pressed }) => [card, { padding: spacing.lg, gap: spacing.sm, backgroundColor: pressed ? colors.bg : colors.card }]}
     >
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
-        <Avatar name={member.fullName} src={member.avatarUrl} size={44} />
+        <Avatar name={member.fullName} src={member.avatarUrl} size={44} toneKey={member.id} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>{member.fullName}</Text>
           <Text style={{ fontSize: 13, color: "#475569" }}>{role}</Text>

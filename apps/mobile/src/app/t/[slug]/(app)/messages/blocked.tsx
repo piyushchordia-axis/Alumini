@@ -45,7 +45,7 @@ function BlockedMembers() {
         }
         renderItem={({ item: b }) => (
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md }}>
-            <Avatar name={b.member.fullName} src={b.member.avatarUrl} size={40} />
+            <Avatar name={b.member.fullName} src={b.member.avatarUrl} size={40} toneKey={b.member.id} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>
                 {b.member.fullName}

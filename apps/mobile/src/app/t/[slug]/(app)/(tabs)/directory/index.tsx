@@ -36,7 +36,7 @@ function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }
   return (
     <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, tagline, memberYearsLabel(member)].join(", ")}>
       <Row gap={12} style={{ flexWrap: "nowrap" }}>
-        <Avatar name={member.fullName} src={member.avatarUrl} size={48} />
+        <Avatar name={member.fullName} src={member.avatarUrl} size={48} toneKey={member.id} />
         <View style={{ flex: 1, gap: 2 }}>
           <Row gap={6}>
             <Text style={{ fontWeight: "700", color: colors.text }} numberOfLines={1}>

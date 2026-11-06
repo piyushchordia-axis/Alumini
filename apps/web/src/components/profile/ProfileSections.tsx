@@ -76,6 +76,7 @@ export function ProfileBasicsSection({ form: f }: { form: ProfileFormController 
           <AvatarPicker
             slug={f.tenant.slug}
             name={f.fullName ?? ""}
+            toneKey={f.initial?.id}
             value={field.value ?? null}
             error={fieldState.error?.message}
             onBusyChange={f.setPhotoBusy}

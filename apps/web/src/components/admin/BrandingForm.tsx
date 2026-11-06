@@ -10,7 +10,6 @@ import {
   fieldErrorsFrom,
   isSwatchChosen,
   normalizeHexInput,
-  parseHex,
   swatchLabel,
   type BrandingDraft,
   type TenantBrandingUpdate,
@@ -18,7 +17,7 @@ import {
 } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import clsx from "clsx";
-import { useCallback, useId, useState, type CSSProperties } from "react";
+import { useCallback, useId, useState } from "react";
 import { CountrySelect } from "@/components/common/CountrySelect";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { TimeZoneSelect } from "@/components/common/TimeZoneSelect";
@@ -110,9 +109,6 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
     });
   };
   const preview = brandPreviewColours(v, initial);
-  // The preview's initials in the colour being chosen (Tailwind's primary reads this variable), not the saved one.
-  const draftPrimary = parseHex(preview.from);
-  const initialsColour = draftPrimary ? ({ "--c-primary": `${draftPrimary.r} ${draftPrimary.g} ${draftPrimary.b}` } as CSSProperties) : undefined;
   const warnings = brandContrastWarnings(v);
   // The same words as the phone app's preview.
   const shownText = brandPreviewText(v);
@@ -146,9 +142,10 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
       }}
     >
       <div className="flex items-center gap-4 rounded-lg border border-slate-200 p-4" style={{ background: `linear-gradient(135deg, ${preview.from}, ${preview.to})`, color: preview.text }}>
-        {/* On white, so the initials' brand tint doesn't vanish into the brand gradient. */}
-        <span className="shrink-0 rounded-full bg-white p-0.5 shadow-sm" style={initialsColour}>
-          <Avatar name={shownText.initialsOf} src={v.logoUrl} size="lg" />
+        {/* On white, so the initials' brand tint doesn't vanish into the brand gradient; in the colour being chosen, not
+            the saved one. */}
+        <span className="shrink-0 rounded-full bg-white p-0.5 shadow-sm">
+          <Avatar name={shownText.initialsOf} src={v.logoUrl} size="lg" brandColor={preview.from} />
         </span>
         <div>
           <div className="text-xs uppercase tracking-wide opacity-80">Preview</div>

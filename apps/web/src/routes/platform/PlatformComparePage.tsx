@@ -134,7 +134,7 @@ export function PlatformComparePage() {
                   <tr key={r.tenant.id} className="whitespace-nowrap tabular-nums">
                     <td className="min-w-[13rem] whitespace-normal px-3 py-2">
                       <Link to={`/platform/tenants/${r.tenant.id}`} className="flex items-center gap-2 font-medium text-slate-900 hover:underline">
-                        <Avatar name={r.tenant.shortName ?? r.tenant.name} src={r.tenant.logoUrl} size="sm" />
+                        <Avatar name={r.tenant.shortName ?? r.tenant.name} src={r.tenant.logoUrl} size="sm" brandColor={r.tenant.primaryColor} />
                         <span className="min-w-0 max-w-[14rem]">
                           <span className="block">{r.tenant.name}</span>
                           <span className="block text-xs font-normal text-slate-500">

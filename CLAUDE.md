@@ -31,7 +31,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   offer (`memberStartYearOptions`, `memberEndYearOptions`) and their rules (`memberYearsIssues`); `lib/jobs.ts` a job's
   facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
-  of an institution colour (`brandTones`); `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
+  of an institution colour (`brandTones`); `lib/avatar.ts` initials' colours (`avatarTone`, `brandAvatarTone`);
+  `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
   `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
   `lib/branding.ts` the console's Branding form (`brandingSave`, `BRAND_SWATCHES`, `brandContrastWarnings`) and the
@@ -184,6 +185,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `ChoiceInput` stays a real input (forced colours get the native control back); a `Checkbox` row that must be a 44px
     target passes `min-h-11 py-3`, which keeps a one-line label centred. `color.test.ts` pins the pairs across the
     colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`).
+  - **Avatars.** A member's `Avatar` (both apps) passes `toneKey`, their membership id (`MemberCardDto.id`,
+    `ChatMemberDto.id`, a celebration's `membershipId`, your own `membership.id`), so their initials have one tone
+    (`avatarTone`) on every screen; never another id, or the colour changes from screen to screen. Institutions,
+    businesses and groups pass nothing and get the ink on the solid tint (web `primary-tint`, mobile
+    `theme.primaryTint`); a page no institution's theme colours passes the institution's `brandColor` (each one's in a
+    list of several, the invited one's on the web invitation page), as the Branding previews pass the colour being
+    chosen. `CompanyLogo` takes its tone from the company's name.
   - **Greys and tones.** Greys and status colours come from shared `lib/tones.ts`, and `tones.test.ts` pins their
     contrast. `GREYS`, darkest first: text, body (labels), secondary `#475569` (excerpts, and every grey on a tinted
     surface), meta `#5b6b80` (times, places, counts, bylines, hints, placeholders: the lightest grey text, 4.97:1 on
@@ -305,7 +313,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `apps/mobile/src/components/charts`. Their palette, ticks, number and week text and mark layouts are in
   `packages/shared/src/lib/charts.ts` (the Analytics cards in `lib/analytics.ts`), which web `chartUtils.ts` re-exports,
   so both apps place every mark alike. Series colours come from its validated `SERIES` (fixed order, colour-blind
-  checked), never from tenant brand colours.
+  checked), never from tenant brand colours. The initials' `AVATAR_TONES` (`lib/avatar.ts`) are a separate palette:
+  don't draw one from the other.
 - After adding a native Expo module (e.g. `react-native-svg`), restart Metro (`pnpm mobile`); a server started before
   the install will fail to resolve the package. Prefer `npx expo install <pkg>` inside `apps/mobile`.
 - Do not declare React components inside another component's render body (e.g. a local `NavLabel`): ESLint

@@ -116,7 +116,7 @@ function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: ()
   const line = memberYearsLine(member, row.blockedByMe && "You blocked them");
   return (
     <li className="flex min-h-14 items-center gap-3 px-4 py-2">
-      <Avatar name={member.fullName} src={member.avatarUrl} size="sm" />
+      <Avatar name={member.fullName} src={member.avatarUrl} size="sm" toneKey={member.id} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-slate-900">
           {member.fullName}

@@ -18,6 +18,7 @@ const HINT = "Members recognise faces first. Large photos are made smaller for y
 export function AvatarPicker({
   slug,
   name,
+  toneKey,
   value,
   onChange,
   error,
@@ -25,6 +26,8 @@ export function AvatarPicker({
 }: {
   slug: string;
   name: string;
+  /** The membership's id, for the colour the initials have everywhere else; none until registration makes one. */
+  toneKey?: string | null;
   value: string | null;
   onChange: (url: string | null) => void;
   error?: string;
@@ -58,7 +61,7 @@ export function AvatarPicker({
   return (
     <View style={styles.panel} role="group" aria-label="Profile photo">
       <View style={styles.ring}>
-        <Avatar name={name} src={value} size={SIZE} />
+        <Avatar name={name} src={value} size={SIZE} toneKey={toneKey} />
       </View>
       <View style={{ alignItems: "center", gap: 2 }}>
         <Text style={styles.title}>Profile photo</Text>

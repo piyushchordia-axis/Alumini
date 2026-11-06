@@ -111,7 +111,7 @@ function ReferralRequest({ jobId }: { jobId: string }) {
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-          <Avatar name={poster} src={j.author.avatarUrl} size={40} />
+          <Avatar name={poster} src={j.author.avatarUrl} size={40} toneKey={j.author.id} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>Posted by {poster}</Text>
             <Text style={{ fontSize: 13, color: "#475569" }}>{memberRoleLine(j.author)}</Text>

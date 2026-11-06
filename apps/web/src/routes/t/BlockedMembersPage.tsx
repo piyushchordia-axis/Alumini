@@ -45,7 +45,7 @@ export function BlockedMembersPage() {
             <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
               {list.items.map((b) => (
                 <li key={b.member.id} className="flex items-center gap-3 px-4 py-3">
-                  <Avatar name={b.member.fullName} src={b.member.avatarUrl} size="md" />
+                  <Avatar name={b.member.fullName} src={b.member.avatarUrl} size="md" toneKey={b.member.id} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-900">{b.member.fullName}</p>
                     <p className="truncate text-xs text-slate-500">{memberYearsLine(b.member, `Blocked ${formatDate(b.createdAt)}`)}</p>

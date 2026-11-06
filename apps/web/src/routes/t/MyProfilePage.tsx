@@ -110,7 +110,7 @@ export function MyProfilePage() {
         <ul className="mt-3 divide-y divide-slate-100">
           {memberships.map((m) => (
             <li key={m.id} className="flex items-center gap-3 py-2">
-              <Avatar name={m.tenant.shortName ?? m.tenant.name} src={m.tenant.logoUrl} size="sm" />
+              <Avatar name={m.tenant.shortName ?? m.tenant.name} src={m.tenant.logoUrl} size="sm" brandColor={m.tenant.primaryColor} />
               <span className="flex-1 text-sm">
                 {m.tenant.name} <span className="text-slate-400">· {m.status.toLowerCase()}</span>
               </span>

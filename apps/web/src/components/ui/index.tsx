@@ -1,6 +1,6 @@
-import type { ToneName } from "@illuminize/shared";
+import { avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
 import clsx from "clsx";
-import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { IconCheck, IconChevronRight, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
@@ -375,19 +375,44 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
   );
 }
 
-export function Avatar({ name, src, size = "md", className }: { name: string; src?: string | null; size?: "sm" | "md" | "lg" | "xl"; className?: string }) {
+/**
+ * A photo, or initials in its place. A member's initials pass `toneKey`, their membership id, for a colour of their own
+ * (avatarTone) that is the same on every screen. A page no institution's theme colours passes the institution's
+ * `brandColor` (each one's in a list of several, the invited one's on the invitation page). Otherwise (this institution,
+ * a business, a group) they are the brand's ink on its solid tint.
+ */
+export function Avatar({
+  name,
+  src,
+  size = "md",
+  className,
+  toneKey,
+  brandColor,
+}: {
+  name: string;
+  src?: string | null;
+  size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
+  toneKey?: string | null;
+  brandColor?: string | null;
+}) {
   const s = { sm: "h-8 w-8 text-xs", md: "h-10 w-10 text-sm", lg: "h-14 w-14 text-base", xl: "h-24 w-24 text-2xl" }[size];
   const iconSize = { sm: 16, md: 20, lg: 28, xl: 44 }[size];
   // The initials (or, with no name yet, a person icon) show while the photo loads and whenever it won't (deleted,
   // offline, blocked). Remembering which src loaded or failed, rather than flags, makes a new photo start over.
   const [failed, setFailed] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<string | null>(null);
+  const tone = useMemo(() => (toneKey ? avatarTone(toneKey) : brandColor ? brandAvatarTone(brandColor) : null), [toneKey, brandColor]);
   const photo = src && src !== failed ? src : null;
   const shown = !!photo && loaded === photo;
   const letters = initials(name);
   return (
-    // Once the photo is in, the tint goes, so a logo with see-through parts looks as it would on its own.
-    <span className={clsx("relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-primary", !shown && "bg-primary/15", s, className)}>
+    // Once the photo is in, the tint goes, so a logo with see-through parts looks as it would on its own. A tone is
+    // known only at run time, so it's an inline style.
+    <span
+      className={clsx("relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold", !tone && "text-primary-ink", !tone && !shown && "bg-primary-tint", s, className)}
+      style={tone ? { color: tone.fg, backgroundColor: shown ? undefined : tone.bg } : undefined}
+    >
       {!shown && (
         <span aria-hidden={photo ? true : undefined} className="flex items-center justify-center">
           {letters || <IconProfile size={iconSize} />}

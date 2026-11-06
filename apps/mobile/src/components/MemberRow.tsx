@@ -13,7 +13,7 @@ export function MemberRow({ slug, member, meta, size = 36 }: { slug: string; mem
   const line = memberYearsLine(member, meta ?? member.headline ?? member.companyName);
   return (
     <Pressable onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityRole="link" accessibilityLabel={`${member.fullName}, ${line}`} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-      <Avatar name={member.fullName} src={member.avatarUrl} size={size} />
+      <Avatar name={member.fullName} src={member.avatarUrl} size={size} toneKey={member.id} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontWeight: "600", color: colors.text }} numberOfLines={1}>
           {member.fullName}

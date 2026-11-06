@@ -25,7 +25,7 @@ export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardD
   return (
     <Card as="article" className="relative p-4 transition focus-within:ring-2 focus-within:ring-primary/30 hover:border-slate-300 hover:shadow">
       <div className="flex items-start gap-3">
-        <Avatar name={member.fullName} src={member.avatarUrl} size="md" />
+        <Avatar name={member.fullName} src={member.avatarUrl} size="md" toneKey={member.id} />
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-slate-900 [overflow-wrap:anywhere]">
             <Link to={mentorPath(slug, member.id)} aria-label={mentorCardLabel(mentor)} className="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none">

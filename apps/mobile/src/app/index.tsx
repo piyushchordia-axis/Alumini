@@ -47,7 +47,7 @@ export default function TenantPickerScreen() {
         ListEmptyComponent={!tenants.isLoading ? <EmptyState title="No institutions found" description="Ask your alumni office to join Illuminize." /> : undefined}
         renderItem={({ item: t }) => (
           <Pressable onPress={() => router.push(`/t/${t.slug}`)} accessibilityRole="button" accessibilityLabel={t.name} style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 14 }}>
-            <Avatar name={t.shortName ?? t.name} src={t.logoUrl} />
+            <Avatar name={t.shortName ?? t.name} src={t.logoUrl} brandColor={t.primaryColor} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontWeight: "600", color: colors.text }}>{t.name}</Text>
               <Text style={{ color: colors.muted, fontSize: 12 }}>{[t.city, countryName(t.country)].filter(Boolean).join(", ")}</Text>

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, paintedColour, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -333,6 +333,15 @@ try {
     const look = await expectChosenChip(chosen, "the chosen Like chip");
     if (look.icon.join(" ") !== "29 78 216") throw new Error(`the chosen icon is rgb ${look.icon.join(" ")}, not the brand's ink`);
     if (look.chip.join(" ") !== "223 230 250") throw new Error(`the chosen chip is rgb ${look.chip.join(" ")}, not the brand's wash`);
+    // The author's initials, on the post and on the app bar's My profile, are the member's own tone, the same in both and
+    // not the institution's colours, which its initials beside its name in the app bar keep: its ink on its tint.
+    const onPost = await expectInitials(card.getByText("MS", { exact: true }), "the author's initials on the post");
+    const { demoUniversity } = INSTITUTION_INITIALS;
+    if (onPost.behind === demoUniversity.behind || onPost.colour === demoUniversity.colour) throw new Error(`the author's initials on the post are rgb ${onPost.colour} on rgb ${onPost.behind}, the institution's colours, not a tone of their own`);
+    const myProfile = page.getByRole("button", { name: "My profile", exact: true }).locator("visible=true").last();
+    expectSameTone(onPost, await expectInitials(myProfile.getByText("MS", { exact: true }), "the app bar's initials"), "the member's initials on the post and in the app bar");
+    const appBarLogo = page.getByRole("heading", { name: "DemoU", exact: true }).locator("visible=true").last().locator("xpath=preceding-sibling::*[1]");
+    await expectInstitutionInitials(appBarLogo.getByText("D", { exact: true }), demoUniversity, "Demo University's initials in the app bar");
     await shot("m04b2-reaction-chosen");
     await chosen.click();
     await card.locator('[aria-label="Like"][aria-pressed="false"]').waitFor();
@@ -626,6 +635,10 @@ try {
     // Where it's done and what it pays, written from its work mode and its pay range, with its experience, and three of
     // its four skills with the rest counted.
     await backend.getByText("Zylo Labs · Mumbai · Remote", { exact: true }).waitFor();
+    // It has no logo, so its tile shows the company's initials in a tone from its name (amber), readable and not the
+    // institution's colours, as on the web app.
+    const zylo = await expectInitials(backend.getByText("ZL", { exact: true }), "Zylo Labs's initials on its job card");
+    if (zylo.behind === INSTITUTION_INITIALS.demoUniversity.behind || zylo.colour === INSTITUTION_INITIALS.demoUniversity.colour) throw new Error(`Zylo Labs's initials are rgb ${zylo.colour} on rgb ${zylo.behind}, the institution's colours, not a tone from its name`);
     await backend.getByText("₹25–40 LPA", { exact: true }).waitFor();
     await backend.getByText("3–6 years", { exact: true }).waitFor();
     await backend.getByText("+1 more", { exact: true }).waitFor();
@@ -665,6 +678,10 @@ try {
     const intern = onTop(page.getByRole("button", { name: /^Summer Intern – Strategy/ }));
     const apm = onTop(page.getByRole("button", { name: /^Associate Product Manager/ }));
     await intern.waitFor();
+    // Deloitte's tile is another company's tone (red), neither Zylo Labs's nor the institution's.
+    const deloitte = await expectInitials(intern.getByText("D", { exact: true }), "Deloitte's initials on its job card");
+    if (deloitte.behind === INSTITUTION_INITIALS.demoUniversity.behind || deloitte.colour === INSTITUTION_INITIALS.demoUniversity.colour) throw new Error(`Deloitte's initials are rgb ${deloitte.colour} on rgb ${deloitte.behind}, the institution's colours, not a tone from its name`);
+    if (deloitte.behind === zylo.behind) throw new Error("Zylo Labs's and Deloitte's initials are in the same tone");
     await onTop(page.getByRole("button", { name: "Filters", exact: true })).click();
     const workModes = onTop(page.getByRole("group", { name: "Work mode", exact: true }));
     await workModes.getByRole("button", { name: "Remote", exact: true }).click();
@@ -2812,6 +2829,8 @@ try {
     const preview = page.getByRole("img", { name: /^Preview, / }).locator("visible=true").last();
     await preview.getByText(changed, { exact: true }).waitFor();
     if (!(await preview.getAttribute("aria-label")).endsWith(`, ${changed}`)) throw new Error(`the preview is read as "${await preview.getAttribute("aria-label")}"`);
+    // Its initials are in the colour being chosen: the saved orange's ink on its tint, until another is typed.
+    await expectInstitutionInitials(preview.getByText("S", { exact: true }), INSTITUTION_INITIALS.samaj, "the preview's initials in the Samaj's orange");
     if ((await saved()).tagline !== changed) throw new Error("Save didn't send the tagline typed");
 
     // Nothing from here to Teal is saved.
@@ -2846,6 +2865,8 @@ try {
     // A colour too light for white text says what it does to buttons and links, and never stops a save.
     await primary.fill("#fef9c3");
     await page.getByText(/^White text is hard to read on this colour \(\d+\.\d:1\), so buttons filled with it use dark text/).locator("visible=true").first().waitFor();
+    // Still readable in a near-white colour: its ink, darkened, on its tint.
+    await expectInstitutionInitials(preview.getByText("S", { exact: true }), INSTITUTION_INITIALS.paleYellow, "the preview's initials in a near-white colour");
     if (await held()) throw new Error("the contrast warning held Save branding");
 
     // A colour that isn't one is refused under its box, said by Save too, and nothing is sent.

@@ -35,7 +35,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
           <ul className="mt-2 flex gap-2 overflow-x-auto pb-0.5">
             {d.items.map((c) => (
               <li key={`${c.membershipId}-${c.kind}`} className="flex min-w-[220px] shrink-0 items-center gap-2.5 rounded-lg bg-slate-50 px-2.5 py-2 ring-1 ring-slate-200/80">
-                <Avatar name={c.fullName} src={c.avatarUrl} size="sm" />
+                <Avatar name={c.fullName} src={c.avatarUrl} size="sm" toneKey={c.membershipId} />
                 <div className="min-w-0 flex-1">
                   <Link to={`/t/${slug}/app/directory/${c.membershipId}`} className="block truncate text-sm font-medium text-slate-900 hover:underline">
                     {c.isMe ? "You" : c.fullName}

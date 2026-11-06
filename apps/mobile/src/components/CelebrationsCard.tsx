@@ -37,7 +37,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
             {d.items.map((c) => (
               <View key={`${c.membershipId}-${c.kind}`} style={{ width: 220, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f8fafc", borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 8 }}>
                 <Pressable onPress={() => router.push(`/t/${slug}/directory/${c.membershipId}`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                  <Avatar name={c.fullName} src={c.avatarUrl} size={32} />
+                  <Avatar name={c.fullName} src={c.avatarUrl} size={32} toneKey={c.membershipId} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.text, fontWeight: "600", fontSize: 13 }} numberOfLines={1}>
                       {c.isMe ? "You" : c.fullName}

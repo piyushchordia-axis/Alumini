@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, INSTITUTION_INITIALS, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -335,6 +335,14 @@ try {
     await announcement.waitFor();
     await expectReadable(announcement, "the Announcement badge");
     await expectEdge(announcement, "the Announcement badge");
+    // One member, one colour: both pinned posts are Ananya Rao's, and her initials take the same tone on each, readable,
+    // and not the institution's tint, which only the institution's own initials keep.
+    const welcome = page.locator("article", { hasText: "Welcome to the official Demo University alumni network" }).first();
+    const [annAuthor, welcomeAuthor] = [ann, welcome].map((post) => post.locator('a[href*="/app/directory/"]').first());
+    if ((await annAuthor.getAttribute("href")) !== (await welcomeAuthor.getAttribute("href"))) throw new Error("the two pinned posts aren't by the same member");
+    const onAnnouncement = await expectInitials(annAuthor.getByText("AR", { exact: true }), "Ananya Rao's initials on the announcement");
+    expectSameTone(onAnnouncement, await expectInitials(welcomeAuthor.getByText("AR", { exact: true }), "Ananya Rao's initials on the welcome post"), "Ananya Rao's initials on her two posts");
+    if (onAnnouncement.behind === INSTITUTION_INITIALS.demoUniversity.behind) throw new Error("Ananya Rao's initials sit on the institution's tint, not a tone of her own");
     const poll = page.locator("article", { hasText: "Where should we hold the next London meetup?" }).first();
     await poll.waitFor();
     await poll.locator('[aria-label="Poll"] button:has-text("Shoreditch")').click();
@@ -406,6 +414,14 @@ try {
     const intern = page.locator("a", { hasText: "Summer Intern – Strategy" });
     await intern.waitFor();
     await page.locator("a", { hasText: "Zylo Labs · Mumbai · Remote" }).waitFor();
+    // The seeded jobs have no logo, so each card's tile shows the company's initials in a tone from its name, readable
+    // and not the institution's colours: Zylo Labs's amber and Deloitte's red, two companies apart.
+    const zylo = await expectInitials(backend.getByText("ZL", { exact: true }), "Zylo Labs's initials on its job card");
+    const deloitte = await expectInitials(intern.getByText("D", { exact: true }), "Deloitte's initials on its job card");
+    for (const look of [zylo, deloitte]) {
+      if (look.behind === INSTITUTION_INITIALS.demoUniversity.behind || look.colour === INSTITUTION_INITIALS.demoUniversity.colour) throw new Error(`a company's initials are rgb ${look.colour} on rgb ${look.behind}, the institution's colours, not a tone from its name`);
+    }
+    if (zylo.behind === deloitte.behind) throw new Error("Zylo Labs's and Deloitte's initials are in the same tone");
     // A card gives the pay and experience, and three of the seeded four skills with the rest counted.
     await backend.getByText("₹25–40 LPA", { exact: true }).waitFor();
     await backend.getByText("3–6 years", { exact: true }).waitFor();
@@ -837,6 +853,12 @@ try {
       await avatar.locator("img").waitFor({ state: "detached" });
       await avatar.getByText("ST", { exact: true }).waitFor();
     }
+    // In the member's own tone, the same in both and readable; the institution's initials beside them in the header are
+    // its ink on its tint, another colour.
+    const inHeader = await expectInitials(header.getByText("ST", { exact: true }), "the header's initials");
+    expectSameTone(inHeader, await expectInitials(picker.getByText("ST", { exact: true }), "the photo picker's initials"), "the member's initials in the header and the picker");
+    const logo = await expectInstitutionInitials(page.locator("header a", { hasText: "DemoU" }).first().getByText("D", { exact: true }), INSTITUTION_INITIALS.demoUniversity, "Demo University's initials in the header");
+    if (logo.behind === inHeader.behind) throw new Error("the member's initials are in the institution's colours");
     await shot("08f-profile-photo-unavailable");
     await page.unroute(images);
   });

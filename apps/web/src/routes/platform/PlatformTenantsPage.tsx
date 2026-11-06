@@ -46,7 +46,7 @@ export function PlatformTenantsPage() {
               <tr key={t.id} className="hover:bg-slate-50">
                 <td className="px-3 py-2">
                   <Link to={`/platform/tenants/${t.id}`} className="flex items-center gap-2">
-                    <Avatar name={t.shortName ?? t.name} src={t.logoUrl} size="sm" />
+                    <Avatar name={t.shortName ?? t.name} src={t.logoUrl} size="sm" brandColor={t.primaryColor} />
                     <span>
                       <span className="block font-medium text-slate-900">{t.name}</span>
                       <span className="block text-xs text-slate-500">

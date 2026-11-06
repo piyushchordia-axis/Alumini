@@ -76,7 +76,7 @@ function MentorRequestPage({ id }: { id: string }) {
       <PageHeader title="Request mentorship" />
       <Card className="p-5">
         <div className="flex items-start gap-3">
-          <Avatar name={name} src={m.member.avatarUrl} size="md" />
+          <Avatar name={name} src={m.member.avatarUrl} size="md" toneKey={m.member.id} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900 [overflow-wrap:anywhere]">{name}</p>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(m.member)}</p>

@@ -61,7 +61,7 @@ export function PostComposer() {
   return (
     <Card elevation={2} className="overflow-hidden p-0">
       <div className="flex items-start gap-3 p-4 pb-3">
-        <Avatar name={membership.fullName} src={membership.avatarUrl} className="mt-0.5" />
+        <Avatar name={membership.fullName} src={membership.avatarUrl} toneKey={membership.id} className="mt-0.5" />
         <div className="min-w-0 flex-1 space-y-3">
           <Textarea
             aria-label="New post"

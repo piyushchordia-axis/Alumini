@@ -1,5 +1,5 @@
-import { STATUS_TONES, type ToneName } from "@illuminize/shared";
-import { cloneElement, useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
+import { STATUS_TONES, avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
+import { cloneElement, useEffect, useEffectEvent, useMemo, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
@@ -431,25 +431,32 @@ export function Badge({ label, tone = "neutral", icon }: { label: string; tone?:
   );
 }
 
-export function Avatar({ name, src, size = 40 }: { name: string; src?: string | null; size?: number }) {
+/**
+ * A photo, or initials in its place, as on the web app. A member's initials pass `toneKey`, their membership id, for a
+ * colour of their own (avatarTone) that is the same on every screen; a list of several institutions passes each one's
+ * `brandColor`. Otherwise (this institution, a business, a group) they are the brand's ink on its solid tint.
+ */
+export function Avatar({ name, src, size = 40, toneKey, brandColor }: { name: string; src?: string | null; size?: number; toneKey?: string | null; brandColor?: string | null }) {
   const theme = useTheme();
   // The initials (or, with no name yet, a person icon) show while the photo loads and whenever it won't (deleted,
   // offline). Remembering which src loaded or failed, rather than flags, makes a new photo start over.
   const [failed, setFailed] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<string | null>(null);
+  const tone = useMemo(() => (toneKey ? avatarTone(toneKey) : brandColor ? brandAvatarTone(brandColor) : null), [toneKey, brandColor]);
   const photo = src && src !== failed ? src : null;
   const shown = !!photo && loaded === photo;
   const letters = initials(name);
+  const ink = tone?.fg ?? theme.primaryInk;
   return (
     // Once the photo is in, the tint goes, so a logo with see-through parts looks as it would on its own.
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: "hidden", backgroundColor: shown ? "transparent" : theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: "hidden", backgroundColor: shown ? "transparent" : (tone?.bg ?? theme.primaryTint), alignItems: "center", justifyContent: "center" }}>
       {!shown &&
         (letters ? (
-          <Text aria-hidden={!!photo} style={{ color: theme.primary, fontWeight: "700", fontSize: size * 0.36 }}>
+          <Text aria-hidden={!!photo} style={{ color: ink, fontWeight: "700", fontSize: size * 0.36 }}>
             {letters}
           </Text>
         ) : (
-          <IconProfile size={Math.round(size * 0.45)} color={theme.primary} />
+          <IconProfile size={Math.round(size * 0.45)} color={ink} />
         ))}
       {photo && (
         <Image

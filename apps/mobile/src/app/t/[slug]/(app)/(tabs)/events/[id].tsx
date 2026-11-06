@@ -120,7 +120,7 @@ export default function EventDetailScreen() {
         {attendees.items.map((m) => (
           <Pressable key={m.id} onPress={() => router.push(`/t/${slug}/directory/${m.id}`)} accessibilityRole="link">
             <Row gap={8}>
-              <Avatar name={m.fullName} src={m.avatarUrl} size={28} />
+              <Avatar name={m.fullName} src={m.avatarUrl} size={28} toneKey={m.id} />
               <Text style={{ color: colors.text }}>
                 {m.fullName} <Muted>· {memberYearsLabel(m)}</Muted>
               </Text>

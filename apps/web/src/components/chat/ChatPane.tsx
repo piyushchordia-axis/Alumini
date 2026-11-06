@@ -42,7 +42,7 @@ export function ChatNotice({ icon, title, text, children }: { icon?: ReactElemen
 export function ChatPaneHeader({ backTo, title, member, profileHref, subtitle, actions }: { backTo: string; title: string; member?: ChatMemberDto | null; profileHref?: string | null; subtitle?: ReactNode; actions?: ReactNode }) {
   const who = (
     <>
-      {member !== undefined && <Avatar name={title} src={member?.avatarUrl} size="sm" />}
+      {member !== undefined && <Avatar name={title} src={member?.avatarUrl} size="sm" toneKey={member?.id} />}
       <span className="min-w-0">
         <span className="block truncate text-base font-semibold text-slate-900">{title}</span>
         {subtitle && <span className="block truncate text-xs text-slate-500">{subtitle}</span>}

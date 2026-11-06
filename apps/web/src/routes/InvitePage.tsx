@@ -34,7 +34,8 @@ export function InvitePage() {
     <div className="flex min-h-full items-center justify-center p-6" style={{ background: `linear-gradient(160deg, ${tenant.primaryColor}14, transparent 60%)` }}>
       <Card className="w-full max-w-md p-6 text-center">
         <div className="flex justify-center">
-          <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} size="xl" />
+          {/* No institution's theme is applied on this page, so the logo's initials take the invited one's colour. */}
+          <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} size="xl" brandColor={tenant.primaryColor} />
         </div>
         <h1 className="mt-4 text-xl font-semibold text-slate-900">
           {firstName ? `${firstName}, you're invited` : "You're invited"} to join {tenant.name}

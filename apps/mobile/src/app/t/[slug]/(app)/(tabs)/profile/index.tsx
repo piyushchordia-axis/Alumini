@@ -108,7 +108,7 @@ export default function MyProfileScreen() {
         {memberships.map((m) => (
           <Row key={m.id} style={{ justifyContent: "space-between" }}>
             <Row gap={8}>
-              <Avatar name={m.tenant.shortName ?? m.tenant.name} src={m.tenant.logoUrl} size={28} />
+              <Avatar name={m.tenant.shortName ?? m.tenant.name} src={m.tenant.logoUrl} size={28} brandColor={m.tenant.primaryColor} />
               <Text style={{ color: colors.text }}>
                 {m.tenant.name} <Muted>· {m.status.toLowerCase()}</Muted>
               </Text>

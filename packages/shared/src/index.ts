@@ -11,6 +11,7 @@ export * from "./lib/welcome";
 export * from "./lib/richText";
 export * from "./lib/salary";
 export * from "./lib/color";
+export * from "./lib/avatar";
 export * from "./lib/tones";
 export * from "./lib/rsvp";
 export * from "./lib/appearance";

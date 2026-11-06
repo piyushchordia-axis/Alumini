@@ -87,7 +87,7 @@ function MentorRequest({ id }: { id: string }) {
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl + insets.bottom, gap: spacing.lg }}>
         <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
-            <Avatar name={name} src={m.member.avatarUrl} size={44} />
+            <Avatar name={name} src={m.member.avatarUrl} size={44} toneKey={m.member.id} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>{name}</Text>
               <Text style={{ fontSize: 13, color: "#475569" }}>{memberRoleLine(m.member)}</Text>

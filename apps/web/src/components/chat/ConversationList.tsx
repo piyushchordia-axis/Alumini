@@ -24,7 +24,7 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
         }
       >
         <span className="relative shrink-0">
-          <Avatar name={name} src={c.peer?.avatarUrl} size="md" />
+          <Avatar name={name} src={c.peer?.avatarUrl} size="md" toneKey={c.peer?.id} />
           {c.group && (
             <span aria-hidden className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-500 shadow ring-1 ring-slate-200">
               <IconGroups size={12} />

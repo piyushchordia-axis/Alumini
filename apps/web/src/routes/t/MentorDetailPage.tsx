@@ -81,7 +81,7 @@ function MentorDetailPage({ id }: { id: string }) {
       </Link>
       <Card className="p-5 sm:p-6">
         <div className="flex items-start gap-4">
-          <Avatar name={member.fullName} src={member.avatarUrl} size="lg" />
+          <Avatar name={member.fullName} src={member.avatarUrl} size="lg" toneKey={member.id} />
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold text-slate-900 [overflow-wrap:anywhere]">{member.fullName}</h1>
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(member)}</p>

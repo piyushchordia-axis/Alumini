@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -101,10 +101,17 @@ try {
 
   await step("a member's page shows the admin their whole profile", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
+    const searched = page.waitForResponse((r) => r.url().includes("/admin/members?") && new URL(r.url()).searchParams.get("q") === "Kiran Joshi");
     await page.getByLabel("Search members").fill("Kiran Joshi");
+    // His initials have a tone of his own, not the institution's colours, and keep it on his page. Read once the search
+    // has answered, so the row read is the one that stays.
+    await searched;
+    const inList = await expectInitials(page.locator("main li", { hasText: "Kiran Joshi" }).first().getByText("KJ", { exact: true }), "Kiran Joshi's initials in the members list");
+    if (inList.colour === INSTITUTION_INITIALS.demoCollege.colour) throw new Error("Kiran Joshi's initials are in the institution's ink, not a tone of his own");
     await page.locator("a", { hasText: "Kiran Joshi" }).first().click();
     await page.waitForURL(/\/admin\/members\/[0-9a-f-]+$/);
     await page.waitForSelector("h1:has-text('Kiran Joshi')");
+    expectSameTone(inList, await expectInitials(page.locator("main").getByText("KJ", { exact: true }), "Kiran Joshi's initials on his page"), "Kiran Joshi's initials in the list and on his page");
     await page.getByText("Founder of Joshi Robotics: warehouse robots for Indian logistics firms", { exact: true }).waitFor();
     await page.getByText("Warehouse automation", { exact: true }).waitFor();
     await page.getByText("Automation engineer", { exact: true }).waitFor();
@@ -485,6 +492,9 @@ try {
     await expectSvgNoEmoji(green, "the chosen suggested colour");
     const warning = page.getByText(/^White text is hard to read on this colour \(\d+\.\d:1\), so buttons filled with it use dark text/);
     if (await warning.count()) throw new Error("Demo College's green shows the contrast warning");
+    // The preview's initials are in the colour being chosen: the saved green's ink on its tint, until another is typed.
+    const previewInitials = page.getByText("Preview", { exact: true }).locator("xpath=../..").getByText("D", { exact: true });
+    await expectInstitutionInitials(previewInitials, INSTITUTION_INITIALS.demoCollege, "the preview's initials in Demo College's green");
     const brandingSaves = [];
     const countBranding = (request) => {
       if (request.method() === "PATCH" && request.url().endsWith("/admin/branding")) brandingSaves.push(request);
@@ -492,6 +502,8 @@ try {
     page.on("request", countBranding);
     await page.getByLabel("Primary colour hex code", { exact: true }).fill("#fef9c3");
     await warning.waitFor();
+    // Still readable in a near-white colour: its ink, darkened, on its tint.
+    await expectInstitutionInitials(previewInitials, INSTITUTION_INITIALS.paleYellow, "the preview's initials in a near-white colour");
     if ((await green.getAttribute("aria-checked")) !== "false") throw new Error("a typed colour left the green suggestion chosen");
     // A warning never stops a save.
     const saveBranding = page.getByRole("button", { name: "Save branding", exact: true });
@@ -617,6 +629,9 @@ try {
     try {
       await guest.goto(link);
       await guest.waitForSelector("text=Kavita, you're invited");
+      // No institution's theme colours this page (a fresh tab has the default blue), so its logo's initials take the
+      // invited institution's own colour: Demo College's ink on its tint.
+      await expectInstitutionInitials(guest.getByText("D", { exact: true }), INSTITUTION_INITIALS.demoCollege, "Demo College's initials on the invitation page");
       await guest.click("text=Accept invitation");
       await loginWithPhone(invitePhone, guest);
       await guest.waitForURL(/\/register$/);
@@ -1092,6 +1107,10 @@ try {
     await page.waitForURL(/\/platform\/tenants$/);
     await page.waitForSelector("text=Demo University");
     await page.waitForSelector("text=Demo International School");
+    // Each institution's initials in its own colour, as the list shows several.
+    const initialsOf = (name) => page.locator("main tr", { hasText: name }).first().getByText("D", { exact: true });
+    await expectInstitutionInitials(initialsOf("Demo University"), INSTITUTION_INITIALS.demoUniversity, "Demo University's initials in the platform's list");
+    await expectInstitutionInitials(initialsOf("Demo College"), INSTITUTION_INITIALS.demoCollege, "Demo College's initials in the platform's list");
     // The console's nav draws SVG icons, as the admin console's does, each link named by its label alone and 40px tall.
     const nav = page.locator('nav[aria-label="Platform sections"]');
     await expectSvgNoEmoji(nav, "the platform console's nav");

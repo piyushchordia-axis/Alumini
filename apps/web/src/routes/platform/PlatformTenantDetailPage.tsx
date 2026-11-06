@@ -57,7 +57,7 @@ export function PlatformTenantDetailPage() {
       <PageHeader
         title={
           <span className="flex items-center gap-3">
-            <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} />
+            <Avatar name={tenant.shortName ?? tenant.name} src={tenant.logoUrl} brandColor={tenant.primaryColor} />
             {tenant.name}
             <Badge tone={tenant.status === "ACTIVE" ? "success" : tenant.status === "SUSPENDED" ? "warning" : "neutral"}>{tenant.status}</Badge>
           </span>
@@ -185,7 +185,7 @@ function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: A
         {admins.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No admins yet.</li>}
         {admins.map((a) => (
           <li key={a.id} className="flex items-center gap-3 px-4 py-3">
-            <Avatar name={a.fullName} src={a.avatarUrl} size="sm" />
+            <Avatar name={a.fullName} src={a.avatarUrl} size="sm" toneKey={a.id} />
             <span className="flex-1 text-sm">
               <span className="font-medium text-slate-900">{a.fullName}</span>
               <span className="text-slate-500"> · {memberYearsLine(a, formatPhone(a.phone))}</span>

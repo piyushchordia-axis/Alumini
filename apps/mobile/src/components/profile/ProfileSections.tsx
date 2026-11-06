@@ -60,7 +60,7 @@ export function ProfileBasicsSection({ form: f }: { form: ProfileDraftController
   const years = memberYearFields(f.tenant.type);
   return (
     <View style={styles.stack}>
-      <AvatarPicker slug={f.tenant.slug} name={d.fullName} value={d.avatarUrl} error={errors.avatarUrl} onBusyChange={f.setPhotoBusy} onChange={f.setAvatar} />
+      <AvatarPicker slug={f.tenant.slug} name={d.fullName} toneKey={f.initial?.id} value={d.avatarUrl} error={errors.avatarUrl} onBusyChange={f.setPhotoBusy} onChange={f.setAvatar} />
       <Input label="Full name *" value={d.fullName} onChangeText={(v) => set("fullName", v)} error={errors.fullName} autoComplete="name" />
       <Input
         label={`${years.start.label} *`}

@@ -8,7 +8,7 @@ export function MemberCard({ slug, member }: { slug: string; member: DirectoryCa
   return (
     <Link to={`/t/${slug}/app/directory/${member.id}`}>
       <Card className="flex items-center gap-3 p-4 transition hover:border-slate-300 hover:shadow">
-        <Avatar name={member.fullName} src={member.avatarUrl} size="lg" />
+        <Avatar name={member.fullName} src={member.avatarUrl} size="lg" toneKey={member.id} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate font-semibold text-slate-900">{member.fullName}</span>

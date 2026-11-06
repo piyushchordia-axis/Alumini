@@ -27,7 +27,7 @@ export function AdminMemberRow({ slug, member, actions, you, disabled = false }:
         accessibilityLabel={name}
         style={({ pressed }) => [styles.who, pressed ? { opacity: 0.6 } : null]}
       >
-        <Avatar name={member.fullName} src={member.avatarUrl} size={AVATAR} />
+        <Avatar name={member.fullName} src={member.avatarUrl} size={AVATAR} toneKey={member.id} />
         <View style={styles.text}>
           <View style={styles.nameLine}>
             <Text numberOfLines={1} style={styles.name}>

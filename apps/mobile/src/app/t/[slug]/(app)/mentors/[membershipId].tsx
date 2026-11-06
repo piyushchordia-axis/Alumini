@@ -56,7 +56,7 @@ function MentorDetail({ id }: { id: string }) {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl + insets.bottom, gap: spacing.lg }}>
         <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.lg }}>
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
-            <Avatar name={member.fullName} src={member.avatarUrl} size={56} />
+            <Avatar name={member.fullName} src={member.avatarUrl} size={56} toneKey={member.id} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text role="heading" style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
                 {member.fullName}

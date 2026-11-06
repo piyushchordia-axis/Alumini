@@ -382,15 +382,15 @@ export async function expectEdge(locator, where, min = 3) {
 }
 
 /**
- * The seeded institutions' ink and wash ("r g b"), as brandTones gives them for their colours (Demo University's
- * #1d4ed8 is also both apps' default and the platform console's; color.test.ts pins all four inks and washes) and both
- * apps draw them.
+ * The seeded institutions' ink, wash and solid 12% tint ("r g b"), as brandTones gives them for their colours (Demo
+ * University's #1d4ed8 is also both apps' default and the platform console's; color.test.ts pins all four inks and
+ * washes) and both apps draw them.
  */
 export const BRAND_TONES = {
-  demoUniversity: { ink: "29 78 216", wash: "223 230 250" },
-  demoCollege: { ink: "4 118 86", wash: "220 236 231" },
-  demoSchool: { ink: "167 78 12", wash: "243 230 221" },
-  samaj: { ink: "184 62 14", wash: "245 228 221" },
+  demoUniversity: { ink: "29 78 216", wash: "223 230 250", tint: "228 234 250" },
+  demoCollege: { ink: "4 118 86", wash: "220 236 231", tint: "225 239 235" },
+  demoSchool: { ink: "167 78 12", wash: "243 230 221", tint: "246 234 225" },
+  samaj: { ink: "184 62 14", wash: "245 228 221", tint: "248 232 226" },
 };
 
 /**
@@ -475,6 +475,58 @@ export async function expectChoiceLook(choice, boxSelector, where, { checked, ti
   const tickContrast = contrastOf(stroke.colour, drawn.colour);
   if (tickContrast < 4.5) throw new Error(`${where}'s tick (rgb ${stroke.colour}) is ${tickContrast.toFixed(2)}:1 on its box (rgb ${drawn.colour}), under 4.5:1`);
   return result;
+}
+
+/**
+ * Fails unless the initials `locator` finds (the element holding the letters, as getByText finds it), standing in for a
+ * photo, read at 4.5:1 on a circle or tile of their own (rounded itself, or filling a rounded frame of about its size
+ * that clips it, as a company's tile fills its bordered frame), so initials that lost their tone and sit on the card
+ * can't pass. Gives { colour, behind, contrast }, as expectReadable does.
+ */
+export async function expectInitials(locator, where) {
+  const look = await expectReadable(locator, where);
+  const ownCircle = await locator.evaluate((el) => {
+    for (let box = el; box; box = box.parentElement) {
+      const style = getComputedStyle(box);
+      if (style.backgroundColor === "transparent" || /^rgba\(.*,\s*0\)$/.test(style.backgroundColor)) continue;
+      const { width, height } = box.getBoundingClientRect();
+      if (width > 128 || height > 128) return false;
+      for (let frame = box; frame; frame = frame.parentElement) {
+        const outer = frame.getBoundingClientRect();
+        if (outer.width > width + 4 || outer.height > height + 4) return false;
+        const framed = getComputedStyle(frame);
+        if (parseFloat(framed.borderTopLeftRadius) > 0 && (frame === box || framed.overflowX !== "visible")) return true;
+      }
+      return false;
+    }
+    return false;
+  });
+  if (!ownCircle) throw new Error(`${where} sit on no circle of their own`);
+  return look;
+}
+
+/** Fails unless two looks expectInitials gave are the same colours: one member's tone in two places. */
+export function expectSameTone(a, b, where) {
+  if (a.colour !== b.colour || a.behind !== b.behind) throw new Error(`${where} differ: rgb ${a.colour} on rgb ${a.behind}, then rgb ${b.colour} on rgb ${b.behind}`);
+}
+
+/**
+ * Institutions' initials as expectInitials reads them: the brand's ink on its solid tint (brandAvatarTone, pinned in
+ * avatar.test.ts), for Demo University (#1d4ed8), Demo College (#047857), the Samaj (#c2410c) and the pale yellow both
+ * Branding steps type (#fef9c3). No member's tone is any of these.
+ */
+export const INSTITUTION_INITIALS = {
+  demoUniversity: { colour: BRAND_TONES.demoUniversity.ink, behind: BRAND_TONES.demoUniversity.tint },
+  demoCollege: { colour: BRAND_TONES.demoCollege.ink, behind: BRAND_TONES.demoCollege.tint },
+  samaj: { colour: BRAND_TONES.samaj.ink, behind: BRAND_TONES.samaj.tint },
+  paleYellow: { colour: "103 106 98", behind: "255 254 248" },
+};
+
+/** Fails unless the initials `locator` finds are `want`, one of INSTITUTION_INITIALS, and read (expectInitials). */
+export async function expectInstitutionInitials(locator, want, where) {
+  const look = await expectInitials(locator, where);
+  if (look.colour !== want.colour || look.behind !== want.behind) throw new Error(`${where} are rgb ${look.colour} on rgb ${look.behind}, not the institution's ink on its tint (rgb ${want.colour} on rgb ${want.behind})`);
+  return look;
 }
 
 async function expectContrast(locator, property, where, min, says) {

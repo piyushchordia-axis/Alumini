@@ -79,7 +79,7 @@ export function AdminMembersPage() {
         {list.data?.data.map((m) => (
           <li key={m.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-1 items-start gap-3">
-              <Avatar name={m.fullName} src={m.avatarUrl} />
+              <Avatar name={m.fullName} src={m.avatarUrl} toneKey={m.id} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Link to={`/t/${slug}/admin/members/${m.id}`} className="font-medium text-slate-900 hover:underline">

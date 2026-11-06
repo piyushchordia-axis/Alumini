@@ -28,7 +28,7 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
       style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 68, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: pressed ? colors.bg : colors.card, borderBottomWidth: 1, borderBottomColor: colors.border })}
     >
       <View>
-        <Avatar name={name} src={c.peer?.avatarUrl} size={44} />
+        <Avatar name={name} src={c.peer?.avatarUrl} size={44} toneKey={c.peer?.id} />
         {c.group && (
           <View aria-hidden style={{ position: "absolute", right: -3, bottom: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
             <IconGroups size={13} color={colors.muted} />

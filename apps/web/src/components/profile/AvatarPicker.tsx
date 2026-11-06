@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 export function AvatarPicker({
   slug,
   name,
+  toneKey,
   value,
   onChange,
   error,
@@ -22,6 +23,8 @@ export function AvatarPicker({
 }: {
   slug: string;
   name: string;
+  /** The membership's id, for the colour the initials have everywhere else; none until registration makes one. */
+  toneKey?: string | null;
   value: string | null;
   onChange: (url: string | null) => void;
   error?: string;
@@ -86,7 +89,7 @@ export function AvatarPicker({
 
   return (
     <div role="group" aria-labelledby={titleId} aria-describedby={hintId} className="flex flex-col items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-slate-50 p-4 text-center sm:flex-row sm:text-left">
-      <Avatar name={name} src={value} size="xl" className="ring-4 ring-white shadow-[var(--shadow-1)]" />
+      <Avatar name={name} src={value} size="xl" toneKey={toneKey} className="ring-4 ring-white shadow-[var(--shadow-1)]" />
       <div className="min-w-0 flex-1">
         <p id={titleId} className="font-display text-sm font-semibold text-slate-900">
           Profile photo
