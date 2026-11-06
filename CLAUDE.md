@@ -24,7 +24,10 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
   `src/lib/profile.ts` holds the profile's sections and registration steps, strength, hidden inputs and "Use details
-  from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
+  from"; `lib/memberYears.ts` a member's years here: their text (`memberYearsLabel`, `memberYearsLine`; an
+  invitation's `invitationYearsLabel`), the inputs' labels by institution type (`memberYearFields`), the years they
+  offer (`memberStartYearOptions`, `memberEndYearOptions`) and their rules (`memberYearsIssues`); `lib/jobs.ts` a job's
+  facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
   of an institution colour (`brandTones`); `lib/appearance.ts` a member's background (`resolveAppearance`,
   `pageBackdrop` and the tiles both apps offer); `lib/branding.ts` the console's Branding form (`brandingSave`,
@@ -108,9 +111,18 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Profiles.** A form neither checks nor sends the inputs it hides (`hiddenProfileKeys`, `withoutHiddenProfileKeys`),
   and an edit (profile or job) leaves a key it doesn't send as stored: a new optional text field takes `.optional()`
   after `optionalTrimmed` (or works like jobs' `optionalText`), because bare `optionalTrimmed` turns a missing key into
-  null. The profile copy (`toPortableProfileDto`, "Use details from …") never carries the name, batch, what they do,
-  the institution's questions, marital status and kids, the phone setting or the photo, and carries the date of birth
-  only when the source profile shows the birthday on its feed.
+  null. The profile copy (`toPortableProfileDto`, "Use details from …") never carries the name, the years here (start
+  and end), what they do, the institution's questions, marital status and kids, the phone setting or the photo, and
+  carries the date of birth only when the source profile shows the birthday on its feed.
+- **Member years.** `startYear` (the year they joined) is required. `batchYear` is the end year, the year they left or
+  will leave, which `minBatchYear`/`maxBatchYear` bound; it is null at type OTHER for someone who still belongs, and
+  also, until the member gives one, at an institution retyped from OTHER (README → Known gaps), so code at every type
+  treats it as nullable (SQL wraps comparisons in `coalesce`, as `notCurrentPupil` does). The pupil rule reads it. A
+  member's years text goes through `memberYearsLabel` / `memberYearsLine` ("2008–2012", "1996–present"), never a
+  hand-built "Batch of", and an invitation's through `invitationYearsLabel` ("From 2008" when only the start is given);
+  a year input offers `memberStartYearOptions` / `memberEndYearOptions`, and every year rule goes through
+  `memberYearsIssues` (`lib/memberYears.ts`), which the forms, the invitation import and the API
+  (`assertMemberYears`) share. An edit is checked only when it sends a year, together with the stored other one.
 - **Rich text.** Long member-written text renders through `RichText` (web `components/common/RichText.tsx`, mobile
   `components/RichText.tsx`), never `dangerouslySetInnerHTML`; cards use `plainExcerpt`, forms show `RICH_TEXT_HINT`.
   Posts, comments and chat stay plain text.

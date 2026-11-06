@@ -5,10 +5,11 @@ branded starting page; alumni sign in with their mobile number (OTP over WhatsAp
 are approved automatically or by the institution's admins, and then use the community. Illuminize staff onboard
 institutions and keep offline billing (chargeback) records from a platform console.
 
-- **Members** (web and phone app): a profile with work and study history, skills and links (set up in three guided
-  steps), a community feed with polls and announcements, a jobs board with structured job posts and referral requests,
-  a funding board, a business directory, the batch directory, events with RSVPs, birthdays and anniversaries, a weekly
-  digest, and private contact: direct messages (each starting as a request), group chats and mentorship.
+- **Members** (web and phone app): a profile with the years they were there, work and study history, skills and links
+  (set up in three guided steps), a community feed with polls and announcements, a jobs board with structured job posts
+  and referral requests, a funding board, a business directory, the member directory, events with RSVPs, birthdays and
+  anniversaries, a weekly digest, and private contact: direct messages (each starting as a request), group chats and
+  mentorship.
 - **Institution admins** (web and phone app): member approval, content moderation and reports, chat reports with an
   audited view, feature switches and branding, profile questions, invitations, announcements, analytics and CSV
   exports.
@@ -107,11 +108,11 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 | Tenant admin, Demo University (`demo-university`) | `+919000000001` | members auto-approved, content published immediately; an open chat report and a reported business listing |
 | Tenant admin, Demo College (`demo-college`) | `+919000000002` | admin approves members **and** content; has pending members, pending posts/job/event/business listing and an open spam report |
 | Tenant admin, Demo School (`demo-school`) | `+919000000003` | admin approves members, content published immediately; messaging, groups and mentorship start off, as at any school |
-| Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | Jignesh Patel; type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
-| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` (Parth Joshi, Diya Raval) pending approval |
-| Members | `+9191000000xx` | see `apps/api/src/db/seed.ts` |
-| Current pupil, Demo School | `+919100000026` | Naina Sen, batch two years from now: never sees messages, groups, mentors or referrals |
-| Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months |
+| Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | Jignesh Patel, a member since 1998; type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
+| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` (Parth Joshi, Diya Raval) pending approval. Each has a "member since" year (Bhavin 1996, Hetal 2005, Nisha 2010), and all but Kiran Parikh (2008–2021) still belong ("2005–present") |
+| Members | `+9191000000xx` | see `apps/api/src/db/seed.ts`; each has a start and an end year, four years apart at the university and the college (Rahul and Priya 2008–2012), ten to twelve at the school (Aditya Reddy 1993–2004) |
+| Current pupil, Demo School | `+919100000026` | Naina Sen, who joined four years ago and leaves two years from now: never sees messages, groups, mentors or referrals |
+| Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months; their years follow the same pattern, and at the Samaj four in five still belong |
 
 Any other phone number registers as a brand-new member.
 
@@ -147,8 +148,9 @@ members, profile questions and jobs already there as they are.
   started working, past roles, a degree here, studies elsewhere, links and Open to. They come from a random stream of
   their own, so every other generated value is as it was.
 - **Profile questions.** Demo University no longer asks "Department", which field of study replaces, and its waiting
-  invitation for Harsh Vora prefills Hostel instead. Demo College's "Branch" and "Higher studies" became one filterable
-  multiple-choice question, "Clubs and societies".
+  invitation for Harsh Vora prefills Hostel instead, with his years (2012–2016). Demo College's "Branch" and "Higher
+  studies" became one filterable multiple-choice question, "Clubs and societies". Demo School no longer asks "Year you
+  joined the school", which every profile's start year replaces.
 - **Rich jobs.** Rahul's "Backend Engineer (Node.js)" at Zylo Labs fills in nearly everything: Remote from Mumbai,
   Mid level, 3–6 years, four skills, two openings, "₹25–40 LPA" with the pay note "Plus ESOPs", bulleted
   Responsibilities, Requirements and Benefits, How to apply with a link, and About the company. Priya's "Associate
@@ -166,7 +168,7 @@ before showing the demo.
 ### Tenants and membership
 
 - A **user** is a phone number (global). A **membership** is that user inside one tenant and carries the profile
-  (name, batch year, photo, date of birth, profession, company, designation, city/country, headline, work and study
+  (name, years here, photo, date of birth, profession, company, designation, city/country, headline, work and study
   history, skills, links, optional marital status and kids, bio, interests, and the institution's own profile
   questions: see **Profiles and onboarding**) and the approval state. One person can belong to several institutions.
 - **Profile questions** are defined per institution (up to 30: text, long text, number, date, single or multiple
@@ -247,10 +249,14 @@ nothing. The rules live in `packages/shared/src/lib/features.ts`.
 ### Current pupils
 
 A school can have pupils who haven't left yet. At a school only, with the year read in the institution's time zone, a
-member counts as a current pupil (`isCurrentPupil`) when their batch year is in the future, when they've entered a date
-of birth and are under 18, or when they've entered none and their batch year is this year. Adding a date of birth that
-shows 18 or over lifts the last rule. An admin that staff add with no batch year gets last year, so at a school they
-never count.
+member counts as a current pupil (`isCurrentPupil`) when their end year (the year they leave) is in the future, when
+they've entered a date of birth and are under 18, or when they've entered none and their end year is this year. Adding
+a date of birth that shows 18 or over lifts the last rule. A blank end year is neither in the future nor this year, so
+it never makes someone a pupil by itself, but the date of birth still decides: a member with a blank end year who is
+under 18 is a pupil. Only a community leaves it blank, and a school retyped from one can have blanks until members fill
+them in (see Known gaps). The SQL version (`notCurrentPupil`) wraps its end-year comparisons in `coalesce`, so a blank
+makes them false, not null (which `not` would keep null, dropping the row), and applies the date-of-birth rule as the
+app does. An admin that staff add with no years gets last year as both, so the end-year rules never make them a pupil.
 
 Current pupils can't use messages, groups, mentorship or referral requests, whatever the school switches on:
 
@@ -269,13 +275,13 @@ member's page and in the members CSV), the forms don't ask them for either, and 
 
 ### Profiles and onboarding
 
-A profile belongs to a membership, so someone in two institutions has two: the batch, the degree and admins' edits
+A profile belongs to a membership, so someone in two institutions has two: the years, the degree and admins' edits
 are the institution's own, and each admin's CSV export covers only their members. **Use details from …** (below)
-saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts` and `schemas/membership.ts`, so both apps
-and the API agree.
+saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts`, `lib/memberYears.ts` and
+`schemas/membership.ts`, so both apps and the API agree.
 
-- **Fields.** Besides name (2 to 100 characters), batch, date of birth, what they do, company and role (120 each),
-  city (80), country, bio (1000) and interests (20, of 40 characters each), a profile holds:
+- **Fields.** Besides name (2 to 100 characters), years here (below), date of birth, what they do, company and role (120
+  each), city (80), country, bio (1000) and interests (20, of 40 characters each), a profile holds:
   - a photo (see **Photos and uploads**);
   - a **headline** of up to 120 characters on one line (runs of spaces and line breaks become one space), shown under
     the name;
@@ -291,8 +297,35 @@ and the API agree.
   - **Open to**: Hiring, Collaborating and Investing. Open to work stays the job-seeker profile, and Mentor comes from
     the mentor profile: profiles and directory cards carry `isMentor` by the Mentors list's own rule, and the edit
     screen links to **Offer to mentor** for a member who can mentor and doesn't yet.
-- **Years** run from 1940 to this year, judged when the input is parsed rather than when the server started; studies
-  elsewhere may end up to 10 years ahead. An entry can't end before it starts.
+- **Years here.** Every member gives the year they joined and the year they left or will leave, so people can tell who
+  is who. A school, college or university asks "Year you joined" and "Year you left (or will leave)", both required. A
+  community (type OTHER, such as the Samaj) asks "Member since", required, and "Until (leave blank if you still are)",
+  which is optional: blank means they still belong (`memberYearFields`). The membership holds them as `startYear` and
+  `batchYear`, the end year, which is null at a community for someone who still belongs, and at an institution retyped
+  from a community until the member gives one (see Known gaps), so code treats it as nullable at every type. Both
+  apps' forms, the invitation import and the API apply the same rules (`memberYearsIssues`): the start runs from 1930
+  to this year; the end falls within the institution's Earliest and Latest batch year (Admin → Settings), and at a
+  community it can't be in the future; and the end is never before the start, which a CHECK constraint backs up.
+  Registering checks both years. An edit is checked only when it sends a year, together with the stored other one,
+  read under the membership's row lock, so a save that sends neither (an admin answering the institution's questions,
+  say) is never refused for years stored under an earlier rule. Admins can't change a member's years on either app
+  (see Known gaps).
+- **The years under every name.** `memberYearsLabel` writes them by hand, en dash included, for Hermes: "2008–2012",
+  "2012" when they joined and left in one year, "1996–present" with no end, and a pupil's end year ahead as it is. They
+  show in grey wherever members are named: post and comment authors; job, business, funding and event posters and
+  organisers; seekers, mentors, requests, event attendees, celebrations ("Birthday · 2008–2012") and the directory;
+  profiles (and the "here" entry of their studies); group members, invitation search and blocked members; and the
+  consoles' member rows and pages. Under a name they lead the grey line (`memberYearsLine`: "2008–2012 · Infosys"); on
+  one line they follow the name: "Posted by Hetal Shah (2005–present) · 3h ago", the moderation queue's "by Nisha Modi
+  (2010–present)", and an admin's notice, "Parth Joshi (2018–present) has requested to join." The chat list puts them
+  after the other member's name, as the line below is the message preview, and a direct chat's header shows them under
+  the name; a group's messages show names alone. The grey is each app's muted text (web `text-slate-500`, the phone's
+  `colors.muted`), not the fainter grey, which is too faint to read. A member's page in the admin console lists them as
+  "Years here", and the sign-up date, which used to read "Member since", reads "Registered" there and on member
+  profiles.
+- **Other years** (the year they started working, past roles and studies elsewhere) run from 1940 to this year, judged
+  when the input is parsed rather than when the server started; studies elsewhere may end up to 10 years ahead. An entry
+  can't end before it starts.
 - **Lists** travel whole in the same body as the rest of the profile and replace what's stored. The server stores past
   roles and studies newest first: by end year (or the start year when there's no end), then start year, with entries
   that have no years last.
@@ -318,7 +351,7 @@ and the API agree.
   doesn't send as stored (null or `[]` clears it), so leaving a hidden input out loses nothing beyond the school rule
   above.
 - **Profile pages.** A member's profile, My profile and the admin's member page share one layout on both apps: photo,
-  name, the headline (or else the role line, such as "CEO at Zylo Labs"), batch and place, and badges (Open to work,
+  name, the headline (or else the role line, such as "CEO at Zylo Labs"), years and place, and badges (Open to work,
   Mentor, each Open to choice); then links (a website named by its host, `rel="noopener noreferrer nofollow"`), the bio
   as rich text, skills, "N years of experience · industry", a timeline with the current role first and then past roles,
   studies here (not at schools) and elsewhere, and interests. Empty parts are left out. The edit form (under the
@@ -330,9 +363,11 @@ and the API agree.
 **Registration** walks through the same three sections on both apps, under a step bar: "Step 1 of 3 · Basics", then
 Work and About you.
 
-1. **Basics**: the photo, name and batch (still the first two inputs), what they do, date of birth, city and country,
-   and the institution's required questions. Everything registration requires is on this step, so skipping the others
-   is always safe.
+1. **Basics** ("Your photo, name and years here, so people know it's you."): the photo, the name, the two years, worded
+   for the institution (see "Years here" above), what they do, date of birth, city and country, and the institution's
+   required questions. Everything registration requires is on this step, so skipping the others is always safe. On the
+   web both years are selects that start blank; on the phone they're number-pad boxes, the end marked required only
+   where it is.
 2. **Work**: headline, company, role, industry, the year they started working, skills and past roles.
 3. **About you**: bio, interests, degree and field of study, studies elsewhere, links and Open to, the institution's
    optional questions, a **Personal** disclosure (marital status and kids) and the sharing switches.
@@ -368,7 +403,8 @@ Each step leaves out what the member isn't asked (see "Who is asked what" above)
   redirect replaced everything) never reaches `usePreventRemove`, as the navigator hands it straight to Android, so
   registration's own `BackHandler` answers it there, the same way. A double tap moves one step.
 - **Re-applying** after a rejection prefills every step and shows the reason above each. On a first registration the
-  name comes from the invitation, or else from the account.
+  name and both years come from the invitation, or else the name from the account. The subtitle asks newcomers to tell
+  their batchmates who they are, or at a community their fellow members.
 - **The draft stays in memory only**, as it holds personal details, and survives a background refetch failing.
 
 **Use details from another institution.** Step 1 offers "You have a profile at …" with a **Use details from …** button
@@ -377,7 +413,7 @@ institution (never one waiting, rejected or suspended, nor at a suspended or arc
 
 - It brings only details that belong to the person: city and country, headline, company, role, industry, the year they
   started working, skills, past roles, bio, interests, studies elsewhere (the degree and field of study there become one
-  entry named after that institution), links (checked against today's rules) and Open to. Never the batch, the
+  entry named after that institution), links (checked against today's rules) and Open to. Never the years here, the
   institution's questions, the **Personal** details (marital status and kids), the phone setting or the photo.
 - The date of birth comes only when that profile shows the birthday on its feed, because a new profile celebrates it
   until the member turns that off.
@@ -412,7 +448,14 @@ profile always shows what's left to add." in its place. My profile always shows 
 regardless of case), field of study (matched whole, like city) and Open to sit behind **More filters** (web) and
 **Filters** (mobile). `GET /directory/filters` returns the industries present and the 50 commonest skills and fields of
 study, merged across case and spelled as most members spell them (cached for five minutes). Cards show the headline (or
-the role line) and short Open to badges that screen readers hear in full.
+the role line), the years and place, and short Open to badges that screen readers hear in full.
+
+**Were there in** a year finds everyone whose years include it: members who had joined by then and left that year or
+later, or who still belong (`year`, which replaced `batchYear`). It stays in view beside the search on the web, a
+select with "Any year" and then "Were there in 2015" and so on, and on the phone it's a list behind **Filters**, as
+some 90 years wouldn't fit in a row of chips. `GET /directory/filters` offers `years` (which replaced `batchYears`):
+every year from the earliest an approved member joined to the latest anyone was there, never past this year in the
+institution's time zone, newest first (its cache key went to v4 with the change).
 
 ### Photos and uploads
 
@@ -618,19 +661,29 @@ per member, address, IP and globally (`EMAIL_VERIFY_GLOBAL_DAILY_CAP`). Links in
 
 ### Invitations
 
-Admins import a CSV (phone, and optionally name, batch, email and any profile-question key) from **Admin →
+Admins import a CSV (phone, and optionally name, start and end years, email and any profile-question key) from **Admin →
 Invitations** on the web or the phone; the app parses it (`packages/shared/src/lib/invitations.ts`) and sends it in
 chunks of 500, and each row comes back as new, updated, already a member or invalid with a reason, by its line in the
 file. Phones without a country code use the institution's country. A chunk that fails stops the import, which says how
 many rows went: importing the file again updates those rather than adding them twice, and it says to do so only when the
 failure may pass (the network, a limit, a server error). A row with a cell longer than the API takes at all ("Class of
-2012" as a batch) would fail its whole chunk, so the apps send it as a blank row, which the API leaves out on the same
+2012" as a year) would fail its whole chunk, so the apps send it as a blank row, which the API leaves out on the same
 line, and show their own reason for it (`importRowTooLong`). The phone picks the file with the document picker (Files,
 iCloud Drive, Google Drive) and saves the template through the share sheet (`apps/mobile/src/lib/files.ts`). The
 template carries a byte order mark so Excel reads names in any script; a list saved from Excel should be "CSV UTF-8", as
 a plain CSV loses them, and its phone column formatted as Text, as Excel and Google Sheets read a typed +919876543210 as
 a number (Excel then saves it as 9.19876E+11, which the API refuses).
 
+- **Years.** The start year's column may be headed start_year, start, year_joined, joined, member_since, since or from,
+  and the end year's end_year, end, batch, batch_year, year, graduation_year, year_left, until or to
+  (`INVITE_CSV_HEADERS`, read regardless of case and spacing), so an old list with a "Batch" column still gives the end
+  year; a column named for one of the institution's questions is that answer only. Either year may be blank, as the
+  member fills in what's missing: the API checks only what a row gives (`memberYearsIssues` with `required: false`),
+  in words about the person invited ("End year: Can't be before the start year"), and a blank year keeps what an
+  earlier import stored, a lone year being checked against it. The template's columns are `phone`, `name`,
+  `start_year`, `end_year`, `email` and the question keys, with an example from 2008 to 2012, or from 2008 with a blank
+  end year at a community, and the import's hint says so. The preview and the list show a row's years as "2008–2012",
+  "From 2008" or "2012" (`invitationYearsLabel`), and registration fills both in.
 - Sending uses the plan's channels (WhatsApp, SMS, email), at most `INVITES_DAILY_LIMIT` per institution per day and
   one resend per invitation per day. Without paid channels the admin copies the link or shares it from their own
   WhatsApp.
@@ -658,8 +711,9 @@ a number (Excel then saves it as 9.19876E+11, which the API refuses).
   runs as a background job in batches of 1000 and stops if the post is removed first. The feed's pinned strip shows
   five; further pinned posts stay in the feed with their badge.
 - **Celebrations.** A feed card lists today's birthdays (day and month only, never the year) and membership
-  anniversaries (from the approval date), with *Send wishes*. The member gets one greeting, and wishes collect into one
-  notification ("Asha and 23 others…"). Members can opt out of either in their profile.
+  anniversaries (from the approval date), each with the member's years here ("3 years with us · 2008–2012"), with *Send
+  wishes*. The member gets one greeting, and wishes collect into one notification ("Asha and 23 others…"). Members can
+  opt out of either in their profile.
 - **Weekly digest.** Every Monday the top posts, new jobs and upcoming events of the past week are saved for each
   institution, shown in the app ("This week") and emailed to members with a confirmed email who haven't turned it off.
   Only ids are stored, so content removed since never appears.
@@ -691,14 +745,18 @@ needed. Bulk notifications are written in chunks of 1000 with dedupe keys and br
 
 **Admin → Analytics** charts the last 12 weeks, 6 months or 12 months (weeks start on Monday in the institution's time
 zone): new and active members per week (active means the same as for billing), posts, comments, jobs and events per
-week, and who the members are (batches, cities, countries, professions, profile completeness, answers to choice
+week, and who the members are (years, cities, countries, professions, profile completeness, answers to choice
 questions, invitation funnel), with each headline number compared with the period before. Every chart has a table
-view. Profile completeness counts photo, headline, city, company, industry, skills, past roles, education (a degree or
-field of study here, or studies elsewhere), birthday, LinkedIn, any link and confirmed email. *Members CSV* exports
-every member with all profile answers (admin-only ones included) and confirmed email, and after "Last active" the
-profile's own details: headline, industry, the year they started working, skills, degree, field of study, past roles,
-studies elsewhere, each link and Open to (a list in one cell; no degree columns at a school). *Activity CSV* gives
-active days and content per member for the chosen period. Exports stream in batches of 1000,
+view. **Members by batch** counts approved members by their end year ("Batch of 2012"); a community, where most members
+have no end year, has **Members by year joined** in its place, by the start year ("Joined in 1996"), as the API's
+`coverage.yearsOf` says (`BATCH` or `JOINED`). A member with no end year is left out of a batch chart. Profile
+completeness counts photo, headline, city, company, industry, skills, past roles, education (a degree or field of study
+here, or studies elsewhere), birthday, LinkedIn, any link and confirmed email. *Members CSV* exports every member with
+their Start year and End year (blank for a community member who still belongs), all profile answers (admin-only ones
+included) and confirmed email, and after "Last active" the profile's own details: headline, industry, the year they
+started working, skills, degree, field of study, past roles, studies elsewhere, each link and Open to (a list in one
+cell; no degree columns at a school). *Activity CSV* gives each member's Start year and End year, then active days and
+content per member for the chosen period. Exports stream in batches of 1000,
 start with a UTF-8 BOM so Excel reads them correctly, prefix cells starting with `= + - @` with `'` so spreadsheets
 don't run them as formulas (this includes `+91…` phone numbers), and are audited and rate-limited.
 
@@ -708,7 +766,7 @@ the axis ticks, where every mark goes, and the number and week text, written by 
 Hermes lacks parts of ("1,234", "10K", "2 Nov"). The web draws SVG (`apps/web/src/components/charts`) and the phone
 app `react-native-svg` (`apps/mobile/src/components/charts`). On the phone the period is a row of chips kept in the
 address (`?weeks=26`), the charts stay up while another period loads, a finger scrubs through a column or line
-chart's weeks (or batches) with the chosen one named on a line above it, and a screen reader finds each such chart as
+chart's weeks (or years) with the chosen one named on a line above it, and a screen reader finds each such chart as
 one adjustable control whose value is that line. The exports go to the share sheet, with their BOM (`lib/files.ts`).
 
 ### Jobs
@@ -1094,8 +1152,8 @@ apps/api/src
   routes/         public, auth, me, tenant (member + admin), platform
   services/otp/   console / WhatsApp Cloud / MSG91 senders behind one interface
 apps/api/drizzle  SQL migrations (generated; some hand-written parts: pg_trgm, the moderation_items view, the
-                  content_type rebuilds in 0019 and 0023, the LinkedIn clean-up in 0028, the jobs backfill in 0029 and
-                  the deletion audit rows' phone numbers removed in 0032)
+                  content_type rebuilds in 0019 and 0023, the LinkedIn clean-up in 0028, the jobs backfill in 0029,
+                  the deletion audit rows' phone numbers removed in 0032 and the start years backfilled in 0034)
 apps/api/test     vitest unit + integration tests (real Postgres, in-memory Redis; helpers/images.ts makes real images)
 apps/web/src      routes/ (member app, t/admin, platform), components/ (ui, icons, feed, layout, profile, jobs,
                   common/RichText…), hooks/, stores/; design tokens in index.css (Manrope + Source Sans 3,
@@ -1106,7 +1164,8 @@ apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and o
 packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client, upload
                   helpers), realtime/ (events and client), chat/ (chat cache and live sync, no React),
                   lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections;
-                  profile.ts: profile sections, registration steps, strength and "Use details from"; skills.ts;
+                  profile.ts: profile sections, registration steps, strength and "Use details from";
+                  memberYears.ts: a member's start and end years, their text and their rules; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
                   phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
                   appearance.ts: a member's background; admin.ts and its siblings: what both admin consoles share)
@@ -1131,9 +1190,9 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 
 The directory and the jobs board filter by query parameter, besides `cursor` and `limit`:
 
-- `GET /t/:slug/directory`: `q` (name, company, role, headline or skill), `batchYear`, `city`, `country`,
-  `professionType`, `company`, `industry`, `skill`, `fieldOfStudy`, `openTo`, and `field=key:value` (repeatable).
-  `GET /directory/filters` lists the choices.
+- `GET /t/:slug/directory`: `q` (name, company, role, headline or skill), `year` (were there in that year; it replaced
+  `batchYear`), `city`, `country`, `professionType`, `company`, `industry`, `skill`, `fieldOfStudy`, `openTo`, and
+  `field=key:value` (repeatable). `GET /directory/filters` lists the choices (`years` replaced `batchYears`).
 - `GET /t/:slug/jobs`: `q` (title, company or skill), `jobType`, `workMode` (which replaced `remote`), `seniority`,
   `experience` (years), `location`, `canRefer`, `mine` and `includeClosed`. It returns `JobCardDto`s; `GET /jobs/:id`
   returns the full job.
@@ -1284,7 +1343,7 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   from the hash by trying every number. It must cover too the raw numbers a deletion still leaves: in invitations, in
   outbound message records, and in the `platform.tenant.create` audit row of an institution whose first admin they
   were (its `initialAdmin`).
-- **The pupil rule trusts what members enter.** A pupil who gives a false batch year or date of birth gets through.
+- **The pupil rule trusts what members enter.** A pupil who gives a false end year or date of birth gets through.
 - **A blocked member's abuse is invisible to admins,** because withheld messages can't be reported.
 - **Reporting a sole admin's message** stops them suspending anyone or changing roles until staff close the report.
 - **A reported admin keeps some reach over the reporter:** they can still moderate the reporter's posts and see the
@@ -1367,6 +1426,18 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
+- Member years:
+  - Retyping an institution away from a community (type OTHER) leaves its members' blank end years blank until each
+    gives one, which their next profile save asks for. Until then they read "–present" ("1996–present"), count as there
+    in every later year in the directory's Were there in, are left out of Members by batch, and at a school count as
+    current pupils only if their date of birth shows them under 18.
+  - Admins can't edit a member's years on either app, as they couldn't the batch before; the API already checks any
+    years an admin's edit sends.
+  - At a community, "N years with us" on the celebrations card still counts from when the membership was approved in
+    the app, not from "Member since".
+  - At a community, Settings still calls the end years' range "Earliest batch year" and "Latest batch year" (it bounds
+    "Until"), and some copy still says "batchmates": the directory's subtitle, the empty feed, jobs and businesses, the
+    profile strength card, the bio's placeholder, the invitation page and the invitation email.
 - The admin console in the phone app:
   - Illuminize staff who aren't members of an institution can't use its console in the phone app, which needs an
     approved membership there; they use the web console.

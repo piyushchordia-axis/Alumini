@@ -45,12 +45,12 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
 **As a new alumnus**
 1. On the first screen, pick **Demo University** and sign in with any new number. The landing is brand-first (cover +
    institution name); chrome uses SVG icons, not emoji.
-2. Create your profile in three steps: **Basics** (a photo, your name and batch), **Work** (or **Skip for now**) and
-   **About you**, then **Join the network**. "What's new" below walks through it.
+2. Create your profile in three steps: **Basics** (a photo, your name, and the years you joined and left), **Work** (or
+   **Skip for now**) and **About you**, then **Join the network**. "What's new" below walks through it.
 3. Post in the community feed (composer tray with Add image / Poll / Post), react and comment on others' posts.
 4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
 5. Open **Events** and RSVP to the Mumbai coffee meetup, or plan your own gathering.
-6. Search the **Directory** by name, company or skill, or filter it by batch and city.
+6. Search the **Directory** by name, company or skill, or filter it by **Were there in** a year, or by city.
 7. Sign out, pick **Demo College**, register again with a new number, and see the "awaiting approval" screen.
 
 **As an institution admin** (sign in to Demo College with `+91 90000 00002`, then click **Admin**)
@@ -85,6 +85,24 @@ phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
 
+**Start and end years for every member** (run `pnpm db:reset` first)
+
+- **Joining asks for both years.** Join Demo University with a new number: Basics asks "Year you joined" and "Year you
+  left (or will leave)", both required, and an end before the start is refused. At **Shri Gujarati Samaj**, a
+  community, it asks "Member since" and "Until", which you leave blank if you still belong: you then show as, say,
+  "2015–present". An invitation fills both in.
+- **Under every name.** The years show in grey with members' names: under them in the feed and its comments, the
+  directory, profiles, a direct chat's header, group members and more, and after the name in the chat list, where the
+  line below is the last message. Rahul and Priya were at Demo University 2008–2012. At the Samaj, Jignesh Patel has
+  been a member since 1998, Bhavin Trivedi since 1996 ("1996–present"), and all the showcase members still belong but
+  Kiran Parikh, whose years are 2008–2021.
+- **Were there in.** In **Directory**, choose **Were there in** 2012 (under **Filters** on the phone app): Priya is
+  there, and in 2013 she isn't. **Any year** takes the filter off.
+- **For admins.** The invitations template has `start_year` and `end_year` columns, and a list with a "Batch" column
+  still imports it as the end year. **Analytics** has **Members by batch**, or at the Samaj **Members by year joined**,
+  and the Members and Activity CSVs have **Start year** and **End year** columns. A member's page says when they
+  **Registered**, since "Member since" now means a community's first year.
+
 **The admin console on the phone, and twelve fixes** (run `pnpm db:reset` first)
 
 - **The admin console in the phone app.** Sign in to **Shri Gujarati Samaj** in the phone app as its admin, Jignesh
@@ -116,18 +134,18 @@ them in three steps. Job posts give the pay, experience, skills, the role in sec
 apps match.
 
 - **Join in three steps.** Pick **Demo University** and sign in with a new number. **Create your profile** opens on
-  "Step 1 of 3 · Basics": choose **Add photo**, fill in your name and batch, and press **Continue**. On "Step 2 of 3 ·
-  Work", type a headline, then press **Skip for now**: you move on to "Step 3 of 3 · About you" without what you typed
-  on Work. The step bar at the top goes back to any step you've opened, and the browser's Back to the step before.
-  Press **Join the network** and the feed opens. At Demo College the last button is **Submit for approval**, with "An
-  admin at DCE will review your profile before you can join." under it.
+  "Step 1 of 3 · Basics": choose **Add photo**, fill in your name and your years, and press **Continue**. On "Step 2 of
+  3 · Work", type a headline, then press **Skip for now**: you move on to "Step 3 of 3 · About you" without what you
+  typed on Work. The step bar at the top goes back to any step you've opened, and the browser's Back to the step
+  before. Press **Join the network** and the feed opens. At Demo College the last button is **Submit for approval**,
+  with "An admin at DCE will review your profile before you can join." under it.
 - **Use details from another institution.** Sign in to **Demo University** as Kiran Joshi (`+91 91000 00011`), who is a
-  member of Demo College only. The first step says "You have a profile at Demo College of Engineering". Give a batch and
-  type a city, then choose **Use details from Demo College of Engineering**: it fills in his headline, company, skills,
-  past role, studies, website and more, keeps the city you typed, and says what it filled in and what it kept. Press
-  **Continue**, change the headline on Work, go back to Basics on the step bar and choose **Undo**: the rest goes, and
-  your headline stays. The batch, the institution's own questions, the **Personal** details (marital status and kids)
-  and the photo are never copied.
+  member of Demo College only. The first step says "You have a profile at Demo College of Engineering". Fill in the
+  years and type a city, then choose **Use details from Demo College of Engineering**: it fills in his headline,
+  company, skills, past role, studies, website and more, keeps the city you typed, and says what it filled in and what
+  it kept. Press **Continue**, change the headline on Work, go back to Basics on the step bar and choose **Undo**: the
+  rest goes, and your headline stays. The years, the institution's own questions, the **Personal** details (marital
+  status and kids) and the photo are never copied.
   Rahul or Priya signing in to Demo College see **Use details from Demo University** the same way.
 - **Profile strength.** Sign in as Rahul (`+91 91000 00001`). The feed opens with **Complete your profile** at 80%, and
   the one thing missing, **Add a profile photo**, opens the Basics part of his profile. **Not now** hides the card for
@@ -228,8 +246,9 @@ profile and sign out.
   2. Tick **Messaging** first (Mentorship needs it), then **Groups** and **Mentorship**, and **Save settings**.
   3. Sign in to Demo School as Aditya Reddy (`+91 91000 00021`), an alumnus: Messages is in the menu now, and Groups and
      Mentors too.
-  4. Sign in to Demo School as Naina Sen (`+91 91000 00026`). Her batch is two years away, so she's still at school:
-     she sees no Messages, Groups or Mentors, and Jobs has no Referrals, even though the school switched them all on.
+  4. Sign in to Demo School as Naina Sen (`+91 91000 00026`). She leaves school two years from now, so she's still a
+     pupil: she sees no Messages, Groups or Mentors, and Jobs has no Referrals, even though the school switched them all
+     on.
 - **Notification settings** (bell → **Settings**) now have **Messages** and **Mentorship and referrals**. Messages can
   be **In app** (the number on Messages alone) or **In app + push**; they never appear under the bell.
 - **Deleting your account** (Profile) now explains that your messages stay in other people's chats, shown as from a

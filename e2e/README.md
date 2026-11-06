@@ -54,19 +54,20 @@ Covers:
 - tenant picker → landing → phone + OTP → registration in three steps → auto-approved feed: "Signed in as" with the
   number on Basics, and one Back on every step; Back on an untouched Basics leaving for the landing page, which offers
   Join DemoU (not the sign-in button) instead of sending them back into the form; a photo on Basics, Continue refusing a
-  missing name and focusing it, the Work step's heading taking focus, the step bar, Back and the browser's Back going to
-  the step before with nothing lost, the browser's Back and Back on a Basics with something typed asking "Leave
-  registration?" and Cancel staying, Skip for now putting Work back as it was last accepted, the profile question on
-  About you, a server error sending the member back to Work with the headline focused, and the photo arriving with the
-  profile;
+  missing name and focusing it, both years starting blank and asked for under the institution's labels ("Year you
+  joined", "Year you left (or will leave)"), and an end year before the start refused; the Work step's heading taking
+  focus, the step bar, Back and the browser's Back going to the step before with nothing lost, the browser's Back and
+  Back on a Basics with something typed asking "Leave registration?" and Cancel staying, Skip for now putting Work back
+  as it was last accepted, the profile question on About you, a server error sending the member back to Work with the
+  headline focused, and the photo arriving with the profile;
 - the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
   and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
   announcement and a poll vote; a poll with several choices, its drawn boxes saying which are chosen (`aria-pressed`)
-  before the vote; the celebrations card and wishes; the weekly digest (run through the platform job endpoint, see
-  `lib.mjs`);
+  before the vote; the celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
+  digest (run through the platform job endpoint, see `lib.mjs`);
 - jobs: seeded cards with pay, experience and "+1 more" skills; the Work mode and experience filters behind More
   filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend Engineer page offering
   a member with no skills "Add your skills to see which you match" in place of a count, its link landing on My
@@ -79,8 +80,10 @@ Covers:
 - rich text: the seeded meetup's bullets, its link opening in a new tab, and its email opening in place with nofollow;
   the Zylo Labs listing's bullets as one list with no dash left, its link, and a numbered list keeping its start;
 - an RSVP; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
-  More filters leaving Priya out, and Priya's card with her headline, then her profile: headline, skills, her current
-  role before her past one, studies here and elsewhere, and a LinkedIn link with the right target and rel;
+  More filters leaving Priya out, Were there in beside the search ("Were there in 2012" and so on) leaving Priya
+  (2008–2012) out in 2013, finding her in 2012, and Any year taking it off, and Priya's card with her headline, then
+  her profile: headline, skills, her current role before her past one, studies here and elsewhere, and a LinkedIn link
+  with the right target and rel;
 - businesses: search and filters, contact details only on a listing's own page; add (its logo a 4000 × 3000 photo of
   over 5 MB, made smaller in the browser before it goes up), edit, find it in My posts and delete it;
 - My profile: the photo picker refusing a text file beside it, Cancel upload pressed while a photo is still being
@@ -89,7 +92,8 @@ Covers:
   the start refused in its row and a server error on `experiences.0.endYear` shown there; the meter moving to 75 with
   four skills, a link and a past role saved, asking for neither skills nor a link,
   and its bio item linking to About you; `#work` landing on Work on a phone with no sideways scrolling; and all of it
-  on the profile other members open, found by the new headline; Delete account's confirm dialog, saying a suspension
+  on the profile other members open, found by the new headline, with the years given at registration (2008–2012) under
+  the name on the card and the profile, and "Registered"; Delete account's confirm dialog, saying a suspension
   or blocks come back with the number, cancelled with the account still there;
 - matching skills at a phone's width, with "typescript, aws" among the skills just saved: the Backend Engineer card
   showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, its link's name saying
@@ -99,8 +103,9 @@ Covers:
 - joining Demo College as that member (nothing sent): its landing page offering Join DCE and "Signed in as" rather than
   sending them into the form, and forgetting Demo College as the institution to start at, so Choose a different
   institution opens the list; the name from the account, Use a different number with a city typed asking first and
-  Cancel staying, Use details from Demo University keeping that city, Undo keeping a headline changed after the copy,
-  with focus back on Use details, and Back on Basics asking "Leave registration?", whose Leave goes to the landing page;
+  Cancel staying, Use details from Demo University keeping that city and filling in no years, Undo keeping a headline
+  changed after the copy, with focus back on Use details, and Back on Basics asking "Leave registration?", whose Leave
+  goes to the landing page;
   re-applying after a rejection (answered by the script) prefilling every step, with the reason on each and no Use
   details offer;
 - the phone layout: every section opens its own page, the More sheet, its active state, sections the institution has
@@ -144,10 +149,11 @@ Covers:
   page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
   nothing of the admin's), and a pending business listing whose contact details show only once opened; a group waiting
-  (answered by the script) approved in two presses, the first opening its name and description beside what members see
-  until then and sending nothing, the second sending what was shown, refused as changed meanwhile and fetched again,
-  then, with the preview showing the owner's new name, a press sending nothing and asking to check it again, and the
-  next sending the new name; resolving the spam report by removing content;
+  (answered by the script), its byline giving the owner's years ("by Rohan Gupta (2012–2016)"), approved in two
+  presses, the first opening its name and description beside what members see until then and sending nothing, the
+  second sending what was shown, refused as changed meanwhile and fetched again, then, with the preview showing the
+  owner's new name, a press sending nothing and asking to check it again, and the next sending the new name; resolving
+  the spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
   Branding with Demo College's green chosen among the suggested colours (a drawn tick), a near-white colour typed
   showing the contrast warning with Save branding still enabled, and Save held, saying why, while the script holds a
@@ -155,13 +161,14 @@ Covers:
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
-  confirm dialog (Cancel first); importing an invitation CSV (once the profile questions are in) and joining through
-  its link in a second browser, with the name filled in and the three steps; another invitation revoked through its
-  confirm dialog (Cancel first sends nothing); an announcement that also goes by email, asked first in the app's dialog
-  with the email box's count and the billing line, Cancel posting nothing, then Post and send; Demo University's Send
-  pending asking first in a dialog that says it's billed (Cancel sends nothing), a refusal (answered by the script, as
-  for a plan that stopped sending) closing the dialog and saying why, then a send (answered by the script, so nothing
-  is billed);
+  confirm dialog (Cancel first); importing an invitation CSV (once the profile questions are in) whose "Year Joined" and
+  "Batch" columns are read as the start and end years ("Using phone, name, start year, end year.", 2011–2015 in the
+  preview's Years and on the row once imported), and joining through its link in a second browser, with the name and
+  both years filled in and the three steps; another invitation revoked through its confirm dialog (Cancel first sends
+  nothing); an announcement that also goes by email, asked first in the app's dialog with the email box's count and
+  the billing line, Cancel posting nothing, then Post and send; Demo University's Send pending asking first in a dialog
+  that says it's billed (Cancel sends nothing), a refusal (answered by the script, as for a plan that stopped sending)
+  closing the dialog and saying why, then a send (answered by the script, so nothing is billed);
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
   Open tab counting the open report (1, then 0 once it's resolved), a note typed and cancelled gone from the next
@@ -171,9 +178,10 @@ Covers:
   phone;
 - analytics: the headline figures' changes (the period before scripted, so each direction shows) in words beside SVG
   arrows, never text arrows; the New members chart's weeks day first ("2 Nov") in an en-US browser; its Table switch
-  keeping its name, pressed, with a row a week in place of the chart; "Updating…" with the 12 weeks' charts still up
-  while the script holds the 26 weeks' answer; and the members CSV, with the profile's own columns after "Last active"
-  and Rahul's seeded headline and skills in them;
+  keeping its name, pressed, with a row a week in place of the chart; Members by batch's table, its columns Batch and
+  Members, with 2012 among its rows; "Updating…" with the 12 weeks' charts still up while the script holds the 26
+  weeks' answer; and the members CSV, starting Name, Phone, Email, Start year, End year, Status, with Rahul's 2008 and
+  2012, and with the profile's own columns after "Last active" and Rahul's seeded headline and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
   console's dashboard counts it, the count in amber, and the sidebar's row named the same on a wider screen), and
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
@@ -182,12 +190,14 @@ Covers:
   colour saved and tinting the page (Demo University's tint) with its grey text a shade darker, on the feed after a
   reload too, with post cards painting their own white; the console's dashboard and Branding tab staying on the plain
   page; and Plain putting the page and its grey text back;
-- the platform console: login, onboarding an institution with its first admin, a billing plan and usage, stats and
-  user search, the institution comparison and its CSV, the chat reports list showing only escalated reports (and rows
-  on a phone: the nav item's open count, why each is staff's, "About an admin" or "No other admin", and reports another
-  member of staff must handle, or that no member of staff may take yet, or that are closed, each with its note and no
-  link), opening an institution's admin console without being a member, a school's settings starting with Messaging,
-  Groups and Mentorship off and saying why, and the admin console stacking on a phone.
+- the platform console: login, onboarding an institution with its first admin, whose years are asked under a
+  college's labels, an end before the start refused on its box with nothing created, and the admin then listed with
+  2010–2014 on the Admins tab; a billing plan and usage, stats and user search, the institution comparison and its CSV,
+  the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
+  staff's, "About an admin" or "No other admin", and reports another member of staff must handle, or that no member of
+  staff may take yet, or that are closed, each with its note and no link), opening an institution's admin console
+  without being a member, a school's settings starting with Messaging, Groups and Mentorship off and saying why, and
+  the admin console stacking on a phone.
 
 ## Mobile (Expo app exported for the web)
 
@@ -210,17 +220,19 @@ Covers:
   screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so nothing holds
   the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the form; with a
   name typed, the page held, Use a different number asking first and Cancel staying signed in, and Back asking "Leave
-  registration?", Cancel staying with the name and Leave going to the landing screen; the step bar going back with
-  Work kept, Skip for now putting Work back as it was last accepted, Back from About you and from Work, a server error
-  sending the member back to Work with the page still held, and Join the network leaving the screen (it isn't held)
-  with nothing holding the feed;
-- the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
+  registration?", Cancel staying with the name and Leave going to the landing screen; the years filled by their labels
+  ("Year you joined *", "Year you left (or will leave) *"), never by position, so a past role's Start year can't be
+  taken for them, and Continue with no start year staying on Basics with "Enter the year you joined"; the step bar going
+  back with Work kept, Skip for now putting Work back as it was last accepted, Back from About you and from Work, a
+  server error sending the member back to Work with the page still held, and Join the network leaving the screen (it
+  isn't held) with nothing holding the feed;
+- the "Complete your profile" card: 0 for a name and years, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
-  taking it back, the celebrations card and a poll vote; a poll with several choices, its drawn boxes saying which are
-  chosen (`aria-checked`) before the vote;
+  taking it back, the celebrations card (a birthday row and an anniversary row with years) and a poll vote; a poll
+  with several choices, its drawn boxes saying which are chosen (`aria-checked`) before the vote;
 - Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
   nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
@@ -240,8 +252,10 @@ Covers:
   skills"; and "You have 0 of 4 skills" with no marks on Associate Product Manager;
 - an RSVP, with the description's bullets, link and mail link as on the web;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
-  name, the Investing filter leaving Priya out, and Priya's full profile with her roles in order and a LinkedIn link
-  with the right target and rel;
+  name, the Investing filter leaving Priya out, Were there in chosen from a list behind Filters and counted with them
+  (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
+  ("2008–2012 · London, United Kingdom"), "Registered", her roles in order and a LinkedIn link with the right target
+  and rel;
 - businesses behind More: search, filters and contact details only on a listing's own page; the description's bullets
   as one list with the bullet marks hidden from screen readers, its numbered steps read out from 1 with the numbers on
   the left, and its link; add (its logo changed to a 4000 × 3000 photo of over 5 MB, made smaller before it goes up),
@@ -292,8 +306,9 @@ Covers:
   (Cancel first), and Show archived listing it to restore, after a reload too; and, with the role taken away (answered
   by the script), the console leaving for the feed with one set of tabs, More dropping its row, and the console opened
   cold doing the same;
-- the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi and Diya
-  Raval with their details line and 44px actions named for them, no sideways scrolling, and Approve all asking first
+- the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi's
+  details line led by his years, as a member who still belongs ("2018–present · +91 91000 00037 · Infosys, Pune ·
+  requested …"), 44px actions named for Parth and Diya Raval, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
   its Reject opening the reason sheet first, an open reason sheet closing and saying where he stands once the API's
   live notice of a change refetches the list showing him decided elsewhere (and not opening again by itself when he
@@ -306,40 +321,40 @@ Covers:
   refreshes; the Approved tab, its answer held back by the script, showing a spinner and none of Rejected's rows or
   buttons until its own arrive; searching for Nisha, and for Jignesh, whose own row says "You" with no actions; and a
   second page (answered by the script) loading on scroll, a row repeated across the pages shown once;
-- a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list, with her
-  facts (her phone as the console writes it, her place by name, what she does), her mentor profile listed in Mentors
-  with its areas and availability, no sideways scrolling, and Remove as mentor asking first (Cancel sends nothing); her
-  answers edited, Chapter saved as Diaspora ("Answers saved"), then Surat chosen and cancelled, the saved answer
-  standing and the next edit starting from it; View profile in the app leaving the console for her profile, back on the
-  tabs; an admin-managed question (added by the script) given to the admin as a text box, saying only admins see the
-  answer, and sent by Save; Parth Joshi made an admin and the role taken away again, each through its confirmation
-  (Cancel first sends nothing), the Admin badge following, and his recent activity naming Jignesh Patel with the changes
-  made; the audit log from the console's home, opening on All, its Members chip showing Diya's rejection with its
-  reason, a prefix typed by hand that is no chip's ("membership.app") leaving none chosen, and one that is
-  ("chat_report.") choosing that chip and finding nothing, Clear choosing All again, a membership row opening Diya's
-  page with Back keeping the filter, and a row carrying a phone hash (answered by the script) showing its other details
-  and never the hash;
+- a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
+  starting "Nisha Modi, Approved, 2010–present"), with her facts (her phone as the console writes it, her place by name,
+  what she does), her mentor profile listed in Mentors with its areas and availability, no sideways scrolling, and
+  Remove as mentor asking first (Cancel sends nothing); her answers edited, Chapter saved as Diaspora ("Answers saved"),
+  then Surat chosen and cancelled, the saved answer standing and the next edit starting from it; View profile in the app
+  leaving the console for her profile, back on the tabs; an admin-managed question (added by the script) given to the
+  admin as a text box, saying only admins see the answer, and sent by Save; Parth Joshi made an admin and the role taken
+  away again, each through its confirmation (Cancel first sends nothing), the Admin badge following, and his recent
+  activity naming Jignesh Patel with the changes made; the audit log from the console's home, opening on All, its
+  Members chip showing Diya's rejection with its reason, a prefix typed by hand that is no chip's ("membership.app")
+  leaving none chosen, and one that is ("chat_report.") choosing that chip and finding nothing, Clear choosing All
+  again, a membership row opening Diya's page with Back keeping the filter, and a row carrying a phone hash (answered by
+  the script) showing its other details and never the hash;
 - the console's moderation and reports queues, as the Samaj admin: Moderation from the console's sections, opening on
   Awaiting approval with its count, All types chosen, "Nothing is waiting for review." and no sideways scrolling; a
-  group waiting (answered by the script) approved in two presses, the first opening it (Hide says it's expanded) with
-  what members see until then and the note that chat messages are never shown, sending nothing, the second sending the
-  name and description shown, refused in its row as changed meanwhile, and the group fetched again, then, with the
-  preview showing the owner's new name, a press sending nothing and asking in the row to check it again, and the next
-  sending the new name; Hetal's job under Published and Job, its preview with the title an h2 and "About the role" an
-  h3, the apply link as text, no link but the row's Open in app, no Apply and no skills compared, and Kiran's closed job
-  showing its closed line and "No apply link, email or phone."; Nisha's post removed through the reason sheet, Cancel
-  keeping the note for next time, then restored from Removed; Hetal's post pinned and unpinned, the button's SVG icon
-  and its label following; a link with `item=` opening that post's preview, and a content notice (answered by the
-  script) opening Awaiting approval with Post chosen, saying the item isn't waiting any more, Back returning to
-  Notifications, and the notice tapped again once the script lists the post as waiting, the queue cached by the first
-  visit fetched again rather than taken for the answer, so the post opens with no "isn't waiting" line; Open in app
-  leaving the console for the post's own page with one tab bar; Hetal's post reported from the feed, then the console's
-  "Open reports, 1" tile opening Reports on Open with its count, the row labelled Spam, Post and Published (never the
-  raw status), with the reporter, the details and the post's words; Dismiss refused (answered by the script) as already
-  handled, closing the sheet, saying so and refetching the list; Resolve, keep content with a note, then "No open
-  reports" and the note under Resolved; and a report notice (answered by the script) for it saying it has already been
-  handled, then, tapped again once the script lists it as open, the Open list fetched again and the report shown with no
-  "already handled" line;
+  group waiting (answered by the script), "by Hetal Shah (2005–present)", approved in two presses, the first opening it
+  (Hide says it's expanded) with what members see until then and the note that chat messages are never shown, sending
+  nothing, the second sending the name and description shown, refused in its row as changed meanwhile, and the group
+  fetched again, then, with the preview showing the owner's new name, a press sending nothing and asking in the row to
+  check it again, and the next sending the new name; Hetal's job under Published and Job, its preview with the title an
+  h2 and "About the role" an h3, the apply link as text, no link but the row's Open in app, no Apply and no skills
+  compared, and Kiran's closed job showing its closed line and "No apply link, email or phone."; Nisha's post removed
+  through the reason sheet, Cancel keeping the note for next time, then restored from Removed; Hetal's post pinned and
+  unpinned, the button's SVG icon and its label following; a link with `item=` opening that post's preview, and a
+  content notice (answered by the script) opening Awaiting approval with Post chosen, saying the item isn't waiting any
+  more, Back returning to Notifications, and the notice tapped again once the script lists the post as waiting, the
+  queue cached by the first visit fetched again rather than taken for the answer, so the post opens with no "isn't
+  waiting" line; Open in app leaving the console for the post's own page with one tab bar; Hetal's post reported from
+  the feed, then the console's "Open reports, 1" tile opening Reports on Open with its count, the row labelled Spam,
+  Post and Published (never the raw status), with the reporter, the details and the post's words; Dismiss refused
+  (answered by the script) as already handled, closing the sheet, saying so and refetching the list; Resolve, keep
+  content with a note, then "No open reports" and the note under Resolved; and a report notice (answered by the script)
+  for it saying it has already been handled, then, tapped again once the script lists it as open, the Open list fetched
+  again and the report shown with no "already handled" line;
 - chat reports in the console, as the Samaj admin, the list and every view answered by the script (so no view writes an
   audit row) and each view the app asks for counted: the tile and the row with the open count, the Open tab with it, the
   privacy lines, and who reported whom and why with no words anywhere in the page until View messages; the thread
@@ -370,17 +385,19 @@ Covers:
   channels and going back to the feed; then the console's queue listing the real one with both badges, and Unpin there
   leaving it an announcement on the feed, no longer pinned;
 - the console's invitations, as the Samaj admin: none yet, Can send today read as none and no Send pending on a plan
-  that sends nothing, no sideways scrolling; the import modal's Template downloading invitations-template.csv with its
-  byte order mark, the questions' keys as columns and the example phone unguarded; a two-row CSV picked through the file
-  chooser (the document picker's web input), previewed with the columns used and ignored, Send now disabled, imported
-  ("2 new, 0 updated, 0 skipped.") after the script has held the request long enough to see "Importing 0 of 2…" and
-  "Keep this screen open…" and the bar's Back leave the screen where it is, and Done saying "2 invited, 0 updated" on
-  the list; Copy link read back from the clipboard; WhatsApp opening a new tab at wa.me with the number and the Samaj's
-  message (answered by the script); a search kept in the address; Revoke through its sheet (Cancel first), the row then
-  Revoked, listed under the Revoked tab, which a reload keeps; and, with the plan said to send by WhatsApp (answered by
-  the script, so nothing is billed), Send 1 pending asking first and saying it's billed (Cancel sends nothing), a
-  refusal (as for a plan that stopped sending) closing the sheet and saying why on the list, then "Sending 1
-  invitation", and a row's Send saying "Invitation sent";
+  that sends nothing, no sideways scrolling; the import modal's hint saying a community's end year may be blank, and its
+  Template downloading invitations-template.csv with its byte order mark, `start_year` and `end_year`, the questions'
+  keys as columns, the example phone unguarded and the example's end year blank; a two-row CSV with "Member Since" and
+  "Until" columns picked through the file chooser (the document picker's web input), previewed with the columns used
+  ("phone, name, start year, end year, Chapter") and ignored and each row's years ("From 2015", "2009–2016"), Send now
+  disabled, imported ("2 new, 0 updated, 0 skipped.") after the script has held the request long enough to see
+  "Importing 0 of 2…" and "Keep this screen open…" and the bar's Back leave the screen where it is, and Done saying "2
+  invited, 0 updated" on the list, each row with its years; Copy link read back from the clipboard; WhatsApp opening a
+  new tab at wa.me with the number and the Samaj's message (answered by the script); a search kept in the address;
+  Revoke through its sheet (Cancel first), the row then Revoked, listed under the Revoked tab, which a reload keeps;
+  and, with the plan said to send by WhatsApp (answered by the script, so nothing is billed), Send 1 pending asking
+  first and saying it's billed (Cancel sends nothing), a refusal (as for a plan that stopped sending) closing the sheet
+  and saying why on the list, then "Sending 1 invitation", and a row's Send saying "Invitation sent";
 - the console's analytics, as the Samaj admin: opened from the console's Analytics row on the last 12 weeks, the
   compared headline tiles (the period before scripted, so each direction shows) named with their change ("New members,
   12. +20% vs the previous 12 weeks (10)") and drawing it as an SVG arrow beside the words, never a text arrow; the New
@@ -389,10 +406,12 @@ Covers:
   weeks, the 12 weeks' charts staying up with "Updating…" while the script holds the answer, and the headline figures
   then compared with "the previous 6 months"; the New members card's Table switch keeping its name, pressed, and listing
   27 rows (its header and 26 weeks) in place of the chart; the invitations funnel's table saying Imported 2; Activity's
-  table with its five headers whole on one line and every row's figures right under them; no sideways scrolling; the
-  members CSV saying "Preparing…" while the script holds it, with Activity CSV disabled until it's saved (one export
-  at a time), then downloaded as shri-gujarati-samaj-members-<date>.csv with one byte order mark and the Samaj's
-  Chapter among its columns; and a reload keeping 6 months.
+  table with its five headers whole on one line and every row's figures right under them; Members by year joined, a
+  slider whose value reads "Joined in …, N members", its table's columns Year joined and Members, with 1996 among its
+  rows; no sideways scrolling; the members CSV saying "Preparing…" while the script holds
+  it, with Activity CSV disabled until it's saved (one export at a time), then downloaded as
+  shri-gujarati-samaj-members-<date>.csv with one byte order mark, Start year and End year after Email (Hetal Shah's
+  2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -402,7 +421,10 @@ Not covered by any script: reporting a declined, withdrawn or closed mentorship 
 admin's view of a note report from the API (**View request** in Chat reports; the phone journey's is answered by the
 script). The API tests cover them. Nor is the last registration
 step's **Join the network** for an invitation at an institution that approves members automatically but has invitation
-auto-approve off, as no seeded institution is set up that way.
+auto-approve off, as no seeded institution is set up that way. Nor are registering at a community with Until left
+blank, or a member changing their own years on My profile: the API tests cover the rules (`membership.test.ts`), and
+the checks on a real phone below cover the forms. Nor does a script check that the Samaj's Analytics has no Members by
+batch card beside Members by year joined: the unit tests do (`unit/analytics.test.ts`).
 
 ## Checks that need a real phone
 
@@ -480,6 +502,10 @@ Still the new number, joining Demo University. Leave Work empty with Skip for no
       the system editor crops it square, and the round preview shows it once it's uploaded. On the other phone, deny
       access (or turn it off in Settings first): "Allow photo access to choose an image." shows under the buttons.
       Turn access back on in Settings afterwards, for part 4.
+- [ ] On Basics, tap "Year you joined *", then "Year you left (or will leave) *": each brings up the number pad with
+      the box still in view above it, takes only digits, four at most, and says under it which years it takes. Type
+      2014 and 2012 and choose Continue: Basics stays, with "Can't be before the year you joined" under the second box,
+      which TalkBack or VoiceOver reads there. Make the second 2018 and carry on.
 - [ ] Android's back button and the iPhone's swipe from the left edge: on Work and About you they go to the step before,
       keeping what was typed (on the iPhone the screen springs back into place, with no flicker of the screen under
       it). On an untouched Basics they leave for the institution's landing screen, which shows Join and "Use a different
@@ -499,15 +525,35 @@ Still the new number, joining Demo University. Leave Work empty with Skip for no
 
 ### 3. Profiles
 
-As Rahul. For the copy banner, Rahul opens Demo College under More → Switch institution: leave without sending, or he'll
-be waiting for approval there.
+As Rahul. For the copy banner and the Samaj's years, Rahul opens Demo College and Shri Gujarati Samaj under More →
+Switch institution: leave each without sending, or he'll be waiting for approval there, and switch back to Demo
+University after.
 
 - [ ] TalkBack or VoiceOver, in Edit profile: Remove on a past role says "Removed" and its name, and focus moves to
       Add a past role; Done folds a row and moves focus to its Edit button; Done on a row whose end year is before its
       start says the problem and moves focus to that year.
 - [ ] TalkBack or VoiceOver, on Rahul's registration at Demo College: Use details from Demo University reads out what
-      it filled in and moves focus to Undo. Type a batch, Continue, change the headline on Work, go back to Basics and
-      choose Undo: it reads out what it kept, and focus goes back to Use details from Demo University.
+      it filled in and moves focus to Undo. Type both years, Continue, change the headline on Work, go back to Basics
+      and choose Undo: it reads out what it kept, and focus goes back to Use details from Demo University.
+- [ ] Rahul joining Shri Gujarati Samaj, a community: Basics asks "Member since *" and "Until (leave blank if you still
+      are)", with no asterisk on Until. Give a year in Member since and leave Until blank: Continue goes on to Work.
+      Back on Basics, type next year in Until and Continue: "Leave this blank if you still are" shows under it. Leave
+      without sending (Back on Basics, then Leave).
+- [ ] My profile → Edit profile, Basics: "Year you joined *" holds 2008 and "Year you left (or will leave) *" 2012, and
+      each brings up the number pad with the box in view above it. Clear the first and choose Save profile: "Enter the
+      year you joined" shows under it, and nothing is saved. Type 2008 again and save, or leave with Back.
+- [ ] The years in grey with names. On the feed, the line under each post's author and each comment's author starts
+      with their years (Priya Nair's "2008–2012"); on Directory each card's grey line does ("2008–2012 · London, United
+      Kingdom"), and so does the line under the name on Priya's profile, which says "Registered" and a date lower down.
+      On the narrowest phone you have, with the largest text size, nothing overlaps and the years stay whole. TalkBack
+      or VoiceOver reads the years with the name, as two years, not as a sum ("2008 minus 2012").
+- [ ] Directory → Filters → Were there in: the list opens over the screen, headed "Were there in" with Close, newest
+      first, from the last year anyone was there (2024 in the demo data, not this year) back to the 1990s, and scrolls
+      smoothly. Choose 2010: the list closes, the box says 2010, the toggle says
+      "Hide filters (1)", and the results are the members who were there in 2010, Rahul and Priya among them. Open it
+      again: 2010 is marked, and Any year at the top takes the filter off. TalkBack or VoiceOver reads the box as "Were
+      there in, Any year" (then "Were there in, 2010") and the chosen year in the list as selected. Android's back
+      button closes the list without changing anything.
 - [ ] My profile → Or edit → About you opens Edit profile scrolled to the About you heading, and Work to the Work
       heading. This checks the scroll to a section (`measureLayout`) on the new architecture.
 - [ ] TalkBack or VoiceOver, on Rahul's feed: Not now on "Complete your profile" moves focus to "Hidden for 14 days. My
@@ -564,6 +610,10 @@ the console (part 14).
 
 ### 7. Messages
 
+- [ ] Messages: the chat with Priya shows "2008–2012" after her name, with the message preview under them, and "London &
+      UK alumni" shows no years. Open the chat: its header has her years under her name. On the narrowest phone you
+      have, with the largest text size, the name and years fit their row without covering anything else in it.
+      TalkBack or VoiceOver reads her years with her name, in the list and in the header.
 - [ ] Open Rahul's chat with Priya and tap the message box. The box and the newest message stay above the keyboard,
       with no gap and nothing hidden behind it, and closing the keyboard puts the screen back.
 - [ ] Type several lines. The box grows to its limit and then scrolls inside itself, and Send stays reachable.
@@ -649,19 +699,23 @@ second copy of a screen, or back to the page the button was on.
 ### 13. Notices with Approve and Reject
 
 For parts 13 to 16, both phones are Shri Gujarati Samaj's admin, Jignesh Patel (`+91 90000 00004`), who has two
-members waiting for approval (Parth Joshi and Diya Raval). Two checks on the way there:
+members waiting for approval (Parth Joshi and Diya Raval). Three checks on the way there:
 
 - [ ] Sign Rahul out from More: you land on Demo University's own page, with "Sign in / Join with mobile number". Choose
       a different institution, then Shri Gujarati Samaj, and sign in as Jignesh.
 - [ ] On the Samaj feed, press and hold a reaction on a post, as in part 5: once chosen, the chip is a light orange tint
       with a thin ring and a filled icon, and the count beside it turns orange. Like again takes it back.
+- [ ] On the Samaj feed, the grey line under Hetal Shah's name on her posts starts "2005–present": she is still a
+      member.
 
 Then, on a computer, join Shri Gujarati Samaj in the web app with another number that isn't in the demo data
-(`+91 98765 43212`, say) and submit for approval: the admin's Notifications get a new-member notice.
+(`+91 98765 43212`, say), giving 2015 as Member since and leaving Until blank, and submit for approval: the admin's
+Notifications get a new-member notice.
 
-- [ ] In Notifications, that member's notice has Approve and Reject under its text, and TalkBack or VoiceOver reads
-      them with the member's name ("Approve …", "Reject …"). Approve asks first; Cancel. Tapping the notice's text opens
-      the member's page in the console, and Back returns to Notifications.
+- [ ] In Notifications, that member's notice says "… (2015–present) has requested to join." and has Approve and Reject
+      under its text, and TalkBack or VoiceOver reads them with the member's name ("Approve …", "Reject …"). Approve
+      asks first; Cancel. Tapping the notice's text opens the member's page in the console, and Back returns to
+      Notifications.
 
 ### 14. The admin console, page by page
 
@@ -822,20 +876,22 @@ The console's file pickers and the share sheet, as the Samaj admin.
       open until the import finishes." shows (VoiceOver or TalkBack says it on a blocked Back). Done then returns to the
       list, which says how many were invited.
 - [ ] Import's Template opens the share sheet with invitations-template.csv (not .csv.csv). Save it to Files (iPhone) or
-      Drive or Downloads (Android). Opened in a text editor (Files' preview, or Notes), the example row's phone reads
-      +919876543210 with no ' in front, and the Samaj's question keys are columns. Opened in Excel or Google Sheets, the
-      header row reads the same, but the example phone shows as a number (9.19876E+11 in Excel, 919876543210 in
-      Sheets), as both read a leading + as a sign: so the import's hint says to format the phone column as Text before
-      typing numbers. Do that in Excel, type +919876543210, save as CSV UTF-8 and import it: the row is new, not refused
-      as scientific notation.
+      Drive or Downloads (Android). Opened in a text editor (Files' preview, or Notes), the columns are phone, name,
+      start_year, end_year, email and the Samaj's question keys, the example row's phone reads +919876543210 with no '
+      in front, and its end_year is blank (someone who still belongs). Opened in Excel or Google Sheets, the header row
+      reads the same and start_year shows 2008, but the example phone shows as a number (9.19876E+11 in Excel,
+      919876543210 in Sheets), as both read a leading + as a sign: so the import's hint says to format the phone column
+      as Text before typing numbers. Do that in Excel, type +919876543210 with 2015 as its start_year, save as CSV
+      UTF-8 and import it: the row is new, not refused as scientific notation, and its line says "From 2015".
 - [ ] First set Jignesh's city on My profile to અમદાવાદ. Then Analytics → Members CSV: it says "Preparing…", and
       Activity CSV is dimmed and can't be pressed meanwhile (one export at a time), then the share sheet opens with
       shri-gujarati-samaj-members-<date>.csv (not .csv.csv), and closing the sheet without choosing anything shows no
       error. Do the same with Activity CSV (shri-gujarati-samaj-activity-<first week>-to-<today>.csv). Save both to
       Files (iPhone) or Drive or Downloads (Android) and open them in Excel or Google Sheets: the columns line up, the
-      first header reads "Name" with nothing in front of it, the names read correctly, the Members CSV has a Chapter
-      column and its city reads અમદાવાદ (not "àª…": the file is UTF-8 with a byte order mark), and each phone number
-      keeps all its digits, behind a ' that stops a spreadsheet reading it as a sum. Put Ahmedabad back.
+      first header reads "Name" with nothing in front of it, the names read correctly, both files have Start year and
+      End year columns (Hetal Shah's End year blank: she still belongs), the Members CSV has a Chapter column and its
+      city reads અમદાવાદ (not "àª…": the file is UTF-8 with a byte order mark), and each phone number keeps all its
+      digits, behind a ' that stops a spreadsheet reading it as a sum. Put Ahmedabad back.
 
 ### 16. Charts
 
