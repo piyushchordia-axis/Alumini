@@ -1,13 +1,13 @@
-import type { ProfileFieldDto, ProfileFieldValue } from "@illuminize/shared";
-import { formatProfileFieldValue } from "@illuminize/shared";
+import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, type ProfileFieldAnswers, type ProfileFieldAudience, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
 import clsx from "clsx";
 import { FormField, Input, Select, Textarea } from "@/components/ui";
 
-export type FieldAnswers = Record<string, ProfileFieldValue | null>;
+export type FieldAnswers = ProfileFieldAnswers;
 
 /**
  * Inputs for an institution's own profile questions. `readOnly` fields (admin-managed, for members) show their
- * current answer as text. Values are kept as the API expects them (choice values, yes/no booleans, "YYYY-MM-DD").
+ * current answer as text. Values are kept as the API expects them (choice values, yes/no booleans, "YYYY-MM-DD"). With
+ * `audience="admin"` the hints are worded for an admin answering for the member.
  */
 export function CustomFieldInputs({
   fields,
@@ -15,19 +15,21 @@ export function CustomFieldInputs({
   errors,
   onChange,
   readOnly,
+  audience = "member",
 }: {
   fields: ProfileFieldDto[];
   values: FieldAnswers;
   errors: Record<string, string>;
   onChange: (key: string, value: ProfileFieldValue | null) => void;
   readOnly?: (f: ProfileFieldDto) => boolean;
+  audience?: ProfileFieldAudience;
 }) {
   return (
     <>
       {fields.map((f) => {
         const v = values[f.key] ?? null;
         const id = `field-${f.key}`;
-        const hint = [f.helpText, f.visibility === "ADMINS" ? "Only you and the admins see this." : null].filter(Boolean).join(" ") || undefined;
+        const hint = profileFieldHint(f, audience);
         const wide = f.type === "LONG_TEXT" || f.type === "MULTI_SELECT";
         if (readOnly?.(f)) {
           return (
@@ -63,7 +65,7 @@ export function CustomFieldInputs({
             break;
           case "SELECT": {
             const current = typeof v === "string" ? v : "";
-            const options = current && !f.options.some((o) => o.value === current) ? [...f.options, { value: current, label: current }] : f.options;
+            const options = choiceOptionsWithCurrent(f.options, current);
             control = (
               <Select id={id} value={current} invalid={!!errors[f.key]} onChange={(e) => onChange(f.key, e.target.value || null)}>
                 <option value="">Choose…</option>
@@ -80,7 +82,7 @@ export function CustomFieldInputs({
             const chosen = Array.isArray(v) ? v : [];
             control = (
               <div className="flex flex-wrap gap-2 py-1">
-                {f.options.map((o) => {
+                {choiceOptionsWithCurrent(f.options, chosen).map((o) => {
                   const on = chosen.includes(o.value);
                   return (
                     <button
@@ -112,6 +114,4 @@ export function CustomFieldInputs({
   );
 }
 
-/** Answers keyed by field key, from a membership's answer list. */
-export const answersToValues = (answers: Array<{ key: string; value: ProfileFieldValue | null }> | undefined): FieldAnswers =>
-  Object.fromEntries((answers ?? []).map((a) => [a.key, a.value]));
+export { answersToValues } from "@illuminize/shared";

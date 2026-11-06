@@ -8,7 +8,7 @@ import {
   type MentorAvailability,
   type MentorshipBox,
 } from "../constants";
-import type { MemberCardDto, MentorCardDto, MentorshipDto } from "../types/dto";
+import type { MemberCardDto, MentorCardDto, MentorProfileDto, MentorshipDto } from "../types/dto";
 
 /** How a mentorship's status reads, in the same words on both apps. Withdrawn and ended share a status and differ in whether it was ever accepted. */
 export function mentorshipStatusLabel(m: Pick<MentorshipDto, "box" | "status" | "acceptedAt">): string {
@@ -145,3 +145,23 @@ export const MENTORSHIP_CONFIRM = {
   },
   stop: { title: "Stop mentoring?", body: STOP_MENTORING_EXPLAINED, confirm: "Stop mentoring" },
 } as const;
+
+/** An admin taking a member out of the Mentors list, asked first on both consoles. Its note can't be reported, so this is the way to act on it. */
+export const MENTOR_REMOVE_CONFIRM = {
+  title: "Remove as mentor?",
+  body: "They'll no longer appear in Mentors, and requests waiting for them will be declined. Mentorships already under way carry on. They can offer to mentor again, so suspend them if it happens again.",
+  confirm: "Remove as mentor",
+  done: "Removed as a mentor",
+} as const;
+
+/** Whether a member's mentor profile puts them in the Mentors list, as their admin page says it. */
+export const mentorListedText = (isActive: boolean) => (isActive ? "Listed in Mentors" : "Not listed in Mentors");
+
+/** A mentor profile as a member's admin page lists it: what they offer, when, and their note in their own words. */
+export function mentorProfileRows(p: Pick<MentorProfileDto, "areas" | "availability" | "availabilityNote" | "note">): Array<{ label: string; value: string }> {
+  return [
+    { label: "Areas", value: p.areas.map((a) => MENTOR_AREA_LABELS[a]).join(", ") || "—" },
+    { label: "Availability", value: mentorAvailabilityText(p) },
+    { label: "Note", value: p.note ?? "—" },
+  ];
+}

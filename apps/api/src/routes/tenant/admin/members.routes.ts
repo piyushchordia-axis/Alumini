@@ -44,7 +44,7 @@ export function memberRoutes(ctx: AppContext): Router {
         listAuditForMembership(ctx.db, tenantId, params.membershipId, req.auth!.userId),
         getMentorProfileForAdmin(ctx, tenantId, params.membershipId),
       ]);
-      const detail: AdminMemberDetailDto = { ...member, audit: audit.map((a) => toAuditDto(a)), mentorProfile };
+      const detail: AdminMemberDetailDto = { ...member, audit: audit.map((a) => toAuditDto(a.entry, a.actorName)), mentorProfile };
       ok(res, detail);
     }),
   );

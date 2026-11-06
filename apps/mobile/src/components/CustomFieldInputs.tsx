@@ -1,25 +1,30 @@
-import { formatProfileFieldValue, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
+import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, type ProfileFieldAnswers, type ProfileFieldAudience, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
 import { Text, View } from "react-native";
 import { DateTimeField } from "@/components/DateTimeField";
 import { Chip, ChipSelect, Input, Muted } from "@/components/ui";
 import { colors, useTheme } from "@/theme";
 
-export type FieldAnswers = Record<string, ProfileFieldValue | null>;
+export type FieldAnswers = ProfileFieldAnswers;
 
-export const answersToValues = (answers: { key: string; value: ProfileFieldValue | null }[] | undefined): FieldAnswers =>
-  Object.fromEntries((answers ?? []).map((a) => [a.key, a.value]));
+export { answersToValues } from "@illuminize/shared";
 
-/** Inputs for the institution's own profile questions; admin-managed ones show their answer as text. */
+/**
+ * Inputs for the institution's own profile questions. A member sees the admin-managed ones as text; an admin answering
+ * for a member (`audience="admin"`) can change every one, with hints worded for them. A saved choice that is no longer
+ * an option still shows, so an edit doesn't drop it unasked.
+ */
 export function CustomFieldInputs({
   fields,
   values,
   errors,
   onChange,
+  audience = "member",
 }: {
   fields: ProfileFieldDto[];
   values: FieldAnswers;
   errors: Record<string, string>;
   onChange: (key: string, value: ProfileFieldValue | null) => void;
+  audience?: ProfileFieldAudience;
 }) {
   const theme = useTheme();
   return (
@@ -27,8 +32,8 @@ export function CustomFieldInputs({
       {fields.map((f) => {
         const v = values[f.key] ?? null;
         const label = `${f.label}${f.required ? " *" : ""}`;
-        const hint = [f.helpText, f.visibility === "ADMINS" ? "Only you and the admins see this." : null].filter(Boolean).join(" ") || undefined;
-        if (!f.memberEditable) {
+        const hint = profileFieldHint(f, audience);
+        if (audience === "member" && !f.memberEditable) {
           return (
             <View key={f.key} style={{ gap: 4 }}>
               <Text style={{ fontWeight: "600", color: colors.text }}>{f.label}</Text>
@@ -66,7 +71,7 @@ export function CustomFieldInputs({
           case "SELECT":
             return (
               <View key={f.key} style={{ gap: 4 }}>
-                <ChipSelect label={label} options={f.options} value={typeof v === "string" ? v : ""} onChange={(c) => onChange(f.key, c || null)} allowEmpty={!f.required} />
+                <ChipSelect label={label} options={choiceOptionsWithCurrent(f.options, v)} value={typeof v === "string" ? v : ""} onChange={(c) => onChange(f.key, c || null)} allowEmpty={!f.required} />
                 {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
               </View>
             );
@@ -76,7 +81,7 @@ export function CustomFieldInputs({
               <View key={f.key} style={{ gap: 6 }}>
                 <Text style={{ fontWeight: "600", color: colors.text, fontSize: 13 }}>{label}</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {f.options.map((o) => {
+                  {choiceOptionsWithCurrent(f.options, chosen).map((o) => {
                     const on = chosen.includes(o.value);
                     return <Chip key={o.value} label={o.label} active={on} color={theme.primary} onPress={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])} />;
                   })}

@@ -137,22 +137,25 @@ Covers:
   Approve and Reject 44px tall beside the link to her page, never inside it; an open Reject closing with a toast that
   says where she stands once the API's live notice of a change refetches the list showing her decided elsewhere, and
   not opening again by itself when she waits again; Approve sending the status the notice showed, and the notice then
-  showing Approved); a member's page showing Kiran Joshi's whole profile
-  (headline, skills, past role, studies elsewhere, Open to); approving a pending job after its full preview (the
+  showing Approved); a member's page showing Kiran Joshi's whole profile (headline, skills, past role, studies
+  elsewhere, Open to), and Make admin and Remove admin role each asking first (Cancel sending nothing), each toast
+  naming Kiran, and both changes in the recent activity by the admin's name; his answers' Cancel putting back the
+  saved ones, and the admin's own page, with its answers being edited, linking from its recent activity to Kiran's
+  page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
   nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
   spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
-  the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in
-  its new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
-  confirm dialog (Cancel first); importing an
-  invitation CSV and joining through its link in a second browser, with the name filled in and the three steps; an
-  announcement that also goes by email;
+  the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
+  new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
+  confirm dialog (Cancel first); importing an invitation CSV and joining through its link in a second browser, with the
+  name filled in and the three steps; an announcement that also goes by email;
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
-  audit row the view writes, the messages discarded on leaving the page, a report another admin just handled, removing
-  the reported message, and the page on a phone;
+  audit row the view writes, the audit log's Chat reports chip showing only that family and the console's Audit log
+  link then showing the whole log again, with no filter written back, the messages discarded on leaving the page, a
+  report another admin just handled, removing the reported message, and the page on a phone;
 - analytics charts and the members CSV, with the profile's own columns after "Last active" and Rahul's seeded headline
   and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
@@ -253,31 +256,44 @@ Covers:
   tile, each tile 44px), Institution colour saved and tinting the screen (the Samaj's tint) with `Muted` text a shade
   darker, and the feed after a reload with its post cards painting their own white, the console's home staying on the
   plain page, and Plain putting the page and its grey text back; the console's Settings, reached from the approval
-  sentence's 44px Settings link (and
-  later from the section's row), saying the plan has no messaging, a blank batch year refused under its box with
-  nothing sent, a save refused while another admin's change comes back (both answered by the script) starting the form
-  again from the stored settings and still saying "Couldn't save: …", Messaging off clearing Mentorship and holding it
-  with "Needs Messaging", and Funding saved off (sending only that switch) with More dropping it at once, then back on;
-  Profile fields, adding "Seva team …" in the modal editor (the key following the question, options added by Return
-  and by Add, the directory filter box disabled for short text and for admin-only answers), moving it up (in its new
-  place, said, with the arrows waiting, while the script holds the move) and down, a move the script refuses put back
-  with "Couldn't move it" while the list's refetch is held, archiving it after the confirm sheet (Cancel first), and
-  Show archived listing it to restore, after a reload too; and, with the role taken away (answered by the script), the
-  console leaving for the feed with one set of tabs, More dropping its row, and the console opened cold doing the same;
+  sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, a blank batch year
+  refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
+  script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
+  Mentorship and holding it with "Needs Messaging", and Funding saved off (sending only that switch) with More dropping
+  it at once, then back on; Profile fields, adding "Seva team …" in the modal editor (the key following the question,
+  options added by Return and by Add, the directory filter box disabled for short text and for admin-only answers),
+  moving it up (in its new place, said, with the arrows waiting, while the script holds the move) and down, a move the
+  script refuses put back with "Couldn't move it" while the list's refetch is held, archiving it after the confirm sheet
+  (Cancel first), and Show archived listing it to restore, after a reload too; and, with the role taken away (answered
+  by the script), the console leaving for the feed with one set of tabs, More dropping its row, and the console opened
+  cold doing the same;
 - the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi and Diya
   Raval with their details line and 44px actions named for them, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
   its Reject opening the reason sheet first, an open reason sheet closing and saying where he stands once the API's
   live notice of a change refetches the list showing him decided elsewhere (and not opening again by itself when he
   waits again), Approve sending the status the notice showed, the same notice then refused as "already approved",
-  showing Approved or "No longer waiting" once dealt with, and its text opening the members waiting with Back
+  showing Approved or "No longer waiting" once dealt with, and its text opening his page in the console with Back
   returning; Diya rejected through the reason sheet, its Reject held under 3 characters, a server failure (answered by
   the script) keeping the sheet open with the error and the reason typed, and a refusal saying she was already
   rejected closing it, saying so and refreshing the list; then listed under Rejected with her reason, where a refusal
   (answered by the script) says she has already been approved, the Approve sent the status her row showed, and the list
   refreshes; the Approved tab, its answer held back by the script, showing a spinner and none of Rejected's rows or
   buttons until its own arrive; searching for Nisha, and for Jignesh, whose own row says "You" with no actions; and a
-  second page (answered by the script) loading on scroll, a row repeated across the pages shown once.
+  second page (answered by the script) loading on scroll, a row repeated across the pages shown once;
+- a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list, with her
+  facts (her phone as the console writes it, her place by name, what she does), her mentor profile listed in Mentors
+  with its areas and availability, no sideways scrolling, and Remove as mentor asking first (Cancel sends nothing); her
+  answers edited, Chapter saved as Diaspora ("Answers saved"), then Surat chosen and cancelled, the saved answer
+  standing and the next edit starting from it; View profile in the app leaving the console for her profile, back on the
+  tabs; an admin-managed question (added by the script) given to the admin as a text box, saying only admins see the
+  answer, and sent by Save; Parth Joshi made an admin and the role taken away again, each through its confirmation
+  (Cancel first sends nothing), the Admin badge following, and his recent activity naming Jignesh Patel with the changes
+  made; the audit log from the console's home, opening on All, its Members chip showing Diya's rejection with its
+  reason, a prefix typed by hand that is no chip's ("membership.app") leaving none chosen, and one that is
+  ("chat_report.") choosing that chip and finding nothing, Clear choosing All again, a membership row opening Diya's
+  page with Back keeping the filter, and a row carrying a phone hash (answered by the script) showing its other details
+  and never the hash.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -564,16 +580,16 @@ waiting for approval. Sign Rahul back in afterwards.
       list of sections on the web console are silent.
 - [ ] Pulling the console's home down refreshes it.
 - [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
-      number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the
-      members waiting, the new member among them, with the console's home under it. Back (and the iPhone's swipe back)
-      goes to the console's home, then to the Samaj feed, with one tab bar, never a blank screen; on Android one more
-      Back leaves the app rather than showing the Samaj feed again (the phone remembers the Samaj, so the start screen
-      redirects there as the push opens: one Samaj, not two). Do it again with the app open on another tab: Back returns
-      there, by way of the console's home. Then once more with the console's home already open: the push opens the
-      members waiting above it, and a single Back returns to the console's home.
+      number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the new
+      member's page in the console, with the console's home under it. Back (and the iPhone's swipe back) goes to the
+      console's home, then to the Samaj feed, with one tab bar, never a blank screen; on Android one more Back leaves
+      the app rather than showing the Samaj feed again (the phone remembers the Samaj, so the start screen redirects
+      there as the push opens: one Samaj, not two). Do it again with the app open on another tab: Back returns there, by
+      way of the console's home. Then once more with the console's home already open: the push opens the member's page
+      above it, and a single Back returns to the console's home.
 - [ ] In Notifications, that member's notice has Approve and Reject under its text, and TalkBack or VoiceOver reads
       them with the member's name ("Approve …", "Reject …"). Approve asks first; Cancel. Tapping the notice's text opens
-      the members waiting.
+      the member's page, and Back returns to Notifications.
 - [ ] On the members list, choose Reject on that member: with the keyboard up, the reason box and the sheet's Reject
       and Cancel stay above it on both phones, and Reject stays disabled until the reason has 3 characters. On Android
       the back button closes the sheet (the keyboard first, if it's up), and opening Reject again still shows what was
@@ -582,6 +598,13 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] TalkBack or VoiceOver on the members list: the status tabs are read as tabs with their counts, and each row's
       buttons with the member's name ("Approve Parth Joshi", "Reject Parth Joshi"), so one row's can't be mistaken for
       the next's. The admin's own row (search Jignesh under Approved) says "You" and has no buttons.
+- [ ] Open Nisha Modi from the members list (Approved) and choose Edit answers under Profile questions: the editor
+      scrolls into view. On a small phone, pick a Chapter and type in any text or number question: with the keyboard up,
+      the field being typed in, Save answers and Cancel can all be reached by scrolling, on both phones. Cancel puts the
+      saved answers back; Save says "Answers saved" and shows them.
+- [ ] On that page, TalkBack or VoiceOver reads the facts as label then value ("Phone", "+91 91000 00036"), and a
+      long press on the phone number offers Copy. Make admin and Remove as mentor each open a confirmation; on Android
+      the back button closes it, and on both phones Cancel changes nothing.
 - [ ] Settings: tap "Earliest batch year". The number pad comes up with the box still in view above it, on the iPhone
       and on Android, and only digits go in (four at most). Scroll down with the keyboard up: Save settings can be
       reached. TalkBack or VoiceOver reads Mentorship, with Messaging off, as a dimmed (disabled) checkbox and then
@@ -598,6 +621,10 @@ waiting for approval. Sign Rahul back in afterwards.
 - [ ] Profile fields, TalkBack or VoiceOver: the arrows are read as "Move … up" and "Move … down", the first field's up
       and the last's down as dimmed; after a move the new place is read out ("… moved up: 2 of 3"), and focus stays
       on the arrow pressed.
+- [ ] Audit log (from the console's home): the chips scroll sideways and each is read as a button with its state;
+      Members fills the field with "membership." and TalkBack or VoiceOver reads each row's action, time, who acted and
+      its details. A row's "membership …" link opens that member's page, and Back returns to the log with Members still
+      chosen. Scroll fast to the end: more rows load with no repeats, and the line under them counts what's shown.
 
 **Appearance**
 

@@ -210,8 +210,8 @@ profile and sign out.
 - **Deleting your account** (Profile) now explains that your messages stay in other people's chats, shown as from a
   "Deleted member", and that groups you own pass to the member who has been in them longest.
 - **On the phone app** everything members do above works the same: Messages is a tab, and you tap a message to report
-  it. Settings is in the phone app's admin console too (More → **Admin console**); the other admin steps (Chat
-  reports, Audit log, Reports and Moderation) are on the web console for now (README → Known gaps lists what isn't on
+  it. Settings and the Audit log are in the phone app's admin console too (More → **Admin console**); the other admin
+  steps (Chat reports, Reports and Moderation) are on the web console for now (README → Known gaps lists what isn't on
   the phone yet).
 
 **Wave 1: grow and engage** (`pnpm db:reset` loads six months of demo history for these)

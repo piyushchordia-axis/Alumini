@@ -1,7 +1,7 @@
 import { ADMIN_SECTIONS, MOBILE_ADMIN_SECTIONS, NOTIFICATION_TYPES, adminKeys, isAdminNotification } from "@illuminize/shared";
 import { ApiClientError } from "@illuminize/shared/client";
 import { describe, expect, it } from "vitest";
-import { adminHomeHref, adminSectionHref, isPushAdminOf, isStoredAdminOf, membershipToRefetch, opensInPlace } from "../../../mobile/src/lib/admin";
+import { adminHomeHref, adminMemberHref, adminSectionHref, isPushAdminOf, isStoredAdminOf, membershipToRefetch, opensInPlace } from "../../../mobile/src/lib/admin";
 import { notificationHref } from "../../../mobile/src/lib/notificationLinks";
 import { qk } from "../../../mobile/src/lib/queryKeys";
 
@@ -16,14 +16,21 @@ const ADMIN_PAYLOADS: Record<string, Record<string, string>> = {
 };
 
 describe("notificationHref in the phone app", () => {
-  it("opens the members waiting from a request to join, and the console's home from every other admin notice, for an admin", () => {
+  it("opens the member's page from a request to join, and the console's home from every other admin notice, for an admin", () => {
     const adminTypes = NOTIFICATION_TYPES.filter(isAdminNotification);
     expect(adminTypes).toEqual(Object.keys(ADMIN_PAYLOADS));
     for (const type of adminTypes) {
-      const href = type === "NEW_MEMBER_PENDING" ? "/t/demo/admin/members?status=PENDING" : "/t/demo/admin";
+      const href = type === "NEW_MEMBER_PENDING" ? `/t/demo/admin/members/${ID}` : "/t/demo/admin";
       expect(notificationHref("demo", type, ADMIN_PAYLOADS[type], { isAdmin: true }), type).toBe(href);
-      expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe(href);
     }
+    expect(adminMemberHref("demo", ID)).toBe(`/t/demo/admin/members/${ID}`);
+  });
+
+  it("opens the members waiting from a request to join that doesn't name a member, or names one by something other than an id", () => {
+    for (const data of [{}, { membershipId: "../settings" }, { membershipId: 42 }, null]) {
+      expect(notificationHref("demo", "NEW_MEMBER_PENDING", data, { isAdmin: true }), JSON.stringify(data)).toBe("/t/demo/admin/members?status=PENDING");
+    }
+    for (const type of Object.keys(ADMIN_PAYLOADS).filter((t) => t !== "NEW_MEMBER_PENDING")) expect(notificationHref("demo", type, {}, { isAdmin: true }), type).toBe("/t/demo/admin");
   });
 
   it("opens nothing from an admin notice for someone who isn't an admin, such as one demoted since", () => {

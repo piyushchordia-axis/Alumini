@@ -37,7 +37,8 @@ export async function listAudit(
       .from(auditLog)
       .leftJoin(memberships, eq(memberships.id, auditLog.actorMembershipId))
       .where(where)
-      .orderBy(desc(auditLog.createdAt))
+      // The id breaks ties, as rows written in one instant share createdAt: offset pages must not repeat or skip one.
+      .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
       .limit(f.pageSize)
       .offset((f.page - 1) * f.pageSize),
     db.select({ count: sql<number>`count(*)::int` }).from(auditLog).where(where),
@@ -45,11 +46,19 @@ export async function listAudit(
   return { rows, total: count?.count ?? 0 };
 }
 
-export async function listAuditForMembership(db: DbClient, tenantId: string, membershipId: string, viewerUserId: string, limit = 20): Promise<AuditRow[]> {
+/** The latest rows about a member or by them, each with its actor's name at the institution, as listAudit gives it. */
+export async function listAuditForMembership(
+  db: DbClient,
+  tenantId: string,
+  membershipId: string,
+  viewerUserId: string,
+  limit = 20,
+): Promise<Array<{ entry: AuditRow; actorName: string | null }>> {
   return db
-    .select()
+    .select({ entry: auditLog, actorName: memberships.fullName })
     .from(auditLog)
+    .leftJoin(memberships, eq(memberships.id, auditLog.actorMembershipId))
     .where(and(eq(auditLog.tenantId, tenantId), or(eq(auditLog.targetId, membershipId), eq(auditLog.actorMembershipId, membershipId)), visibleTo(viewerUserId)))
-    .orderBy(desc(auditLog.createdAt))
+    .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
     .limit(limit);
 }

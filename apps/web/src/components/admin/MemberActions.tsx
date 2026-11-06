@@ -1,5 +1,5 @@
 import { MEMBER_ACTION_COPY, approveAllDoneText, memberActionDoneText, memberActionErrorText, memberActionLabel, memberActionsFor, memberStatusNowText, type MemberAdminAction, type MembershipRole, type MembershipStatus, type NotificationSubjectDto } from "@illuminize/shared";
-import { errorMessage, unlessOutOfDate } from "@illuminize/shared/client";
+import { unlessOutOfDate } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
@@ -65,13 +65,10 @@ export function useMemberActions(slug: string) {
     onSuccess: (r) => toast.success(approveAllDoneText(r.approved)),
     onSettled: () => void invalidateTenant(qc, slug),
   });
+  // The page that asks first says how it went. A refusal refreshes too: the member may have been suspended meanwhile.
   const setRole = useMutation({
     mutationFn: (v: { id: string; role: MembershipRole }) => api.admin.members.setRole(slug, v.id, v.role),
-    onSuccess: () => {
-      void invalidateTenant(qc, slug);
-      toast.success("Role updated");
-    },
-    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => void invalidateTenant(qc, slug),
   });
   return {
     run: (action: MemberAdminAction, member: MemberRef, reason?: string) => act.mutateAsync({ action, member, reason }),

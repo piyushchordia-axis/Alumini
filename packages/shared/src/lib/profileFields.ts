@@ -237,6 +237,39 @@ export function archiveFieldConfirm(label: string): { title: string; body: strin
   };
 }
 
+/** Answers keyed by field key, as the forms hold them and the API takes them. */
+export type ProfileFieldAnswers = Record<string, ProfileFieldValue | null>;
+
+/** A membership's answers as a form's values, keyed by field. */
+export function answersToValues(answers: ReadonlyArray<{ key: string; value: ProfileFieldValue | null }> | undefined): ProfileFieldAnswers {
+  return Object.fromEntries((answers ?? []).map((a) => [a.key, a.value]));
+}
+
+/** Who fills in a member's answers: the member, or an admin, who can also change the ones set by admins. */
+export type ProfileFieldAudience = "member" | "admin";
+
+/**
+ * The hint under a question's input: its help text, then who sees the answer, worded for whoever is filling it in. An
+ * admin-managed question an admin answers is hidden from the member unless everyone may see it.
+ */
+export function profileFieldHint(f: { helpText?: string | null; visibility: ProfileFieldVisibility; memberEditable: boolean }, audience: ProfileFieldAudience = "member"): string | undefined {
+  let who: string | null = null;
+  if (audience === "member") who = f.visibility === "ADMINS" ? "Only you and the admins see this." : null;
+  else if (f.visibility === "ADMINS") who = f.memberEditable ? "Only the member and the admins see this." : "Only admins see this answer.";
+  else if (!f.memberEditable) who = "Set by the admins: the member can't change it.";
+  return [f.helpText, who].filter(Boolean).join(" ") || undefined;
+}
+
+/**
+ * A choice question's options, with any saved answer no longer among them (an option removed since) added as itself, so
+ * an edit shows it rather than a blank, and doesn't drop it unasked.
+ */
+export function choiceOptionsWithCurrent(options: readonly ProfileFieldOption[], current: ProfileFieldValue | null | undefined): ProfileFieldOption[] {
+  const saved = Array.isArray(current) ? current : typeof current === "string" && current !== "" ? [current] : [];
+  const missing = [...new Set(saved)].filter((v) => !options.some((o) => o.value === v));
+  return [...options, ...missing.map((v) => ({ value: v, label: v }))];
+}
+
 /** How an answer reads on a profile: option labels, "Yes"/"No", dates as given. */
 export function formatProfileFieldValue(def: Pick<ProfileFieldDef, "type" | "options">, value: ProfileFieldValue | null | undefined): string {
   if (value === null || value === undefined) return "";

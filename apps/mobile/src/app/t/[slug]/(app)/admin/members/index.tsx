@@ -106,7 +106,7 @@ export default function AdminMembersScreen() {
           refreshing={refreshing}
           onRefresh={() => void refresh()}
           ItemSeparatorComponent={Divider}
-          renderItem={({ item }) => <AdminMemberRow member={item} actions={actions} you={item.id === membership.id} disabled={list.isPlaceholderData} />}
+          renderItem={({ item }) => <AdminMemberRow slug={slug} member={item} actions={actions} you={item.id === membership.id} disabled={list.isPlaceholderData} />}
           ListEmptyComponent={
             <View style={styles.empty}>
               {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}

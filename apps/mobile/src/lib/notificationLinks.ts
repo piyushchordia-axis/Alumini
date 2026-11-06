@@ -1,4 +1,5 @@
 import { jobsQuery, notificationTarget } from "@illuminize/shared";
+import { adminMemberHref } from "./admin";
 
 /** Screen for a notification (list tap or push tap). Admin notices open the console, for admins only. */
 export function notificationHref(slug: string, type: string, data: unknown, { isAdmin }: { isAdmin: boolean }): `/t/${string}` | null {
@@ -33,8 +34,9 @@ export function notificationHref(slug: string, type: string, data: unknown, { is
       return `${base}/feed`;
     case "admin":
       if (!isAdmin) return null;
-      // A request to join opens the members waiting; the others the console's home, which shows what's waiting, until
-      // their own section is in the phone app.
-      return t.section === "members" ? `${base}/admin/members?status=PENDING` : `${base}/admin`;
+      // A request to join opens the member's page (the members waiting, from a notice that didn't name them); the others
+      // the console's home, which shows what's waiting, until their own section is in the phone app.
+      if (t.section === "members") return t.membershipId ? adminMemberHref(slug, t.membershipId) : `${base}/admin/members?status=PENDING`;
+      return `${base}/admin`;
   }
 }

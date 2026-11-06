@@ -22,6 +22,11 @@ export function adminSectionHref(slug: string, key: AdminSectionKey, query?: Rea
   return search ? `${path}?${search}` : path;
 }
 
+/** A member's page in the console, as on the web console. */
+export function adminMemberHref(slug: string, membershipId: string): `/t/${string}` {
+  return `/t/${slug}/admin/members/${membershipId}`;
+}
+
 /**
  * Whether the stored session makes this person an admin of `slug`, by the (app) layout's rule: the institution's admin,
  * or Illuminize staff. For a push that opens the app cold, before the membership has loaded; the console's guard still

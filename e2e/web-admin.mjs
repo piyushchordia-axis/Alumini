@@ -104,6 +104,81 @@ try {
     await shot("a02b-member-detail");
   });
 
+  await step("Make admin and Remove admin role each ask first, and Cancel changes nothing", async () => {
+    // On Kiran Joshi's page from the step before.
+    const roles = [];
+    const onRequest = (r) => r.method() === "PATCH" && r.url().endsWith("/role") && roles.push(JSON.parse(r.postData() ?? "{}").role);
+    page.on("request", onRequest);
+    try {
+      await page.getByRole("button", { name: "Make admin", exact: true }).click();
+      const make = page.getByRole("dialog", { name: "Make Kiran Joshi an admin?", exact: true });
+      await make.getByText("They'll be able to approve members, moderate content, change settings and read the audit log for Demo College of Engineering.", { exact: true }).waitFor();
+      await make.getByRole("button", { name: "Cancel", exact: true }).click();
+      await make.waitFor({ state: "detached" });
+      if (roles.length) throw new Error("Cancel still changed Kiran's role");
+
+      await page.getByRole("button", { name: "Make admin", exact: true }).click();
+      await make.getByRole("button", { name: "Make admin", exact: true }).click();
+      await page.getByText("Kiran Joshi is now an admin", { exact: true }).waitFor();
+      await make.waitFor({ state: "detached" });
+
+      await page.getByRole("button", { name: "Remove admin role", exact: true }).click();
+      const remove = page.getByRole("dialog", { name: "Remove Kiran Joshi's admin role?", exact: true });
+      await remove.getByText("They keep their membership but lose the admin console.", { exact: true }).waitFor();
+      await remove.getByRole("button", { name: "Remove admin role", exact: true }).click();
+      await page.getByText("Kiran Joshi is no longer an admin", { exact: true }).waitFor();
+      await remove.waitFor({ state: "detached" });
+      await page.getByRole("button", { name: "Make admin", exact: true }).waitFor();
+      if (roles.join() !== "TENANT_ADMIN,MEMBER") throw new Error(`the role changes sent ${roles.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+    // Both changes are in the member's recent activity, by the admin's name.
+    await page.locator("tr", { hasText: "membership.role_change" }).first().waitFor();
+    if (await page.locator("tr", { hasText: "Platform / system" }).count()) throw new Error("recent activity calls an admin's action the system's");
+  });
+
+  await step("answers Cancel puts back the saved ones, and another member's page never opens on an edit", async () => {
+    // Kiran's page, from the step before: a choice made and cancelled is gone when editing starts again.
+    const kiranId = page.url().split("/").pop();
+    const patches = [];
+    const onRequest = (r) => r.method() === "PATCH" && r.url().endsWith("/profile") && patches.push(r.url());
+    page.on("request", onRequest);
+    try {
+      const firstClub = () => page.getByRole("group", { name: "Clubs and societies", exact: true }).getByRole("button").first();
+      await page.getByRole("button", { name: "Edit answers", exact: true }).click();
+      const saved = await firstClub().getAttribute("aria-pressed");
+      await firstClub().click();
+      if ((await firstClub().getAttribute("aria-pressed")) === saved) throw new Error("the club didn't change when pressed");
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await page.getByRole("button", { name: "Edit answers", exact: true }).click();
+      if ((await firstClub().getAttribute("aria-pressed")) !== saved) throw new Error("editing again didn't start from the saved answers");
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+
+      // The admin's own page links to Kiran from its recent activity. With Kiran's page held from the visit before, an
+      // editor open on the admin's own answers mustn't follow to Kiran's, where Save would write the admin's answers.
+      await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED&q=Suresh%20Patil`);
+      await page.locator("li").getByRole("link", { name: "Suresh Patil", exact: true }).first().click();
+      await page.getByText("This is you.", { exact: true }).waitFor();
+      const toKiran = page.getByRole("link", { name: `membership ${kiranId.slice(0, 8)}`, exact: true }).first();
+      await toKiran.click();
+      await page.waitForURL(`**/admin/members/${kiranId}`);
+      await page.waitForSelector("h1:has-text('Kiran Joshi')");
+      await page.goBack();
+      await page.getByText("This is you.", { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Edit answers", exact: true }).click();
+      await page.getByRole("button", { name: "Save answers", exact: true }).waitFor();
+      await toKiran.click();
+      await page.waitForURL(`**/admin/members/${kiranId}`);
+      await page.waitForSelector("h1:has-text('Kiran Joshi')");
+      await page.getByRole("button", { name: "Edit answers", exact: true }).waitFor();
+      if (await page.getByRole("button", { name: "Save answers" }).count()) throw new Error("Kiran's page opened on the editor left open on the admin's own page");
+      if (patches.length) throw new Error(`Cancel or moving between members sent ${patches.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+  });
+
   await step("reject a pending member with a reason", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
     const row = page.locator("li", { hasText: "Amit Verma" }).first();
@@ -492,6 +567,23 @@ try {
     await page.goto(`${BASE}/t/demo-university/admin/audit`);
     await page.locator("tr", { hasText: "chat_report.view" }).first().locator("text=Ananya").waitFor();
     if (await page.locator(`text=${SEEDED_BODY}`).count()) throw new Error("the audit log shows the reported message");
+    // The Chat reports chip shows only that family, kept in the address.
+    const chip = page.getByRole("button", { name: "Chat reports", exact: true });
+    await chip.click();
+    await page.waitForURL(/[?&]action=chat_report\./);
+    if ((await chip.getAttribute("aria-pressed")) !== "true") throw new Error("the Chat reports chip isn't shown chosen");
+    await page.waitForFunction(() => {
+      const actions = [...document.querySelectorAll("tbody tr td:nth-child(2)")].map((td) => td.textContent?.trim() ?? "");
+      return actions.length > 0 && actions.every((a) => a.startsWith("chat_report."));
+    });
+    await shot("a08e2-audit-chip");
+    // The console's own Audit log link, with the page still open, shows the whole log again: the filter isn't written
+    // back over the address.
+    await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: "Audit log", exact: true }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll("tbody tr td:nth-child(2)")].some((td) => !(td.textContent ?? "").trim().startsWith("chat_report.")));
+    if (new URL(page.url()).searchParams.has("action")) throw new Error(`the audit log's link kept a filter: ${page.url()}`);
+    if ((await page.getByRole("button", { name: "All", exact: true }).getAttribute("aria-pressed")) !== "true") throw new Error("the audit log's link didn't choose All");
+    if ((await chip.getAttribute("aria-pressed")) === "true") throw new Error("the Chat reports chip stayed chosen");
   });
 
   await step("leaving the chat reports page discards the messages", async () => {

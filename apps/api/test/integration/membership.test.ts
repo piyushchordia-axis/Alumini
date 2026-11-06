@@ -204,6 +204,50 @@ describe.skipIf(!dbAvailable)("membership + approval", () => {
     expect(seen).toEqual([...ids].sort().reverse());
   });
 
+  it("names who acted in a member's recent activity: the admin and the member by their names here, staff by none", async () => {
+    const { tenant } = await createTenant(ctx, { memberApprovalMode: "ADMIN_APPROVAL" });
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN", fullName: "Asha Admin" });
+    const staff = await createUser(ctx, { isPlatformAdmin: true });
+    const user = await createUser(ctx);
+    const session = await loginAs(ctx, user.phoneE164);
+    const base = `/api/v1/t/${tenant.slug}`;
+    const id = (await api().post(`${base}/memberships`).set(auth(session.accessToken)).send(PROFILE)).body.data.id as string;
+    expect((await api().post(`${base}/admin/members/${id}/approve`).set(admin.headers)).status).toBe(200);
+    // As Illuminize staff act at an institution they aren't a member of: a user, and no membership to name them by.
+    await ctx.db.insert(auditLog).values({ tenantId: tenant.id, actorUserId: staff.id, action: "membership.role_change", targetType: "membership", targetId: id, metadata: { from: "MEMBER", to: "TENANT_ADMIN" } });
+
+    const detail = await api().get(`${base}/admin/members/${id}`).set(admin.headers);
+    expect(detail.status).toBe(200);
+    const byAction = new Map((detail.body.data.audit as Array<{ action: string; actorName: string | null }>).map((a) => [a.action, a]));
+    expect(byAction.get("membership.approve")).toMatchObject({ actorName: "Asha Admin", actorMembershipId: admin.membership.id });
+    expect(byAction.get("membership.create")).toMatchObject({ actorName: "Test Member", actorMembershipId: id });
+    expect(byAction.get("membership.role_change")).toMatchObject({ actorName: null, actorUserId: staff.id, actorMembershipId: null });
+  });
+
+  it("pages the audit log in one fixed order, so rows written in the same instant each show once", async () => {
+    const { tenant } = await createTenant(ctx);
+    const admin = await memberSession(ctx, tenant.id, { role: "TENANT_ADMIN" });
+    // One createdAt for all, as rows written in one transaction can have, so only the tiebreak orders them.
+    const at = new Date("2026-01-01T00:00:00.000Z");
+    const written = await ctx.db
+      .insert(auditLog)
+      .values(Array.from({ length: 7 }, (_, i) => ({ tenantId: tenant.id, actorMembershipId: admin.membership.id, action: "invitation.send", metadata: { count: i }, createdAt: at })))
+      .returning({ id: auditLog.id });
+    const ids = written.map((r) => r.id);
+
+    const seen: string[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const res = await api().get(`/api/v1/t/${tenant.slug}/admin/audit?action=invitation.&page=${page}&pageSize=2`).set(admin.headers);
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(7);
+      seen.push(...res.body.data.map((a: { id: string }) => a.id));
+    }
+    // Every row once across the pages, newest first and then by id, the same however Postgres reads the rows.
+    expect(seen).toHaveLength(7);
+    expect(new Set(seen).size).toBe(7);
+    expect(seen).toEqual([...ids].sort().reverse());
+  });
+
   it("enforces role and tenant boundaries", async () => {
     const { tenant: a } = await createTenant(ctx, { slug: "tenant-a" });
     const { tenant: b } = await createTenant(ctx, { slug: "tenant-b" });

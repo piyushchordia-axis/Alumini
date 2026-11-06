@@ -1,9 +1,13 @@
 import {
+  MARITAL_STATUS_LABELS,
   MEMBERSHIP_STATUSES,
   MIN_BATCH_YEAR,
+  PROFESSION_TYPE_LABELS,
   channelName,
+  countryName,
   type ApprovalMode,
   type ContentType,
+  type MembershipRole,
   type MembershipStatus,
   type MessageChannel,
   type ModerationStatus,
@@ -102,7 +106,7 @@ export type AdminSectionKey = AdminSection["key"];
  * The sections the phone app's console has so far (its Dashboard is the console's home). It lists the others as on the
  * web console, and README → Known gaps names them, until every page is in the phone app.
  */
-export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members", "profileFields", "settings"];
+export const MOBILE_ADMIN_SECTIONS: readonly AdminSectionKey[] = ["dashboard", "members", "profileFields", "settings", "audit"];
 
 /** A figure on the console's home, which both apps draw as a tile. */
 export interface DashboardTile {
@@ -409,6 +413,68 @@ export function parseMemberStatus(raw: unknown): MembershipStatus {
 export function memberListMeta(m: Pick<AdminMemberDto, "batchYear" | "phone" | "companyName" | "city" | "createdAt">, formatDate: (iso: string) => string): string {
   const work = [m.companyName, m.city].filter(Boolean).join(", ");
   return [`Batch of ${m.batchYear}`, formatPhone(m.phone), work, `requested ${formatDate(m.createdAt)}`].filter(Boolean).join(" · ");
+}
+
+/** One fact on a member's admin page. */
+export interface MemberFact {
+  label: string;
+  value: string;
+}
+
+/**
+ * What a member's admin page lists beside their profile (ProfileDetails shows the work, studies, links and bio), with
+ * "—" for anything not given. Instants go through the caller's formatters, as Hermes may lack Intl date formatting. A
+ * date of birth is a calendar date, written by formatCalendarDate, so it never shows a day early west of UTC.
+ */
+export function memberFacts(
+  m: Pick<AdminMemberDto, "phone" | "batchYear" | "professionType" | "city" | "country" | "dateOfBirth" | "maritalStatus" | "kidsCount" | "createdAt" | "lastActiveAt" | "lastLoginAt">,
+  format: { formatDate: (iso: string) => string; formatDateTime: (iso: string) => string },
+): MemberFact[] {
+  const facts: Array<[string, string | number | null]> = [
+    ["Phone", formatPhone(m.phone)],
+    ["Batch", m.batchYear],
+    ["Profession", PROFESSION_TYPE_LABELS[m.professionType]],
+    ["City", [m.city, countryName(m.country)].filter(Boolean).join(", ")],
+    ["Date of birth", m.dateOfBirth ? formatCalendarDate(m.dateOfBirth) : null],
+    ["Marital status", m.maritalStatus ? MARITAL_STATUS_LABELS[m.maritalStatus] : null],
+    ["Kids", m.kidsCount],
+    ["Member since", format.formatDate(m.createdAt)],
+    ["Last active", m.lastActiveAt ? format.formatDateTime(m.lastActiveAt) : "never"],
+    ["Last login", m.lastLoginAt ? format.formatDateTime(m.lastLoginAt) : "never"],
+  ];
+  return facts.map(([label, value]) => ({ label, value: value === null || value === "" ? "—" : String(value) }));
+}
+
+/** The words of a role change, from its button to what it did. */
+export interface RoleChangeCopy {
+  label: string;
+  title: string;
+  body: string;
+  confirm: string;
+  /** Taking the role away is drawn as a destructive action. */
+  destructive: boolean;
+  done: string;
+}
+
+/** Making a member an admin of `tenantName`, or taking the role away, asked first on both apps. */
+export function roleChangeCopy(name: string, to: MembershipRole, tenantName: string): RoleChangeCopy {
+  return to === "TENANT_ADMIN"
+    ? {
+        label: "Make admin",
+        title: `Make ${name} an admin?`,
+        body: `They'll be able to approve members, moderate content, change settings and read the audit log for ${tenantName}.`,
+        confirm: "Make admin",
+        destructive: false,
+        done: `${name} is now an admin`,
+      }
+    : {
+        label: "Remove admin role",
+        title: `Remove ${name}'s admin role?`,
+        body: "They keep their membership but lose the admin console.",
+        confirm: "Remove admin role",
+        destructive: true,
+        done: `${name} is no longer an admin`,
+      };
 }
 
 /** The members list's empty state: "No pending members", or with a search, "No approved members match “Nisha”". */

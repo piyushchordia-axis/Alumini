@@ -2405,7 +2405,7 @@ try {
   // The admin console, as the Samaj admin signed in by the step before. Its sections come to the phone one at a time:
   // until then the console's home lists them as on the web console.
   const SAMAJ = BASE + "/t/shri-gujarati-samaj";
-  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations", "Audit log"];
+  const ON_THE_WEB_CONSOLE = ["Analytics", "Moderation", "Reports", "Chat reports", "Invitations"];
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
@@ -2452,12 +2452,13 @@ try {
     for (const label of ["Approved members", "New members (30d)", "Posts (7d)", "Upcoming events"]) await page.locator(`[aria-label^="${label}, "]`).first().waitFor();
     await page.getByText("New members are held for approval. Content follows your moderation settings.", { exact: true }).waitFor();
     // Until a section is in the phone app, the home lists it as on the web console. Members is, so its tile and row link
-    // (as do Profile fields' and Settings' rows, which the steps after this use).
+    // (as do the rows of Profile fields, Settings and the Audit log, which the steps after this use).
     await page.getByText("On the web console for now:", { exact: true }).waitFor();
-    const listed = (await page.getByRole("list").filter({ hasText: "Audit log" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
+    const listed = (await page.getByRole("list").filter({ hasText: "Invitations" }).last().getByRole("listitem").allInnerTexts()).map((s) => s.trim());
     if (listed.join() !== ON_THE_WEB_CONSOLE.join()) throw new Error(`the console's home lists ${listed.join(", ")} as on the web console, expected ${ON_THE_WEB_CONSOLE.join(", ")}`);
     await page.getByRole("link", { name: "Pending members, 2", exact: true }).waitFor();
     await page.getByRole("link", { name: "Members, 2 waiting", exact: true }).waitFor();
+    await page.getByRole("link", { name: "Audit log", exact: true }).waitFor();
     if (await page.getByRole("link", { name: /^Content to review/ }).count()) throw new Error("the Content to review tile links to a section the phone app doesn't have yet");
     // The console is a stack of its own above the tabs, as on the web: no tab bar.
     if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the console shows the tab bar");
@@ -2991,11 +2992,11 @@ try {
       await page.goto(SAMAJ + "/profile/notifications");
       await shown(page.getByText("No longer waiting", { exact: true })).waitFor();
 
-      // Its text still opens the members waiting, where Diya is now alone, and Back returns to the notices.
+      // Its text still opens his page in the console, now approved, and Back returns to the notices.
       await shown(page.getByText("New member awaiting approval", { exact: true })).click();
-      await page.waitForURL("**/t/shri-gujarati-samaj/admin/members?status=PENDING");
-      await memberButton("Reject Diya Raval").waitFor();
-      if (await page.getByText("Parth Joshi", { exact: true }).locator("visible=true").count()) throw new Error("Pending still lists Parth Joshi once approved");
+      await page.waitForURL(`**/t/shri-gujarati-samaj/admin/members/${parthId}`);
+      await shown(page.getByRole("heading", { name: "Parth Joshi", exact: true })).waitFor();
+      await shown(page.getByText("Approved", { exact: true })).waitFor();
       await backButton().click();
       await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
     } finally {
@@ -3147,6 +3148,234 @@ try {
       // 27 rows at 25 a page make two pages: nothing past page 2 is asked for.
       if (!asked.includes(2) || asked.some((n) => n > 2)) throw new Error(`the list asked for pages ${asked.join(", ")}`);
       await shot("m14d-members-page-2");
+    } finally {
+      await page.unroute(url);
+    }
+  });
+
+  // A member's page in the console, and the audit log, as the Samaj admin still.
+  const pressed = async (button) => (await button.getAttribute("aria-pressed")) === "true";
+  // The audit log's chips (AUDIT_ACTION_FILTERS), All first.
+  const AUDIT_CHIPS = ["All", "Members", "Content", "Reports", "Chat reports", "Invitations", "Profile fields", "Settings", "Mentors", "Mentorships", "Referrals", "Exports", "Platform"];
+  let nishaId = null;
+
+  await step("a member's page shows their facts and mentor profile, and Remove as mentor asks first", async () => {
+    await page.goto(SAMAJ + "/admin/members?status=APPROVED&q=Nisha");
+    // The row's name and details open her page; its actions sit beside the link, never in it.
+    await shown(page.getByRole("link", { name: /^Nisha Modi, Approved, Batch of 2010/ })).click();
+    await page.waitForURL(/\/t\/shri-gujarati-samaj\/admin\/members\/[0-9a-f-]{36}$/);
+    nishaId = page.url().split("/").pop();
+    await shown(page.getByRole("heading", { name: "Nisha Modi", exact: true })).waitFor();
+    // The facts her profile doesn't show, the phone as the console writes it, and the place by name.
+    await shown(page.getByText("+91 91000 00036", { exact: true })).waitFor();
+    await shown(page.getByText("New Jersey, United States", { exact: true })).waitFor();
+    await shown(page.getByText("Working at a company", { exact: true })).waitFor();
+    // Seeded as a mentor, in her own words.
+    await shown(page.getByText("Listed in Mentors", { exact: true })).waitFor();
+    await shown(page.getByText("Career advice, Working abroad, Consulting", { exact: true })).waitFor();
+    await shown(page.getByText("Every two weeks. Weekday evenings, US East time", { exact: true })).waitFor();
+    await fitsPhone("a member's page", shown(page.getByText("Listed in Mentors", { exact: true })));
+    await shot("m15-admin-member");
+
+    const sent = [];
+    const onRequest = (r) => r.method() === "POST" && r.url().includes("/admin/mentors/") && sent.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await memberButton("Remove as mentor").click();
+      const sheet = shown(page.getByRole("alertdialog", { name: "Remove as mentor?", exact: true }));
+      await sheet.getByText(/^They'll no longer appear in Mentors, and requests waiting for them will be declined\./).waitFor();
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      if (sent.length) throw new Error(`Cancel still sent ${sent.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+    await shown(page.getByText("Listed in Mentors", { exact: true })).waitFor();
+  });
+
+  await step("an admin edits a member's answers, the admin-managed ones too: Save keeps them, and Cancel puts back what was chosen", async () => {
+    // On Nisha's page from the step before. Samaj asks every member their Chapter.
+    await memberButton("Edit answers").click();
+    await memberButton("Diaspora").click();
+    const patched = page.waitForRequest((r) => r.method() === "PATCH" && r.url().endsWith(`/admin/members/${nishaId}/profile`));
+    await memberButton("Save answers").click();
+    const sent = JSON.parse((await patched).postData() ?? "{}");
+    if (sent.fields?.chapter !== "diaspora") throw new Error(`Save answers sent ${JSON.stringify(sent)}`);
+    await statusSays("Answers saved").waitFor();
+    await shown(page.getByText("Diaspora", { exact: true })).waitFor();
+    if (await page.getByRole("button", { name: "Save answers" }).locator("visible=true").count()) throw new Error("the answers editor stayed open after saving");
+
+    // Another choice, then Cancel: nothing is sent, the saved answer stands, and editing again starts from it.
+    const later = [];
+    const onRequest = (r) => r.method() === "PATCH" && r.url().includes(`/admin/members/${nishaId}`) && later.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await memberButton("Edit answers").click();
+      await memberButton("Surat").click();
+      if (!(await pressed(memberButton("Surat")))) throw new Error("the Surat chip isn't chosen after pressing it");
+      await memberButton("Cancel").click();
+      await shown(page.getByText("Diaspora", { exact: true })).waitFor();
+      if (await page.getByText("Surat", { exact: true }).locator("visible=true").count()) throw new Error("Cancel kept the answer it was meant to drop");
+      await memberButton("Edit answers").click();
+      if (!(await pressed(memberButton("Diaspora"))) || (await pressed(memberButton("Surat")))) throw new Error("editing again didn't start from the saved answer, Diaspora");
+      await memberButton("Cancel").click();
+      if (later.length) throw new Error(`Cancel still sent ${later.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+
+    // Out of the console to her profile in the app: down to the tabs under it, rather than a second set on top.
+    await shown(page.getByRole("link", { name: "View profile in the app", exact: true })).click();
+    await page.waitForURL(`**/t/shri-gujarati-samaj/directory/${nishaId}`);
+    await shown(page.getByText("Nisha Modi", { exact: true })).waitFor();
+    if (!(await page.locator('a[role="tab"]').locator("visible=true").count())) throw new Error("leaving the console for Nisha's profile didn't come back to the tabs");
+
+    // An admin-managed question (added by the script: the Samaj's own two are members' to answer) is the admin's to
+    // answer here, with a hint that the member never sees it, and Save sends it. The script takes it out of what goes to
+    // the API, which doesn't know it.
+    const OFFICE = { id: "00000000-0000-4000-8000-0000000000f1", key: "e2e_office_notes", label: "Office notes", helpText: null, type: "LONG_TEXT", options: [], required: false, visibility: "ADMINS", memberEditable: false, filterable: false, position: 99, archivedAt: null };
+    const fieldsUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/profile-fields(\?|$)/;
+    await page.route(fieldsUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      return route.fulfill({ response, json: { data: [...(await response.json()).data, OFFICE] } });
+    });
+    const profileUrl = new RegExp(`/admin/members/${nishaId}/profile$`);
+    const office = [];
+    await page.route(profileUrl, (route) => {
+      if (route.request().method() !== "PATCH") return route.fallback();
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      office.push(body.fields?.[OFFICE.key]);
+      const fields = { ...body.fields };
+      delete fields[OFFICE.key];
+      return route.continue({ postData: JSON.stringify({ ...body, fields }) });
+    });
+    try {
+      await page.goto(SAMAJ + `/admin/members/${nishaId}`);
+      await shown(page.getByText("Office notes", { exact: true })).waitFor();
+      await memberButton("Edit answers").click();
+      const notes = shown(page.getByLabel("Office notes", { exact: true }));
+      if ((await notes.evaluate((el) => el.tagName)) !== "TEXTAREA") throw new Error("the admin-managed question isn't an input for the admin");
+      await shown(page.getByText("Only admins see this answer.", { exact: true })).waitFor();
+      await notes.fill("Met at the Edison meetup");
+      await memberButton("Save answers").click();
+      await statusSays("Answers saved").waitFor();
+      if (office.join() !== "Met at the Edison meetup") throw new Error(`Save answers sent the admin-managed answer as ${JSON.stringify(office)}`);
+    } finally {
+      await page.unroute(fieldsUrl);
+      await page.unroute(profileUrl);
+    }
+  });
+
+  await step("Make admin and Remove admin role each ask first, and recent activity names who acted", async () => {
+    await page.goto(SAMAJ + `/admin/members/${parthId}`);
+    await shown(page.getByRole("heading", { name: "Parth Joshi", exact: true })).waitFor();
+    // The bar's own Admin badge is there throughout; Parth's own is one more.
+    const adminBadges = () => page.getByText("Admin", { exact: true }).locator("visible=true").count();
+    const before = await adminBadges();
+    const roles = [];
+    const onRequest = (r) => r.method() === "PATCH" && r.url().endsWith(`/admin/members/${parthId}/role`) && roles.push(JSON.parse(r.postData() ?? "{}").role);
+    page.on("request", onRequest);
+    try {
+      await memberButton("Make admin").click();
+      let sheet = shown(page.getByRole("alertdialog", { name: "Make Parth Joshi an admin?", exact: true }));
+      await sheet.getByText("They'll be able to approve members, moderate content, change settings and read the audit log for Shri Gujarati Samaj.", { exact: true }).waitFor();
+      await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
+      if (roles.length) throw new Error("Cancel still changed his role");
+
+      await memberButton("Make admin").click();
+      await sheet.getByRole("button", { name: "Make admin", exact: true }).click();
+      await statusSays("Parth Joshi is now an admin").waitFor();
+      await sheet.waitFor({ state: "hidden" });
+      await memberButton("Remove admin role").waitFor();
+      if ((await adminBadges()) !== before + 1) throw new Error("Parth's Admin badge didn't show once he was made an admin");
+      await shot("m15b-admin-role");
+
+      await memberButton("Remove admin role").click();
+      sheet = shown(page.getByRole("alertdialog", { name: "Remove Parth Joshi's admin role?", exact: true }));
+      await sheet.getByText("They keep their membership but lose the admin console.", { exact: true }).waitFor();
+      await sheet.getByRole("button", { name: "Remove admin role", exact: true }).click();
+      await statusSays("Parth Joshi is no longer an admin").waitFor();
+      await sheet.waitFor({ state: "hidden" });
+      await memberButton("Make admin").waitFor();
+      if ((await adminBadges()) !== before) throw new Error("Parth's Admin badge stayed once the role was taken away");
+      if (roles.join() !== "TENANT_ADMIN,MEMBER") throw new Error(`the role changes sent ${roles.join(", ")}`);
+    } finally {
+      page.off("request", onRequest);
+    }
+
+    // What was done to him, newest first, each by the admin's name, with the change it made.
+    await shown(page.getByRole("heading", { name: "Recent activity", exact: true })).waitFor();
+    await shown(page.getByText("membership.approve", { exact: true })).waitFor();
+    await shown(page.getByText("PENDING → APPROVED", { exact: true })).waitFor();
+    await shown(page.getByText("TENANT_ADMIN → MEMBER", { exact: true })).waitFor();
+    if ((await page.getByText("Jignesh Patel", { exact: true }).locator("visible=true").count()) < 3) throw new Error("recent activity doesn't name Jignesh Patel for the approval and both role changes");
+    if (await page.getByText("Platform / system", { exact: true }).locator("visible=true").count()) throw new Error("recent activity calls an admin's action the system's");
+  });
+
+  await step("the audit log filters by chip and by prefix, a row opens its member, and no phone hash shows", async () => {
+    // Diya, rejected by the members list's steps: her row in the log links to her page.
+    const token = await page.evaluate(() => localStorage.getItem("illuminize.access"));
+    const rejected = await fetch(`${API}/api/v1/t/shri-gujarati-samaj/admin/members?status=REJECTED&q=Diya`, { headers: { Authorization: `Bearer ${token}` } });
+    const diyaId = (await rejected.json()).data?.[0]?.id;
+    if (!diyaId) throw new Error("Diya Raval isn't among the rejected members");
+
+    await page.goto(SAMAJ + "/admin");
+    await shown(page.getByRole("link", { name: "Audit log", exact: true })).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/audit");
+    await shown(page.getByText("Every admin and member action, newest first", { exact: true })).waitFor();
+    if (!(await pressed(memberButton("All")))) throw new Error("the audit log didn't open on All");
+
+    await memberButton("Members").click();
+    await page.waitForURL(/[?&]action=membership\./);
+    await shown(page.getByText("membership.reject", { exact: true })).waitFor();
+    await shown(page.getByText("Reason: Not a Samaj member yet", { exact: true })).waitFor();
+    await shown(page.getByText("PENDING → REJECTED", { exact: true })).waitFor();
+    await fitsPhone("the audit log", shown(page.getByText("membership.reject", { exact: true })));
+    await shot("m16-audit-log");
+
+    // A prefix typed that is no chip's leaves none chosen; one that is a chip's chooses it. Finding nothing says what it
+    // looked for.
+    const field = shown(page.getByLabel("Filter by action", { exact: true }));
+    await field.fill("membership.app");
+    await page.waitForURL(/[?&]action=membership\.app/);
+    await shown(page.getByText("membership.approve", { exact: true })).waitFor();
+    for (const chip of AUDIT_CHIPS) if (await pressed(memberButton(chip))) throw new Error(`the ${chip} chip is chosen for a prefix typed by hand`);
+    await field.fill("chat_report.");
+    await page.waitForURL(/[?&]action=chat_report\./);
+    await shown(page.getByText("Nothing starts with “chat_report.”", { exact: true })).waitFor();
+    if (!(await pressed(memberButton("Chat reports")))) throw new Error("typing the Chat reports chip's prefix didn't choose it");
+    if ((await pressed(memberButton("Members"))) || (await pressed(memberButton("All")))) throw new Error("another chip stays chosen for the Chat reports prefix");
+    await memberButton("Clear search").click();
+    await page.waitForURL((url) => !url.searchParams.has("action"));
+    if (!(await pressed(memberButton("All")))) throw new Error("clearing the filter didn't choose All");
+
+    // A membership row opens that member's page; Back returns to the log, its chip still chosen.
+    await memberButton("Members").click();
+    await page.waitForURL(/[?&]action=membership\./);
+    await shown(page.getByRole("link", { name: `membership ${diyaId.slice(0, 8)}`, exact: true })).click();
+    await page.waitForURL(`**/t/shri-gujarati-samaj/admin/members/${diyaId}`);
+    await shown(page.getByRole("heading", { name: "Diya Raval", exact: true })).waitFor();
+    await backButton().click();
+    await page.waitForURL(/\/admin\/audit\?action=membership\./);
+    if (!(await pressed(memberButton("Members")))) throw new Error("Back to the audit log lost its filter");
+
+    // A row whose metadata carries a phone hash, as a deleted account's does (answered by the script): its other details
+    // show, the hash never does.
+    const hash = "f00dcafe".repeat(8);
+    const url = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/audit\?/;
+    await page.route(url, (route) => {
+      if (route.request().method() !== "GET" || new URL(route.request().url()).searchParams.get("action") !== "auth.") return route.fallback();
+      const row = { id: "00000000-0000-4000-8000-0000000000e1", tenantId: null, actorUserId: null, actorMembershipId: null, actorName: null, action: "auth.account_deleted", targetType: "user", targetId: "00000000-0000-4000-8000-0000000000e2", metadata: { phoneHash: hash, memberships: 1, heldSuspensions: 1 }, createdAt: new Date().toISOString() };
+      return answer(route, 200, { data: [row], page: 1, pageSize: 50, total: 1 });
+    });
+    try {
+      await field.fill("auth.");
+      await shown(page.getByText("auth.account_deleted", { exact: true })).waitFor();
+      await shown(page.getByText("Memberships: 1", { exact: true })).waitFor();
+      await shown(page.getByText("Held suspensions: 1", { exact: true })).waitFor();
+      if ((await page.evaluate(() => document.body.innerText)).includes(hash.slice(0, 8))) throw new Error("the audit log shows a phone hash");
     } finally {
       await page.unroute(url);
     }
