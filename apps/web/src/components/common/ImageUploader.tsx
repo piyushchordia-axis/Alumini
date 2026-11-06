@@ -103,7 +103,7 @@ export function ImageUploader({
         </>
       )}
       {problem && (
-        <p role="alert" className="w-full text-sm text-red-600">
+        <p role="alert" className="w-full text-sm text-tone-danger-ink">
           {problem}
         </p>
       )}

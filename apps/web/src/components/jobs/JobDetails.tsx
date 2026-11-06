@@ -78,8 +78,8 @@ function JobSkills({ skills, viewer }: { skills: string[]; viewer?: SkillsViewer
             <li
               key={skill}
               className={clsx(
-                "inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs [overflow-wrap:anywhere]",
-                has ? "bg-primary font-semibold text-white" : "bg-primary/10 font-medium text-primary",
+                "inline-flex max-w-full items-center gap-1 rounded-full border border-primary-edge px-[9px] py-[3px] text-xs [overflow-wrap:anywhere]",
+                has ? "bg-primary font-semibold text-on-primary" : "bg-primary/10 font-medium text-primary-ink",
               )}
             >
               {has && <IconCheck size={14} strokeWidth={2.5} />}

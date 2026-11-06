@@ -571,7 +571,7 @@ export function JobForm({
           )}
         </div>
       )}
-      {wrong.length > 0 && <p className="text-sm font-medium text-red-600">Check {wrong.join(", ")} above.</p>}
+      {wrong.length > 0 && <p className="text-sm font-medium text-tone-danger-ink">Check {wrong.join(", ")} above.</p>}
       {serverError ? <ErrorBox error={serverError} /> : null}
       <Button type="submit" loading={formState.isSubmitting} disabled={logoBusy}>
         {logoBusy ? "Uploading logo…" : submitLabel}

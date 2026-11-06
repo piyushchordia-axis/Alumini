@@ -52,7 +52,7 @@ export function CommentList({ postId, canComment }: { postId: string; canComment
             <div className="flex items-start justify-between gap-2">
               <MemberLink slug={slug} member={c.author} meta={timeAgo(c.createdAt)} size="sm" />
               <span className="flex items-center gap-3 text-xs text-slate-400">
-                {c.moderationStatus === "REMOVED" && <span className="text-red-500">Removed</span>}
+                {c.moderationStatus === "REMOVED" && <span className="text-tone-danger-ink">Removed</span>}
                 {c.isMine || isTenantAdmin ? (
                   <button onClick={() => confirm("Delete comment?") && remove.mutate(c.id)} className="hover:text-red-600">
                     Delete

@@ -236,7 +236,7 @@ export function ProfileDetails({
         <SectionHeading level={headingLevel}>Skills</SectionHeading>
         <ul className="flex flex-wrap gap-1.5">
           {profile.skills.map((s) => (
-            <li key={s} className="rounded-full bg-primary/10 px-3 py-1 text-sm text-primary [overflow-wrap:anywhere]">
+            <li key={s} className="rounded-full border border-primary-edge bg-primary/10 px-[11px] py-[3px] text-sm text-primary-ink [overflow-wrap:anywhere]">
               {s}
             </li>
           ))}

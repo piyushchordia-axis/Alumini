@@ -44,7 +44,7 @@ export function EmailSettings() {
       {status.isLoading ? (
         <p className="mt-3 text-sm text-slate-400">Loading…</p>
       ) : status.isError ? (
-        <p className="mt-3 text-sm text-red-600">{errorMessage(status.error)}</p>
+        <p className="mt-3 text-sm text-tone-danger-ink">{errorMessage(status.error)}</p>
       ) : (
         <div className="mt-3 space-y-3">
           {d?.email && (

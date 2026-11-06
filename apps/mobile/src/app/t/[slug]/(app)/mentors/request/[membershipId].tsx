@@ -1,4 +1,4 @@
-import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, memberYearsLabel, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
+import { MENTORSHIP_NOTE_MAX_LENGTH, STATUS_TONES, memberRoleLine, memberYearsLabel, mentorshipNoteHelp, mentorshipNoteSchema } from "@illuminize/shared";
 import { errorMessage, fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -123,7 +123,7 @@ function MentorRequest({ id }: { id: string }) {
                   />
                   {/* Laid out here rather than as the field's hint, so the help and the count stay in view beside an error. */}
                   {noteError ? (
-                    <Text role="alert" style={{ fontSize: 12, color: colors.danger }}>
+                    <Text role="alert" style={{ fontSize: 12, color: STATUS_TONES.danger.ink }}>
                       {noteError}
                     </Text>
                   ) : null}

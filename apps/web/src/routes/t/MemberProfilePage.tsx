@@ -49,7 +49,7 @@ export function MemberProfilePage() {
                 <a href={`tel:${m.phone}`} className="text-primary">
                   {formatPhone(m.phone)}
                 </a>{" "}
-                <a href={`https://wa.me/${m.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-emerald-600">
+                <a href={`https://wa.me/${m.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-tone-success-ink">
                   WhatsApp
                 </a>
               </dd>

@@ -49,7 +49,8 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
    **Skip for now**) and **About you**, then **Join the network**. "What's new" below walks through it.
 3. Post in the community feed (composer tray with Add image / Poll / Post), react and comment on others' posts.
 4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
-5. Open **Events** and RSVP to the Mumbai coffee meetup, or plan your own gathering.
+5. Open **Events** and RSVP to the Mumbai coffee meetup (your answer shows in its colour, green for I'm going, with a
+   check), or plan your own gathering.
 6. Search the **Directory** by name, company or skill, or filter it by **Were there in** a year, or by city.
 7. Sign out, pick **Demo College**, register again with a new number, and see the "awaiting approval" screen.
 
@@ -84,6 +85,14 @@ No phone handy? Run `pnpm mobile:web` instead, then open **Mobile app (Expo) (80
 phone-sized preview in the browser. Port 4000 must still be public.
 
 ## What's new
+
+**Usability pass**
+
+- **Tags that read in any colour.** Badges, skill chips and the chat list's **Archived** tag have a thin edge in their
+  colour and the same fills on the web and the phone, so a pale institution colour no longer fades them into the card.
+  RSVP to the Mumbai coffee meetup: your answer is drawn in its colour (green for **I'm going**, amber for **Maybe**)
+  with a check, and a poll marks your vote with a check too. Errors under a field are a darker red that reads on the
+  page, and toasts read better.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 

@@ -246,8 +246,8 @@ export function ProfileDetails({ profile, tenant, style }: { profile: ProfileVie
         <SectionHeading>Skills</SectionHeading>
         <View role="list" style={styles.wrap}>
           {profile.skills.map((s) => (
-            <View key={s} role="listitem" style={[styles.skill, { backgroundColor: theme.primarySoft }]}>
-              <Text style={{ fontSize: 14, color: theme.primary }}>{s}</Text>
+            <View key={s} role="listitem" style={[styles.skill, { backgroundColor: theme.primarySoft, borderColor: theme.primaryEdge }]}>
+              <Text style={{ fontSize: 14, color: theme.primaryInk }}>{s}</Text>
             </View>
           ))}
         </View>
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   heading: { fontSize: 14, fontWeight: "700", color: colors.text },
   body: { fontSize: 15, lineHeight: 22, color: "#1e293b" },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  skill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5, maxWidth: "100%" },
+  skill: { borderRadius: radius.full, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 4, maxWidth: "100%" },
   facts: { fontSize: 14, color: "#475569" },
   linkPill: {
     flexDirection: "row",

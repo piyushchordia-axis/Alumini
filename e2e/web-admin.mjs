@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -83,8 +83,17 @@ try {
     await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
     const row = page.locator("li", { hasText: "Divya Menon" }).first();
     await row.waitFor();
+    // Her status is a tag in the warning tone: its ink on its fill, and an edge that shows on the list.
+    const status = row.getByText("Pending approval", { exact: true });
+    await expectReadable(status, "the Pending approval badge");
+    await expectEdge(status, "the Pending approval badge");
     await row.locator('button:has-text("Approve")').click();
-    await page.getByText("Divya Menon approved", { exact: true }).waitFor();
+    // The toast is white on the success tone's solid, which reads (emerald-600 didn't).
+    const toast = page.getByText("Divya Menon approved", { exact: true });
+    await toast.waitFor();
+    await expectReadable(toast, "the success toast");
+    const { colour: solid } = await paintedColour(toast, "backgroundColor");
+    if (solid !== "4 120 87") throw new Error(`the success toast is rgb ${solid}, not the success tone's solid (4 120 87)`);
     await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
     await page.waitForSelector("li:has-text('Divya Menon')");
     await shot("a02-members");

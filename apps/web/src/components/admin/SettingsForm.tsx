@@ -40,7 +40,7 @@ function FeatureCheckbox({ feature, features, error, onChange }: { feature: Tena
         className={ROW}
       />
       {(blocked || error) && (
-        <p id={hintId} className={error ? "ml-6 text-xs text-red-600" : "ml-6 text-xs text-slate-500"} role={error ? "alert" : undefined}>
+        <p id={hintId} className={error ? "ml-6 text-xs text-tone-danger-ink" : "ml-6 text-xs text-slate-500"} role={error ? "alert" : undefined}>
           {error ?? blocked}
         </p>
       )}

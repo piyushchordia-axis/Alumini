@@ -3,7 +3,7 @@ import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, peerY
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
-import { Avatar, Button, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { api } from "@/lib/api";
@@ -43,7 +43,7 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
           <span className="flex items-center gap-2">
             <span className={clsx("truncate text-sm", unread ? "text-slate-800" : "text-slate-500", !c.lastMessage?.body && c.lastMessage && "italic")}>{conversationPreview(c)}</span>
             <span className="ml-auto flex shrink-0 items-center gap-1">
-              {c.group?.archived && <span className="rounded-full bg-slate-100 px-1.5 text-[11px] text-slate-500">Archived</span>}
+              {c.group?.archived && <Badge>Archived</Badge>}
               {muted && (
                 <span className="flex text-slate-400" title="Muted">
                   <IconBellOff size={14} />

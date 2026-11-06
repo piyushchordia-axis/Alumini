@@ -48,7 +48,7 @@ export function ConfirmDialog({
     >
       {body ? <p className="text-sm text-slate-600">{body}</p> : null}
       {error ? (
-        <p className="mt-3 text-sm text-red-600" role="alert">
+        <p className="mt-3 text-sm text-tone-danger-ink" role="alert">
           {errorMessage(error)}
         </p>
       ) : null}

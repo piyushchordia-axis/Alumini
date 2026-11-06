@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, nameWithYears, type EventDto } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, nameWithYears, rsvpBadge, type EventDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
@@ -16,6 +16,7 @@ function EventCard({ slug, event }: { slug: string; event: EventDto }) {
   const router = useRouter();
   const theme = useTheme();
   const d = new Date(event.startAt);
+  const rsvp = rsvpBadge(event.myRsvp);
   return (
     <Card onPress={() => router.push(`/t/${slug}/events/${event.id}`)}>
       <Row gap={12} style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
@@ -33,7 +34,7 @@ function EventCard({ slug, event }: { slug: string; event: EventDto }) {
           <Row>
             <Badge label={EVENT_KIND_LABELS[event.kind]} tone="info" />
             {event.isCancelled && <Badge label="Cancelled" tone="danger" />}
-            {event.myRsvp && <Badge label={`You: ${event.myRsvp.toLowerCase()}`} tone={event.myRsvp === "YES" ? "success" : event.myRsvp === "MAYBE" ? "warning" : "neutral"} />}
+            {rsvp && <Badge label={rsvp.label} tone={rsvp.tone} />}
             <ModerationBadge status={event.moderationStatus} />
           </Row>
           <Muted>

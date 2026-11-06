@@ -1,4 +1,4 @@
-import { brandTones, DIM_PAGE_TEXT, GREYS, pageBackdrop, pageInk, parseHex, PLAIN_PAGE_COLOR, type MemberAppearance, type PageBackdropSpec, type TenantPublicDto } from "@illuminize/shared";
+import { brandTones, DIM_PAGE_TEXT, GREYS, pageBackdrop, pageInk, parseHex, PLAIN_PAGE_COLOR, STATUS_TONES, type MemberAppearance, type PageBackdropSpec, type TenantPublicDto } from "@illuminize/shared";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 /** The plain colours. The greys are the shared ones (GREYS), each with its job: see lib/tones.ts. */
@@ -14,10 +14,11 @@ export const colors = {
   muted: GREYS.meta,
   /** Icons, borders and tag edges, never text. */
   faint: GREYS.faint,
-  danger: "#dc2626",
-  success: "#059669",
-  warning: "#d97706",
-  info: "#0284c7",
+  /** The status tones' solids (STATUS_TONES), for fills under white text, borders and icons. Text in a tone takes its ink. */
+  danger: STATUS_TONES.danger.solid,
+  success: STATUS_TONES.success.solid,
+  warning: STATUS_TONES.warning.solid,
+  info: STATUS_TONES.info.solid,
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };

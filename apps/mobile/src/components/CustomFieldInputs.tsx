@@ -1,4 +1,4 @@
-import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, type ProfileFieldAnswers, type ProfileFieldAudience, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
+import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, STATUS_TONES, type ProfileFieldAnswers, type ProfileFieldAudience, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
 import { Text, View } from "react-native";
 import { DateTimeField } from "@/components/DateTimeField";
 import { Chip, ChipSelect, Input, Muted } from "@/components/ui";
@@ -65,14 +65,14 @@ export function CustomFieldInputs({
             return (
               <View key={f.key} style={{ gap: 4 }}>
                 <ChipSelect label={label} options={[{ value: "true", label: "Yes" }, { value: "false", label: "No" }]} value={v === true ? "true" : v === false ? "false" : ""} onChange={(c) => onChange(f.key, c === "" ? null : c === "true")} allowEmpty={!f.required} />
-                {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
+                {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
               </View>
             );
           case "SELECT":
             return (
               <View key={f.key} style={{ gap: 4 }}>
                 <ChipSelect label={label} options={choiceOptionsWithCurrent(f.options, v)} value={typeof v === "string" ? v : ""} onChange={(c) => onChange(f.key, c || null)} allowEmpty={!f.required} />
-                {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
+                {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
               </View>
             );
           case "MULTI_SELECT": {
@@ -86,7 +86,7 @@ export function CustomFieldInputs({
                     return <Chip key={o.value} label={o.label} active={on} color={theme.primary} onPress={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])} />;
                   })}
                 </View>
-                {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
+                {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}
               </View>
             );
           }

@@ -1,4 +1,4 @@
-import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, memberRoleLine, memberYearsLabel, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
+import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDER, STATUS_TONES, memberRoleLine, memberYearsLabel, myReferralText, referralAskRefusalText, referralNoteHelp, referralNoteSchema, takesReferralRequests } from "@illuminize/shared";
 import { errorMessage, fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -149,7 +149,7 @@ function ReferralRequest({ jobId }: { jobId: string }) {
                 />
                 {/* Laid out here rather than as the field's hint, so the help and the count stay in view beside an error. */}
                 {noteError ? (
-                  <Text role="alert" style={{ fontSize: 12, color: colors.danger }}>
+                  <Text role="alert" style={{ fontSize: 12, color: STATUS_TONES.danger.ink }}>
                     {noteError}
                   </Text>
                 ) : null}

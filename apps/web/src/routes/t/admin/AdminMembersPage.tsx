@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { MemberActionButtons, useMemberActions } from "@/components/admin/MemberActions";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { Avatar, Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -85,7 +85,7 @@ export function AdminMembersPage() {
                   <Link to={`/t/${slug}/admin/members/${m.id}`} className="font-medium text-slate-900 hover:underline">
                     {m.fullName}
                   </Link>
-                  {m.role === "TENANT_ADMIN" && <span className="rounded bg-primary/10 px-1.5 text-xs text-primary">Admin</span>}
+                  {m.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}
                   <MemberStatusBadge status={m.status} />
                 </div>
                 <div className="mt-0.5 break-words text-xs text-slate-500">{memberListMeta(m, formatDate)}</div>

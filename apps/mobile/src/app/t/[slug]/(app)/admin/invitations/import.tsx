@@ -1,6 +1,7 @@
 import {
   INVITATION_CSV_HINT,
   INVITATION_TEMPLATE_FILE,
+  STATUS_TONES,
   formatCount,
   importDoneText,
   importIgnoredText,
@@ -202,7 +203,7 @@ export default function InvitationImportScreen() {
             <View role="list" aria-label="Rows not imported" style={styles.problems}>
               {(showAll ? problems : problems.slice(0, PROBLEMS_SHOWN)).map((p) => (
                 <Text key={p.row} role="listitem" style={styles.problem}>
-                  Line {p.row} <Text style={styles.phone}>{p.phone}</Text>: <Text style={{ color: p.status === "invalid" ? colors.danger : colors.muted }}>{p.message}</Text>
+                  Line {p.row} <Text style={styles.phone}>{p.phone}</Text>: <Text style={{ color: p.status === "invalid" ? STATUS_TONES.danger.ink : colors.muted }}>{p.message}</Text>
                 </Text>
               ))}
             </View>

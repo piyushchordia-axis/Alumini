@@ -47,7 +47,12 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
               <div className="relative flex justify-between gap-2">
                 <span className={clsx(mine && "font-semibold text-slate-900")}>
                   {o.label}
-                  {mine && " ✓"}
+                  {mine && (
+                    <>
+                      <IconCheck size={14} strokeWidth={2.5} className="ml-1 inline align-[-2px]" />
+                      <span className="sr-only">, your vote</span>
+                    </>
+                  )}
                 </span>
                 <span className="tabular-nums text-slate-600">
                   {pct}% <span className="text-xs text-slate-400">({o.votes})</span>

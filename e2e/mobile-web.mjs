@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, paintedColour, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -352,7 +352,14 @@ try {
     for (let i = 0; i < 30 && !(await question.count()); i++) await page.mouse.wheel(0, 600);
     await question.scrollIntoViewIfNeeded();
     await page.getByRole("button", { name: "Canary Wharf" }).locator("visible=true").first().click();
-    await page.locator('[aria-label^="Canary Wharf"][aria-label*="your vote"]').first().waitFor();
+    const voted = page.locator('[aria-label^="Canary Wharf"][aria-label*="your vote"]').first();
+    await voted.waitFor();
+    // Marked with a drawn check, not a ✓ (which expectSvgNoEmoji's emoji test doesn't catch), and the words "your vote"
+    // in the row's text, as the web export doesn't read a label on a plain box.
+    await expectSvgNoEmoji(voted, "the poll's chosen answer");
+    const votedText = await voted.innerText();
+    if (votedText.includes("✓")) throw new Error("the poll still marks the vote with a ✓");
+    if (!votedText.includes("your vote")) throw new Error(`the poll's chosen answer reads "${votedText}", with no hidden "your vote"`);
     await shot("m04d-poll");
   });
 
@@ -738,6 +745,20 @@ try {
     await tap("I'm going");
     // The feed's tab, with this member's post, stays mounted but hidden: the attendee is the visible match.
     await page.getByText("Mobile Smoke").locator("visible=true").first().waitFor();
+    // As on the web: the chosen answer in its tone (I'm going: the success fill, edge and ink) with a drawn check, not
+    // a ✓, in a group named for screen readers, and every answer a 44px target.
+    const rsvp = page.getByRole("group", { name: "Your RSVP", exact: true }).locator("visible=true").first();
+    const chosen = rsvp.locator('[aria-pressed="true"]');
+    await chosen.filter({ hasText: "I'm going" }).waitFor();
+    if ((await chosen.innerText()).includes("✓")) throw new Error("the chosen RSVP still shows a ✓");
+    await expectSvgNoEmoji(chosen, "the chosen RSVP");
+    await expectReadable(chosen.getByText("I'm going", { exact: true }), "the chosen RSVP");
+    await expectEdge(chosen, "the chosen RSVP");
+    const { colour: fill } = await paintedColour(chosen, "backgroundColor");
+    if (fill !== "209 250 229") throw new Error(`the chosen RSVP is rgb ${fill}, not the success tone's fill (209 250 229)`);
+    const answers = rsvp.getByRole("button");
+    if ((await answers.count()) !== 3) throw new Error(`the RSVP group holds ${await answers.count()} buttons, not 3`);
+    for (const box of await Promise.all((await answers.all()).map((b) => b.boundingBox()))) if (!box || box.height < 44) throw new Error(`an RSVP button is ${box?.height}px tall, under 44px`);
     await shot("m06-event");
     void before;
   });
@@ -3092,6 +3113,10 @@ try {
     if (!/^Pending\s*2$/.test((await pending.innerText()).trim())) throw new Error(`the Pending tab reads "${await pending.innerText()}", not its count of 2`);
     // A community member who still belongs: their years run to the present.
     await shown(page.getByText(/^2018–present · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
+    // Their status is a tag in the warning tone, as on the web: its ink on its fill, and an edge that shows on the row.
+    const status = shown(page.getByRole("link", { name: /^Parth Joshi, / })).getByText("Pending approval", { exact: true });
+    await expectReadable(status, "the Pending approval badge");
+    await expectEdge(status.locator(".."), "the Pending approval badge");
     for (const name of ["Approve Parth Joshi", "Reject Parth Joshi", "Approve Diya Raval", "Reject Diya Raval"]) {
       const box = await memberButton(name).boundingBox();
       if (!box || box.height < 44) throw new Error(`"${name}" is ${box?.height}px tall, under 44px`);

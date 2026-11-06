@@ -1,3 +1,4 @@
+import { STATUS_TONES } from "@illuminize/shared";
 import { useState } from "react";
 import { FlatList, Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -50,7 +51,7 @@ export function OptionPicker<T extends string>({ label, value, options, onChange
         </Text>
         <Text style={{ color: colors.faint }}>▾</Text>
       </Pressable>
-      {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: colors.muted, fontSize: 12 }}>{hint}</Text> : null}
+      {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: colors.muted, fontSize: 12 }}>{hint}</Text> : null}
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "bottom", "left", "right"]}>

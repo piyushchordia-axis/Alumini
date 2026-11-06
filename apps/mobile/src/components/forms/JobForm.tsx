@@ -17,6 +17,7 @@ import {
   SALARY_CURRENCY_LABELS,
   SALARY_PERIODS,
   SALARY_PERIOD_LABELS,
+  STATUS_TONES,
   WORK_MODES,
   WORK_MODE_LABELS,
   experienceLabel,
@@ -230,7 +231,7 @@ const FIELD_LABELS: Partial<Record<keyof JobCreateInput, string>> = {
 /** A heading's level, which React Native's types don't know: each part is an h2 on the web export. */
 const level2 = { "aria-level": 2 } as object;
 const labelStyle = { fontSize: 13, fontWeight: "600", color: "#334155" } as const;
-const errorStyle = { color: colors.danger, fontSize: 12 } as const;
+const errorStyle = { color: STATUS_TONES.danger.ink, fontSize: 12 } as const;
 const hintStyle = { color: colors.muted, fontSize: 12 } as const;
 
 /** One part of the form, headed, as on the web app. */

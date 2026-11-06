@@ -1,3 +1,4 @@
+import type { ToneName } from "@illuminize/shared";
 import clsx from "clsx";
 import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
@@ -171,7 +172,7 @@ export function FormField({
   const captionText = (
     <>
       {label}
-      {required && <span className="text-red-500"> *</span>}
+      {required && <span className="text-tone-danger-ink"> *</span>}
     </>
   );
   const caption = (
@@ -181,7 +182,7 @@ export function FormField({
   );
   const descId = htmlFor ? `${htmlFor}-desc` : undefined;
   const footer = error ? (
-    <span id={descId} className="mt-1 block text-xs text-red-600" role="alert">
+    <span id={descId} className="mt-1 block text-xs text-tone-danger-ink" role="alert">
       {error}
     </span>
   ) : hint ? (
@@ -240,17 +241,19 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   );
 }
 
-type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "primary";
+type Tone = ToneName | "primary";
+/** The shared status tones (STATUS_TONES), so a tag looks the same as on the phone; the brand's is its tint, edge and ink. */
 const toneClass: Record<Tone, string> = {
-  neutral: "bg-slate-100 text-slate-700",
-  success: "bg-emerald-100 text-emerald-800",
-  warning: "bg-amber-100 text-amber-800",
-  danger: "bg-red-100 text-red-800",
-  info: "bg-sky-100 text-sky-800",
-  primary: "bg-primary/10 text-primary-ink",
+  neutral: "border-tone-neutral-edge bg-tone-neutral-fill text-tone-neutral-ink",
+  success: "border-tone-success-edge bg-tone-success-fill text-tone-success-ink",
+  warning: "border-tone-warning-edge bg-tone-warning-fill text-tone-warning-ink",
+  danger: "border-tone-danger-edge bg-tone-danger-fill text-tone-danger-ink",
+  info: "border-tone-info-edge bg-tone-info-fill text-tone-info-ink",
+  primary: "border-primary-edge bg-primary/10 text-primary-ink",
 };
+/** A tag. Its 1px edge keeps its shape where the fill doesn't show (forced colours), and takes a pixel off the padding. */
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", toneClass[tone], className)}>{children}</span>;
+  return <span className={clsx("inline-flex items-center rounded-full border px-[7px] py-px text-xs font-medium", toneClass[tone], className)}>{children}</span>;
 }
 
 export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
@@ -513,7 +516,7 @@ function ToastList() {
           onClick={() => dismiss(t.id)}
           className={clsx(
             "pointer-events-auto rounded-lg px-4 py-2 text-sm text-white shadow-lg",
-            t.tone === "success" ? "bg-emerald-600" : t.tone === "error" ? "bg-red-600" : "bg-slate-800",
+            t.tone === "success" ? "bg-tone-success-solid" : t.tone === "error" ? "bg-tone-danger-solid" : "bg-slate-800",
           )}
         >
           {t.message}

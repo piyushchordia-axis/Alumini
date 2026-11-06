@@ -19,9 +19,9 @@ function SkillChip({ skill, has }: { skill: string; has: boolean }) {
   const theme = useTheme();
   const said = has && Platform.OS !== "web" ? { accessible: true, accessibilityLabel: `${skill} ${YOU_HAVE_THIS_TEXT}` } : {};
   return (
-    <View role="listitem" {...said} style={[styles.chip, { backgroundColor: has ? theme.primary : theme.primarySoft }]}>
-      {has && <IconCheck size={14} strokeWidth={2.5} color="#fff" />}
-      <Text style={[styles.chipText, has ? { color: "#fff", fontWeight: "600" } : { color: theme.primary }]}>{skill}</Text>
+    <View role="listitem" {...said} style={[styles.chip, { backgroundColor: has ? theme.primary : theme.primarySoft, borderColor: theme.primaryEdge }]}>
+      {has && <IconCheck size={14} strokeWidth={2.5} color={theme.onPrimary} />}
+      <Text style={[styles.chipText, has ? { color: theme.onPrimary, fontWeight: "600" } : { color: theme.primaryInk }]}>{skill}</Text>
       {has && Platform.OS === "web" && <Text style={styles.srOnly}> {YOU_HAVE_THIS_TEXT}</Text>}
     </View>
   );
@@ -55,7 +55,8 @@ export function JobSkills({ skills, viewer }: { skills: string[]; viewer?: Skill
 
 const styles = StyleSheet.create({
   list: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%", borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 },
+  // The brand's edge keeps a pale brand's chip in shape on white; the padding gives up the pixel the edge takes.
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%", borderRadius: radius.full, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
   chipText: { flexShrink: 1, fontSize: 12, fontWeight: "500" },
   line: { fontSize: 14, color: "#475569" },
   add: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" },

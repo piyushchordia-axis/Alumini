@@ -32,6 +32,7 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
   of an institution colour (`brandTones`); `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
+  `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
   `lib/branding.ts` the console's Branding form (`brandingSave`, `BRAND_SWATCHES`, `brandContrastWarnings`) and the
   time zones a picker offers (`timeZoneOptions`);
@@ -196,7 +197,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     (web `primary-edge`, mobile `theme.primaryEdge`; a member's Institution colour page can take it under 3:1, so a line
     drawn on the page itself, not in a card, needs its own check against `pageBackdrop`), and `tint`, its 12% tint as a
     solid colour (web `primary-tint`, mobile `theme.primaryTint`). A new value goes in `tones.ts` and, written out, in
-    `index.css`, which the test checks against it.
+    `index.css`, which the test checks against it. A tag (`Badge` on both apps, skill and input chips) is its tone's
+    fill, a 1px edge and its ink, with a pixel less padding so the edge doesn't change its size; a chosen RSVP is its
+    tone's fill, edge and ink. A field's error is the danger ink, as web `FormField` (with its required `*`) and mobile
+    `Input`/`FieldError` draw it (the phone's `*` is part of the label), toasts sit on the solids, and the phone's
+    `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders.
   - **Elevation.** Page background (web `--surface-page`, mobile `useTheme().page.color`) is quieter than content.
     Level 1: posts and list modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write
     surfaces (`elevation={2}`). Do not flatten feed cards into the page.

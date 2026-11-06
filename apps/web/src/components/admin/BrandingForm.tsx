@@ -52,7 +52,7 @@ function ColourField({ label, value, shown, placeholder, error, warning, onChang
       </div>
       {/* Under the box it's about, as on the phone, not under the suggested colours. */}
       {error && (
-        <span id={errorId} role="alert" className="mt-1 block text-xs text-red-600">
+        <span id={errorId} role="alert" className="mt-1 block text-xs text-tone-danger-ink">
           {error}
         </span>
       )}

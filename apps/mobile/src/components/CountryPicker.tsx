@@ -1,4 +1,4 @@
-import { countriesPopularFirst, countryByCode, flagEmoji, POPULAR_COUNTRY_CODES, searchCountries, type Country } from "@illuminize/shared";
+import { countriesPopularFirst, countryByCode, flagEmoji, POPULAR_COUNTRY_CODES, searchCountries, STATUS_TONES, type Country } from "@illuminize/shared";
 import { useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -49,7 +49,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
         </Text>
         <Text style={{ color: colors.faint }}>▾</Text>
       </Pressable>
-      {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : null}
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "bottom", "left", "right"]}>

@@ -73,7 +73,10 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
             {shown.map(({ skill, matched: has }) => (
               <li
                 key={skill}
-                className={clsx("inline-flex min-w-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-xs", has ? "bg-primary/10 font-semibold text-primary" : "bg-slate-100 text-slate-700")}
+                className={clsx(
+                  "inline-flex min-w-0 items-center gap-0.5 rounded-full border px-[7px] py-px text-xs",
+                  has ? "border-primary-edge bg-primary/10 font-semibold text-primary-ink" : "border-tone-neutral-edge bg-tone-neutral-fill text-tone-neutral-ink",
+                )}
               >
                 {has && <IconCheck size={12} strokeWidth={2.5} />}
                 <span className="truncate">{skill}</span>

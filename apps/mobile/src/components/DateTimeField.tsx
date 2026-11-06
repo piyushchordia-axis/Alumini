@@ -1,3 +1,4 @@
+import { STATUS_TONES } from "@illuminize/shared";
 import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { createElement, useState } from "react";
 import { Modal, Platform, Pressable, Text, View } from "react-native";
@@ -112,7 +113,7 @@ export function DateTimeField({ label, value, onChange, mode = "datetime", error
         ) : null}
       </View>
       {field}
-      {error ? <Text style={{ color: colors.danger, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: colors.muted, fontSize: 12 }}>{hint}</Text> : null}
+      {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: colors.muted, fontSize: 12 }}>{hint}</Text> : null}
       {Platform.OS === "ios" && (
         <Modal visible={iosOpen} transparent animationType="slide" onRequestClose={() => setIosOpen(false)}>
           <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(15,23,42,0.4)" }}>

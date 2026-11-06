@@ -1,10 +1,10 @@
-import { EVENT_KIND_LABELS, memberYearsLabel, type RsvpStatus } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, GREYS, memberYearsLabel, RSVP_GROUP_LABEL, rsvpChoices, rsvpClosedText, rsvpsOpen, STATUS_TONES, type RsvpStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
-import { IconMapPin } from "@/components/icons";
+import { IconCheck, IconMapPin } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
@@ -15,7 +15,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
-import { colors } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 export default function EventDetailScreen() {
   const { tenant, isTenantAdmin } = useMembership();
@@ -41,14 +41,8 @@ export default function EventDetailScreen() {
   if (ev.isLoading) return <Spinner />;
   if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
   const e = ev.data;
-  const full = !!e.maxAttendees && e.yesCount >= e.maxAttendees && e.myRsvp !== "YES";
-  const started = new Date(e.startAt).getTime() <= openedAt;
-  const disabled = e.isCancelled || started || e.moderationStatus !== "APPROVED" || rsvp.isPending;
-  const options: { value: RsvpStatus; label: string; color: string }[] = [
-    { value: "YES", label: full ? "Full" : "I'm going", color: colors.success },
-    { value: "MAYBE", label: "Maybe", color: colors.warning },
-    { value: "NO", label: "Can't make it", color: "#475569" },
-  ];
+  const disabled = !rsvpsOpen(e, openedAt) || rsvp.isPending;
+  const closedText = rsvpClosedText(e, openedAt);
   return (
     <Screen title="Event">
       <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -80,27 +74,33 @@ export default function EventDetailScreen() {
             <Text style={{ fontWeight: "700", color: colors.text }}>{e.yesCount}</Text> going{e.maybeCount ? ` · ${e.maybeCount} maybe` : ""}
             {e.maxAttendees ? ` · ${Math.max(e.maxAttendees - e.yesCount, 0)} spots left` : ""}
           </Text>
-          <Row>
-            {options.map((o) => {
-              const active = e.myRsvp === o.value;
+          <View role="group" aria-label={RSVP_GROUP_LABEL} style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+            {rsvpChoices(e).map((o) => {
+              // As the web draws them: a chosen answer is its tone's fill, edge and ink (STATUS_TONES), and the others are white,
+              // with the web's slate-300 edge (borderStrong) and slate-700 label (GREYS.body).
+              const tone = STATUS_TONES[o.tone];
+              const off = disabled || o.full;
               return (
                 <Pressable
                   key={o.value}
-                  disabled={disabled || (o.value === "YES" && full)}
-                  onPress={() => rsvp.mutate(active ? null : o.value)}
+                  disabled={off}
+                  onPress={() => rsvp.mutate(o.chosen ? null : o.value)}
                   accessibilityRole="button"
-                  {...toggleState(active)}
-                  aria-disabled={disabled || (o.value === "YES" && full)}
-                  style={{ paddingHorizontal: 14, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: active ? o.color : "#fff", borderWidth: 1, borderColor: active ? o.color : colors.border, opacity: disabled ? 0.5 : 1 }}>
-                  <Text style={{ color: active ? "#fff" : colors.text, fontWeight: "600" }}>
-                    {active ? "✓ " : ""}
-                    {o.label}
-                  </Text>
+                  {...toggleState(o.chosen)}
+                  aria-disabled={off}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, minHeight: 44, borderRadius: 10, borderWidth: 1, backgroundColor: o.chosen ? tone.fill : colors.card, borderColor: o.chosen ? tone.edge : colors.borderStrong, opacity: off ? 0.5 : 1 }}
+                >
+                  {o.chosen && (
+                    <View aria-hidden>
+                      <IconCheck size={16} strokeWidth={2.5} color={tone.ink} />
+                    </View>
+                  )}
+                  <Text style={{ fontSize: 14, color: o.chosen ? tone.ink : GREYS.body, fontWeight: o.chosen ? "600" : "500" }}>{o.label}</Text>
                 </Pressable>
               );
             })}
-          </Row>
-          {started && !e.isCancelled && <Muted>RSVPs are closed: this event has started.</Muted>}
+          </View>
+          {closedText && <Muted>{closedText}</Muted>}
           <Row style={{ justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}>
             <MemberRow slug={slug} member={e.author} meta="Organiser" />
             {!e.isMine && <ReportButton slug={slug} contentType="EVENT" contentId={e.id} />}

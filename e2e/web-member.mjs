@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -330,11 +330,19 @@ try {
     await page.goto(BASE + "/t/demo-university/app/feed");
     const ann = page.locator("article", { hasText: "Registrations for DemoU Alumni Day 2026" }).first();
     await ann.waitFor();
-    await ann.getByText("Announcement", { exact: true }).waitFor();
+    // A tag in the brand's tone: its ink on its tint, and an edge that shows on the card.
+    const announcement = ann.getByText("Announcement", { exact: true });
+    await announcement.waitFor();
+    await expectReadable(announcement, "the Announcement badge");
+    await expectEdge(announcement, "the Announcement badge");
     const poll = page.locator("article", { hasText: "Where should we hold the next London meetup?" }).first();
     await poll.waitFor();
     await poll.locator('[aria-label="Poll"] button:has-text("Shoreditch")').click();
-    await poll.locator("text=Shoreditch ✓").waitFor();
+    // The vote is marked with a drawn check, which screen readers hear as "your vote", not a ✓.
+    const voted = poll.getByText("Shoreditch, your vote", { exact: true });
+    await voted.waitFor();
+    await expectSvgNoEmoji(voted, "the poll's chosen answer");
+    if ((await poll.innerText()).includes("✓")) throw new Error("the poll still marks the vote with a ✓");
     await poll.locator("text=/\\d+%/").first().waitFor();
     await shot("04b-announcement-poll");
   });
@@ -359,8 +367,8 @@ try {
     for (const name of ["Web", "Phone"]) if (/[☐☑]/.test(await option(name).innerText())) throw new Error(`the "${name}" option still draws a ballot-box symbol`);
     await option("Phone").click();
     await poll.getByRole("button", { name: "Vote", exact: true }).click();
-    await poll.getByText("Web ✓", { exact: true }).waitFor();
-    await poll.getByText("Phone ✓", { exact: true }).waitFor();
+    await poll.getByText("Web, your vote", { exact: true }).waitFor();
+    await poll.getByText("Phone, your vote", { exact: true }).waitFor();
     await shot("04b-poll-several");
   });
 
@@ -566,6 +574,19 @@ try {
     const before = await page.locator("strong").first().textContent();
     await page.click("button:has-text(\"I'm going\")");
     await page.locator("strong").first().filter({ hasText: new RegExp(`^${Number(before) + 1}$`) }).waitFor({ timeout: 10000 });
+    // The chosen answer is drawn in its tone (I'm going: the success fill, edge and ink), with a drawn check rather than
+    // a ✓, and every answer is a 44px target.
+    const rsvp = page.getByRole("group", { name: "Your RSVP", exact: true });
+    const answers = rsvp.getByRole("button");
+    const chosen = rsvp.locator('button[aria-pressed="true"]');
+    await chosen.filter({ hasText: "I'm going" }).waitFor();
+    if ((await chosen.innerText()).includes("✓")) throw new Error("the chosen RSVP still shows a ✓");
+    await expectSvgNoEmoji(chosen, "the chosen RSVP");
+    await expectReadable(chosen, "the chosen RSVP");
+    await expectEdge(chosen, "the chosen RSVP");
+    const { colour: fill } = await paintedColour(chosen, "backgroundColor");
+    if (fill !== "209 250 229") throw new Error(`the chosen RSVP is rgb ${fill}, not the success tone's fill (209 250 229)`);
+    for (const box of await Promise.all((await answers.all()).map((b) => b.boundingBox()))) if (!box || box.height < 44) throw new Error(`an RSVP button is ${box?.height}px tall, under 44px`);
     await page.waitForSelector("text=Smoke Tester");
     // The seeded description's bullets are list items, and its web address a link that opens in a new tab.
     await page.locator("ul > li", { hasText: "Partners and kids welcome" }).waitFor();
@@ -938,6 +959,11 @@ try {
     const onCard = (await chips.allTextContents()).map((t) => t.trim());
     if (onCard.join("|") !== "TypeScript (you have this)|AWS (you have this)|Node.js|+1 more") throw new Error(`the card's skills read ${onCard.join(", ")}, not this member's two first`);
     if ((await chips.nth(1).locator("svg").count()) !== 1 || (await chips.nth(2).locator("svg").count()) !== 0) throw new Error("only the skills this member has should carry a check on the card");
+    // Each chip is a tag with an edge in its tone: the brand's on one they have, the neutral grey's on the rest.
+    await expectReadable(chips.first(), "a skill the member has, on the card");
+    await expectEdge(chips.first(), "a skill the member has, on the card");
+    await expectReadable(chips.nth(2), "a skill the member doesn't have, on the card");
+    await expectEdge(chips.nth(2), "a skill the member doesn't have, on the card");
     const [row, chip] = [await cardSkills.boundingBox(), await chips.first().boundingBox()];
     if (row.height > chip.height + 1) throw new Error(`the card's skills take ${row.height}px, more than one line of ${chip.height}px`);
     // The card's name, which is all a screen reader says of it in a list of links, names the skills and which they have.
@@ -955,6 +981,10 @@ try {
     if (onPage.join("|") !== "Node.js|TypeScript (you have this)|PostgreSQL|AWS (you have this)") throw new Error(`the job's skills read ${onPage.join(", ")}`);
     if ((await skills.filter({ hasText: "TypeScript" }).locator("svg").count()) !== 1 || (await skills.filter({ hasText: "Node.js" }).locator("svg").count()) !== 0)
       throw new Error("only the skills this member has should carry a check on the job's page");
+    // One they have is filled in the brand, with text on it that reads; the others are its tint. Both keep an edge.
+    await expectReadable(skills.filter({ hasText: "TypeScript" }), "a skill the member has, on the job's page");
+    await expectEdge(skills.filter({ hasText: "TypeScript" }), "a skill the member has, on the job's page");
+    await expectEdge(skills.filter({ hasText: "Node.js" }), "a skill the member doesn't have, on the job's page");
     await page.screenshot({ path: `${SHOTS}/06e-job-skills-match-phone.png`, fullPage: true });
 
     // A job asking for none of them says so, and marks nothing.

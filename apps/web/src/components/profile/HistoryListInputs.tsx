@@ -172,7 +172,7 @@ function HistoryList({
         </ul>
       )}
       {rootError && (
-        <p className="mt-2 text-xs text-red-600" role="alert">
+        <p className="mt-2 text-xs text-tone-danger-ink" role="alert">
           {rootError}
         </p>
       )}

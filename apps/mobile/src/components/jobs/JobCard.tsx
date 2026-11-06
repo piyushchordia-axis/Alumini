@@ -1,4 +1,4 @@
-import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, nameWithYears, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
+import { CAN_REFER_BADGE, JOB_TYPE_LABELS, MODERATION_STATUS_LABELS, STATUS_TONES, YOU_HAVE_THIS_TEXT, experienceLabel, jobPlaceLabel, jobSalaryText, nameWithYears, skillMatch, skillsMatchedFirst, type JobCardDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { Text, View } from "react-native";
@@ -90,10 +90,22 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
           {shown.map(({ skill, matched: has }) => (
             <View
               key={skill}
-              style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 1, minWidth: 0, borderRadius: radius.full, backgroundColor: has ? theme.primarySoft : "#f1f5f9", paddingHorizontal: 8, paddingVertical: 2 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 2,
+                flexShrink: 1,
+                minWidth: 0,
+                borderRadius: radius.full,
+                borderWidth: 1,
+                borderColor: has ? theme.primaryEdge : STATUS_TONES.neutral.edge,
+                backgroundColor: has ? theme.primarySoft : STATUS_TONES.neutral.fill,
+                paddingHorizontal: 7,
+                paddingVertical: 1,
+              }}
             >
-              {has && <IconCheck size={12} strokeWidth={2.5} color={theme.primary} />}
-              <Text numberOfLines={1} style={[{ flexShrink: 1, fontSize: 12, color: "#334155" }, has ? { fontWeight: "600", color: theme.primary } : null]}>
+              {has && <IconCheck size={12} strokeWidth={2.5} color={theme.primaryInk} />}
+              <Text numberOfLines={1} style={[{ flexShrink: 1, fontSize: 12, color: STATUS_TONES.neutral.ink }, has ? { fontWeight: "600", color: theme.primaryInk } : null]}>
                 {skill}
               </Text>
             </View>

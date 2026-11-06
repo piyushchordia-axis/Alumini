@@ -92,7 +92,7 @@ export function GroupForm({
 
       <fieldset aria-describedby={`${choiceId}-fixed`}>
         <legend className="mb-1 block text-sm font-medium text-slate-700">
-          Who can join{!editing && <span className="text-red-500"> *</span>}
+          Who can join{!editing && <span className="text-tone-danger-ink"> *</span>}
         </legend>
         <p id={`${choiceId}-fixed`} className="mb-2 text-xs text-slate-500">
           {editing ? "This was chosen when the group was created, and can't be changed." : "You can't change this after the group is created."}
@@ -126,7 +126,7 @@ export function GroupForm({
           })}
         </div>
         {e.visibility && (
-          <p className="mt-1 text-xs text-red-600" role="alert">
+          <p className="mt-1 text-xs text-tone-danger-ink" role="alert">
             {e.visibility.message}
           </p>
         )}

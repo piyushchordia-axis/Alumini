@@ -2,11 +2,18 @@ import type { PollDto } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { IconCheck } from "@/components/icons";
 import { Button, Muted, Row } from "@/components/ui";
 import { api } from "@/lib/api";
 import { colors, spacing, useTheme } from "@/theme";
+
+/**
+ * A result row is one stop on a phone, which reads its label ("Canary Wharf, 50 percent, your vote"). The web export
+ * doesn't read a label on a plain box, so there the drawn check's words are hidden text after the answer, as on the web
+ * app (JobSkills does the same).
+ */
+const ONE_STOP = Platform.OS !== "web" ? { accessible: true } : {};
 
 /** A post's poll: choose (one, or several when allowed); after voting or once closed, result bars. */
 export function PollView({ slug, postId, poll, canVote }: { slug: string; postId: string; poll: PollDto; canVote: boolean }) {
@@ -38,13 +45,23 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
         const pct = total ? Math.round((o.votes / total) * 100) : 0;
         if (showResults) {
           return (
-            <View key={o.id} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: "hidden" }} accessibilityLabel={`${o.label}, ${pct} percent${mine ? ", your vote" : ""}`}>
+            <View
+              key={o.id}
+              {...ONE_STOP}
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: "hidden" }}
+              accessibilityLabel={`${o.label}, ${pct} percent${mine ? ", your vote" : ""}`}
+            >
               <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, backgroundColor: mine ? `${theme.primary}33` : "#f1f5f9" }} />
               <Row style={{ justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 9 }}>
-                <Text style={{ color: colors.text, fontWeight: mine ? "700" : "400", flexShrink: 1 }}>
-                  {o.label}
-                  {mine ? " ✓" : ""}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: mine ? "700" : "400", flexShrink: 1 }}>{o.label}</Text>
+                  {mine && (
+                    <View aria-hidden>
+                      <IconCheck size={14} strokeWidth={2.5} color={colors.text} />
+                    </View>
+                  )}
+                  {mine && Platform.OS === "web" && <Text style={styles.srOnly}>, your vote</Text>}
+                </View>
                 <Text style={{ color: colors.muted }}>
                   {pct}% ({o.votes})
                 </Text>
@@ -101,3 +118,8 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  // Read by a screen reader, unseen.
+  srOnly: { position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 },
+});

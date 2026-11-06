@@ -103,7 +103,7 @@ function MentorRequestPage({ id }: { id: string }) {
                 {/* The asterisk is for the eye: the box says it's required itself, so its name is the label alone, as on the mobile app. */}
                 <label htmlFor={`${fieldId}-note`} className="mb-1 block text-sm font-medium text-slate-700">
                   Note to the mentor
-                  <span className="text-red-500" aria-hidden="true">
+                  <span className="text-tone-danger-ink" aria-hidden="true">
                     {" "}
                     *
                   </span>
@@ -123,7 +123,7 @@ function MentorRequestPage({ id }: { id: string }) {
                   placeholder="Say who you are, what you'd like help with, and why you're asking them."
                 />
                 {noteError && (
-                  <p id={`${fieldId}-error`} className="mt-1 text-xs text-red-600" role="alert">
+                  <p id={`${fieldId}-error`} className="mt-1 text-xs text-tone-danger-ink" role="alert">
                     {noteError}
                   </p>
                 )}

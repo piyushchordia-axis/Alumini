@@ -12,6 +12,7 @@ export * from "./lib/richText";
 export * from "./lib/salary";
 export * from "./lib/color";
 export * from "./lib/tones";
+export * from "./lib/rsvp";
 export * from "./lib/appearance";
 export * from "./lib/branding";
 export * from "./lib/jobs";

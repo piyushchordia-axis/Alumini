@@ -90,8 +90,9 @@ Covers:
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
   and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
-  announcement and a poll vote; a poll with several choices, its drawn boxes saying which are chosen (`aria-pressed`)
-  before the vote; the celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
+  announcement, its Announcement badge's ink readable and its edge at 3:1, and a poll vote, marked with a drawn check
+  (read as "your vote") rather than a ✓; a poll with several choices, its drawn boxes saying which are chosen
+  (`aria-pressed`) before the vote; the celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
   digest (run through the platform job endpoint, see `lib.mjs`);
 - jobs: seeded cards with pay, experience and "+1 more" skills; the Work mode and experience filters behind More
   filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend Engineer page offering
@@ -104,7 +105,8 @@ Covers:
   Labs, filling the website; deleting a job through the confirm dialog;
 - rich text: the seeded meetup's bullets, its link opening in a new tab, and its email opening in place with nofollow;
   the Zylo Labs listing's bullets as one list with no dash left, its link, and a numbered list keeping its start;
-- an RSVP; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
+- an RSVP, the chosen answer in its tone (the success fill, its ink readable, an edge at 3:1, a drawn check and no ✓)
+  and every answer 44px tall; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
   More filters leaving Priya out, Were there in beside the search ("Were there in 2012" and so on) leaving Priya
   (2008–2012) out in 2013, finding her in 2012, and Any year taking it off, and Priya's card with her headline, then
   her profile: headline, skills, her current role before her past one, studies here and elsewhere, and a LinkedIn link
@@ -121,8 +123,9 @@ Covers:
   the name on the card and the profile, and "Registered"; Delete account's confirm dialog, saying a suspension
   or blocks come back with the number, cancelled with the account still there;
 - matching skills at a phone's width, with "typescript, aws" among the skills just saved: the Backend Engineer card
-  showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, its link's name saying
-  "(you have this)" after each; its page keeping the job's order, the same two checked, and "You have 2 of 4 skills";
+  showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, each chip's text readable
+  and its edge at 3:1, its link's name saying "(you have this)" after each; its page keeping the job's order, the same
+  two checked (filled in the brand, readable, with an edge, as the others have), and "You have 2 of 4 skills";
   "You have 0 of 4 skills" and no marks on Associate Product Manager; and the member's own job, asking for TypeScript
   among skills too long for one line, unmarked on its page and on its My posts card, whose chips shorten to fit;
 - joining Demo College as that member (nothing sent): its landing page offering Join DCE and "Signed in as" rather than
@@ -168,7 +171,8 @@ pnpm e2e:admin
 
 Covers:
 
-- the tenant admin dashboard; approving and rejecting members, each toast naming the member; Approve all asking first
+- the tenant admin dashboard; approving and rejecting members, each toast naming the member (the Pending approval
+  badge's ink readable and its edge at 3:1, and the success toast white on the success tone's solid, readable); Approve all asking first
   (opened and cancelled, sending nothing); approving Pooja Bhatt from her new-member notice (answered by the script: its
   Approve and Reject 44px tall beside the link to her page, never inside it; an open Reject closing with a toast that
   says where she stands once the API's live notice of a change refetches the list showing her decided elsewhere, and
@@ -267,8 +271,9 @@ Covers:
   and the card gone after a reload;
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
-  taking it back, the celebrations card (a birthday row and an anniversary row with years) and a poll vote; a poll
-  with several choices, its drawn boxes saying which are chosen (`aria-checked`) before the vote;
+  taking it back, the celebrations card (a birthday row and an anniversary row with years) and a poll vote, marked with
+  a drawn check rather than a ✓, with "your vote" in the row's hidden text; a poll with several choices, its drawn boxes
+  saying which are chosen (`aria-checked`) before the vote;
 - Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
   nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
@@ -286,7 +291,8 @@ Covers:
   TypeScript and AWS first on that card, each with a check, then Node.js and "+1 more" on one line, with "(you have
   this)" after each in the card's name; its page keeping the job's order, the same two checked, and "You have 2 of 4
   skills"; and "You have 0 of 4 skills" with no marks on Associate Product Manager;
-- an RSVP, with the description's bullets, link and mail link as on the web;
+- an RSVP, with the description's bullets, link and mail link as on the web, and the chosen answer as on the web (its
+  tone's fill, ink and edge, a drawn check and no ✓) in a "Your RSVP" group of three 44px buttons;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
   name, the Investing filter leaving Priya out, Were there in chosen from a list behind Filters and counted with them
   (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
@@ -348,7 +354,8 @@ Covers:
   cold doing the same;
 - the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi's
   details line led by his years, as a member who still belongs ("2018–present · +91 91000 00037 · Infosys, Pune ·
-  requested …"), 44px actions named for Parth and Diya Raval, no sideways scrolling, and Approve all asking first
+  requested …"), his Pending approval badge's ink readable and its edge at 3:1, 44px actions named for Parth and Diya
+  Raval, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
   its Reject opening the reason sheet first, an open reason sheet closing and saying where he stands once the API's
   live notice of a change refetches the list showing him decided elsewhere (and not opening again by itself when he
@@ -642,6 +649,11 @@ the console (part 14).
 - [ ] An empty list (Messages → Requests): its icon sits in a round, light tint of the brand colour and is drawn in the
       brand colour (blue at Demo University; part 14 checks it at the Samaj), and TalkBack or VoiceOver reads the title
       as a heading and doesn't stop on the icon.
+- [ ] Tags have a thin edge in their colour that you can see outdoors, at Demo University and at Shri Gujarati Samaj:
+      a post's Announcement badge, a job card's skills and a pending member's badge in the console. On an event, the
+      chosen RSVP is its colour (green for I'm going) with a check, the label not cut off at the largest text size, and
+      TalkBack or VoiceOver reads the buttons as a "Your RSVP" group, the chosen one as selected. In a poll you voted
+      in, each result is one item, and yours ends "your vote".
 
 ### 6. Navigation
 

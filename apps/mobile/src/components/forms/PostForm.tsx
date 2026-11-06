@@ -1,4 +1,4 @@
-import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, announcementConfirmCopy, postCreateSchema, type AnnouncementOptions, type PostCreateInput, type PostDto } from "@illuminize/shared";
+import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, STATUS_TONES, announcementConfirmCopy, postCreateSchema, type AnnouncementOptions, type PostCreateInput, type PostDto } from "@illuminize/shared";
 import { useState } from "react";
 import { Image, Pressable, Switch, Text, View } from "react-native";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
@@ -131,7 +131,7 @@ export function PostForm({
             onChange={(v) => setPoll({ ...poll, closesInDays: v })}
             allowEmpty
           />
-          {errors.poll ? <Text style={{ color: colors.danger, fontSize: 12 }}>{errors.poll}</Text> : null}
+          {errors.poll ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{errors.poll}</Text> : null}
           <Button title="Remove poll" variant="ghost" onPress={() => setPoll(null)} />
         </View>
       )}

@@ -155,7 +155,7 @@ export function AvatarPicker({
           ) : null}
         </div>
         {message && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
+          <p role="alert" className="mt-2 text-sm text-tone-danger-ink">
             {message}
           </p>
         )}

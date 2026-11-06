@@ -194,7 +194,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
       {outcome && (
         <div className="space-y-2 text-sm" role="status">
           {outcome.error ? (
-            <p className="text-red-700">
+            <p className="text-tone-danger-ink">
               {errorMessage(outcome.error)}
               {partial ? ` ${partial}` : ""}
             </p>
@@ -204,7 +204,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
             <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-3 text-xs">
               {problems.map((p) => (
                 <li key={p.row}>
-                  Line {p.row} <span className="font-mono">{p.phone}</span>: <span className={p.status === "invalid" ? "text-red-700" : "text-slate-600"}>{p.message}</span>
+                  Line {p.row} <span className="font-mono">{p.phone}</span>: <span className={p.status === "invalid" ? "text-tone-danger-ink" : "text-slate-600"}>{p.message}</span>
                 </li>
               ))}
             </ul>

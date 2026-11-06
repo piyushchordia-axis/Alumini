@@ -39,7 +39,7 @@ export function UnsubscribePage() {
             <p className="mt-2 text-sm text-slate-600">
               Stop {WHAT[info.data!.scope]} from <span className="font-medium">{info.data!.tenantName}</span>.
             </p>
-            {confirm.isError && <p className="mt-3 text-sm text-red-600">{errorMessage(confirm.error)}</p>}
+            {confirm.isError && <p className="mt-3 text-sm text-tone-danger-ink">{errorMessage(confirm.error)}</p>}
             <Button className="mt-4 w-full" loading={confirm.isPending} onClick={() => confirm.mutate()}>
               Unsubscribe
             </Button>

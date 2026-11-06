@@ -3,7 +3,7 @@ import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, forma
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
-import { Avatar, Button, EmptyState, ListEmpty, Muted, SectionScreen, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, ListEmpty, Muted, SectionScreen, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -47,11 +47,7 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: unread ? colors.text : colors.muted, fontStyle: c.lastMessage && !c.lastMessage.body ? "italic" : "normal" }}>
             {preview}
           </Text>
-          {c.group?.archived && (
-            <View style={{ backgroundColor: "#f1f5f9", borderRadius: radius.full, paddingHorizontal: 6 }}>
-              <Text style={{ fontSize: 11, color: colors.muted }}>Archived</Text>
-            </View>
-          )}
+          {c.group?.archived && <Badge label="Archived" />}
           {muted && (
             <View aria-hidden>
               <IconBellOff size={14} color={colors.faint} />

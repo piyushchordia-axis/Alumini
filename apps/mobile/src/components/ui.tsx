@@ -1,3 +1,4 @@
+import { STATUS_TONES, type ToneName } from "@illuminize/shared";
 import { cloneElement, useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
@@ -412,23 +413,20 @@ export function Card({ children, style, onPress, accessibilityLabel }: { childre
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-/** `icon` draws before the label in the badge's text colour (an SVG from components/icons); screen readers skip it, as the label says it all. */
-export function Badge({ label, tone = "neutral", icon }: { label: string; tone?: "neutral" | "success" | "warning" | "danger" | "info" | "primary"; icon?: (color: string) => ReactNode }) {
+/**
+ * A tag, in one of the shared status tones (STATUS_TONES) or the brand's, as the web draws it: its fill, a 1px edge, which
+ * keeps its shape where the fill doesn't show, and its ink. `icon` draws before the label in the ink (an SVG from
+ * components/icons); screen readers skip it, as the label says it all.
+ */
+export function Badge({ label, tone = "neutral", icon }: { label: string; tone?: ToneName | "primary"; icon?: (color: string) => ReactNode }) {
   const theme = useTheme();
-  const map = {
-    neutral: { bg: "#f1f5f9", fg: "#334155" },
-    success: { bg: "#d1fae5", fg: "#065f46" },
-    warning: { bg: "#fef3c7", fg: "#92400e" },
-    danger: { bg: "#fee2e2", fg: "#991b1b" },
-    info: { bg: "#e0f2fe", fg: "#075985" },
-    primary: { bg: theme.primarySoft, fg: theme.primaryInk },
-  }[tone];
+  const look = tone === "primary" ? { fill: theme.primarySoft, edge: theme.primaryEdge, ink: theme.primaryInk } : STATUS_TONES[tone];
   return (
-    <View style={[styles.badge, icon ? styles.badgeWithIcon : null, { backgroundColor: map.bg }]}>
+    <View style={[styles.badge, icon ? styles.badgeWithIcon : null, { backgroundColor: look.fill, borderColor: look.edge }]}>
       {icon ? (
-        <View aria-hidden>{icon(map.fg)}</View>
+        <View aria-hidden>{icon(look.ink)}</View>
       ) : null}
-      <Text style={[styles.badgeText, { color: map.fg }]}>{label}</Text>
+      <Text style={[styles.badgeText, { color: look.ink }]}>{label}</Text>
     </View>
   );
 }
@@ -608,7 +606,7 @@ const styles = StyleSheet.create({
   buttonWithIcon: { flexDirection: "row", gap: spacing.sm },
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
   input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
-  error: { color: colors.danger, fontSize: 12 },
+  error: { color: STATUS_TONES.danger.ink, fontSize: 12 },
   hint: { color: colors.muted, fontSize: 12 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   chipText: { fontSize: 13, color: colors.text },
@@ -633,9 +631,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, alignSelf: "flex-start" },
+  // The edge takes a pixel of the padding, so it doesn't make the tag bigger.
+  badge: { borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, alignSelf: "flex-start" },
   badgeWithIcon: { flexDirection: "row", alignItems: "center", gap: 4 },
-  badgeText: { fontSize: 11, fontWeight: "600" },
+  // The web's text-xs font-medium.
+  badgeText: { fontSize: 12, fontWeight: "500" },
   empty: { alignItems: "center", gap: spacing.xs, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },
   emptyInline: { alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.xl },
   emptyTitle: { fontWeight: "700", color: colors.text, fontSize: 16, textAlign: "center" },

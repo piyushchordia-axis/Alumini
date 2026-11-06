@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, nameWithYears, type EventDto } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, nameWithYears, rsvpBadge, type EventDto } from "@illuminize/shared";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/format";
 
 export function EventCard({ slug, event }: { slug: string; event: EventDto }) {
   const d = new Date(event.startAt);
+  const rsvp = rsvpBadge(event.myRsvp);
   return (
     <ContentCard to={`/t/${slug}/app/events/${event.id}`} status={event.moderationStatus} className="flex gap-4 p-4">
       <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -16,7 +17,7 @@ export function EventCard({ slug, event }: { slug: string; event: EventDto }) {
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="truncate font-semibold text-slate-900">{event.title}</h3>
           {event.isCancelled && <Badge tone="danger">Cancelled</Badge>}
-          {event.myRsvp && <Badge tone={event.myRsvp === "YES" ? "success" : event.myRsvp === "MAYBE" ? "warning" : "neutral"}>You: {event.myRsvp.toLowerCase()}</Badge>}
+          {rsvp && <Badge tone={rsvp.tone}>{rsvp.label}</Badge>}
           <ModerationStatusBadge status={event.moderationStatus} />
         </div>
         <p className="text-sm text-slate-600">

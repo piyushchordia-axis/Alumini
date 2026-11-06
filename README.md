@@ -557,6 +557,40 @@ Only they see it: their own membership carries it, and no admin, directory or "U
   photo is refused ("Upload a photo first"). **Remove photo** goes back to Plain when the photo is the background, and
   leaves another choice as it is.
 
+### Colour and contrast
+
+Both apps draw grey text, tags and status colours from one shared set in `packages/shared/src/lib/tones.ts`, so a tag
+looks the same on the web and the phone and stays readable in any institution colour.
+
+- **Greys.** `GREYS`, darkest first: text, body (labels), secondary `#475569` (excerpts, and grey on a tinted surface),
+  meta `#5b6b80` (times, places, counts, bylines and hints: 5.44:1 on white, 4.97 on the page) and faint `#748297`
+  (icons, borders and tag edges, never text). The web's `index.css` redraws Tailwind's `slate-500` and `slate-400` as
+  meta and faint; the phone's `colors` take them by name.
+- **Status tones.** `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an edge (3:1 on white and
+  the page), an ink (4.5:1 on the fill, white and the page) and a solid (under white text). The web has them as
+  `bg-tone-success-fill`, `border-tone-success-edge`, `text-tone-success-ink`, `bg-tone-success-solid` and so on; the
+  phone reads `STATUS_TONES`, and its `colors.danger`, `success`, `warning` and `info` are the solids.
+- **Tags.** A `Badge`, on either app, is its tone's fill, a 1px edge and its ink; a brand tag is the brand's tint with
+  `brandTones`' `edge` and `ink`. The edge keeps a tag's shape on white whatever the colour, and in Windows' forced
+  colours, where fills vanish; the padding gave up a pixel to it, so tags kept their size. Tag text is the web's
+  `text-xs font-medium`, and 12 points at weight 500 on the phone. Skill chips (a job's card and page, a profile, the
+  Skills box), the chat list's Archived tag and the console members list's Admin tag have their edge too: on a job's
+  card a skill the reader has is the brand's tint and ink with a check, the others neutral; on the job's page it is
+  filled in the brand, its text in `onPrimary`.
+- **RSVP.** `lib/rsvp.ts` holds the buttons (`rsvpChoices`: I'm going, or Full once the places are taken; Maybe; Can't
+  make it), their tones (success, warning, neutral), whether an event takes answers (`rsvpsOpen`: approved, not
+  cancelled and not begun when the page opened), the line once it has begun (`rsvpClosedText`) and the card's badge
+  (`rsvpBadge`: "You: yes" and so on). The chosen answer is its tone's fill, edge and ink, semibold, after a drawn
+  check; the others are white with a light border. Each is a 44px target, in a group named "Your RSVP" on both apps.
+- **Status text.** A field's error is the danger ink `#991b1b` on both apps (web `FormField`, mobile `Input` and
+  `FieldError`), and so, on the web, are the required `*` and a removed comment's "Removed"; the phone writes its `*`
+  into the label, in the label's grey, and shows no "Removed" on comments. The reds the ink replaced fell under 4.5:1 on
+  the page. Toasts are white on the success or danger solid (or slate-800), the WhatsApp link on a member's profile is
+  the success ink, and a poll marks the reader's vote with a drawn check, which screen readers hear as "your vote".
+- **Tests.** `tones.test.ts` pins every pair with `contrastRatio` and checks `index.css` against the shared values, and
+  `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted (`expectReadable` and `expectEdge` in
+  `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill, skill chips and the success toast.
+
 ### Rich text
 
 Long descriptions take bullet lists and clickable links, with no other formatting: the parser is
@@ -1172,8 +1206,9 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   memberYears.ts: a member's start and end years, their text and their rules; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
                   phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
-                  tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); appearance.ts: a member's
-                  background; admin.ts and its siblings: what both admin consoles share)
+                  tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
+                  buttons, tones and open state; appearance.ts: a member's background; admin.ts and its siblings:
+                  what both admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 

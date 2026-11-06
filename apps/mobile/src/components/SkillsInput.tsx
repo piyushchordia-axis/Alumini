@@ -1,4 +1,4 @@
-import { skillKey, tidySkill } from "@illuminize/shared";
+import { skillKey, STATUS_TONES, tidySkill } from "@illuminize/shared";
 import { useImperativeHandle, useRef, useState, type Ref } from "react";
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from "react-native";
 import { IconClose } from "@/components/icons";
@@ -128,13 +128,14 @@ export function SkillsInput({
       {value.length > 0 && (
         <View role="list" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
           {value.map((skill) => (
-            <View key={skill} role="listitem" style={{ flexDirection: "row", alignItems: "center", maxWidth: "100%", borderRadius: radius.full, backgroundColor: theme.primarySoft, paddingLeft: 12 }}>
-              <Text style={{ flexShrink: 1, fontSize: 14, color: theme.primary }}>{skill}</Text>
-              {/* A full 44-point target, as hitSlop isn't read on the web export; the circle drawn inside it is 32. */}
-              <Pressable onPress={() => remove(skill)} accessibilityRole="button" accessibilityLabel={`Remove ${skill}`} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
+            <View key={skill} role="listitem" style={{ flexDirection: "row", alignItems: "center", maxWidth: "100%", borderRadius: radius.full, borderWidth: 1, borderColor: theme.primaryEdge, backgroundColor: theme.primarySoft, paddingLeft: 11 }}>
+              <Text style={{ flexShrink: 1, fontSize: 14, color: theme.primaryInk }}>{skill}</Text>
+              {/* A full 44-point target, as hitSlop isn't read on the web export; the circle drawn inside it is 32. It runs
+                  over the chip's 1px edge, so the edge doesn't make the chip taller. */}
+              <Pressable onPress={() => remove(skill)} accessibilityRole="button" accessibilityLabel={`Remove ${skill}`} style={{ width: 44, height: 44, margin: -1, marginLeft: 0, alignItems: "center", justifyContent: "center" }}>
                 {({ pressed }) => (
                   <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? theme.primarySoft : "transparent" }}>
-                    <IconClose size={14} color={theme.primary} />
+                    <IconClose size={14} color={theme.primaryInk} />
                   </View>
                 )}
               </Pressable>
@@ -155,7 +156,7 @@ export function SkillsInput({
 const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
   input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
-  error: { color: colors.danger, fontSize: 12 },
+  error: { color: STATUS_TONES.danger.ink, fontSize: 12 },
   hint: { color: colors.muted, fontSize: 12 },
   note: { color: "#92400e", fontSize: 12 },
   // Read by a screen reader, unseen.

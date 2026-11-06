@@ -210,7 +210,7 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
               </p>
             )}
           </div>
-          {errors.filterable && <p className="text-xs text-red-600">{errors.filterable}</p>}
+          {errors.filterable && <p className="text-xs text-tone-danger-ink">{errors.filterable}</p>}
         </div>
       </div>
     </Modal>

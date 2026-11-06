@@ -107,7 +107,7 @@ export function SkillsInput({
       {skills.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {skills.map((skill) => (
-            <li key={skill} className="inline-flex max-w-full items-center gap-0.5 rounded-full bg-primary/10 py-0.5 pl-3 pr-0.5 text-sm text-primary">
+            <li key={skill} className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-primary-edge bg-primary/10 py-px pl-[11px] pr-px text-sm text-primary-ink">
               <span className="min-w-0 [overflow-wrap:anywhere]">{skill}</span>
               {/* 32 pixels drawn and 44 to touch: the ::before pads the target into the gaps around the chip. */}
               <button
