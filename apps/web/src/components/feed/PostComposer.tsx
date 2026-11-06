@@ -1,7 +1,20 @@
-import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, type MessageChannel, type PollCreateInput } from "@illuminize/shared";
+import {
+  ANNOUNCEMENT_NO_CHANNELS,
+  ANNOUNCEMENT_ONE_MESSAGE,
+  ANNOUNCEMENT_PIN_LABEL,
+  MAX_POLL_OPTIONS,
+  MAX_POST_IMAGES,
+  announcementChannelLabel,
+  announcementConfirmCopy,
+  announcementReachText,
+  postCreatedText,
+  type MessageChannel,
+  type PollCreateInput,
+} from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { IconAnnounce, IconPoll } from "@/components/icons";
 import { Avatar, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
@@ -16,8 +29,13 @@ export function PostComposer() {
   const [images, setImages] = useState<string[]>([]);
   const [poll, setPoll] = useState<{ options: string[]; allowsMultiple: boolean; closesInDays: string } | null>(null);
   const isAdmin = membership.role === "TENANT_ADMIN";
-  const [announce, setAnnounce] = useState<{ pin: boolean; channels: MessageChannel[] } | null>(null);
+  const [announceChoice, setAnnounce] = useState<{ pin: boolean; channels: MessageChannel[] } | null>(null);
+  // Only while the composer may offer it: an admin who loses the role mid-post is left with a normal post to send.
+  const announce = isAdmin ? announceChoice : null;
   const audience = useQuery({ queryKey: qk.admin.announcementAudience(tenant.slug), queryFn: () => api.admin.announcements.audience(tenant.slug), enabled: !!announce });
+  const reach = audience.data;
+  const [confirming, setConfirming] = useState(false);
+  const billed = announce ? announcementConfirmCopy(reach, announce.channels) : null;
   const qc = useQueryClient();
   const pollInput = (): PollCreateInput | undefined =>
     poll
@@ -36,7 +54,7 @@ export function PostComposer() {
       setPoll(null);
       setAnnounce(null);
       void qc.invalidateQueries({ queryKey: ["posts", tenant.slug] });
-      toast.success(post.kind === "ANNOUNCEMENT" ? "Announcement posted; members are being notified" : post.moderationStatus === "PENDING" ? "Posted — awaiting admin approval" : "Posted!");
+      toast.success(postCreatedText(post));
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -94,23 +112,18 @@ export function PostComposer() {
               <legend className="flex items-center gap-1.5 px-1 font-medium text-slate-800">
                 <IconAnnounce size={16} /> Announcement
               </legend>
-              <p className="text-slate-600">
-                Every member{audience.data ? ` (${audience.data.members})` : ""} gets it in the app and as a push notification.
-              </p>
-              <Checkbox label="Pin to the top of the feed" checked={announce.pin} onChange={(e) => setAnnounce({ ...announce, pin: e.target.checked })} />
-              {(audience.data?.channels ?? []).map((c) => (
+              <p className="text-slate-600">{announcementReachText(reach)}</p>
+              <Checkbox label={ANNOUNCEMENT_PIN_LABEL} checked={announce.pin} onChange={(e) => setAnnounce({ ...announce, pin: e.target.checked })} />
+              {reach?.channels.map((c) => (
                 <Checkbox
                   key={c}
-                  label={
-                    c === "EMAIL"
-                      ? `Also email it (${audience.data!.withEmail} members with a confirmed email)`
-                      : `Also send by ${c === "WHATSAPP" ? "WhatsApp" : "SMS"} (${audience.data!.withPhone} members)`
-                  }
+                  label={announcementChannelLabel(c, reach)}
                   checked={announce.channels.includes(c)}
                   onChange={(e) => setAnnounce({ ...announce, channels: e.target.checked ? [...announce.channels, c] : announce.channels.filter((x) => x !== c) })}
                 />
               ))}
-              {audience.data && audience.data.channels.length === 0 && <p className="text-xs text-slate-500">Your plan doesn&apos;t include email, WhatsApp or SMS announcements.</p>}
+              {reach && reach.channels.length > 1 && <p className="text-xs text-slate-500">{ANNOUNCEMENT_ONE_MESSAGE}</p>}
+              {reach && reach.channels.length === 0 && <p className="text-xs text-slate-500">{ANNOUNCEMENT_NO_CHANNELS}</p>}
             </fieldset>
           )}
           {images.length > 0 && <ImageUploader slug={tenant.slug} urls={images} onChange={setImages} max={MAX_POST_IMAGES} showTrigger={false} />}
@@ -133,14 +146,7 @@ export function PostComposer() {
         <div className="flex items-center gap-2">
           {membership.role !== "TENANT_ADMIN" && <p className="hidden text-xs text-slate-400 sm:block">Subject to moderation</p>}
           <Button
-            onClick={() => {
-              if (announce?.channels.length) {
-                const d = audience.data;
-                const parts = announce.channels.map((c) => (c === "EMAIL" ? `email to ${d?.withEmail ?? 0}` : `${c === "WHATSAPP" ? "WhatsApp" : "SMS"} to ${d?.withPhone ?? 0}`));
-                if (!confirm(`Send this announcement by ${parts.join(" and ")} members? Messages are billed to your institution.`)) return;
-              }
-              create.mutate();
-            }}
+            onClick={() => (billed ? setConfirming(true) : create.mutate())}
             loading={create.isPending}
             disabled={!body.trim() || !pollReady}
           >
@@ -148,6 +154,17 @@ export function PostComposer() {
           </Button>
         </div>
       </div>
+      {billed && (
+        <ConfirmDialog
+          open={confirming}
+          title={billed.title}
+          body={billed.body}
+          confirmLabel={billed.confirm}
+          busy={create.isPending}
+          onConfirm={() => create.mutate(undefined, { onSettled: () => setConfirming(false) })}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </Card>
   );
 }

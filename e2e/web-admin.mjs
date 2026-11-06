@@ -617,9 +617,29 @@ try {
     await page.getByRole("button", { name: "Announce", exact: true }).click();
     await page.getByRole("button", { name: "Undo announce", pressed: true }).waitFor();
     await page.waitForSelector("text=Every member (");
-    await page.locator('label:has-text("Also email it")').locator("input").check();
+    const emailBox = page.locator('label:has-text("Also email it")');
+    await emailBox.locator("input").check();
+    const reach = /^Also email it \((\d[\d,]*) members? with a confirmed email\)$/.exec((await emailBox.innerText()).trim());
+    if (!reach) throw new Error(`the email box reads "${await emailBox.innerText()}", with no count`);
+    // Email is billed, so the app asks first in its own dialog (the browser's would be accepted unseen by this script).
+    const posts = [];
+    const onRequest = (r) => r.method() === "POST" && /\/api\/v1\/t\/demo-university\/posts$/.test(r.url()) && posts.push(r.url());
+    page.on("request", onRequest);
+    const asking = page.getByRole("dialog", { name: "Send this announcement by email?", exact: true });
+    try {
+      await page.click('button:has-text("Post announcement")');
+      await asking.getByText(`It goes by email to ${reach[1]} ${reach[1] === "1" ? "member" : "members"}. Messages are billed to your institution.`, { exact: true }).waitFor();
+      await shot("a08-announcement-confirm");
+      await asking.getByRole("button", { name: "Cancel", exact: true }).click();
+      await asking.waitFor({ state: "detached" });
+      if (posts.length) throw new Error("Cancel still posted the announcement");
+    } finally {
+      page.off("request", onRequest);
+    }
     await page.click('button:has-text("Post announcement")');
+    await asking.getByRole("button", { name: "Post and send", exact: true }).click();
     await page.waitForSelector("text=Announcement posted");
+    await asking.waitFor({ state: "detached" });
     await page.locator("article", { hasText: text }).first().getByText("Announcement", { exact: true }).waitFor();
     await shot("a08-announcement");
   });

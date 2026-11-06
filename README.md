@@ -634,9 +634,15 @@ member or invalid with a reason. Phones without a country code use the instituti
 
 - **Polls.** A post can carry a poll (2 to 6 options, single or multiple choice, optional closing time). Votes are
   anonymous; members see counts. Options are locked once anyone votes.
-- **Announcements.** Admins can post as an announcement: pinned by default, an announcement badge (SVG icon in the
+- **Announcements.** An institution's admins (role `TENANT_ADMIN`; platform staff can't) can post as an announcement,
+  from Announce in the post composer on the web or the phone: pinned by default, an announcement badge (SVG icon in the
   apps), an in-app notification and push to every member, and optionally email, WhatsApp or SMS when the plan includes
-  them (members can opt out of those in their notification settings, and emails carry one-click unsubscribe). The send
+  them (members can opt out of those in their notification settings, and emails carry one-click unsubscribe). The
+  composer asks who it would reach (`announcements/audience`) only while Announce is on, offers only the institution's
+  `tenantOutboundChannels`, and before a billed channel asks first, in a ConfirmDialog (web) or ConfirmSheet (phone),
+  with how many members it reaches and "Messages are billed to your institution." (`announcementConfirmCopy`). Each
+  member gets one message at most: several channels are a chain, tried in the order WhatsApp, SMS, email (email only
+  for a confirmed address), the next only when one can't be sent, and the composer and the confirmation say so. The send
   runs as a background job in batches of 1000 and stops if the post is removed first. The feed's pinned strip shows
   five; further pinned posts stay in the feed with their badge.
 - **Celebrations.** A feed card lists today's birthdays (day and month only, never the year) and membership

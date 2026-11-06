@@ -1,3 +1,4 @@
+import { postCreatedText } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Alert } from "react-native";
@@ -7,7 +8,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 
 export default function NewPostScreen() {
-  const { tenant, isTenantAdmin } = useMembership();
+  const { tenant, membership, isTenantAdmin } = useMembership();
   const router = useRouter();
   const qc = useQueryClient();
   return (
@@ -17,10 +18,12 @@ export default function NewPostScreen() {
         placeholder={`Share something with ${tenant.shortName ?? "the network"}…`}
         submitLabel="Post"
         note={isTenantAdmin ? undefined : "Posts are subject to this institution's moderation settings."}
+        // The role, not isTenantAdmin, which counts platform staff too: posts.service lets only the institution's admins announce.
+        canAnnounce={membership.role === "TENANT_ADMIN"}
         onSubmit={async (input) => {
           const post = await api.posts.create(tenant.slug, input);
           void qc.invalidateQueries({ queryKey: ["posts", tenant.slug] });
-          Alert.alert(post.moderationStatus === "PENDING" ? "Posted — awaiting admin approval" : "Posted!");
+          Alert.alert(postCreatedText(post));
           router.back();
         }}
       />

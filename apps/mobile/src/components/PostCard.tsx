@@ -50,18 +50,13 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
     <Card style={post.kind === "ANNOUNCEMENT" ? { borderLeftWidth: 4, borderLeftColor: theme.primary } : undefined}>
       <Row style={{ justifyContent: "space-between" }}>
         <MemberRow slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
-        <Row gap={6}>
-          {post.kind === "ANNOUNCEMENT" && <Badge label="Announcement" tone="primary" />}
-          {post.isPinned && <Badge label="Pinned" tone="primary" />}
+        {/* At most half the row, wrapping onto a second line, so the author's name and when stay readable. */}
+        <Row gap={6} style={{ flexShrink: 1, maxWidth: "50%", justifyContent: "flex-end" }}>
+          {post.kind === "ANNOUNCEMENT" && <Badge label="Announcement" tone="primary" icon={(c) => <IconAnnounce size={12} color={c} />} />}
+          {post.isPinned && <Badge label="Pinned" tone="primary" icon={(c) => <IconPin size={12} color={c} />} />}
           <ModerationBadge status={post.moderationStatus} />
         </Row>
       </Row>
-      {(post.kind === "ANNOUNCEMENT" || post.isPinned) && (
-        <Row gap={8}>
-          {post.kind === "ANNOUNCEMENT" && <IconAnnounce size={14} color={theme.primary} />}
-          {post.isPinned && <IconPin size={14} color={theme.primary} />}
-        </Row>
-      )}
       <ModerationNote status={post.moderationStatus} note={post.moderationNote} />
       <Pressable onPress={() => canOpen && router.push(`/t/${slug}/feed/${post.id}`)} disabled={!canOpen} accessibilityRole={canOpen ? "link" : undefined}>
         <Body>{post.body}</Body>

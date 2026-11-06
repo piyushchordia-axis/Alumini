@@ -286,6 +286,7 @@ try {
     // A real 1×1 PNG through the browser's file chooser: the upload must send a File, not { uri, name, type }.
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
     for (const name of ["Add image", "Add a poll"]) await expectSvgNoEmoji(page.getByRole("button", { name, exact: true }).locator("visible=true").last(), `the post form's ${name} button`);
+    if (await page.getByRole("button", { name: "Announce", exact: true }).count()) throw new Error("a member's post form offers Announce");
     const chooser = page.waitForEvent("filechooser");
     await tap("Add image");
     await (await chooser).setFiles({ name: "smoke.png", mimeType: "image/png", buffer: png });
@@ -4320,6 +4321,185 @@ try {
       await notice.stop();
       await chat.stop();
     }
+  });
+
+  // Announce in the phone's composer, as the Samaj admin. The Samaj's plan includes no messaging, so nothing is billed;
+  // the sheet for billed channels is checked on ones the script offers, with the post answered by the script too. The
+  // announcement is unpinned at the end, leaving the Samaj's pinned strip as seeded.
+  const ANNOUNCEMENT = `Samaj AGM ${unique}: Sunday at 10am, at the community hall.`;
+  const audienceUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/announcements\/audience$/;
+  const postsUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/posts$/;
+  const feedCard = (text) =>
+    page
+      .locator("div")
+      .filter({ has: page.getByText(text, { exact: true }) })
+      .filter({ has: page.getByRole("button", { name: /^\d+ comments$/ }) })
+      .locator("visible=true")
+      .last();
+  let phonePost = null;
+
+  await step("platform staff who are only members of the Samaj aren't offered Announce, which the API refuses them, though the app counts them as admins", async () => {
+    // Staff (isPlatformAdmin) with a member's role here, both from the API's own answers: isTenantAdmin is true for them,
+    // and the post form must still go by the role.
+    const meUrl = "**/api/v1/me";
+    const membershipUrl = "**/api/v1/t/shri-gujarati-samaj/memberships/me";
+    let asMember = false;
+    await page.route(meUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const { data } = await response.json();
+      return route.fulfill({ response, json: { data: { ...data, user: { ...data.user, isPlatformAdmin: true } } } });
+    });
+    await page.route(membershipUrl, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      asMember = true;
+      return route.fulfill({ response, json: { data: { ...(await response.json()).data, role: "MEMBER" } } });
+    });
+    try {
+      const staff = page.waitForResponse((r) => r.request().method() === "GET" && /\/api\/v1\/me$/.test(r.url()));
+      await page.goto(SAMAJ + "/feed/new");
+      await shown(page.getByLabel("Post text", { exact: true })).waitFor();
+      await staff;
+      if (!asMember) throw new Error("the membership wasn't answered with a member's role");
+      // The note members get goes once the app knows they're staff: it counts them as admins here.
+      await page
+        .getByText("Posts are subject to this institution's moderation settings.", { exact: true })
+        .locator("visible=true")
+        .waitFor({ state: "hidden", timeout: 10_000 })
+        .catch(() => {
+          throw new Error("the post form never treated platform staff as admins, so this step proves nothing");
+        });
+      await shown(page.getByRole("button", { name: "Add a poll", exact: true })).waitFor();
+      if (await page.getByRole("button", { name: /^(Announce|Undo announce)$/ }).count()) throw new Error("platform staff who are only members are offered Announce");
+    } finally {
+      await page.unroute(meUrl);
+      await page.unroute(membershipUrl);
+    }
+  });
+
+  await step("the admin announces from the phone's composer, with Pin and no channels to choose, sent with no sheet, and the feed shows it first, pinned and marked", async () => {
+    const asked = [];
+    const onRequest = (r) => audienceUrl.test(r.url()) && asked.push(r.url());
+    page.on("request", onRequest);
+    try {
+      await page.goto(SAMAJ + "/feed");
+      await shown(page.getByRole("button", { name: "New post", exact: true })).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/feed/new");
+      const announce = shown(page.getByRole("button", { name: "Announce", exact: true }));
+      await announce.waitFor();
+      await expectSvgNoEmoji(announce, "the post form's Announce button");
+      if ((await announce.getAttribute("aria-pressed")) !== "false") throw new Error("Announce starts pressed");
+      await shown(page.getByLabel("Post text", { exact: true })).fill(ANNOUNCEMENT);
+      if (asked.length) throw new Error("the post form asked who an announcement would reach before Announce was pressed");
+      const reached = page.waitForResponse((r) => audienceUrl.test(r.url()));
+      await announce.click();
+      const audience = (await (await reached).json()).data;
+      if (audience.channels.length) throw new Error(`the Samaj's plan offers ${audience.channels.join(", ")} for announcements`);
+      const undo = shown(page.getByRole("button", { name: "Undo announce", exact: true }));
+      if ((await undo.getAttribute("aria-pressed")) !== "true") throw new Error("Announce, once pressed, doesn't say it's on");
+      await shown(page.getByText(`Every member (${audience.members}) gets it in the app and as a push notification.`, { exact: true })).waitFor();
+      await shown(page.getByText("Your plan doesn't include email, WhatsApp or SMS announcements.", { exact: true })).waitFor();
+      if (await page.getByRole("checkbox", { name: /^Also / }).count()) throw new Error("the post form offers a channel the Samaj's plan doesn't include");
+      const pin = shown(page.getByRole("checkbox", { name: "Pin to the top of the feed", exact: true }));
+      if ((await pin.getAttribute("aria-checked")) !== "true") throw new Error("Pin isn't on to start with");
+      await pin.click();
+      if ((await pin.getAttribute("aria-checked")) !== "false") throw new Error("Pin didn't turn off");
+      await pin.click();
+      if ((await pin.getAttribute("aria-checked")) !== "true") throw new Error("Pin didn't turn on again");
+      await fitsPhone("the post form with Announce on", pin);
+      await shot("m19-announce-composer");
+
+      const posted = page.waitForResponse((r) => r.request().method() === "POST" && postsUrl.test(r.url()));
+      await shown(page.getByRole("button", { name: "Post announcement", exact: true })).click();
+      const res = await posted;
+      const sent = res.request().postDataJSON().announcement;
+      if (sent?.pin !== true || JSON.stringify(sent.channels) !== "[]") throw new Error(`the post sent the announcement ${JSON.stringify(sent)}, expected pinned with no channels`);
+      if (res.status() !== 201) throw new Error(`posting the announcement answered ${res.status()}`);
+      const post = (await res.json()).data;
+      if (post.kind !== "ANNOUNCEMENT" || !post.isPinned) throw new Error(`the post was saved as ${post.kind}, ${post.isPinned ? "pinned" : "not pinned"}`);
+      phonePost = post;
+    } finally {
+      page.off("request", onRequest);
+    }
+    // Nothing billed, so nothing asked: straight back to the feed.
+    await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+    if (await page.getByRole("alertdialog").locator("visible=true").count()) throw new Error("posting with no channels asked first");
+    const card = feedCard(ANNOUNCEMENT);
+    await card.waitFor();
+    for (const label of ["Announcement", "Pinned"]) await expectSvgNoEmoji(card.getByText(label, { exact: true }).locator(".."), `the announcement's ${label} badge`);
+    // First on the feed, above the Samaj's own pinned welcome: the newest pinned post leads.
+    const ours = await shown(page.getByText(ANNOUNCEMENT, { exact: true })).boundingBox();
+    const welcome = await shown(page.getByText(/^Welcome to the Shri Gujarati Samaj member network!/)).boundingBox();
+    if (!ours || !welcome || ours.y >= welcome.y) throw new Error("the announcement isn't first on the feed, above the pinned welcome");
+    await shot("m19b-announcement-feed");
+  });
+
+  await step("on a plan with WhatsApp and email (offered by the script), a billed announcement asks first in a sheet with how many it reaches, in what order and who pays; Cancel sends nothing, and Post and send sends it as chosen", async () => {
+    // The API would refuse these channels for the Samaj, so the script answers the audience and the post itself: nothing
+    // is billed or stored.
+    await page.route(audienceUrl, (route) => (route.request().method() === "GET" ? answer(route, 200, { data: { members: 7, withEmail: 3, withPhone: 7, channels: ["WHATSAPP", "EMAIL"] } }) : route.fallback()));
+    const text = `Billed ${ANNOUNCEMENT}`;
+    const sent = [];
+    await page.route(postsUrl, (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      sent.push(route.request().postDataJSON());
+      return answer(route, 201, { data: { ...phonePost, id: "00000000-0000-4000-8000-00000000ac10", body: text } });
+    });
+    try {
+      // Opened afresh, so the audience is asked for again rather than taken from the cache.
+      await page.goto(SAMAJ + "/feed");
+      await shown(page.getByRole("button", { name: "New post", exact: true })).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/feed/new");
+      await shown(page.getByLabel("Post text", { exact: true })).fill(text);
+      await shown(page.getByRole("button", { name: "Announce", exact: true })).click();
+      const whatsapp = shown(page.getByRole("checkbox", { name: "Also send by WhatsApp (7 members)", exact: true }));
+      const email = shown(page.getByRole("checkbox", { name: "Also email it (3 members with a confirmed email)", exact: true }));
+      await whatsapp.waitFor();
+      // Two channels are a chain, not a message each.
+      await shown(page.getByText("If you tick more than one, each member still gets one message: by the first of them, in the order listed, that can be sent.", { exact: true })).waitFor();
+      await email.click();
+      if ((await email.getAttribute("aria-checked")) !== "true") throw new Error("the email box didn't tick");
+      await shown(page.getByRole("button", { name: "Post announcement", exact: true })).click();
+      const byEmail = shown(page.getByRole("alertdialog", { name: "Send this announcement by email?", exact: true }));
+      await byEmail.getByText("It goes by email to 3 members. Messages are billed to your institution.", { exact: true }).waitFor();
+      await byEmail.getByRole("button", { name: "Post and send", exact: true }).waitFor();
+      await shot("m19c-announce-billed");
+      await byEmail.getByRole("button", { name: "Cancel", exact: true }).click();
+      await byEmail.waitFor({ state: "hidden" });
+      if (sent.length) throw new Error("Cancel still sent the announcement");
+      if ((await shown(page.getByLabel("Post text", { exact: true })).inputValue()) !== text) throw new Error("Cancel cleared the post's text");
+
+      // Both: each member once, by WhatsApp, and by email only when that can't be sent.
+      await whatsapp.click();
+      if ((await whatsapp.getAttribute("aria-checked")) !== "true") throw new Error("the WhatsApp box didn't tick");
+      await shown(page.getByRole("button", { name: "Post announcement", exact: true })).click();
+      const byBoth = shown(page.getByRole("alertdialog", { name: "Send this announcement by WhatsApp or email?", exact: true }));
+      await byBoth.getByText("It goes to 7 members, one message each: by WhatsApp, or when that can't be sent, by email. Messages are billed to your institution.", { exact: true }).waitFor();
+      if (sent.length) throw new Error("the announcement was sent before Post and send");
+      await byBoth.getByRole("button", { name: "Post and send", exact: true }).click();
+      await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+      await byBoth.waitFor({ state: "hidden" });
+      if (sent.length !== 1) throw new Error(`Post and send sent ${sent.length} posts`);
+      const [{ body, announcement }] = sent;
+      if (body !== text) throw new Error(`Post and send sent "${body}"`);
+      if (announcement?.pin !== true || [...(announcement.channels ?? [])].sort().join() !== "EMAIL,WHATSAPP") throw new Error(`Post and send sent the announcement ${JSON.stringify(announcement)}, expected pinned by WhatsApp and email`);
+    } finally {
+      await page.unroute(postsUrl);
+      await page.unroute(audienceUrl);
+    }
+  });
+
+  await step("the console's queue lists the phone's announcement as one, and Unpin there takes it off the pinned strip while it stays an announcement", async () => {
+    await page.goto(SAMAJ + "/admin/moderation?status=APPROVED&type=POST");
+    const row = queueRow(ANNOUNCEMENT);
+    for (const label of ["Announcement", "Pinned"]) await row.getByText(label, { exact: true }).waitFor();
+    await row.getByRole("button", { name: "Unpin", exact: true }).click();
+    await row.getByRole("status").filter({ hasText: "Unpinned" }).waitFor();
+    await page.goto(SAMAJ + "/feed");
+    const card = feedCard(ANNOUNCEMENT);
+    await card.getByText("Announcement", { exact: true }).waitFor();
+    if (await card.getByText("Pinned", { exact: true }).count()) throw new Error("the announcement still shows as pinned after Unpin");
   });
 
   console.log(results.join("\n"));

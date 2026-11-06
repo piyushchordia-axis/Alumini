@@ -156,7 +156,8 @@ Covers:
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
   confirm dialog (Cancel first); importing an invitation CSV and joining through its link in a second browser, with the
-  name filled in and the three steps; an announcement that also goes by email;
+  name filled in and the three steps; an announcement that also goes by email, asked first in the app's dialog with
+  the email box's count and the billing line, Cancel posting nothing, then Post and send;
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
   Open tab counting the open report (1, then 0 once it's resolved), a note typed and cancelled gone from the next
@@ -209,9 +210,10 @@ Covers:
 - the "Complete your profile" card: 0 for a name and a batch, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
-- a post with a photo, editing it, a Like on it (the chosen chip Demo University's wash, apart from its tray and from
-  white, with a filled icon in their ink at 3:1 or more on it) and taking it back, the celebrations card and a poll vote; a poll with several choices, its drawn boxes
-  saying which are chosen (`aria-checked`) before the vote;
+- a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
+  University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
+  taking it back, the celebrations card and a poll vote; a poll with several choices, its drawn boxes saying which are
+  chosen (`aria-checked`) before the vote;
 - Edit profile: Cancel upload pressed while a photo is still being prepared freeing the picker at once and sending
   nothing, then a photo through the round picker, saved as a 512-pixel square JPEG; a headline, three skills and a past
   role in their sections, Done refusing an end year before the start, a server error on `experiences.0.endYear` in its
@@ -346,7 +348,19 @@ Covers:
   after the app went to the background took its sheet, said under the tabs; Dismiss sending its note, saying so, and
   the report leaving the list and the count; and a chat report's notice opening the list scrolled to its report
   (twelfth in the list) without opening it, then View there scrolling the row up so its words, down to Hide, are on
-  screen.
+  screen;
+- Announce in the post form: not offered to platform staff who are only members of the Samaj (the API's answers with
+  `isPlatformAdmin` and a member's role, which the app counts as an admin), as the API refuses them; as the Samaj
+  admin, the audience not asked for until Announce is pressed (its SVG icon, then "Undo announce" pressed), every
+  member's count, no channel boxes and the line saying the plan has none, Pin on to start with and toggling, Post
+  announcement sending it pinned with no channels and no sheet, and the feed showing it first, above the Samaj's pinned
+  welcome, with its Announcement and Pinned badges drawn with SVG icons; on a plan with WhatsApp and email (the audience
+  and the post answered by the script, so nothing is billed or stored), both boxes with their counts and the line saying
+  each member still gets one message, email alone asking first in a sheet with its count and "Messages are billed to
+  your institution.", Cancel sending nothing and keeping the text, then both asking "by WhatsApp or email?" with one
+  message each to every member, by email only when WhatsApp can't be sent, and Post and send sending it pinned with both
+  channels and going back to the feed; then the console's queue listing the real one with both badges, and Unpin there
+  leaving it an announcement on the feed, no longer pinned.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -666,6 +680,13 @@ waiting for approval. Sign Rahul back in afterwards.
       preview fits the screen with nothing cut off at the sides, the apply link can be selected but not tapped, and on a
       low-end Android a long preview scrolls smoothly. A post with photos (post one from Rahul's phone first) shows them
       as small thumbnails that load.
+- [ ] New post, as the Samaj admin: TalkBack or VoiceOver reads Announce as a button, not selected, and once pressed
+      as "Undo announce", selected; Pin to the top of the feed as a checked checkbox, and the line saying the plan has no
+      channels.
+      Post announcement goes back to the feed with "Announcement posted; members are being notified", the post first
+      with its Announcement and Pinned badges. A member's phone gets the push. Unpin it from the console's Moderation
+      afterwards. (On Demo University, whose plan includes email, as `+91 90000 00001`: ticking Also email it and posting
+      asks first in a sheet; Cancel it.)
 - [ ] TalkBack or VoiceOver on a queue row: its badges are read as words ("Announcement", "Pinned", "1 report"), View
       full content says whether it's expanded, and each Approve, Remove or Pin is followed by the item's opening words,
       so one row's can't be mistaken for the next's. Open in app says it leaves the admin console, and does: the post

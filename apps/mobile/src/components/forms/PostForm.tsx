@@ -1,19 +1,53 @@
-import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, postCreateSchema, type PostCreateInput, type PostDto } from "@illuminize/shared";
+import { MAX_POLL_OPTIONS, MAX_POST_IMAGES, announcementConfirmCopy, postCreateSchema, type AnnouncementOptions, type PostCreateInput, type PostDto } from "@illuminize/shared";
 import { useState } from "react";
 import { Image, Pressable, Switch, Text, View } from "react-native";
-import { IconImage, IconPoll } from "@/components/icons";
-import { Button, ChipSelect, ErrorText, Input, Muted, Row } from "@/components/ui";
+import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { IconAnnounce, IconImage, IconPoll } from "@/components/icons";
+import { Button, ChipSelect, ErrorText, Input, Muted, Row, toggleState } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
 import { colors } from "@/theme";
+import { AnnouncementPanel, useAnnouncementAudience } from "./AnnouncementPanel";
 import { useFormErrors } from "./useFormErrors";
 
-export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubmit }: { slug: string; placeholder: string; initial?: PostDto; submitLabel: string; note?: string; onSubmit: (v: PostCreateInput) => Promise<void> }) {
+/**
+ * `canAnnounce` offers Announce, for a new post by the institution's own admin: the API refuses anyone else, platform
+ * staff included.
+ */
+export function PostForm({
+  slug,
+  placeholder,
+  initial,
+  submitLabel,
+  note,
+  canAnnounce = false,
+  onSubmit,
+}: {
+  slug: string;
+  placeholder: string;
+  initial?: PostDto;
+  submitLabel: string;
+  note?: string;
+  canAnnounce?: boolean;
+  onSubmit: (v: PostCreateInput) => Promise<void>;
+}) {
   const [body, setBody] = useState(initial?.body ?? "");
   const [images, setImages] = useState<string[]>(initial?.imageUrls ?? []);
   // Polls are added when posting; editing a post keeps its poll as it was.
   const [poll, setPoll] = useState<{ options: string[]; allowsMultiple: boolean; closesInDays: "" | "1" | "3" | "7" } | null>(null);
+  const [announceChoice, setAnnounce] = useState<AnnouncementOptions | null>(null);
+  // Only while the form may offer it: an admin who loses the role mid-post (the membership refetched) is left with a
+  // normal post they can still send, not an announcement the API refuses and no button to undo it.
+  const announce = canAnnounce ? announceChoice : null;
+  const audience = useAnnouncementAudience(slug, !!announce);
+  // What was checked and is waiting for the admin to confirm the billed channels.
+  const [confirming, setConfirming] = useState<PostCreateInput | null>(null);
+  const billed = announce ? announcementConfirmCopy(audience.data, announce.channels) : null;
   const upload = useImageUpload(slug);
   const { errors, serverError, busy, fromZod, run } = useFormErrors();
+  const send = async (input: PostCreateInput) => {
+    await run(() => onSubmit(input));
+    setConfirming(null);
+  };
   const submit = () =>
     run(async () => {
       const parsed = postCreateSchema.safeParse({
@@ -28,9 +62,11 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
               },
             }
           : {}),
+        ...(announce ? { announcement: announce } : {}),
       });
       if (!parsed.success) return fromZod(parsed.error);
-      await onSubmit(parsed.data);
+      if (billed) setConfirming(parsed.data);
+      else await onSubmit(parsed.data);
     });
   return (
     <>
@@ -58,7 +94,12 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
         )}
       </Row>
       <ErrorText error={upload.error} />
-      {!initial && !poll && <Button title="Add a poll" icon={(c) => <IconPoll size={18} color={c} />} variant="ghost" onPress={() => setPoll({ options: ["", ""], allowsMultiple: false, closesInDays: "" })} />}
+      {!initial && (!poll || canAnnounce) && (
+        <Row>
+          {!poll && <Button title="Add a poll" icon={(c) => <IconPoll size={18} color={c} />} variant="ghost" onPress={() => setPoll({ options: ["", ""], allowsMultiple: false, closesInDays: "" })} />}
+          {canAnnounce && <Button title={announce ? "Undo announce" : "Announce"} icon={(c) => <IconAnnounce size={18} color={c} />} variant="ghost" {...toggleState(!!announce)} onPress={() => setAnnounce(announce ? null : { pin: true, channels: [] })} />}
+        </Row>
+      )}
       {poll && (
         <View style={{ gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10 }}>
           <Text style={{ fontWeight: "700", color: colors.text }}>Poll options</Text>
@@ -94,9 +135,23 @@ export function PostForm({ slug, placeholder, initial, submitLabel, note, onSubm
           <Button title="Remove poll" variant="ghost" onPress={() => setPoll(null)} />
         </View>
       )}
+      {announce && <AnnouncementPanel value={announce} onChange={setAnnounce} audience={audience.data} error={errors.announcement} />}
       {note ? <Muted>{note}</Muted> : null}
       <ErrorText error={serverError} />
-      <Button title={submitLabel} onPress={() => void submit()} loading={busy} disabled={!body.trim() || (!!poll && poll.options.filter((o) => o.trim()).length < 2)} />
+      <Button title={announce ? "Post announcement" : submitLabel} onPress={() => void submit()} loading={busy} disabled={!body.trim() || (!!poll && poll.options.filter((o) => o.trim()).length < 2)} />
+      {billed && (
+        <ConfirmSheet
+          open={!!confirming}
+          title={billed.title}
+          body={billed.body}
+          confirmLabel={billed.confirm}
+          busy={busy}
+          onConfirm={() => {
+            if (confirming) void send(confirming);
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
     </>
   );
 }
