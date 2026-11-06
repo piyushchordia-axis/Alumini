@@ -38,7 +38,7 @@ export function PlatformChatReportsPage() {
       />
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
-      {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={`No ${REPORT_STATUS_LABELS[status].toLowerCase()} escalated reports`} />}
+      {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={`No ${REPORT_STATUS_LABELS[status].toLowerCase()} escalated reports`} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {q.data?.data.map((r) => (
           <ReportRow key={r.id} report={r} />

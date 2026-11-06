@@ -15,7 +15,7 @@ export function RequireFeature({ feature }: { feature: TenantFeature }) {
   const label = LINKS_BY_FEATURE[feature]?.label ?? feature;
   return (
     <EmptyState
-      icon={<IconLock size={32} className="text-slate-400" />}
+      icon={<IconLock />}
       title={`${label} is turned off`}
       description={`${tenant.shortName ?? tenant.name} has switched this section off.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
@@ -37,7 +37,7 @@ export function RequireChat() {
     // Messages fill the window edge to edge on a phone, so this needs its own margin there.
     <div className="max-md:p-4">
       <EmptyState
-        icon={<IconLock size={32} className="text-slate-400" />}
+        icon={<IconLock />}
         title="Messages aren't available"
         description={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}
         action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
@@ -52,7 +52,7 @@ export function RequireGroups() {
   if (tenant.settings.features.groups && membership.chatEligible) return <Outlet />;
   return (
     <EmptyState
-      icon={<IconLock size={32} className="text-slate-400" />}
+      icon={<IconLock />}
       title="Groups aren't available"
       description={`Groups aren't open to your account at ${tenant.shortName ?? tenant.name}.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}
@@ -72,7 +72,7 @@ export function MentorsUnavailable() {
   const { tenant } = useMembership();
   return (
     <EmptyState
-      icon={<IconLock size={32} className="text-slate-400" />}
+      icon={<IconLock />}
       title="Mentors aren't available"
       description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}
       action={<LinkButton to={homePath(tenant.slug, tenant.settings.features)}>Go to the app</LinkButton>}

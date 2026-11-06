@@ -22,7 +22,7 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon={<IconJobs size={32} className="text-slate-400" />}
+        icon={<IconJobs />}
         title={title ?? said.heading}
         description={text ?? said.body}
         action={
@@ -48,7 +48,7 @@ export function ReferralsUnavailable() {
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon={<IconLock size={32} className="text-slate-400" />}
+        icon={<IconLock />}
         title="Referrals aren't available"
         description={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}
         action={

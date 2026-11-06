@@ -9,7 +9,6 @@ import { refreshProfileFields, useAdminProfileFields } from "@/hooks/useAdminPro
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { leaveGroupNotice } from "@/lib/groups";
-import { colors } from "@/theme";
 
 /**
  * The profile-field editor, a modal above the console's list: `?id` edits that field, none adds one. There's no API to
@@ -43,8 +42,12 @@ export default function ProfileFieldEditScreen() {
   if (id && !field) {
     return (
       <AdminScreen title="Edit profile field">
-        <EmptyState icon={<IconFields size={32} color={colors.faint} />} title="This field was archived or removed" description="Restore it from Show archived fields to edit it." />
-        <Button title="Back to profile fields" variant="outline" onPress={leave} />
+        <EmptyState
+          icon={<IconFields />}
+          title="This field was archived or removed"
+          description="Restore it from Show archived fields to edit it."
+          action={<Button title="Back to profile fields" variant="outline" onPress={leave} />}
+        />
       </AdminScreen>
     );
   }

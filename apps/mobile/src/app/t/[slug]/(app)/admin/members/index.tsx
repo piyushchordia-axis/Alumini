@@ -111,7 +111,7 @@ export default function AdminMembersScreen() {
             <View style={styles.empty}>
               {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
               <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
-                <EmptyState icon={search ? <IconSearch size={32} color={colors.faint} /> : <IconDirectory size={32} color={colors.faint} />} title={memberEmptyTitle(status, search)} description={search ? MEMBER_SEARCH_HINT : undefined} />
+                <EmptyState icon={search ? <IconSearch /> : <IconDirectory />} title={memberEmptyTitle(status, search)} description={search ? MEMBER_SEARCH_HINT : undefined} />
               </ListEmpty>
             </View>
           }

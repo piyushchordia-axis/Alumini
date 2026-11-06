@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle, peerYears } from "@illuminize/shared/chat";
+import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, peerYears } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
@@ -64,14 +64,6 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
   );
 }
 
-/** What an empty Chats tab suggests, from whichever kinds of chat the institution has on. */
-function emptyChatsHint(features: TenantFeatures): string {
-  if (!features.messaging) return "When you join a group, its conversation shows here.";
-  const message = features.directory ? "Open a member's profile in the Directory and choose Message this member" : "When you message a member, or accept a request, the conversation shows here";
-  if (!features.groups) return `${message}.`;
-  return features.directory ? `${message}, or join a group.` : "When you message a member, accept a request or join a group, the conversation shows here.";
-}
-
 /**
  * The inbox: conversations, groups' among them, under Chats, and requests waiting for an answer under Requests. With
  * direct messages off there are no requests, so there's no Requests tab.
@@ -118,7 +110,7 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
           <div className="p-4">
             {inbox === "MAIN" ? (
               <EmptyState
-                icon={<IconMessages size={32} className="text-slate-400" />}
+                icon={<IconMessages />}
                 title="No conversations yet"
                 description={emptyChatsHint(features)}
                 action={
@@ -130,7 +122,7 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
                 }
               />
             ) : (
-              <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
+              <EmptyState icon={<IconMail />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
             )}
           </div>
         ) : (

@@ -42,12 +42,14 @@ function Discover({ slug }: { slug: string }) {
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             {search ? (
-              <EmptyState icon={<IconSearch size={32} color={colors.faint} />} title="No groups match" description="Try another name, or create the group yourself." />
+              <EmptyState icon={<IconSearch />} title="No groups match" description="Try another name, or create the group yourself." />
             ) : (
-              <View style={{ gap: spacing.md }}>
-                <EmptyState icon={<IconGroups size={32} color={colors.faint} />} title="No open groups yet" description="Create one, and any member here can find and join it." />
-                <Button title="Create group" variant="outline" onPress={() => router.push(`/t/${slug}/groups/new`)} />
-              </View>
+              <EmptyState
+                icon={<IconGroups />}
+                title="No open groups yet"
+                description="Create one, and any member here can find and join it."
+                action={<Button title="Create group" variant="outline" onPress={() => router.push(`/t/${slug}/groups/new`)} />}
+              />
             )}
           </ListEmpty>
         }
@@ -69,7 +71,7 @@ function MyGroups({ slug }: { slug: string }) {
       onRefresh={() => void list.refetch()}
       ListEmptyComponent={
         <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-          <EmptyState icon={<IconGroups size={32} color={colors.faint} />} title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />
+          <EmptyState icon={<IconGroups />} title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />
         </ListEmpty>
       }
       renderItem={({ item }) => <GroupCard slug={slug} group={item} />}
@@ -110,7 +112,7 @@ function Invitations({ slug, onStatus }: { slug: string; onStatus: (text: string
         ListHeaderComponent={accept.error ? <StatusLine tone="warning" text={errorMessage(accept.error)} /> : undefined}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No invitations" description="When someone invites you to a group, the invitation waits here for you to accept or decline." />
+            <EmptyState icon={<IconMail />} title="No invitations" description="When someone invites you to a group, the invitation waits here for you to accept or decline." />
           </ListEmpty>
         }
         renderItem={({ item }) => (

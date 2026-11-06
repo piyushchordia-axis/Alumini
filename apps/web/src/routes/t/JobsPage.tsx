@@ -168,11 +168,11 @@ export function JobsPage() {
             </div>
             {!jobs.isLoading && !jobs.error && jobs.items.length === 0 &&
               (filters.canRefer ? (
-                <EmptyState icon={<IconJobs size={32} className="text-slate-400" />} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
+                <EmptyState icon={<IconJobs />} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
               ) : moreActive || filters.q || filters.jobType ? (
-                <EmptyState icon={<IconJobs size={32} className="text-slate-400" />} title="No openings match" description="Try removing a filter." />
+                <EmptyState icon={<IconJobs />} title="No openings match" description="Try removing a filter." />
               ) : (
-                <EmptyState icon={<IconJobs size={32} className="text-slate-400" />} title="No openings right now" description="Know of a role? Post it for your batchmates." />
+                <EmptyState icon={<IconJobs />} title="No openings right now" description="Know of a role? Post it for your batchmates." />
               ))}
             <LoadMore hasNextPage={!!jobs.hasNextPage} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} />
           </>
@@ -186,7 +186,7 @@ export function JobsPage() {
                 <SeekerCard key={s.member.id} slug={slug} seeker={s} />
               ))}
             </div>
-            {!seekers.isLoading && seekers.items.length === 0 && <EmptyState icon={<IconProfile size={32} className="text-slate-400" />} title="Nobody is looking right now" />}
+            {!seekers.isLoading && seekers.items.length === 0 && <EmptyState icon={<IconProfile />} title="Nobody is looking right now" />}
             <LoadMore hasNextPage={!!seekers.hasNextPage} isFetchingNextPage={seekers.isFetchingNextPage} fetchNextPage={() => void seekers.fetchNextPage()} />
           </>
         ) : available ? (

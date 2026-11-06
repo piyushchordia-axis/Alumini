@@ -15,7 +15,7 @@ export function GroupUnavailable({ slug, error, title, text, onRetry }: { slug: 
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon={<IconGroups size={32} className="text-slate-400" />}
+        icon={<IconGroups />}
         title={heading}
         description={body}
         action={

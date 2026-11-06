@@ -22,7 +22,7 @@ export function MentorUnavailable({ slug, error, title, text, onRetry }: { slug:
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon={<IconMentors size={32} className="text-slate-400" />}
+        icon={<IconMentors />}
         title={heading}
         description={body}
         action={

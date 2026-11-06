@@ -3,8 +3,8 @@ import { useRouter } from "expo-router";
 import type { ReactElement, ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { IconLock } from "@/components/icons";
-import { Avatar, Button } from "@/components/ui";
+import { IconLock, type IconProps } from "@/components/icons";
+import { Avatar, Button, EmptyIcon } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { homeHref } from "@/lib/sections";
 import { colors, PlainPage, spacing, useTheme } from "@/theme";
@@ -71,14 +71,15 @@ export const iconButton = { width: 44, height: 44, borderRadius: 22, alignItems:
 
 /**
  * In place of a chat screen that can't be shown: says why and offers a way on. It never leaves the member on a blank screen.
- * `icon` is an SVG from `components/icons.tsx`, such as `<IconLock size={32} color={colors.faint} />`; screen readers skip it.
+ * `icon` is an SVG from `components/icons.tsx`, passed bare, such as `<IconLock />`: it's drawn in the brand's badge
+ * (EmptyIcon), as an empty state's is.
  */
-export function ChatNotice({ icon, title, text, children }: { icon?: ReactElement; title: string; text?: string; children?: ReactNode }) {
+export function ChatNotice({ icon, title, text, children }: { icon?: ReactElement<IconProps>; title: string; text?: string; children?: ReactNode }) {
   // On the page it sits on: a job that can't be shown is on the member's background, a chat on the plain page.
   const { pageMuted } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.sm }}>
-      {icon ? <View aria-hidden>{icon}</View> : null}
+      {icon ? <EmptyIcon icon={icon} style={{ marginBottom: spacing.xs }} /> : null}
       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, textAlign: "center" }}>{title}</Text>
       {text ? <Text style={{ fontSize: 14, color: pageMuted, textAlign: "center", maxWidth: 320 }}>{text}</Text> : null}
       {children ? <View style={{ marginTop: spacing.md, gap: spacing.sm, width: "100%", maxWidth: 320 }}>{children}</View> : null}
@@ -96,7 +97,7 @@ export function ChatOff() {
   return (
     <ChatScreen>
       <ChatHeader title="Messages" />
-      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Messages aren't available" text={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock />} title="Messages aren't available" text={`Private messages aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         <Button title="Go back" onPress={leave} />
       </ChatNotice>
     </ChatScreen>

@@ -323,7 +323,7 @@ function Thread({ id }: { id: string }) {
         {messages.isLoading ? (
           <Spinner label="Loading messages…" />
         ) : firstLoadFailed ? (
-          <ChatNotice icon={<IconAlert size={32} color={colors.faint} />} title="Messages couldn't be loaded" text={errorMessage(messages.error)}>
+          <ChatNotice icon={<IconAlert />} title="Messages couldn't be loaded" text={errorMessage(messages.error)}>
             <Button title="Retry loading" variant="outline" onPress={() => void messages.refetch()} />
           </ChatNotice>
         ) : (
@@ -466,8 +466,7 @@ function ThreadUnavailable({ id, error, onRetry }: { id: string; error: unknown;
   const about = group ? groupUnavailable(group) : null;
   const title = about?.title ?? (off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened");
   const text = about?.text ?? (off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.");
-  const iconProps = { size: 32, color: colors.faint };
-  const icon = about ? <IconGroups {...iconProps} /> : off ? <IconLock {...iconProps} /> : <IconMessages {...iconProps} />;
+  const icon = about ? <IconGroups /> : off ? <IconLock /> : <IconMessages />;
   return (
     <ChatScreen>
       <ChatHeader title={about && group ? group.name : "Conversation"} />

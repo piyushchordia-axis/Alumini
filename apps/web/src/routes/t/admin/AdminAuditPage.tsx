@@ -96,7 +96,7 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
       {(q.isLoading || (emptyNow && q.isPlaceholderData)) && <Loading />}
       {q.error && !q.data && <ErrorBox error={q.error} />}
       {emptyNow ? (
-        !q.isPlaceholderData && <EmptyState icon={<IconAudit size={32} />} title={auditEmptyTitle(filter)} />
+        !q.isPlaceholderData && <EmptyState icon={<IconAudit />} title={auditEmptyTitle(filter)} />
       ) : q.data ? (
         <div className={clsx(q.isPlaceholderData && "opacity-60")}>
           <AuditTable rows={q.data.data} memberHref={(id) => `/t/${slug}/admin/members/${id}`} />

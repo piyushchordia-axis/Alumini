@@ -75,8 +75,12 @@ function AdminMember({ id }: { id: string }) {
   if (!valid || (isApiClientError(error) && error.status === 404)) {
     return (
       <AdminScreen title="Member">
-        <EmptyState icon={<IconDirectory size={32} color={colors.faint} />} title="This member isn't here" description="They may have deleted their account, or the link is wrong." />
-        <Button title="Back to members" variant="outline" accessibilityRole="link" onPress={() => router.dismissTo(adminSectionHref(slug, "members"))} />
+        <EmptyState
+          icon={<IconDirectory />}
+          title="This member isn't here"
+          description="They may have deleted their account, or the link is wrong."
+          action={<Button title="Back to members" variant="outline" accessibilityRole="link" onPress={() => router.dismissTo(adminSectionHref(slug, "members"))} />}
+        />
       </AdminScreen>
     );
   }

@@ -48,6 +48,11 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   background, border or outline colour over the backgrounds behind it, and `contrastOf` gives their WCAG contrast.
   `expectReadable` (text at 4.5:1) and `expectEdge` (an edge at 3:1) are built on them, and a new colour check should
   be too. They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
+- `expectEmptyState(box, where, { actions, absent, tones })` checks an empty state or a chat notice, found from its
+  title (the web's `h3` directly inside it, the phone's title as a direct child): an SVG icon and no emoji, on a badge
+  that isn't white, at 3:1 on it, and the links or buttons it should and shouldn't offer. `tones` pins the badge and the
+  icon to the institution's own wash and ink (`BRAND_TONES`, the seeded institutions' as `brandTones` gives them), which
+  a grey badge would otherwise pass for; every check in the scripts gives them.
 - `GREY_TEXT` is both apps' grey text as `textColour` reads it: the meta grey (`91 107 128`) on the plain page and the
   secondary grey (`71 85 105`) on a tint or a photo.
 
@@ -136,7 +141,11 @@ Covers:
 - a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
   alone (its icon is silent); sign out;
 - an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
-  pending screen; and a forced sign-out leaving nothing cached.
+  pending screen; and a forced sign-out leaving nothing cached;
+- empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
+  and the businesses' "match" boxes, an empty Requests tab, a mentor search with Clear filters inside the box and a
+  job's empty referral requests at Demo University (blue), and the pupil's three "aren't available" boxes, each with Go
+  to the app, at Demo School (amber).
 
 ## Web (tenant admin + platform console)
 
@@ -206,7 +215,10 @@ Covers:
   staff's, "About an admin" or "No other admin", and reports another member of staff must handle, or that no member of
   staff may take yet, or that are closed, each with its note and no link), opening an institution's admin console
   without being a member, a school's settings starting with Messaging, Groups and Mentorship off and saying why, and
-  the admin console stacking on a phone.
+  the admin console stacking on a phone;
+- empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): Demo College's
+  empty reports (green), Demo University's empty chat reports (blue), and the platform console's empty escalated
+  reports in the default blue.
 
 ## Mobile (Expo app exported for the web)
 
@@ -422,7 +434,12 @@ Covers:
   rows; no sideways scrolling; the members CSV saying "Preparing…" while the script holds
   it, with Activity CSV disabled until it's saved (one export at a time), then downloaded as
   shri-gujarati-samaj-members-<date>.csv with one byte order mark, Start year and End year after Email (Hetal Shah's
-  2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months.
+  2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months;
+- empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`), with the
+  buttons that used to sit beside them inside the box: the empty inbox with Find a group, Sent referrals with Find jobs
+  that can refer, a mentor search with Clear filters, the directory's and the businesses' "match" boxes and an empty
+  Requests tab at Demo University (blue); the pupil's "aren't available" screens at Demo School (amber), each with its
+  way out; and the console's empty chat reports, Pending tab and invitations at the Samaj (orange).
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -605,6 +622,9 @@ the console (part 14).
       brand tint with a thin ring and a filled icon, and the count beside it turns the brand colour; Like again takes it
       back. Check it here at Demo University (blue); part 13 checks it at Shri Gujarati Samaj (orange).
 - [ ] TalkBack or VoiceOver reads the chosen reaction as selected and the other three as not.
+- [ ] An empty list (Messages → Requests): its icon sits in a round, light tint of the brand colour and is drawn in the
+      brand colour (blue at Demo University; part 14 checks it at the Samaj), and TalkBack or VoiceOver reads the title
+      as a heading and doesn't stop on the icon.
 
 ### 6. Navigation
 
@@ -744,6 +764,8 @@ Still the Samaj admin on both phones, except for Chat reports. Sign Rahul back i
 - [ ] Pulling the console's home down refreshes it.
 - [ ] Under My profile → Appearance, choose Institution colour: the member screens take the Samaj's tint, and the
       console's screens stay on the plain page. Choose Plain again.
+- [ ] Any empty tab in the console (Reports → Dismissed, say): its icon sits in a round, light orange tint and is drawn
+      in orange, as in part 5.
 
 **Members and a member's page**
 

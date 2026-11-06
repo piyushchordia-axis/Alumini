@@ -6,7 +6,6 @@ import { PageFill } from "@/components/PageBackdrop";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { jobsHref } from "@/lib/referrals";
-import { colors } from "@/theme";
 
 /** Why a job can't be shown, in plain words. A job removed, hidden or deleted and a wrong link read the same, as the API answers them. */
 export function jobUnavailableText(error?: unknown): { heading: string; body: string } {
@@ -33,7 +32,7 @@ export function JobUnavailable({ error, title, text, onRetry }: { error?: unknow
     // Often the whole screen (a job that won't open has no shell around it), when it draws the page itself; inside a
     // shell, the shell's page shows through.
     <PageFill>
-      <ChatNotice icon={<IconJobs size={32} color={colors.faint} />} title={title ?? said.heading} text={text ?? said.body}>
+      <ChatNotice icon={<IconJobs />} title={title ?? said.heading} text={text ?? said.body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         <BackToJobs />
       </ChatNotice>
@@ -46,7 +45,7 @@ export function ReferralsUnavailable({ onBack }: { /** In place of going back do
   const { tenant } = useMembership();
   return (
     <PageFill>
-      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Referrals aren't available" text={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock />} title="Referrals aren't available" text={`Referral requests aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         {onBack ? <Button title="Back to jobs" accessibilityRole="link" onPress={onBack} /> : <BackToJobs />}
       </ChatNotice>
     </PageFill>

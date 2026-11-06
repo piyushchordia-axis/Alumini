@@ -279,7 +279,7 @@ export function AdminProfileFieldsPage() {
       {tenant.type !== "SCHOOL" && <p className="text-sm text-slate-600">Degree and field of study are now built into every profile, so they don't need a question here.</p>}
       <Checkbox label="Show archived fields" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
       {fields.length === 0 ? (
-        <EmptyState icon={<IconFields size={32} className="text-slate-400" />} title="No profile fields yet" description="Add questions members answer when they join and on their profile." />
+        <EmptyState icon={<IconFields />} title="No profile fields yet" description="Add questions members answer when they join and on their profile." />
       ) : (
         <Card>
           <ul className="divide-y divide-slate-100">

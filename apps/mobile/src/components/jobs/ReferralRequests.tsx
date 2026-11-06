@@ -6,7 +6,7 @@ import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { useReferralList, useReferralRows } from "@/components/jobs/ReferralRows";
 import { Button, EmptyState, ErrorText, ListEmpty, Spinner, Tabs } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
-import { colors, radius, spacing } from "@/theme";
+import { radius, spacing } from "@/theme";
 
 /** Said above what's left to do while the member can't use referrals, as on the Mentors screen. */
 export function WayOutBanner({ text }: { text: string }) {
@@ -44,15 +44,17 @@ export function ReferralRequests({
   const empty =
     box === "received" ? (
       <EmptyState
-        icon={<IconMail size={32} color={colors.faint} />}
+        icon={<IconMail />}
         title="No referral requests yet"
         description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
       />
     ) : (
-      <View style={{ gap: spacing.md }}>
-        <EmptyState icon={<IconJobs size={32} color={colors.faint} />} title="You haven't asked for a referral yet" description="When you ask a job's poster to refer you, your request and their answer show here." />
-        {!limited && onBrowse && <Button title="Find jobs that can refer" onPress={onBrowse} />}
-      </View>
+      <EmptyState
+        icon={<IconJobs />}
+        title="You haven't asked for a referral yet"
+        description="When you ask a job's poster to refer you, your request and their answer show here."
+        action={!limited && onBrowse ? <Button title="Find jobs that can refer" onPress={onBrowse} /> : undefined}
+      />
     );
   return (
     <>

@@ -323,7 +323,7 @@ export function AdminModerationPage() {
       </div>
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck size={32} className="text-slate-400" />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((item) => (
           <ModerationRow key={moderationItemKey(item)} slug={slug} item={item} features={tenant.settings.features} />

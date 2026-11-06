@@ -61,7 +61,7 @@ export function NewConversationPage() {
           <>
             <ChatPaneHeader backTo={inbox} title="New message" />
             <ChatNotice
-              icon={directOff ? <IconLock size={32} /> : <IconMessages size={32} />}
+              icon={directOff ? <IconLock /> : <IconMessages />}
               title={directOff ? "Private messages aren't available" : "You can't message this member"}
               text={directOff ? `${tenant.shortName ?? tenant.name} has switched private messages off.` : "They can't be contacted here at the moment."}
             >

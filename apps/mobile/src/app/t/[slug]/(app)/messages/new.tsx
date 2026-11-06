@@ -67,7 +67,7 @@ function NewConversation({ to }: { to: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="New message" />
-        <ChatNotice icon={<IconMessages size={32} color={colors.faint} />} title="You can't message this member" text="They can't be contacted here at the moment.">
+        <ChatNotice icon={<IconMessages />} title="You can't message this member" text="They can't be contacted here at the moment.">
           <Button title="Go back" onPress={leave} />
         </ChatNotice>
       </ChatScreen>

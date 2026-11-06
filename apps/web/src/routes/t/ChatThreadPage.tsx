@@ -389,7 +389,7 @@ function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slu
       {() => (
         <>
           <ChatPaneHeader backTo={backTo} title={about && group ? group.name : "Conversation"} />
-          <ChatNotice icon={<Icon size={32} />} title={title} text={text}>
+          <ChatNotice icon={<Icon />} title={title} text={text}>
             {!answered && (
               <Button variant="outline" className="min-h-11" onClick={onRetry}>
                 Retry loading

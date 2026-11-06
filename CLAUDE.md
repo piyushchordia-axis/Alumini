@@ -19,8 +19,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet).
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
-  no React, and the navigation's badges (`sectionBadges`, `moreBadgeLabel`); `src/lib/features.ts` the feature switches
-  and current pupils; `src/lib/sections.ts` the member sections and their names (`SECTION_LABELS`);
+  no React, the navigation's badges (`sectionBadges`, `moreBadgeLabel`) and `chat/empty.ts` what an empty inbox says
+  (`emptyChatsHint`); `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member
+  sections and their names (`SECTION_LABELS`);
   `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
@@ -153,6 +154,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     *inside* labeled SVG-framed hit targets only, on a commented `eslint-disable-next-line`. Notification and push
     titles (the API's 📣, 🎂, 🎉) are message text, not icons, and keep theirs. Section maps store icon *names*
     (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`), not emoji.
+    `EmptyState` and `ChatNotice` draw the bare icon you pass (`<IconMail />`, no size or colour) at their own size, in
+    the brand's ink on a round wash (`EmptyIcon`, 3:1 in any institution colour; no ring, which would read as chosen).
+    An empty state's ways on go in its `action` (links or buttons: the main way on first, as primary; a second way, a
+    way back or one that clears a search or a filter may be outline; on the phone too, never a button beside the box);
+    `inline` drops the frame inside a card or a list; `live`, for search and filter results only, has screen readers
+    read it out, which on the web repeats its words in a hidden status line, so e2e matches its title with
+    `exact: true`. e2e finds the box from its title (web: the `h3` directly inside it; phone: the title's parent) and
+    checks the badge (pinned to the institution's `BRAND_TONES`) and the actions with `expectEmptyState`.
   - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black. Brand-coloured
     text and icons use the ink (web `text-primary-ink`, mobile `theme.primaryInk`) and text on the brand colour uses
     `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the Open to and multiple-choice

@@ -45,7 +45,7 @@ export function NotificationsPage() {
         }
       />
       {list.isLoading && <Loading />}
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconBell size={32} className="text-slate-400" />} title="You're all caught up" />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconBell />} title="You're all caught up" />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.items.map((n) => {
           const to = linkFor(slug, n, isTenantAdmin);

@@ -78,7 +78,7 @@ export default function AdminAuditScreen() {
           <View style={styles.empty}>
             {/* An empty filter's answer, kept while the next one loads, would name the wrong filter. */}
             <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
-              <EmptyState icon={<IconAudit size={32} color={colors.faint} />} title={auditEmptyTitle(filter)} />
+              <EmptyState icon={<IconAudit />} title={auditEmptyTitle(filter)} />
             </ListEmpty>
           </View>
         }

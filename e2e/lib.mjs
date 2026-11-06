@@ -359,6 +359,46 @@ export async function expectEdge(locator, where, min = 3) {
   return expectContrast(locator, "borderTopColor", where, min, "has an edge at");
 }
 
+/**
+ * The seeded institutions' ink and wash ("r g b"), as brandTones gives them for their colours (Demo University's #1d4ed8,
+ * also both apps' default and the platform console's, is pinned in color.test.ts) and both apps draw them.
+ */
+export const BRAND_TONES = {
+  demoUniversity: { ink: "29 78 216", wash: "223 230 250" },
+  demoCollege: { ink: "4 120 87", wash: "220 236 231" },
+  demoSchool: { ink: "170 79 11", wash: "243 230 221" },
+  samaj: { ink: "187 63 13", wash: "245 228 221" },
+};
+
+/**
+ * Fails unless `box` (one empty state or chat notice: on the web the h3's parent, on the phone its title's) draws its icon
+ * as both apps' EmptyIcon does, and offers what it should. The icon is an SVG, with no emoji in the box, on a badge that
+ * isn't white (the brand's wash, not the box), in a colour that shows on it at 3:1 (WCAG 1.4.11: the brand's ink), as
+ * paintedColour sees them. `tones` ({ ink, wash }, one of BRAND_TONES) pins them to the institution's own, which a
+ * neutral grey badge would pass without. `actions` are names of links or buttons it must hold, and `absent` names of
+ * ones it mustn't. Gives { icon, badge, contrast }.
+ */
+export async function expectEmptyState(box, where, { actions = [], absent = [], tones } = {}) {
+  await expectSvgNoEmoji(box, where);
+  // The stroke is on the shapes: a phone's SVG root draws none.
+  const shape = box.locator("svg").first().locator("path, rect, circle, line, polyline").first();
+  let look;
+  try {
+    look = await paintedColour(shape, "stroke");
+  } catch (error) {
+    throw new Error(`${where}'s icon: ${error.message}`);
+  }
+  if (Math.max(...look.behind.split(" ").map((c) => 255 - Number(c))) < 10) throw new Error(`${where} draws its icon on white (rgb ${look.behind}), not on a badge`);
+  const contrast = contrastOf(look.colour, look.behind);
+  if (contrast < 3) throw new Error(`${where}'s icon (rgb ${look.colour}) is ${contrast.toFixed(2)}:1 on its badge (rgb ${look.behind}), under 3:1`);
+  if (tones && look.behind !== tones.wash) throw new Error(`${where}'s badge is rgb ${look.behind}, not the institution's wash (rgb ${tones.wash})`);
+  if (tones && look.colour !== tones.ink) throw new Error(`${where}'s icon is rgb ${look.colour}, not the institution's ink (rgb ${tones.ink})`);
+  const control = (name) => box.getByRole("link", { name, exact: true }).or(box.getByRole("button", { name, exact: true }));
+  for (const name of actions) if (!(await control(name).count())) throw new Error(`${where} doesn't offer "${name}"`);
+  for (const name of absent) if (await control(name).count()) throw new Error(`${where} offers "${name}", which it shouldn't`);
+  return { icon: look.colour, badge: look.behind, contrast };
+}
+
 async function expectContrast(locator, property, where, min, says) {
   let look;
   try {

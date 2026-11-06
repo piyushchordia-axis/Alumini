@@ -159,7 +159,7 @@ export default function DirectoryScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconDirectory size={32} color={colors.faint} />} title="No members match" description="Try removing a filter." />
+            <EmptyState icon={<IconDirectory />} title="No members match" description="Try removing a filter." />
           </ListEmpty>
         }
         renderItem={({ item }) => <MemberCard slug={slug} member={item} />}

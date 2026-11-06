@@ -40,7 +40,7 @@ function BlockedMembers() {
         ListHeaderComponent={<Text style={{ fontSize: 13, color: colors.muted, marginBottom: spacing.sm }}>{BLOCKED_LIST_EXPLAINED}</Text>}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconShield size={32} color={colors.faint} />} title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
+            <EmptyState icon={<IconShield />} title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
           </ListEmpty>
         }
         renderItem={({ item: b }) => (

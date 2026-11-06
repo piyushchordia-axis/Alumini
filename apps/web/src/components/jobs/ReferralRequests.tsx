@@ -16,13 +16,13 @@ export function ReferralRequests({ slug, box, onBoxChange, limited, onBrowse }: 
   const empty =
     box === "received" ? (
       <EmptyState
-        icon={<IconMail size={32} className="text-slate-400" />}
+        icon={<IconMail />}
         title="No referral requests yet"
         description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
       />
     ) : (
       <EmptyState
-        icon={<IconJobs size={32} className="text-slate-400" />}
+        icon={<IconJobs />}
         title="You haven't asked for a referral yet"
         description="When you ask a job's poster to refer you, your request and their answer show here."
         action={

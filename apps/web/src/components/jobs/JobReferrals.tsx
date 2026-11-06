@@ -132,7 +132,7 @@ export function JobReferrals({ slug, job }: { slug: string; job: JobDetailDto })
           list={list}
           limited={!available}
           showJob={false}
-          empty={<EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />}
+          empty={<EmptyState icon={<IconMail />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />}
         />
       </div>
     </Section>

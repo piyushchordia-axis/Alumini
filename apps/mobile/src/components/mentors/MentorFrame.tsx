@@ -6,7 +6,6 @@ import { IconLock, IconMentors } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { mentorsHref } from "@/lib/mentors";
-import { colors } from "@/theme";
 
 /** Mentorship is switched on here, with messaging, and this member isn't a current pupil. */
 export function useMentorsEnabled(): boolean {
@@ -24,7 +23,7 @@ export function MentorsOff({ title = "Mentors" }: { title?: string }) {
   return (
     <ChatScreen>
       <ChatHeader title={title} />
-      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Mentors aren't available" text={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock />} title="Mentors aren't available" text={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         <Button title="Go back" onPress={leave} />
       </ChatNotice>
     </ChatScreen>
@@ -52,7 +51,7 @@ export function MentorUnavailable({ header, error, title, text, onRetry }: { hea
   return (
     <ChatScreen>
       <ChatHeader title={header} />
-      <ChatNotice icon={<IconMentors size={32} color={colors.faint} />} title={heading} text={body}>
+      <ChatNotice icon={<IconMentors />} title={heading} text={body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         {/* Down to the Mentors tab under this screen, rather than a second copy of it on top. */}
         <Button title="Back to mentors" accessibilityRole="link" onPress={() => router.dismissTo(mentorsHref(tenant.slug))} />

@@ -187,7 +187,7 @@ function ModerationQueue({
         }}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconCheck size={32} color={colors.faint} />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />
+            <EmptyState icon={<IconCheck />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />
           </ListEmpty>
         }
         ListFooterComponent={

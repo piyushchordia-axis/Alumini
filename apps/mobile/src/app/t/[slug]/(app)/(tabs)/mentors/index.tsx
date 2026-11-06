@@ -106,20 +106,16 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             {filtered ? (
-              <View style={{ gap: spacing.md }}>
-                <EmptyState icon={<IconSearch size={32} color={colors.faint} />} title="No mentors match" description="Try another name, area or availability." />
-                <Button title="Clear filters" variant="outline" onPress={clear} />
-              </View>
+              <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." action={<Button title="Clear filters" variant="outline" onPress={clear} />} />
             ) : listed ? (
-              <View style={{ gap: spacing.md }}>
-                <EmptyState icon={<IconMentors size={32} color={colors.faint} />} title="You're the only mentor so far" description="Members find you here, and other mentors will be listed here too when they offer to mentor." />
-                <Button title="See your mentor profile" variant="outline" onPress={onOffer} />
-              </View>
+              <EmptyState
+                icon={<IconMentors />}
+                title="You're the only mentor so far"
+                description="Members find you here, and other mentors will be listed here too when they offer to mentor."
+                action={<Button title="See your mentor profile" variant="outline" onPress={onOffer} />}
+              />
             ) : (
-              <View style={{ gap: spacing.md }}>
-                <EmptyState icon={<IconMentors size={32} color={colors.faint} />} title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." />
-                <Button title="Offer to mentor" onPress={onOffer} />
-              </View>
+              <EmptyState icon={<IconMentors />} title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." action={<Button title="Offer to mentor" onPress={onOffer} />} />
             )}
           </ListEmpty>
         }
@@ -292,9 +288,13 @@ function MentorsWayOut({ slug }: { slug: string }) {
   if (!listed && received.items.length === 0 && sent.items.length === 0)
     return (
       <SectionScreen>
-        <View style={{ padding: spacing.lg, gap: spacing.md }}>
-          <EmptyState icon={<IconLock size={32} color={colors.faint} />} title="Mentors aren't available" description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`} />
-          <Button title="Go to the app" accessibilityRole="link" onPress={() => router.replace(homeHref(slug, tenant.settings.features))} />
+        <View style={{ padding: spacing.lg }}>
+          <EmptyState
+            icon={<IconLock />}
+            title="Mentors aren't available"
+            description={`Mentorship isn't open to your account at ${tenant.shortName ?? tenant.name}.`}
+            action={<Button title="Go to the app" accessibilityRole="link" onPress={() => router.replace(homeHref(slug, tenant.settings.features))} />}
+          />
         </View>
       </SectionScreen>
     );

@@ -249,9 +249,9 @@ export default function AdminInvitationsScreen() {
             {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
             <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
               {search ? (
-                <EmptyState icon={<IconSearch size={32} color={colors.faint} />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
+                <EmptyState icon={<IconSearch />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
               ) : (
-                <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
+                <EmptyState icon={<IconMail />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
               )}
             </ListEmpty>
           </View>

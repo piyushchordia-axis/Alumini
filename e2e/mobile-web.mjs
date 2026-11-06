@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -575,6 +575,8 @@ try {
       await openSection(label);
       await page.waitForURL(`**/t/demo-university/${path}`);
       await content.locator("visible=true").first().waitFor();
+      // The title's parent is the box: its icon in Demo University's ink on the wash, and Find a group inside it.
+      if (label === "Messages") await expectEmptyState(content.locator("visible=true").first().locator("xpath=.."), "the empty inbox", { actions: ["Find a group"], tones: BRAND_TONES.demoUniversity });
       if (label === "Funding" || label === "Events" || label === "Groups" || label === "Mentors") continue;
       await selectedBarTab(label).waitFor();
       if (await selectedBarTab("More").count()) throw new Error(`More shows as selected on ${label}`);
@@ -644,6 +646,7 @@ try {
     await tab("Sent", false).click();
     await page.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals&box=sent$/);
     await page.getByText("You haven't asked for a referral yet", { exact: true }).locator("visible=true").first().waitFor();
+    await expectEmptyState(page.getByText("You haven't asked for a referral yet", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the empty Sent referrals", { actions: ["Find jobs that can refer"], tones: BRAND_TONES.demoUniversity });
     await tab("Openings", false).click();
     await page.waitForURL(/\/t\/demo-university\/jobs$/);
     await tab("Openings", true).waitFor();
@@ -758,6 +761,7 @@ try {
     await sneha.waitFor();
     await search.fill("Priya");
     await page.getByText("No members match", { exact: true }).locator("visible=true").first().waitFor();
+    await expectEmptyState(page.getByText("No members match", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the directory's empty state", { tones: BRAND_TONES.demoUniversity });
     await page.getByRole("button", { name: "Clear filters", exact: true }).locator("visible=true").first().click();
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
@@ -838,6 +842,7 @@ try {
     await singh.waitFor();
     await city.fill("nowhere at all");
     await visible(page.getByText("No businesses match", { exact: true })).waitFor();
+    await expectEmptyState(visible(page.getByText("No businesses match", { exact: true })).locator("xpath=.."), "the businesses' empty state", { tones: BRAND_TONES.demoUniversity });
     await city.fill("");
     await zylo.waitFor();
 
@@ -1073,6 +1078,7 @@ try {
     await pageB.goto(`${app}/messages`);
     await shown(pageB.locator('[role="tab"]').getByText("Requests", { exact: true })).click();
     await shown(pageB.getByText("No message requests")).waitFor();
+    await expectEmptyState(shown(pageB.getByText("No message requests", { exact: true })).locator("xpath=.."), "the empty Requests tab", { tones: BRAND_TONES.demoUniversity });
     const messagesTabB = pageB.locator('a[role="tab"]').filter({ hasText: "Messages" }).locator("visible=true").first();
     if (await messagesTabB.getAttribute("aria-label")) throw new Error(`B starts with something waiting: ${await messagesTabB.getAttribute("aria-label")}`);
 
@@ -1527,6 +1533,8 @@ try {
     await card.waitFor();
     await chip("Availability", "Weekly").click();
     await shown(mentee.getByText("No mentors match", { exact: true })).waitFor();
+    // Clear filters is inside the box now, as on the web.
+    await expectEmptyState(shown(mentee.getByText("No mentors match", { exact: true })).locator("xpath=.."), "the mentors' empty state", { actions: ["Clear filters"], tones: BRAND_TONES.demoUniversity });
     await chip("Availability", "Every two weeks").click();
     await card.click();
     await mentee.waitForURL(/\/mentors\/[0-9a-f-]{36}$/);
@@ -2115,8 +2123,8 @@ try {
     await pupil.waitForURL("**/t/demo-school/feed");
     await pupil.goto(`${BASE}/t/demo-school/groups`);
     await pupil.waitForURL("**/t/demo-school/feed");
-    // Each says so under a lock drawn in SVG, not an emoji.
-    const unavailable = (title) => expectSvgNoEmoji(pupil.getByText(title, { exact: true }).locator("visible=true").first().locator("xpath=.."), `"${title}" on ${pupil.url()}`);
+    // Each says so under a lock drawn in SVG, not an emoji, in Demo School's amber ink on its wash, with its way out in the box.
+    const unavailable = (title, wayOut = "Go back") => expectEmptyState(pupil.getByText(title, { exact: true }).locator("visible=true").first().locator("xpath=.."), `"${title}" on ${pupil.url()}`, { actions: [wayOut], tones: BRAND_TONES.demoSchool });
     await pupil.goto(`${BASE}/t/demo-school/messages/00000000-0000-4000-8000-000000000001`);
     await pupil.getByText("Messages aren't available").locator("visible=true").first().waitFor();
     await unavailable("Messages aren't available");
@@ -2130,7 +2138,8 @@ try {
     for (const path of ["mentors", "mentors/00000000-0000-4000-8000-000000000001", "mentors/request/00000000-0000-4000-8000-000000000001"]) {
       await pupil.goto(`${BASE}/t/demo-school/${path}`);
       await pupil.getByText("Mentors aren't available").locator("visible=true").first().waitFor();
-      await unavailable("Mentors aren't available");
+      // The Mentors tab is an empty state with the way into the app; the screens above the tabs go back.
+      await unavailable("Mentors aren't available", path === "mentors" ? "Go to the app" : "Go back");
       if (!pupil.url().endsWith(`/t/demo-school/${path}`)) throw new Error(`${path} redirected a pupil to ${pupil.url()}`);
     }
     if (await pupil.getByRole("tab", { name: "Find mentors" }).locator("visible=true").count()) throw new Error("a pupil is offered Find mentors");
@@ -2536,6 +2545,8 @@ try {
       await page.getByText("A message was reported", { exact: true }).click();
       await page.waitForURL("**/t/shri-gujarati-samaj/admin/chat-reports?status=OPEN&item=00000000-0000-4000-8000-0000000000c1");
       await page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().waitFor();
+      // The console's empty states take the institution's colour too: the Samaj's orange ink on its wash.
+      await expectEmptyState(page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().locator("xpath=.."), "the Samaj's empty chat reports", { tones: BRAND_TONES.samaj });
       await page.getByRole("status").filter({ hasText: "That report isn't in this list any more: it may have been handled already." }).locator("visible=true").last().waitFor();
       await backButton().click();
       await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
@@ -3226,6 +3237,7 @@ try {
     await statusSays("Diya Raval's request rejected").waitFor();
     await sheet.waitFor({ state: "hidden" });
     await shown(page.getByText("No pending members", { exact: true })).waitFor();
+    await expectEmptyState(shown(page.getByText("No pending members", { exact: true })).locator("xpath=.."), "the Samaj's empty Pending tab", { tones: BRAND_TONES.samaj });
 
     // Under Rejected with the reason she was given, and an Approve that sends the status her row shows. Answered by the
     // script as if another admin had approved her meanwhile: the line says so rather than a bare error.
@@ -4572,6 +4584,7 @@ try {
     await shown(page.getByRole("link", { name: "Invitations", exact: true })).click();
     await page.waitForURL("**/t/shri-gujarati-samaj/admin/invitations");
     await shown(page.getByText("No invitations here", { exact: true })).waitFor();
+    await expectEmptyState(shown(page.getByText("No invitations here", { exact: true })).locator("xpath=.."), "the Samaj's empty invitations", { tones: BRAND_TONES.samaj });
     // Nothing to send by: no figure for today, no Send pending, and the links are shared by hand.
     await shown(page.getByLabel("Can send today, none", { exact: true })).waitFor();
     await shown(page.getByText("Your plan doesn't include WhatsApp, SMS or email messages: copy an invitation's link or share it on WhatsApp from your own phone.", { exact: true })).waitFor();

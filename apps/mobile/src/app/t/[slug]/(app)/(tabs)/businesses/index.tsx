@@ -66,7 +66,7 @@ export default function BusinessesScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconBusinesses size={32} color={colors.faint} />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />
+            <EmptyState icon={<IconBusinesses />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />
           </ListEmpty>
         }
         renderItem={({ item }) => <BusinessCard slug={slug} item={item} />}

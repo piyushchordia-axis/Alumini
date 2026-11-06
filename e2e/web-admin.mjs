@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -396,6 +396,8 @@ try {
     await page.click('div[role="dialog"] button:has-text("Remove")');
     await page.waitForSelector("text=Report resolved");
     await page.waitForSelector("text=No open reports");
+    // The console draws its empty states in the institution's colour too: Demo College's green ink on its wash.
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No open reports"))'), "the empty reports queue", { tones: BRAND_TONES.demoCollege });
     await shot("a04-reports");
   });
 
@@ -845,6 +847,7 @@ try {
     await page.click('div[role="dialog"] button:has-text("Remove")');
     await page.waitForSelector("text=Report resolved");
     await page.waitForSelector("text=No open chat reports");
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No open chat reports"))'), "the empty chat reports", { tones: BRAND_TONES.demoUniversity });
     await page.getByRole("tab", { name: /^Open\s*0$/ }).waitFor();
     await page.click('[role="tab"]:has-text("Resolved")');
     const closed = page.locator("li", { hasText: "Arjun" }).first();
@@ -1154,6 +1157,8 @@ try {
     await page.goto(`${BASE}/platform/chat-reports`);
     await page.waitForSelector("h1:has-text('Chat reports')");
     await page.waitForSelector("text=No open escalated reports");
+    // The platform console has no institution's colour, so this is the default blue.
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No open escalated reports"))'), "the platform's empty chat reports", { tones: BRAND_TONES.demoUniversity });
     // The seeded report sits on this tab now and isn't escalated, so only the filter can keep it off.
     await page.click('[role="tab"]:has-text("Resolved")');
     await page.waitForSelector("text=No resolved escalated reports");

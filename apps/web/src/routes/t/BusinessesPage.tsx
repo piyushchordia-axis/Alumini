@@ -41,7 +41,7 @@ export function BusinessesPage() {
           <BusinessCard key={b.id} slug={slug} item={b} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon={<IconBusinesses size={32} className="text-slate-400" />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />}
+      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon={<IconBusinesses />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

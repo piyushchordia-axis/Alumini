@@ -133,7 +133,7 @@ function ReportsQueue({ slug, status, itemId, say, refreshCounts }: { slug: stri
         renderItem={({ item }) => <ReportRow report={item} onAsk={(which) => sheet.ask({ prompt: which, rowKey: item.id, row: item })} />}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconCheck size={32} color={colors.faint} />} title={reportEmptyTitle(status)} />
+            <EmptyState icon={<IconCheck />} title={reportEmptyTitle(status)} />
           </ListEmpty>
         }
         ListFooterComponent={

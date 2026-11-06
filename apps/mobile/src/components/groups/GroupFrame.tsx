@@ -5,7 +5,6 @@ import { IconGroups, IconLock } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { groupsHref } from "@/lib/groups";
-import { colors } from "@/theme";
 
 /** Groups are switched on here and this member isn't a current pupil. Nothing about groups is shown or fetched otherwise. */
 export function useGroupsEnabled(): boolean {
@@ -23,7 +22,7 @@ export function GroupsOff({ title = "Groups" }: { title?: string }) {
   return (
     <ChatScreen>
       <ChatHeader title={title} />
-      <ChatNotice icon={<IconLock size={32} color={colors.faint} />} title="Groups aren't available" text={`Groups aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
+      <ChatNotice icon={<IconLock />} title="Groups aren't available" text={`Groups aren't open to your account at ${tenant.shortName ?? tenant.name}.`}>
         <Button title="Go back" onPress={leave} />
       </ChatNotice>
     </ChatScreen>
@@ -44,7 +43,7 @@ export function GroupUnavailable({ header, error, title, text, onRetry }: { head
   return (
     <ChatScreen>
       <ChatHeader title={header} />
-      <ChatNotice icon={<IconGroups size={32} color={colors.faint} />} title={heading} text={body}>
+      <ChatNotice icon={<IconGroups />} title={heading} text={body}>
         {error !== undefined && !answered && onRetry && <Button title="Retry loading" variant="outline" onPress={onRetry} />}
         {/* Back to the lists, in place of this screen: whatever is under it may be the same group. */}
         <Button title="Back to groups" accessibilityRole="link" onPress={() => router.dismissTo(groupsHref(tenant.slug))} />

@@ -34,7 +34,7 @@ export function FundingPage() {
           <FundingCard key={f.id} slug={slug} item={f} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconFunding size={32} className="text-slate-400" />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconFunding />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

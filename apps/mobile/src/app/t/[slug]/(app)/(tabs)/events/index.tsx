@@ -66,7 +66,7 @@ export default function EventsScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconEvents size={32} color={colors.faint} />} title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />
+            <EmptyState icon={<IconEvents />} title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />
           </ListEmpty>
         }
         renderItem={({ item }) => <EventCard slug={slug} event={item} />}

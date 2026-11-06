@@ -1,10 +1,10 @@
-import { useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
+import { cloneElement, useEffect, useEffectEvent, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
 import { StackHeader } from "@/components/StackHeader";
-import { IconAlert, IconProfile } from "@/components/icons";
+import { IconAlert, IconProfile, type IconProps } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -456,13 +456,55 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
-/** `icon` is an SVG from `components/icons.tsx`, such as `<IconMail size={32} color={colors.faint} />`; screen readers skip it. */
-export function EmptyState({ icon, title, description }: { icon?: ReactElement; title: string; description?: string }) {
+/**
+ * The round badge an empty state or a chat notice draws its icon in, which screen readers skip: the brand's wash, with the
+ * icon in its ink, which reads on it at 3:1 whatever colour the institution chose. It sets the icon's size and colour, so
+ * `icon` is an SVG from `components/icons.tsx` passed bare, such as `<IconMail />`.
+ */
+export function EmptyIcon({ icon, size = "regular", style }: { icon: ReactElement<IconProps>; size?: "regular" | "small"; style?: ViewStyle }) {
+  const theme = useTheme();
+  const side = size === "small" ? 40 : 56;
   return (
-    <View style={styles.empty}>
-      {icon ? <View aria-hidden>{icon}</View> : null}
-      <Text style={styles.emptyTitle}>{title}</Text>
-      {description && <Text style={styles.hint}>{description}</Text>}
+    <View aria-hidden style={[{ width: side, height: side, borderRadius: side / 2, backgroundColor: theme.primaryWash, alignItems: "center", justifyContent: "center" }, style]}>
+      {cloneElement(icon, { size: side / 2, color: theme.primaryInk })}
+    </View>
+  );
+}
+
+/**
+ * What a list or a screen says when it has nothing to show. `icon` is an SVG from `components/icons.tsx`, passed bare
+ * (EmptyIcon draws it). `action` holds its ways on, Buttons stacked full width: the main way on first, as primary; a second
+ * way, a way back or one that clears a search or a filter may be outline. `inline` is for inside a card or a list: no
+ * frame, and a smaller badge. `live` is for search and filter results: screen readers
+ * read the title and the description when it appears. The title stays a direct child of the box, which is how the e2e
+ * scripts find it.
+ */
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  inline = false,
+  live = false,
+}: {
+  icon?: ReactElement<IconProps>;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  inline?: boolean;
+  live?: boolean;
+}) {
+  const { pageMuted } = useTheme();
+  useAnnounced(live ? [title, description].filter(Boolean).join(". ") : "");
+  return (
+    <View style={inline ? styles.emptyInline : styles.empty} accessibilityLiveRegion={live ? "polite" : undefined}>
+      {icon ? <EmptyIcon icon={icon} size={inline ? "small" : "regular"} style={{ marginBottom: inline ? spacing.xs : spacing.sm }} /> : null}
+      <Text {...headingRole(3)} style={[styles.emptyTitle, inline ? { fontSize: 15 } : null]}>
+        {title}
+      </Text>
+      {/* Inline, it may sit on the member's background rather than in a box. */}
+      {description ? <Text style={[styles.emptyText, inline ? { color: pageMuted } : null]}>{description}</Text> : null}
+      {action ? <View style={styles.emptyActions}>{action}</View> : null}
     </View>
   );
 }
@@ -573,8 +615,11 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, alignSelf: "flex-start" },
   badgeWithIcon: { flexDirection: "row", alignItems: "center", gap: 4 },
   badgeText: { fontSize: 11, fontWeight: "600" },
-  empty: { alignItems: "center", gap: 6, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },
-  emptyTitle: { fontWeight: "600", color: colors.text, fontSize: 15 },
+  empty: { alignItems: "center", gap: spacing.xs, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },
+  emptyInline: { alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.xl },
+  emptyTitle: { fontWeight: "700", color: colors.text, fontSize: 16, textAlign: "center" },
+  emptyText: { color: colors.muted, fontSize: 14, textAlign: "center", maxWidth: 320 },
+  emptyActions: { width: "100%", maxWidth: 320, gap: spacing.sm, marginTop: spacing.md },
   errorBox: { backgroundColor: "#fef2f2", borderColor: "#fecaca", borderWidth: 1, borderRadius: radius.md, padding: 10 },
   title: { fontSize: 22, fontWeight: "700", color: colors.text },
   body: { fontSize: 15, lineHeight: 22, color: "#1e293b" },

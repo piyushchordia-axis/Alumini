@@ -60,7 +60,7 @@ export default function FundingScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconFunding size={32} color={colors.faint} />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
+            <EmptyState icon={<IconFunding />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
           </ListEmpty>
         }
         renderItem={({ item }) => <FundingCard slug={slug} item={item} />}

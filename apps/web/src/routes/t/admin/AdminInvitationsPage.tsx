@@ -355,9 +355,9 @@ export function AdminInvitationsPage() {
         <ErrorBox error={list.error ?? "Failed"} />
       ) : list.data.data.length === 0 ? (
         search ? (
-          <EmptyState icon={<IconSearch size={32} className="text-slate-400" />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
+          <EmptyState icon={<IconSearch />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
         ) : (
-          <EmptyState icon={<IconMail size={32} className="text-slate-400" />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
+          <EmptyState icon={<IconMail />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
         )
       ) : (
         <>

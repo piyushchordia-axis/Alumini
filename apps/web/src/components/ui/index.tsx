@@ -208,18 +208,80 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-/** `icon` is an SVG from `components/icons.tsx`, drawn in slate-400 and hidden from screen readers. */
-export function EmptyState({ title, description, action, icon }: { title: ReactNode; description?: ReactNode; action?: ReactNode; icon?: ReactElement }) {
+/**
+ * The round badge an empty state or a chat notice draws its icon in, hidden from screen readers: the brand's wash, with
+ * the icon in its ink, which reads on it at 3:1 whatever colour the institution chose. It sets the icon's size and colour
+ * (its rules reach the SVG, so they beat a class on it), so callers pass the bare icon, such as `<IconMail />`.
+ */
+export function EmptyIcon({ icon, size = "regular", className }: { icon: ReactElement; size?: "regular" | "small"; className?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-      {icon && (
-        <div aria-hidden className="mb-3 text-slate-400">
-          {icon}
-        </div>
+    <div
+      aria-hidden
+      className={clsx(
+        "flex shrink-0 items-center justify-center rounded-full bg-primary-wash text-primary-ink [&_svg]:text-primary-ink",
+        size === "small" ? "size-10 [&_svg]:size-5" : "size-14 [&_svg]:size-7",
+        className,
       )}
-      <h3 className="text-base font-semibold text-slate-800">{title}</h3>
-      {description && <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    >
+      {icon}
+    </div>
+  );
+}
+
+const textOf = (node: ReactNode) => (typeof node === "string" || typeof node === "number" ? String(node) : "");
+
+/**
+ * A live empty state's words in a status line. They go in a moment after it mounts, because a live region that arrives
+ * already filled is often not read, and come out again so the hidden copy doesn't linger beside the visible one.
+ */
+function LiveText({ text }: { text: string }) {
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    const fill = setTimeout(() => setSaid(text), 150);
+    const clear = setTimeout(() => setSaid(""), 5150);
+    return () => {
+      clearTimeout(fill);
+      clearTimeout(clear);
+    };
+  }, [text]);
+  return (
+    <p role="status" className="sr-only">
+      {said}
+    </p>
+  );
+}
+
+/**
+ * What a list or a page says when it has nothing to show. `icon` is an SVG from `components/icons.tsx`, passed bare
+ * (EmptyIcon draws it). `action` holds its ways on, links or buttons, centred and at least 44px tall: the main way on
+ * first, as primary; a second way, a way back or one that clears a search or a filter may be outline. `inline` is for
+ * inside a card or a list: no frame, and a smaller badge. `live` is for search and filter
+ * results: a status line reads out the title and the description (when they're text), so it repeats them in hidden text.
+ * The h3 stays a direct child of the box, which is how the e2e scripts find it.
+ */
+export function EmptyState({
+  title,
+  description,
+  action,
+  icon,
+  inline = false,
+  live = false,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  icon?: ReactElement;
+  inline?: boolean;
+  live?: boolean;
+}) {
+  const spoken = [textOf(title), textOf(description)].filter(Boolean).map((s) => (/[.!?…]$/.test(s) ? s : `${s}.`));
+  return (
+    <div className={clsx("flex flex-col items-center justify-center text-center", inline ? "px-4 py-6" : "rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10")}>
+      {icon && <EmptyIcon icon={icon} size={inline ? "small" : "regular"} className={inline ? "mb-2" : "mb-3"} />}
+      <h3 className={clsx("font-semibold text-slate-900", inline ? "text-sm" : "text-base")}>{title}</h3>
+      {description && <p className="mt-1 max-w-md text-sm text-balance text-slate-500">{description}</p>}
+      {action && <div className="mt-4 flex flex-wrap items-center justify-center gap-2 [&>a]:min-h-11 [&>button]:min-h-11">{action}</div>}
+      {live && <LiveText text={spoken.join(" ")} />}
     </div>
   );
 }

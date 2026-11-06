@@ -21,7 +21,7 @@ export function DigestPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title={`This week at ${tenant.shortName ?? tenant.name}`} subtitle={d ? `Week of ${formatDate(d.weekStart)}` : undefined} />
       {!d ? (
-        <EmptyState icon={<IconFeed size={32} className="text-slate-400" />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
+        <EmptyState icon={<IconFeed />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
       ) : (
         <>
           {d.posts.length > 0 && (

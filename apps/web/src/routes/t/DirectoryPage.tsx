@@ -182,7 +182,7 @@ export function DirectoryPage() {
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconDirectory size={32} className="text-slate-400" />} title="No members match" description="Try removing a filter." />}
+      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconDirectory />} title="No members match" description="Try removing a filter." />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

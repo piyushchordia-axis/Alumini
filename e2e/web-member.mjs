@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { bigPhoto, dropFrames, expectChosenChip, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, bigPhoto, dropFrames, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -596,6 +596,8 @@ try {
     // the same search finds her.
     await search.fill("Priya");
     await page.getByText("No members match", { exact: true }).waitFor();
+    // Its icon in Demo University's blue ink on the wash, not a grey glyph on white.
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No members match"))'), "the directory's empty state", { tones: BRAND_TONES.demoUniversity });
     if (await page.locator("a", { hasText: "Priya Nair" }).count()) throw new Error("the Open to filter kept Priya, who isn't open to investing");
     await openTo.selectOption("");
     await page.click('button:has-text("Hide filters")');
@@ -666,6 +668,7 @@ try {
     await singh.waitFor();
     await city.fill("nowhere at all");
     await page.waitForSelector("text=No businesses match");
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No businesses match"))'), "the businesses' empty state", { tones: BRAND_TONES.demoUniversity });
     await city.fill("");
     await zylo.waitFor();
 
@@ -1379,6 +1382,7 @@ try {
     await pageB.goto(`${app}/messages`);
     await pageB.getByRole("tab", { name: "Requests" }).click();
     await pageB.waitForSelector("text=No message requests");
+    await expectEmptyState(pageB.locator('div:has(> h3:text-is("No message requests"))'), "the empty Requests tab", { tones: BRAND_TONES.demoUniversity });
     const badgeB = pageB.locator('nav[aria-label="Main"]:visible a[href$="/app/messages"]');
     if (await badgeB.getAttribute("aria-label")) throw new Error(`B starts with something waiting: ${await badgeB.getAttribute("aria-label")}`);
 
@@ -1597,8 +1601,8 @@ try {
     await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
     for (const section of ["Messages", "Groups", "Mentors"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);
     await pupil.keyboard.press("Escape");
-    // Each says so under a lock drawn in SVG, not an emoji.
-    const unavailable = (title) => expectSvgNoEmoji(pupil.locator(`div:has(> h3:text-is("${title}"))`), `"${title}"`);
+    // Each says so under a lock drawn in SVG, not an emoji, in Demo School's amber ink on its wash, with the way out.
+    const unavailable = (title) => expectEmptyState(pupil.locator(`div:has(> h3:text-is("${title}"))`), `"${title}"`, { actions: ["Go to the app"], tones: BRAND_TONES.demoSchool });
     await pupil.goto(`${BASE}/t/demo-school/app/messages`);
     await pupil.waitForSelector("text=Messages aren't available");
     await unavailable("Messages aren't available");
@@ -1835,6 +1839,7 @@ try {
     await card.waitFor();
     await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Weekly" });
     await mentee.getByText("No mentors match").waitFor();
+    await expectEmptyState(mentee.locator('div:has(> h3:text-is("No mentors match"))'), "the mentors' empty state", { actions: ["Clear filters"], tones: BRAND_TONES.demoUniversity });
     await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Every two weeks" });
     await card.getByRole("link", { name: LISTENER }).click();
     await mentee.waitForURL(/\/app\/mentors\/[0-9a-f-]{36}$/);
@@ -2040,6 +2045,7 @@ try {
     await poster.getByText("Can refer", { exact: true }).waitFor();
     await poster.getByRole("heading", { name: "Referral requests", exact: true }).waitFor();
     await poster.getByText("No referral requests yet").waitFor();
+    await expectEmptyState(poster.locator('div:has(> h3:text-is("No referral requests yet"))'), "a job's empty referral requests", { tones: BRAND_TONES.demoUniversity });
 
     // Meera finds it under Can refer, which leaves out jobs that take no requests.
     await meera.goto(`${app}/jobs`);

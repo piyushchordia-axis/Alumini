@@ -129,7 +129,7 @@ export function JobReferrals({ slug, job }: { slug: string; job: JobDetailDto })
           <Button title="Retry loading" variant="outline" onPress={() => void list.refetch()} />
         </View>
       ) : list.items.length === 0 ? (
-        <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />
+        <EmptyState icon={<IconMail />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />
       ) : (
         list.items.map((r) => <Fragment key={r.id}>{rows.renderRow(r)}</Fragment>)
       )}

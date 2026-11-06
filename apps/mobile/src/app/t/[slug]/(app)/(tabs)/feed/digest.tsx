@@ -40,7 +40,7 @@ export default function DigestScreen() {
   if (!d) {
     return (
       <Screen title="This week">
-        <EmptyState icon={<IconFeed size={32} color={colors.faint} />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
+        <EmptyState icon={<IconFeed />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
       </Screen>
     );
   }

@@ -215,7 +215,7 @@ function ChatReportsQueue({ slug, status, itemId, say, refreshCounts }: { slug: 
         )}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconCheck size={32} color={colors.faint} />} title={chatReportEmptyTitle(status)} />
+            <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} />
           </ListEmpty>
         }
         ListFooterComponent={

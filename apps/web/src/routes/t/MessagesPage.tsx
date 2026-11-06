@@ -44,5 +44,5 @@ export function MessagesPage() {
 
 /** The right-hand pane with nothing open. Phones never show it. */
 export function NoConversationPane() {
-  return <ChatNotice icon={<IconMessages size={32} />} title="Choose a conversation" text="Messages are private to the people in each conversation. Admins only ever see a message that someone reports, with a few around it." />;
+  return <ChatNotice icon={<IconMessages />} title="Choose a conversation" text="Messages are private to the people in each conversation. Admins only ever see a message that someone reports, with a few around it." />;
 }

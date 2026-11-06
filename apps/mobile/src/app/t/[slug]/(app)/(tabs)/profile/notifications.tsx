@@ -53,7 +53,7 @@ export default function NotificationsScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconBell size={32} color={colors.faint} />} title="You're all caught up" />
+            <EmptyState icon={<IconBell />} title="You're all caught up" />
           </ListEmpty>
         }
         renderItem={({ item: n }) => {

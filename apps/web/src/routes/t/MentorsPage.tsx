@@ -90,10 +90,10 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
         list={{ ...list, hasNextPage: !!list.hasNextPage }}
         empty={
           filtered ? (
-            <EmptyState icon={<IconSearch size={32} className="text-slate-400" />} title="No mentors match" description="Try another name, area or availability." action={<Button variant="outline" className="min-h-11" onClick={clear}>Clear filters</Button>} />
+            <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." action={<Button variant="outline" className="min-h-11" onClick={clear}>Clear filters</Button>} />
           ) : listed ? (
             <EmptyState
-              icon={<IconMentors size={32} className="text-slate-400" />}
+              icon={<IconMentors />}
               title="You're the only mentor so far"
               description="Members find you here, and other mentors will be listed here too when they offer to mentor."
               action={
@@ -103,7 +103,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
               }
             />
           ) : (
-            <EmptyState icon={<IconMentors size={32} className="text-slate-400" />} title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." action={<Button className="min-h-11" onClick={onOffer}>Offer to mentor</Button>} />
+            <EmptyState icon={<IconMentors />} title="No mentors yet" description="When members offer to mentor, they're listed here. You could be the first." action={<Button className="min-h-11" onClick={onOffer}>Offer to mentor</Button>} />
           )
         }
       >

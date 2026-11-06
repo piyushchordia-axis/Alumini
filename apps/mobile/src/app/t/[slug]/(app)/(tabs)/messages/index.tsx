@@ -1,5 +1,5 @@
-import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle, formatChatTime, isMuted, peerYears } from "@illuminize/shared/chat";
+import type { ChatConversationDto, ChatInbox } from "@illuminize/shared";
+import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, formatChatTime, isMuted, peerYears } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
@@ -68,14 +68,6 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
   );
 }
 
-/** What an empty Chats tab suggests, from whichever kinds of chat the institution has on. */
-function emptyChatsHint(features: TenantFeatures): string {
-  if (!features.messaging) return "When you join a group, its conversation shows here.";
-  const message = features.directory ? "Open a member's profile in the Directory and choose Message this member" : "When you message a member, or accept a request, the conversation shows here";
-  if (!features.groups) return `${message}.`;
-  return features.directory ? `${message}, or join a group.` : "When you message a member, accept a request or join a group, the conversation shows here.";
-}
-
 /**
  * The inbox: conversations, groups' among them, under Chats, and requests waiting for an answer under Requests. With direct
  * messages off there are no requests, so there's no Requests tab.
@@ -129,12 +121,14 @@ export default function MessagesScreen() {
           ListEmptyComponent={
             <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
               {inbox === "MAIN" ? (
-                <View style={{ gap: spacing.md }}>
-                  <EmptyState icon={<IconMessages size={32} color={colors.faint} />} title="No conversations yet" description={emptyChatsHint(features)} />
-                  {features.groups && <Button title="Find a group" variant="outline" accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups`)} />}
-                </View>
+                <EmptyState
+                  icon={<IconMessages />}
+                  title="No conversations yet"
+                  description={emptyChatsHint(features)}
+                  action={features.groups ? <Button title="Find a group" variant="outline" accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups`)} /> : undefined}
+                />
               ) : (
-                <EmptyState icon={<IconMail size={32} color={colors.faint} />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
+                <EmptyState icon={<IconMail />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />
               )}
             </ListEmpty>
           }

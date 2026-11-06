@@ -36,9 +36,7 @@ import { moveFocus } from "@/lib/focus";
 import { useGroupNotice } from "@/lib/groups";
 import { qk } from "@/lib/queryKeys";
 import { useReferralsAvailable, useReferralsWayOut } from "@/lib/referrals";
-import { colors, spacing, useTheme } from "@/theme";
-
-const emptyIcon = (Icon: typeof IconJobs) => <Icon size={32} color={colors.faint} />;
+import { spacing, useTheme } from "@/theme";
 
 function SeekerCard({ slug, seeker }: { slug: string; seeker: JobSeekerDto }) {
   return (
@@ -180,11 +178,11 @@ export default function JobsScreen() {
               ListEmptyComponent={
                 <ListEmpty loading={jobs.isLoading} error={jobs.error} onRetry={() => void jobs.refetch()}>
                   {filters.canRefer ? (
-                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
+                    <EmptyState icon={<IconJobs />} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
                   ) : moreActive || filters.q || filters.jobType ? (
-                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings match" description="Try removing a filter." />
+                    <EmptyState icon={<IconJobs />} title="No openings match" description="Try removing a filter." />
                   ) : (
-                    <EmptyState icon={emptyIcon(IconJobs)} title="No openings right now" description="Know of a role? Post it for your batchmates." />
+                    <EmptyState icon={<IconJobs />} title="No openings right now" description="Know of a role? Post it for your batchmates." />
                   )}
                 </ListEmpty>
               }
@@ -213,7 +211,7 @@ export default function JobsScreen() {
               onRefresh={() => void seekers.refetch()}
               ListEmptyComponent={
                 <ListEmpty loading={seekers.isLoading} error={seekers.error} onRetry={() => void seekers.refetch()}>
-                  <EmptyState icon={emptyIcon(IconProfile)} title="Nobody is looking right now" />
+                  <EmptyState icon={<IconProfile />} title="Nobody is looking right now" />
                 </ListEmpty>
               }
               renderItem={({ item }) => <SeekerCard slug={slug} seeker={item} />}
