@@ -4,14 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Sheet } from "@/components/chat/ChatFrame";
-import { Avatar, Button, ErrorText, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, ChoiceMark, ErrorText, Input, Spinner } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
 import { refreshGroup } from "@/lib/groups";
-import { colors, radius, spacing, useTheme } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 
 function Candidate({ member, on, disabled, onPress }: { member: ChatMemberDto; on: boolean; disabled: boolean; onPress: () => void }) {
-  const theme = useTheme();
   const years = memberYearsLabel(member);
   return (
     <Pressable
@@ -24,9 +23,7 @@ function Candidate({ member, on, disabled, onPress }: { member: ChatMemberDto; o
       aria-disabled={disabled}
       style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, opacity: disabled ? 0.5 : 1, backgroundColor: pressed ? colors.bg : colors.card })}
     >
-      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? theme.primary : colors.faint, backgroundColor: on ? theme.primary : "transparent", alignItems: "center", justifyContent: "center" }}>
-        {on && <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>✓</Text>}
-      </View>
+      <ChoiceMark kind="checkbox" checked={on} size={22} />
       <Avatar name={member.fullName} src={member.avatarUrl} size={32} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: 15, color: colors.text }}>

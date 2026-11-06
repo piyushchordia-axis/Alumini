@@ -202,7 +202,6 @@ function FieldModal({ field, onClose }: { field: ProfileFieldDto | null; onClose
               checked={canFilter && v.filterable}
               disabled={!canFilter}
               aria-describedby={canFilter ? undefined : filterHintId}
-              className={canFilter ? undefined : "opacity-60"}
               onChange={(e) => set("filterable", e.target.checked)}
             />
             {!canFilter && (

@@ -559,7 +559,7 @@ export function JobForm({
 
       {offerReferrals && (
         <div className="rounded-lg border border-slate-200 px-3 py-1">
-          <Checkbox {...register("canRefer")} label={CAN_REFER_LABEL} aria-describedby={`${referId}-help${closesWaiting ? ` ${referId}-closes` : ""}`} className="min-h-11 font-medium" />
+          <Checkbox {...register("canRefer")} label={CAN_REFER_LABEL} aria-describedby={`${referId}-help${closesWaiting ? ` ${referId}-closes` : ""}`} className="min-h-11 py-3 font-medium" />
           <p id={`${referId}-help`} className="pb-2 text-xs text-slate-500">
             {CAN_REFER_HELP}
           </p>

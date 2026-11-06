@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useFormErrors } from "@/components/forms/useFormErrors";
-import { Button, ErrorText, Input } from "@/components/ui";
+import { Button, ChoiceMark, ErrorText, Input } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
 type Output = z.output<typeof chatGroupCreateSchema>;
@@ -30,16 +30,15 @@ function VisibilityChoice({ value, checked, disabled, note, onPress }: { value: 
         borderWidth: 1,
         borderRadius: radius.md,
         padding: spacing.md,
-        borderColor: checked ? theme.primary : colors.border,
-        backgroundColor: disabled ? colors.bg : checked ? theme.primarySoft : colors.card,
+        borderColor: checked ? theme.primaryRing : colors.border,
+        backgroundColor: disabled ? colors.bg : checked ? theme.primaryWash : colors.card,
       }}
     >
-      <View style={{ width: 20, height: 20, marginTop: 1, borderRadius: 10, borderWidth: 2, borderColor: checked ? theme.primary : disabled ? colors.border : colors.faint, alignItems: "center", justifyContent: "center" }}>
-        {checked && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />}
-      </View>
+      <ChoiceMark kind="radio" checked={checked} disabled={disabled} style={{ marginTop: 1 }} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ fontSize: 15, fontWeight: "600", color: disabled ? colors.muted : colors.text }}>{info.label}</Text>
-        <Text style={{ fontSize: 13, color: colors.muted }}>{about}</Text>
+        {/* The secondary grey, as on the web: the meta grey reads under 4.5:1 on the wash a chosen card takes. */}
+        <Text style={{ fontSize: 13, color: colors.secondary }}>{about}</Text>
       </View>
     </Pressable>
   );

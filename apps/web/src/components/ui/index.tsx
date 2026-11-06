@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
-import { IconChevronRight, IconProfile } from "@/components/icons";
+import { IconCheck, IconChevronRight, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 
 /* ---------- Button ---------- */
@@ -75,11 +75,69 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
   );
 });
 
+type ChoiceInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { type: "checkbox" | "radio" };
+
+/**
+ * A checkbox's box or a radio's ring, drawn alike in any institution colour: a meta-grey edge (3:1) when clear; chosen,
+ * the box filled with the brand's ink holding a white tick, or an ink ring and dot. It stays a real input, so labels,
+ * forms and Playwright's check() work as ever, and forced colours (Windows High Contrast) get the native control back.
+ * `className` goes on the 16px wrapper (a margin, a stacking order); everything else on the input.
+ */
+export const ChoiceInput = forwardRef<HTMLInputElement, ChoiceInputProps>(function ChoiceInput({ type, className, ...rest }, ref) {
+  const radio = type === "radio";
+  const overlay = "pointer-events-none col-start-1 row-start-1 hidden peer-checked:block peer-disabled:opacity-50 forced-colors:hidden!";
+  return (
+    <span className={clsx("relative inline-grid size-4 shrink-0 place-items-center", className)}>
+      <input
+        ref={ref}
+        type={type}
+        className={clsx(
+          "peer col-start-1 row-start-1 size-4 appearance-none border-2 border-slate-500 bg-white transition-colors checked:border-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink disabled:opacity-50 motion-reduce:transition-none forced-colors:appearance-auto",
+          radio ? "rounded-full" : "rounded checked:bg-primary-ink",
+        )}
+        {...rest}
+      />
+      {radio ? <span aria-hidden className={clsx(overlay, "size-2 rounded-full bg-primary-ink")} /> : <IconCheck size={12} strokeWidth={3} className={clsx(overlay, "text-white")} />}
+    </span>
+  );
+});
+
+/**
+ * A checkbox with its label beside it, the box at the label's first line: a bare row, with no wash or ring when ticked.
+ * A disabled one fades its box and draws its label in the meta grey, from the input itself (so register() works too):
+ * callers don't fade the row. A row that has to be a 44px target passes `min-h-11 py-3`, which keeps a one-line label
+ * centred.
+ */
 export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }>(function Checkbox({ label, className, ...rest }, ref) {
   return (
-    <label className={clsx("flex cursor-pointer items-center gap-2 text-sm text-slate-700", className)}>
-      <input ref={ref} type="checkbox" className="h-4 w-4 rounded border-slate-300 accent-primary" {...rest} />
-      {label}
+    <label className={clsx("flex cursor-pointer items-start gap-2 text-sm text-slate-700 has-disabled:cursor-not-allowed has-disabled:text-slate-500", className)}>
+      <ChoiceInput ref={ref} {...rest} type="checkbox" className="mt-0.5" />
+      <span className="min-w-0 break-words">{label}</span>
+    </label>
+  );
+});
+
+/**
+ * One choice as a 44px tile: a checkbox or radio and its label. Chosen, it takes the wash, a thin ring and the ink box;
+ * the label stays slate-900, since the brand's ink may read only 3:1 on its own wash. Disabled, ticked or not, it is the
+ * plain grey tile with a faded box and a meta-grey label, as the phone's is. It draws its state from `checked` and
+ * `disabled`, so it is for controlled inputs.
+ */
+export const Choice = forwardRef<HTMLInputElement, ChoiceInputProps & { label: ReactNode }>(function Choice({ type, label, className, ...rest }, ref) {
+  return (
+    <label
+      className={clsx(
+        "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors motion-reduce:transition-none",
+        rest.disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500"
+          : rest.checked
+            ? "cursor-pointer border-primary-ring bg-primary-wash text-slate-900"
+            : "cursor-pointer border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50",
+        className,
+      )}
+    >
+      <ChoiceInput ref={ref} type={type} {...rest} />
+      <span className="min-w-0 break-words">{label}</span>
     </label>
   );
 });

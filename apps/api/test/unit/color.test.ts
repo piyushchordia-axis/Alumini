@@ -198,6 +198,24 @@ describe("brandTones", () => {
   it("falls back to the default institution colour for one it can't read", () => {
     expect(brandTones("navy")).toEqual(brandTones("#1d4ed8"));
   });
+
+  // Both apps' checkboxes and radios (web ChoiceInput, mobile ChoiceMark): a chosen one is the ink box (or ring) on the
+  // wash, holding a white tick, beside a label in the text grey and any line under it (the group visibility cards') in
+  // the secondary grey; a clear one has a meta-grey edge on white or the page.
+  it("draws a chosen choice that reads in any colour: the ink box on its wash, a white tick on it and its text on the wash", () => {
+    for (const c of [...ALL, ...sampledColours()]) {
+      const { ink, wash } = brandTones(c);
+      expect(contrastRatio(ink, wash), `${c}'s box on its wash`).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(WHITE, ink), `the tick on ${c}'s box`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(GREYS.text, wash), `a label on ${c}'s wash`).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(GREYS.secondary, wash), `a grey line on ${c}'s wash`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("draws a clear box's edge in the meta grey, which shows (3:1) on white and on the page", () => {
+    expect(contrastRatio(GREYS.meta, WHITE)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(GREYS.meta, PAGE)).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe("pageTint", () => {

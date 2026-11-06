@@ -4,7 +4,7 @@ import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Plat
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
 import { StackHeader } from "@/components/StackHeader";
-import { IconAlert, IconProfile, type IconProps } from "@/components/icons";
+import { IconAlert, IconCheck, IconProfile, type IconProps } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -267,8 +267,42 @@ export function Chip({ label, active, onPress, color, tall = false, onLayout }: 
 }
 
 /**
+ * A checkbox's box or a radio's ring, drawn alike in any institution colour: a meta-grey edge (3:1 on white and the page)
+ * when clear; chosen, the box filled with the brand's ink holding a white tick, or an ink ring and dot. Disabled, the same
+ * at half opacity, as the web's ChoiceInput. Hidden from screen readers: the choice around it says its state.
+ */
+export function ChoiceMark({ kind, checked, disabled = false, size = 20, style }: { kind: "checkbox" | "radio"; checked: boolean; disabled?: boolean; size?: number; style?: ViewStyle }) {
+  const theme = useTheme();
+  const mark = theme.primaryInk;
+  return (
+    <View
+      aria-hidden
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius: kind === "checkbox" ? Math.round(size / 4) : size / 2,
+          borderWidth: 2,
+          borderColor: checked ? mark : colors.muted,
+          backgroundColor: kind === "checkbox" && checked ? mark : "transparent",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.5 : 1,
+        },
+        style,
+      ]}
+    >
+      {checked && (kind === "checkbox" ? <IconCheck size={size - 6} color="#fff" strokeWidth={3} /> : <View style={{ width: size / 2, height: size / 2, borderRadius: size / 4, backgroundColor: mark }} />)}
+    </View>
+  );
+}
+
+/**
  * One choice, as a checkbox or a radio: 44 points tall, its state in aria-checked, which React Native maps on devices and
  * react-native-web emits. `hint` says what choosing it does, for a screen reader, when that's written beside it too.
+ * Chosen, it takes the wash, a thin ring and the ink box; the label stays `colors.text`, since the brand's ink may read
+ * only 3:1 on its own wash. Disabled, ticked or not, it is the plain grey tile with a faded box and a meta-grey label, as
+ * the web's Choice and Checkbox are.
  */
 export function Choice({
   kind,
@@ -307,28 +341,15 @@ export function Choice({
           borderRadius: radius.md,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
-          borderColor: checked ? theme.primary : colors.border,
-          backgroundColor: disabled ? colors.bg : checked ? theme.primarySoft : pressed ? colors.bg : colors.card,
+          borderColor: checked && !disabled ? theme.primaryRing : colors.border,
+          backgroundColor: disabled ? colors.bg : checked ? theme.primaryWash : pressed ? colors.bg : colors.card,
         },
         style,
       ]}
     >
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: kind === "checkbox" ? 5 : 10,
-          borderWidth: 2,
-          borderColor: checked ? theme.primary : disabled ? colors.border : colors.faint,
-          backgroundColor: kind === "checkbox" && checked ? theme.primary : "transparent",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {checked && (kind === "checkbox" ? <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text> : <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />)}
-      </View>
+      <ChoiceMark kind={kind} checked={checked} disabled={disabled} />
       {/* Long labels wrap inside their box rather than widening it. */}
-      <Text style={{ flex: 1, fontSize: 14, color: disabled ? colors.faint : colors.text }}>{label}</Text>
+      <Text style={{ flex: 1, fontSize: 14, color: disabled ? colors.muted : colors.text }}>{label}</Text>
     </Pressable>
   );
 }

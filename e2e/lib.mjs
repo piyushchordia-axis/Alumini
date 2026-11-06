@@ -227,6 +227,28 @@ export async function expectSvgNoEmoji(locator, where) {
 }
 
 /**
+ * Fails unless a screen of the phone app's web build fits the phone: the page, and each scrolling area around `content`
+ * (something in the screen's body). react-native-web clips a vertical ScrollView's sideways overflow (overflow-x:
+ * hidden), so a body too wide for the phone is cut off without ever widening the page: the ScrollView's own width is
+ * what shows it.
+ */
+export async function fitsPhone(where, content) {
+  const { overflow, scrollers } = await content.evaluate((el) => {
+    const widths = [document.documentElement.scrollWidth - document.documentElement.clientWidth];
+    let scrollers = 0;
+    for (let box = el.parentElement; box; box = box.parentElement) {
+      const { overflowX, overflowY } = getComputedStyle(box);
+      if (overflowX !== "hidden" || (overflowY !== "auto" && overflowY !== "scroll")) continue;
+      scrollers += 1;
+      widths.push(box.scrollWidth - box.clientWidth);
+    }
+    return { overflow: Math.max(...widths), scrollers };
+  });
+  if (!scrollers) throw new Error(`found no scrolling area around ${where}'s body to measure`);
+  if (overflow > 0) throw new Error(`${where} is wider than the phone by ${overflow}px`);
+}
+
+/**
  * Fails unless `chip`, a chosen toggle in a tray (a reaction), looks chosen once any transition ends: laid over its tray
  * on the white card, it visibly differs from the tray alone and from the white card, and its icon is filled, in a
  * colour that isn't near-black (no seeded institution's colour is) and reads on the chip (3:1, WCAG 1.4.11). A chosen
@@ -397,6 +419,61 @@ export async function expectEmptyState(box, where, { actions = [], absent = [], 
   for (const name of actions) if (!(await control(name).count())) throw new Error(`${where} doesn't offer "${name}"`);
   for (const name of absent) if (await control(name).count()) throw new Error(`${where} offers "${name}", which it shouldn't`);
   return { icon: look.colour, badge: look.behind, contrast };
+}
+
+/**
+ * Fails unless `choice` (one checkbox or radio with its label: on the web the <label>, on the phone the element with the
+ * role) draws its box as both apps' choices do, in any institution colour, as paintedColour sees it. `boxSelector` finds
+ * the box in it (web "input", phone ":scope > div"), and `label` its label's text (by default its last child).
+ * - Clear: the box's edge is the meta grey (GREY_TEXT; the secondary one on a web tint, which redraws slate-500) and
+ *   shows at 3:1 on the choice (WCAG 1.4.11).
+ * - Chosen: the box (a radio's ring) is in a colour that shows at 3:1 on the choice; a checkbox's holds a drawn tick
+ *   that reads at 4.5:1 on it, with no "✓" glyph, and a radio's ring a dot in the same colour. A tile (`tile`; the
+ *   web's Checkbox is a bare row) is a wash, not white. `tones` ({ ink, wash }, one of BRAND_TONES) pins the box and a
+ *   radio's dot to the institution's ink and the tile to its wash.
+ * - Either way the label reads at 4.5:1, which is why it stays the text grey: the ink may read only 3:1 on its wash.
+ * Not for a disabled choice, whose faded box paintedColour refuses. Gives { box, tile, label }: the box's colour (a
+ * clear one's edge), what it sits on, and the label's colour.
+ */
+export async function expectChoiceLook(choice, boxSelector, where, { checked, tile = true, tones, label = ":scope > :last-child" }) {
+  const glyph = (await choice.innerText()).match(/[✓✔]/);
+  if (glyph) throw new Error(`${where} draws its tick as the glyph ${glyph[0]}`);
+  const text = await expectReadable(choice.locator(label).first(), `${where}'s label`);
+  const box = choice.locator(boxSelector).first();
+  const look = async (locator, property, part) => {
+    try {
+      return await paintedColour(locator, property);
+    } catch (error) {
+      throw new Error(`${where}'s ${part}: ${error.message}`);
+    }
+  };
+  const radio = (await choice.getAttribute("role")) === "radio" || (await box.getAttribute("type")) === "radio";
+  const drawn = await look(box, checked && !radio ? "backgroundColor" : "borderTopColor", "box");
+  const contrast = contrastOf(drawn.colour, drawn.behind);
+  if (contrast < 3) throw new Error(`${where}'s box (rgb ${drawn.colour}) is ${contrast.toFixed(2)}:1 on the choice (rgb ${drawn.behind}), under 3:1`);
+  const result = { box: drawn.colour, tile: drawn.behind, label: text.colour };
+  if (!checked) {
+    // The faint grey, which the clear box used to have, also passes 3:1 on white: only the colour itself tells them apart.
+    if (drawn.colour !== GREY_TEXT.plain && drawn.colour !== GREY_TEXT.dim) throw new Error(`${where}'s clear box has an edge of rgb ${drawn.colour}, not the meta grey (rgb ${GREY_TEXT.plain}, or rgb ${GREY_TEXT.dim} on a tint)`);
+    return result;
+  }
+  if (tones && drawn.colour !== tones.ink) throw new Error(`${where}'s box is rgb ${drawn.colour}, not the institution's ink (rgb ${tones.ink})`);
+  if (tile && Math.max(...drawn.behind.split(" ").map((c) => 255 - Number(c))) < 20) throw new Error(`${where} is all but white (rgb ${drawn.behind}) once chosen, not a wash`);
+  if (tile && tones && drawn.behind !== tones.wash) throw new Error(`${where} is rgb ${drawn.behind} once chosen, not the institution's wash (rgb ${tones.wash})`);
+  if (radio) {
+    // The dot: on the web the overlay beside the input, on the phone the ring's own child.
+    const dot = (await box.evaluate((el) => el.tagName)) === "INPUT" ? box.locator("xpath=following-sibling::*[1]") : box.locator(":scope > *").first();
+    if (!(await dot.isVisible())) throw new Error(`${where} draws no dot in its ring`);
+    const fill = await look(dot, "backgroundColor", "dot");
+    if (fill.colour !== drawn.colour) throw new Error(`${where}'s dot is rgb ${fill.colour}, not its ring's colour (rgb ${drawn.colour})`);
+    return result;
+  }
+  const tick = choice.locator("svg").first();
+  if (!(await tick.isVisible())) throw new Error(`${where} draws no tick`);
+  const stroke = await look(tick.locator("path").first(), "stroke", "tick");
+  const tickContrast = contrastOf(stroke.colour, drawn.colour);
+  if (tickContrast < 4.5) throw new Error(`${where}'s tick (rgb ${stroke.colour}) is ${tickContrast.toFixed(2)}:1 on its box (rgb ${drawn.colour}), under 4.5:1`);
+  return result;
 }
 
 async function expectContrast(locator, property, where, min, says) {

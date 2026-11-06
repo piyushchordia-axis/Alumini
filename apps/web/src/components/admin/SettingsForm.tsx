@@ -21,6 +21,9 @@ import { useId, useState } from "react";
 import { Button, Checkbox, FormField, Input, Select } from "@/components/ui";
 import { toast } from "@/stores/uiStore";
 
+/** A checkbox row 44px tall, as the phone's console draws each switch. */
+const ROW = "min-h-11 py-3";
+
 /** One switch. A key whose prerequisite is off can't be turned on, and says what it needs outside its label, so the label stays its name alone. */
 function FeatureCheckbox({ feature, features, error, onChange }: { feature: TenantFeature; features: TenantFeatures; error?: string; onChange: (next: TenantFeatures) => void }) {
   const hintId = useId();
@@ -34,7 +37,7 @@ function FeatureCheckbox({ feature, features, error, onChange }: { feature: Tena
         aria-invalid={error ? true : undefined}
         onChange={(e) => onChange(toggleFeature(features, feature, e.target.checked))}
         label={FEATURE_LABELS[feature]}
-        className={blocked ? "opacity-60" : undefined}
+        className={ROW}
       />
       {(blocked || error) && (
         <p id={hintId} className={error ? "ml-6 text-xs text-red-600" : "ml-6 text-xs text-slate-500"} role={error ? "alert" : undefined}>
@@ -101,8 +104,9 @@ export function SettingsForm({ initial, tenantType, onSubmit }: { initial: Tenan
           <Input type="number" inputMode="numeric" value={draft.maxBatchYear} invalid={!!errors.maxBatchYear} onChange={(e) => set("maxBatchYear", e.target.value)} />
         </FormField>
       </div>
-      <Checkbox checked={draft.allowSelfRegistration} onChange={(e) => set("allowSelfRegistration", e.target.checked)} label="Allow alumni to register themselves (turn off to onboard members manually only)" />
+      <Checkbox checked={draft.allowSelfRegistration} onChange={(e) => set("allowSelfRegistration", e.target.checked)} label="Allow alumni to register themselves (turn off to onboard members manually only)" className={ROW} />
       <Checkbox
+        className={ROW}
         checked={draft.inviteAutoApprove}
         onChange={(e) => set("inviteAutoApprove", e.target.checked)}
         label="Approve invited alumni straight away (they sign in with the phone number you invited, even when self-registration is off)"

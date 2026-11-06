@@ -3,7 +3,7 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
-import { Card, ErrorBox, Loading, PageHeader } from "@/components/ui";
+import { Card, ChoiceInput, ErrorBox, Loading, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -39,7 +39,7 @@ function Toggle({ label, description, checked, disabled, onChange }: { label: st
         <span className="block text-sm font-medium text-slate-900">{label}</span>
         <span className="block text-sm text-slate-500">{description}</span>
       </span>
-      <input type="checkbox" className="mt-1 h-4 w-4 accent-[var(--color-primary)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <ChoiceInput type="checkbox" className="mt-0.5" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
 }

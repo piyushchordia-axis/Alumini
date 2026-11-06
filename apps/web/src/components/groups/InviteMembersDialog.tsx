@@ -3,7 +3,7 @@ import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Avatar, Button, ErrorBox, Input, Loading, Modal } from "@/components/ui";
+import { Avatar, Button, ChoiceInput, ErrorBox, Input, Loading, Modal } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
 import { refreshGroup } from "@/lib/groups";
@@ -111,7 +111,7 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
               return (
                 <li key={m.id}>
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-                    <input type="checkbox" checked={on} disabled={!on && full} onChange={() => toggle(m)} className="h-4 w-4 shrink-0 accent-primary" />
+                    <ChoiceInput type="checkbox" checked={on} disabled={!on && full} onChange={() => toggle(m)} />
                     {/* The name says who it is: initials or a photo's alt text would only repeat it in the checkbox's name. */}
                     <span aria-hidden>
                       <Avatar name={m.fullName} src={m.avatarUrl} size="sm" />

@@ -164,12 +164,23 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     checks the badge (pinned to the institution's `BRAND_TONES`) and the actions with `expectEmptyState`.
   - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black. Brand-coloured
     text and icons use the ink (web `text-primary-ink`, mobile `theme.primaryInk`) and text on the brand colour uses
-    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the Open to and multiple-choice
-    chips and the reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move over when
-    touched). A chosen state is a wash, a thin ring and the ink, as the reaction chips are (web `bg-primary-wash` and
-    `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which a pale brand loses
-    in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where they can't outrank
-    it.
+    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the choices, the Open to and
+    multiple-choice chips and the reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move
+    over when touched). A chosen state is a wash, a thin ring and the ink, as the reaction chips are (web
+    `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
+    a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
+    they can't outrank it.
+  - **Choices.** Checkboxes and radios are `Choice` / `ChoiceMark` on the phone and `Choice` (a 44px tile) /
+    `ChoiceInput` / `Checkbox` on the web, never a bare input, `accent-*` or a "✓" glyph. A clear box has a meta-grey
+    edge (3:1 on white and the page); a chosen one is an ink box holding a white `IconCheck` (a radio: an ink ring and
+    dot). A chosen tile (`Choice`, the group visibility cards) also takes the wash and the ring, and its text stays
+    dark, the label `slate-900` / `colors.text` and any grey on it the secondary one: the ink is only sure of 3:1 on its
+    own wash, which text needs 4.5:1 on (the one place the ink isn't on the chosen thing's text). A bare row
+    (`Checkbox`, the invite lists) has the box alone. Disabled, ticked or not, the box fades to half, the label is the
+    meta grey and a tile goes plain (no wash or ring), all drawn by the component, so callers don't fade the row.
+    `ChoiceInput` stays a real input (forced colours get the native control back); a `Checkbox` row that must be a 44px
+    target passes `min-h-11 py-3`, which keeps a one-line label centred. `color.test.ts` pins the pairs across the
+    colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`).
   - **Greys and tones.** Greys and status colours come from shared `lib/tones.ts`, and `tones.test.ts` pins their
     contrast. `GREYS`, darkest first: text, body (labels), secondary `#475569` (excerpts, and every grey on a tinted
     surface), meta `#5b6b80` (times, places, counts, bylines, hints, placeholders: the lightest grey text, 4.97:1 on

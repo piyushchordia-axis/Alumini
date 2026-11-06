@@ -12,7 +12,7 @@ import clsx from "clsx";
 import { useId, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import type { z } from "zod";
-import { Button, ErrorBox, FormField, Input, Textarea } from "@/components/ui";
+import { Button, ChoiceInput, ErrorBox, FormField, Input, Textarea } from "@/components/ui";
 
 type Values = z.input<typeof chatGroupCreateSchema>;
 type Output = z.output<typeof chatGroupCreateSchema>;
@@ -107,11 +107,11 @@ export function GroupForm({
               <div
                 key={v}
                 className={clsx(
-                  "relative flex min-h-11 gap-3 rounded-lg border p-3 focus-within:ring-2 focus-within:ring-primary/30",
-                  off ? "border-slate-200 bg-slate-50" : "cursor-pointer border-slate-300 hover:border-slate-400 has-[:checked]:border-primary has-[:checked]:bg-primary/5",
+                  "relative flex min-h-11 gap-3 rounded-lg border p-3 transition-colors motion-reduce:transition-none",
+                  off ? "border-slate-200 bg-slate-50" : "cursor-pointer border-slate-300 not-has-checked:hover:border-slate-400 has-checked:border-primary-ring has-checked:bg-primary-wash",
                 )}
               >
-                <input id={id} type="radio" value={v} disabled={off} aria-describedby={`${id}-about`} className="relative z-10 mt-1 h-4 w-4 shrink-0 accent-primary" {...register("visibility")} />
+                <ChoiceInput id={id} type="radio" value={v} disabled={off} aria-describedby={`${id}-about`} className="z-10 mt-0.5" {...register("visibility")} />
                 <div className="min-w-0">
                   <label htmlFor={id} className={clsx("text-sm font-medium after:absolute after:inset-0 after:rounded-lg", off ? "text-slate-500" : "cursor-pointer text-slate-900")}>
                     {info.label}

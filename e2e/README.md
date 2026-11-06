@@ -53,6 +53,15 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   that isn't white, at 3:1 on it, and the links or buttons it should and shouldn't offer. `tones` pins the badge and the
   icon to the institution's own wash and ink (`BRAND_TONES`, the seeded institutions' as `brandTones` gives them), which
   a grey badge would otherwise pass for; every check in the scripts gives them.
+- `expectChoiceLook(choice, boxSelector, where, { checked, tile, tones, label })` checks a checkbox or radio as both
+  apps draw them (`choice` the web's `<label>` or the phone's element with the role; the box the web's `input`, the
+  phone's `:scope > div`): a clear box's edge the meta grey (`GREY_TEXT`) at 3:1; a chosen one in the ink at 3:1 on
+  the choice, a checkbox's holding a drawn tick at 4.5:1 and no "✓" and a radio's ring a dot of its colour, on a wash
+  that isn't white unless it's a bare row (`tile: false`, as the web's `Checkbox` is); and its label readable at 4.5:1
+  either way. `tones` pins the box and the wash to `BRAND_TONES`. A disabled choice's faded box can't be read: check
+  its label instead.
+- `fitsPhone(where, content)` fails when a screen of the phone app's web build is wider than the phone: the page, or
+  any scrolling area around `content`, which react-native-web clips rather than widening the page.
 - `GREY_TEXT` is both apps' grey text as `textColour` reads it: the meta grey (`91 107 128`) on the plain page and the
   secondary grey (`71 85 105`) on a tint or a photo.
 
@@ -131,7 +140,9 @@ Covers:
   member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap fill, and the
   thread on a phone;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on;
-- groups: an open group found in Discover and joined, live messages both ways, an invite-only group's invitation
+- groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
+  description readable on the wash; an open group found in Discover and joined, live messages both ways, an
+  invite-only group's invitation (the invitee's box in Demo University's ink with a drawn tick, `expectChoiceLook`)
   accepted from Invitations (with the history before it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
@@ -172,7 +183,9 @@ Covers:
   second sending what was shown, refused as changed meanwhile and fetched again, then, with the preview showing the
   owner's new name, a press sending nothing and asking to check it again, and the next sending the new name; resolving
   the spam report by removing content;
-- settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
+- settings, saving only the switches that changed: every checkbox row 44px tall, a ticked switch's box in Demo
+  College's ink with a drawn tick and a cleared one's grey edge at 3:1 (`expectChoiceLook`), and unchecking Messaging
+  unchecking Mentorship and holding it (its label in the meta grey, unfaded), both coming back on;
   Branding with Demo College's green chosen among the suggested colours (a drawn tick), a near-white colour typed
   showing the contrast warning with Save branding still enabled, and Save held, saying why, while the script holds a
   large logo's preparation, then free once the logo is in, with nothing saved;
@@ -312,11 +325,13 @@ Covers:
   than in a card, readable on the plain page and on the tint), and the feed after a reload with its post cards painting
   their own white, the console's home staying on the plain page, and Plain putting the page and its grey text back; the
   console's Settings, reached from the approval
-  sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, a blank batch year
+  sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, the Funding
+  switch and the chosen approval mode drawn in the Samaj's ink on its wash (a drawn tick, a ring), and an approval mode
+  not chosen with a grey edge at 3:1 (`expectChoiceLook`), a blank batch year
   refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
-  Mentorship and holding it with "Needs Messaging", and Funding saved off (sending only that switch) with More dropping
-  it at once, then back on;
+  Mentorship and holding it with "Needs Messaging" (its label in the meta grey), and Funding saved off (sending only
+  that switch) with More dropping it at once, then back on;
   Branding, from Settings' 44px row: the Samaj's orange chosen among the suggested colours, the tagline saved with the
   preview following it, Save held (saying why) while the script holds a large logo's preparation and free again once
   it's cancelled, with nothing uploaded, a near-white colour showing the contrast warning without holding Save, "#12"

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1325,6 +1325,9 @@ try {
       const radio = shown(owner.getByRole("radio", { name: choice, exact: true }));
       await radio.click();
       if ((await radio.getAttribute("aria-checked")) !== "true") throw new Error(`"${choice}" doesn't show as chosen`);
+      // The chosen card takes Demo University's wash and ring around an ink ring and dot, and both its lines read on it.
+      await expectChoiceLook(radio, ":scope > div", `the chosen "${choice}" card`, { checked: true, tones: BRAND_TONES.demoUniversity, label: ":scope > :last-child > :first-child" });
+      await expectReadable(radio.locator(":scope > :last-child > :last-child"), `the chosen "${choice}" card's description`);
       await shown(owner.getByRole("button", { name: "Create group" })).click();
       await owner.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
       await shown(owner.getByLabel("Write a message")).waitFor();
@@ -1388,6 +1391,7 @@ try {
     const candidate = inviting.getByRole("checkbox", { name: new RegExp(`^${joinerName}, ${joinerYears}$`) });
     await candidate.click();
     if ((await candidate.getAttribute("aria-checked")) !== "true") throw new Error("the chosen member doesn't show as chosen");
+    await expectChoiceLook(candidate, ":scope > div", "a chosen invitee", { checked: true, tile: false, label: ":scope > :last-child > :first-child", tones: BRAND_TONES.demoUniversity });
     await owner.screenshot({ path: `${SHOTS}/m11d-group-invite.png` });
     await inviting.getByRole("button", { name: "Send invitation" }).click();
     await inviting.waitFor({ state: "detached" });
@@ -2464,24 +2468,6 @@ try {
   // The row's name carries the count of work waiting, once the counts have loaded.
   const consoleRow = () => page.getByRole("link", { name: /^Admin console(, \d+ waiting)?$/ }).locator("visible=true").first();
   const backButton = () => page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
-  // The page, and each scrolling area around `content` (something in the screen's body). react-native-web clips a
-  // vertical ScrollView's sideways overflow (overflow-x: hidden), so a body too wide for the phone is cut off without
-  // ever widening the page: the ScrollView's own width is what shows it.
-  const fitsPhone = async (where, content) => {
-    const { overflow, scrollers } = await content.evaluate((el) => {
-      const widths = [document.documentElement.scrollWidth - document.documentElement.clientWidth];
-      let scrollers = 0;
-      for (let box = el.parentElement; box; box = box.parentElement) {
-        const { overflowX, overflowY } = getComputedStyle(box);
-        if (overflowX !== "hidden" || (overflowY !== "auto" && overflowY !== "scroll")) continue;
-        scrollers += 1;
-        widths.push(box.scrollWidth - box.clientWidth);
-      }
-      return { overflow: Math.max(...widths), scrollers };
-    });
-    if (!scrollers) throw new Error(`found no scrolling area around ${where}'s body to measure`);
-    if (overflow > 0) throw new Error(`${where} is wider than the phone by ${overflow}px`);
-  };
 
   await step("an admin opens the console from More and from My profile, and its home shows what's waiting", async () => {
     await page.goto(SAMAJ);
@@ -2662,6 +2648,11 @@ try {
     const funding = choice("checkbox", "Funding");
     await expectChoice(funding, "the Funding switch", { checked: true });
     await fitsPhone("the console's settings", funding);
+    // Drawn as on the web, in the Samaj's colour: chosen, the ink box (a radio's ring) on the wash with a drawn tick; the
+    // labels stay dark enough to read on it, and a clear box keeps a grey edge.
+    await expectChoiceLook(funding, ":scope > div", "the Funding switch", { checked: true, tones: BRAND_TONES.samaj });
+    await expectChoiceLook(choice("radio", "Admin must approve members"), ":scope > div", "the chosen approval mode", { checked: true, tones: BRAND_TONES.samaj });
+    await expectChoiceLook(choice("radio", "Auto-approve members"), ":scope > div", "an approval mode not chosen", { checked: false });
 
     // A blank year is refused in words under its box, and nothing is sent.
     const saves = [];
@@ -2714,6 +2705,9 @@ try {
     await choice("checkbox", "Messaging").click();
     await expectChoice(mentorship, "Mentorship with Messaging off", { checked: false, disabled: true });
     await page.getByText("Needs Messaging", { exact: true }).locator("visible=true").first().waitFor();
+    // Held, its box fades and its label turns the meta grey, as the web's does, without the tile fading it further.
+    const held = await expectReadable(mentorship.locator(":scope > :last-child"), "the held Mentorship switch's label");
+    if (held.colour !== GREY_TEXT.plain) throw new Error(`the held Mentorship switch's label is rgb ${held.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
     await choice("checkbox", "Messaging").click();
     await expectChoice(mentorship, "Mentorship with Messaging back on", { checked: false, disabled: false });
     await mentorship.click();

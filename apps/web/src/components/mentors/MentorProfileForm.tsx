@@ -13,9 +13,8 @@ import {
   type MentorProfileUpsert,
 } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
-import clsx from "clsx";
 import { useId, useState, type FormEvent } from "react";
-import { Button, ErrorBox, FormField, Input, Textarea } from "@/components/ui";
+import { Button, Choice, ErrorBox, FormField, Input, Textarea } from "@/components/ui";
 
 type Field = "areas" | "availability" | "availabilityNote" | "note";
 
@@ -73,7 +72,6 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
     }
   };
 
-  const choice = "relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/30";
   return (
     <form className="space-y-5" noValidate onSubmit={(e) => void submit(e)}>
       <fieldset aria-describedby={`${id}-areas-hint${errors.areas ? ` ${id}-areas-error` : ""}`}>
@@ -87,13 +85,7 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
         <div className="grid grid-cols-2 gap-2">
           {MENTOR_AREAS.map((a) => {
             const checked = areas.includes(a);
-            const off = full && !checked;
-            return (
-              <label key={a} className={clsx(choice, checked ? "border-primary bg-primary/5 text-slate-900" : off ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : "border-slate-300 text-slate-800 hover:border-slate-400")}>
-                <input type="checkbox" className="h-4 w-4 shrink-0 accent-primary" checked={checked} disabled={off} onChange={(e) => toggleArea(a, e.target.checked)} />
-                {MENTOR_AREA_LABELS[a]}
-              </label>
-            );
+            return <Choice key={a} type="checkbox" label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={full && !checked} onChange={(e) => toggleArea(a, e.target.checked)} />;
           })}
         </div>
         <FieldError id={`${id}-areas-error`} message={errors.areas} />
@@ -105,10 +97,7 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {MENTOR_AVAILABILITIES.map((v) => (
-            <label key={v} className={clsx(choice, availability === v ? "border-primary bg-primary/5 text-slate-900" : "border-slate-300 text-slate-800 hover:border-slate-400")}>
-              <input type="radio" name={`${id}-availability`} value={v} className="h-4 w-4 shrink-0 accent-primary" checked={availability === v} onChange={() => setAvailability(v)} />
-              {MENTOR_AVAILABILITY_LABELS[v]}
-            </label>
+            <Choice key={v} type="radio" name={`${id}-availability`} value={v} label={MENTOR_AVAILABILITY_LABELS[v]} checked={availability === v} onChange={() => setAvailability(v)} />
           ))}
         </div>
         <FieldError id={`${id}-availability-error`} message={errors.availability} />

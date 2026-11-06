@@ -103,7 +103,7 @@ export function JobsPage() {
                   ))}
                 </Select>
                 <div className="flex flex-wrap items-center gap-x-3">
-                  {available && <Checkbox checked={canRefer} onChange={(e) => setCanRefer(e.target.checked)} label={CAN_REFER_BADGE} className="min-h-11" />}
+                  {available && <Checkbox checked={canRefer} onChange={(e) => setCanRefer(e.target.checked)} label={CAN_REFER_BADGE} className="min-h-11 py-3" />}
                   <Button ref={moreToggle} type="button" variant="ghost" size="sm" className="min-h-11" aria-expanded={moreFilters} onClick={() => setMoreFilters((v) => !v)}>
                     {moreFilters ? "Hide filters" : moreActive ? "More filters · on" : "More filters"}
                   </Button>

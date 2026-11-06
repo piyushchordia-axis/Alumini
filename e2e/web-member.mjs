@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, bigPhoto, dropFrames, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1669,7 +1669,12 @@ try {
       await owner.getByText("Only people you invite can see this group. New members see messages from when they join.").waitFor();
       await owner.getByLabel("Group name").fill(name);
       await owner.getByLabel("Description").fill(`Made by the smoke run ${unique}.`);
-      await owner.getByLabel(choice, { exact: true }).check();
+      const radio = owner.getByLabel(choice, { exact: true });
+      await radio.check();
+      // The chosen card takes Demo University's wash and ring around an ink ring and dot, and both its lines read on it.
+      const card = radio.locator("xpath=ancestor::div[1]");
+      await expectChoiceLook(card, "input", `the chosen "${choice}" card`, { checked: true, tones: BRAND_TONES.demoUniversity, label: ":scope > :last-child > label" });
+      await expectReadable(card.locator(":scope > :last-child > p"), `the chosen "${choice}" card's description`);
       await owner.getByRole("button", { name: "Create group" }).click();
       await owner.waitForURL(/\/app\/messages\/[0-9a-f-]{36}$/);
       await owner.getByLabel("Write a message").waitFor();
@@ -1732,7 +1737,10 @@ try {
     const inviting = owner.locator('[role="dialog"]', { hasText: "Invite members" });
     await inviting.getByLabel("Search members").fill(LISTENER);
     // Named with the years they registered with, which the row shows in grey under the name.
-    await inviting.getByRole("checkbox", { name: new RegExp(`^${LISTENER} 2011–2015$`) }).check();
+    const invitee = { name: new RegExp(`^${LISTENER} 2011–2015$`) };
+    await inviting.getByRole("checkbox", invitee).check();
+    // A filter's inner locator is found inside each label, so it starts from the page, not from the dialog.
+    await expectChoiceLook(inviting.locator("label").filter({ has: owner.getByRole("checkbox", invitee) }), "input", "a chosen invitee", { checked: true, tile: false, label: ":scope > :last-child > :first-child", tones: BRAND_TONES.demoUniversity });
     await inviting.getByRole("button", { name: "Send invitation" }).click();
     await inviting.waitFor({ state: "detached" });
 

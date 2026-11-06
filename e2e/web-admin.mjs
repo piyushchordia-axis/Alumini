@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectEmptyState, expectReadable, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -417,10 +417,16 @@ try {
     };
     const directory = page.locator('label:has-text("Member directory") input');
     const businesses = page.locator('label:has-text("Business directory") input');
+    const row = (name) => page.locator("label").filter({ has: page.getByRole("checkbox", { name, exact: true }) });
 
     // Only what was toggled goes out, so a stale tab can't undo another admin's change.
     await open();
     if (!(await businesses.isChecked())) throw new Error("the Business directory switch should start on");
+    // Every switch is a 44px row, as on the phone, and a ticked one draws its box in Demo College's ink with a drawn tick.
+    const heights = await page.locator("form label").filter({ has: page.getByRole("checkbox") }).evaluateAll((rows) => rows.map((r) => [r.textContent, r.getBoundingClientRect().height]));
+    const short = heights.filter(([, height]) => height < 44);
+    if (!heights.length || short.length) throw new Error(`settings' checkbox rows under 44px: ${JSON.stringify(short.length ? short : heights)}`);
+    await expectChoiceLook(row("Business directory"), "input", "the ticked Business directory switch", { checked: true, tile: false, tones: BRAND_TONES.demoCollege });
     if (!(await page.locator('label:has-text("Messaging") input').isChecked())) throw new Error("the Messaging switch should start on outside schools");
     if (!(await page.locator('label:has-text("Groups") input').isChecked())) throw new Error("the Groups switch should start on outside schools");
     sentFeatures(await save(), undefined);
@@ -428,6 +434,7 @@ try {
 
     await open();
     await directory.uncheck();
+    await expectChoiceLook(row("Member directory"), "input", "the cleared Member directory switch", { checked: false, tile: false });
     sentFeatures(await save(), { directory: false });
 
     // The switch stayed off, and turning it back on restores demo-college for the later steps.
@@ -444,6 +451,9 @@ try {
     await messaging.uncheck();
     if ((await mentorship.isChecked()) || !(await mentorship.isDisabled())) throw new Error("unchecking Messaging should uncheck Mentorship and hold it off");
     await page.getByText("Needs Messaging", { exact: true }).waitFor();
+    // Held, its box fades and its label turns the meta grey, as the phone's does, without the row fading it further.
+    const held = await expectReadable(row("Mentorship").locator(":scope > :last-child"), "the held Mentorship switch's label");
+    if (held.colour !== GREY_TEXT.plain) throw new Error(`the held Mentorship switch's label is rgb ${held.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
     sentFeatures(await save(), { messaging: false, mentorship: false });
     await open();
     if ((await messaging.isChecked()) || (await mentorship.isChecked())) throw new Error("Messaging and Mentorship didn't both stay off after saving");
