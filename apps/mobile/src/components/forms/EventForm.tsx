@@ -1,5 +1,4 @@
 import {
-  COMMON_TIME_ZONES,
   EVENT_KINDS,
   EVENT_KIND_LABELS,
   RICH_TEXT_HINT,
@@ -8,14 +7,14 @@ import {
   localTimeZone,
   utcToZonedWallTime,
   zonedWallTimeToUtc,
-  zoneOffsetLabel,
   type EventCreateInput,
   type EventDto,
   type EventKind,
 } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { DateTimeField } from "@/components/DateTimeField";
+import { TimeZonePicker } from "@/components/TimeZonePicker";
 import { IconImage } from "@/components/icons";
 import { Button, ChipSelect, ErrorText, Input, Row } from "@/components/ui";
 import { useImageUpload } from "@/hooks/useImagePicker";
@@ -43,7 +42,6 @@ export function EventForm({
 }) {
   const deviceTz = localTimeZone();
   const initialZone = initial?.timezone ?? deviceTz;
-  const tzOptions = useMemo(() => [...new Set<string>([initialZone, deviceTz, ...(tenantZone ? [tenantZone] : []), ...COMMON_TIME_ZONES])], [initialZone, deviceTz, tenantZone]);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [kind, setKind] = useState<EventKind | "">(initial?.kind ?? "CASUAL_MEETUP");
@@ -92,7 +90,7 @@ export function EventForm({
       <Input label="Title *" value={title} onChangeText={setTitle} placeholder="Mumbai alumni coffee meetup" error={errors.title} />
       <ChipSelect label="Type *" options={EVENT_KINDS.map((k) => ({ value: k, label: EVENT_KIND_LABELS[k] }))} value={kind} onChange={setKind} />
       <Input label="City *" value={city} onChangeText={setCity} error={errors.city} />
-      <ChipSelect label="Time zone" options={tzOptions.map((t) => ({ value: t, label: `${t.replace(/_/g, " ")} (${zoneOffsetLabel(t)})` }))} value={timezone} onChange={(v) => v && setTimezone(v)} />
+      <TimeZonePicker value={timezone} extra={[initialZone, deviceTz, tenantZone]} onChange={setTimezone} hint="Start and end times are in this time zone." error={errors.timezone} />
       <DateTimeField label={`Starts * (${zoneLabel})`} value={start} onChange={setStart} error={errors.startAt} />
       <DateTimeField label={`Ends (${zoneLabel})`} value={end} onChange={setEnd} error={errors.endAt} clearable />
       <Input label="Max attendees" value={maxAttendees} onChangeText={(v) => setMaxAttendees(v.replace(/\D/g, ""))} keyboardType="number-pad" hint="Leave blank for unlimited" error={errors.maxAttendees} />

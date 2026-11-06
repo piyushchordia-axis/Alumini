@@ -1,14 +1,14 @@
 import {
-  COMMON_TIME_ZONES,
   EVENT_KINDS,
   EVENT_KIND_LABELS,
   RICH_TEXT_HINT,
   eventCreateSchema,
   eventEditSchema,
   localTimeZone,
+  timeZoneLabel,
+  timeZoneOptions,
   utcToZonedWallTime,
   zonedWallTimeToUtc,
-  zoneOffsetLabel,
   type EventCreateInput,
   type EventDto,
   type EventKind,
@@ -56,7 +56,7 @@ export function EventForm({
 }) {
   const [serverError, setServerError] = useState<unknown>(null);
   const initialZone = initial?.timezone ?? localTimeZone();
-  const tzOptions = useMemo(() => [...new Set<string>([initialZone, localTimeZone(), ...(tenantZone ? [tenantZone] : []), ...COMMON_TIME_ZONES])], [initialZone, tenantZone]);
+  const tzOptions = useMemo(() => timeZoneOptions(initialZone, [localTimeZone(), tenantZone]), [initialZone, tenantZone]);
 
   // Convert wall times to instants with the chosen zone, then validate with the shared schema.
   const resolver = useMemo<Resolver<EventFormValues, unknown, EventCreateInput>>(() => {
@@ -124,7 +124,7 @@ export function EventForm({
           <Select {...register("timezone")}>
             {tzOptions.map((tz) => (
               <option key={tz} value={tz}>
-                {tz.replace(/_/g, " ")} ({zoneOffsetLabel(tz)})
+                {timeZoneLabel(tz)}
               </option>
             ))}
           </Select>

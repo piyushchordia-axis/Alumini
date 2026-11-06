@@ -1,10 +1,11 @@
 import { planChannelsSentence } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Pressable, Text, View } from "react-native";
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { SettingsForm } from "@/components/admin/SettingsForm";
-import { IconPalette } from "@/components/icons";
+import { IconChevronRight, IconPalette } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
 import { Button, Card, ErrorText, Muted, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -15,9 +16,11 @@ import { colors, spacing } from "@/theme";
 
 type Said = { text: string; tone: "info" | "warning" };
 
+const BRANDING_SUMMARY = "Name, colours, logo and cover";
+
 /**
- * The console's settings: what the plan includes, then approvals and the feature switches (the web's "Approvals &
- * features" tab). A save refetches the institution too, so the app's sections follow at once: More drops a section
+ * The console's settings: what the plan includes, the way to Branding (the web's other tab), then approvals and the
+ * feature switches (the web's "Approvals & features" tab). A save refetches the institution too, so the app's sections follow at once: More drops a section
  * switched off, while a screen of it that's open stays until it's next in front (FeatureGate redirects on focus), so the
  * admin isn't pulled out of the console.
  */
@@ -25,6 +28,7 @@ export default function AdminSettingsScreen() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
   const qc = useQueryClient();
+  const router = useRouter();
   const q = useQuery({ queryKey: qk.admin.settings(slug), queryFn: () => api.admin.settings.get(slug) });
   // What became of Save. Here rather than in the form, which starts again when the saved settings come back.
   const [said, setSaid] = useStatus<Said>();
@@ -66,15 +70,22 @@ export default function AdminSettingsScreen() {
         </Text>
         <Muted size={13}>{plan.note}</Muted>
       </Card>
-      {/* Its own screen comes later; the web console's Settings has it as a tab. */}
+      {/* Its own screen on the phone; the web console's Settings has it as a tab. */}
       <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 44 }}>
-          <IconPalette size={18} color={colors.muted} />
+        <Pressable
+          onPress={() => router.push(`/t/${slug}/admin/settings/branding`)}
+          accessibilityRole="link"
+          accessibilityLabel="Branding"
+          accessibilityHint={BRANDING_SUMMARY}
+          style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 44, opacity: pressed ? 0.6 : 1 })}
+        >
+          <IconPalette size={18} color={colors.text} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>Branding</Text>
-            <Muted size={13}>Name, colours, logo and cover: on the web console for now.</Muted>
+            <Muted size={13}>{BRANDING_SUMMARY}</Muted>
           </View>
-        </View>
+          <IconChevronRight size={16} color={colors.faint} />
+        </Pressable>
       </Card>
       <SettingsForm
         key={q.data.settings.updatedAt}

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { PAGE_COLOURS, WHITE, expectSvgNoEmoji, pageColours, scriptNotification, textColour } from "./lib.mjs";
+import { PAGE_COLOURS, WHITE, bigPhoto, expectSvgNoEmoji, holdPhotoPreparation, pageColours, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -392,7 +392,46 @@ try {
 
     await page.click("text=Branding");
     await page.waitForSelector("text=Preview");
+    // Demo College's green is a suggested colour, chosen; a near-white one says what it does to buttons and links, and
+    // isn't saved until Save (this step leaves without saving).
+    const swatches = page.getByRole("radiogroup", { name: "Suggested primary colours", exact: true });
+    const green = swatches.getByRole("radio", { name: "Green, #047857", exact: true });
+    if ((await green.getAttribute("aria-checked")) !== "true") throw new Error("Demo College's green isn't the chosen suggested colour");
+    await expectSvgNoEmoji(green, "the chosen suggested colour");
+    const warning = page.getByText(/^White text is hard to read on this colour \(\d+\.\d:1\), so buttons filled with it use dark text/);
+    if (await warning.count()) throw new Error("Demo College's green shows the contrast warning");
+    const brandingSaves = [];
+    const countBranding = (request) => {
+      if (request.method() === "PATCH" && request.url().endsWith("/admin/branding")) brandingSaves.push(request);
+    };
+    page.on("request", countBranding);
+    await page.getByLabel("Primary colour hex code", { exact: true }).fill("#fef9c3");
+    await warning.waitFor();
+    if ((await green.getAttribute("aria-checked")) !== "false") throw new Error("a typed colour left the green suggestion chosen");
+    // A warning never stops a save.
+    const saveBranding = page.getByRole("button", { name: "Save branding", exact: true });
+    if (await saveBranding.isDisabled()) throw new Error("the contrast warning disabled Save branding");
     await shot("a05-settings");
+
+    // Save waits for an upload: held while a logo is being prepared (the script holds it), and free once it's in.
+    const logo = page.getByRole("group", { name: "Logo", exact: true });
+    const camera = await bigPhoto(page);
+    const hold = await holdPhotoPreparation(page);
+    await logo.locator('input[type="file"]').setInputFiles(camera);
+    await hold.held();
+    const waitsForUpload = page.getByText("Save waits for the upload to finish.", { exact: true });
+    await waitsForUpload.waitFor();
+    if (!(await saveBranding.isDisabled())) throw new Error("Save branding can be pressed while the logo is being prepared");
+    const uploaded = page.waitForResponse((r) => r.request().method() === "POST" && /\/uploads(\?|$)/.test(r.url()));
+    await hold.release();
+    const upload = await uploaded;
+    if (upload.status() !== 201) throw new Error(`the logo's upload answered ${upload.status()}: ${await upload.text()}`);
+    await logo.locator(`img[src="${(await upload.json()).data.url}"]`).waitFor();
+    await waitsForUpload.waitFor({ state: "hidden" });
+    if (await saveBranding.isDisabled()) throw new Error("Save branding stayed disabled once the logo was in");
+    hold.stop();
+    page.off("request", countBranding);
+    if (brandingSaves.length) throw new Error("typing a colour or uploading a logo saved the branding");
   });
 
   await step("add a profile question", async () => {

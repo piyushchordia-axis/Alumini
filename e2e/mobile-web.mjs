@@ -2585,7 +2585,7 @@ try {
     await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings");
     // Samaj's plan sends nothing but in-app notices and pushes.
     await page.getByText("Ask the Illuminize team to add WhatsApp, SMS or email messaging.", { exact: true }).waitFor();
-    await page.getByText(/^Name, colours, logo and cover: on the web console for now\.$/).locator("visible=true").first().waitFor();
+    await page.getByRole("link", { name: "Branding", exact: true }).locator("visible=true").last().waitFor();
     await expectChoice(choice("radio", "Admin must approve members"), "Admin must approve members", { checked: true });
     const funding = choice("checkbox", "Funding");
     await expectChoice(funding, "the Funding switch", { checked: true });
@@ -2677,6 +2677,121 @@ try {
     await backButton().click();
     await page.waitForURL("**/t/shri-gujarati-samaj/more");
     await hubRow("Funding").waitFor();
+  });
+
+  await step("the console's Branding, from Settings: a tagline saved with the preview following, Save held by an upload but not by a warning, a bad colour sending nothing, a suggested colour re-theming the app at once, and the Samaj's look put back", async () => {
+    await page.goto(SAMAJ + "/admin/settings");
+    const link = page.getByRole("link", { name: "Branding", exact: true }).locator("visible=true").last();
+    await expectSvgNoEmoji(link, "Settings' Branding row");
+    const linkBox = await link.boundingBox();
+    if (!linkBox || linkBox.height < 44) throw new Error(`Settings' Branding row is ${linkBox?.height}px tall, under 44px`);
+    await link.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings/branding");
+    const field = (name) => page.getByLabel(name, { exact: true }).locator("visible=true").last();
+    const tagline = field("Tagline");
+    const primary = field("Primary colour hex code");
+    await tagline.waitFor();
+    const original = { tagline: await tagline.inputValue(), primary: await primary.inputValue() };
+    if (original.primary !== "#c2410c") throw new Error(`the Samaj's primary colour reads ${original.primary}, expected #c2410c`);
+    await fitsPhone("the console's Branding", tagline);
+    const save = () => page.getByRole("button", { name: "Save branding", exact: true }).locator("visible=true").last();
+    const isBrandingSave = (r) => r.request().method() === "PATCH" && r.url().endsWith("/admin/branding");
+    const saved = async () => {
+      const [res] = await Promise.all([page.waitForResponse(isBrandingSave), save().click()]);
+      if (!res.ok()) throw new Error(`saving the branding failed: ${res.status()}`);
+      await page.getByText("Branding saved", { exact: true }).locator("visible=true").first().waitFor();
+      return res.request().postDataJSON();
+    };
+    const background = (target) => target.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // The app's primary buttons in the institution's colour, once its refetch lands.
+    const expectBrand = async (target, rgb, where) => {
+      for (let i = 0; i < 50 && (await background(target)) !== rgb; i++) await page.waitForTimeout(100);
+      if ((await background(target)) !== rgb) throw new Error(`${where} is ${await background(target)}, not ${rgb}`);
+    };
+    await expectBrand(save(), "rgb(194, 65, 12)", "Save branding in the Samaj's colour");
+    // The suggested colours as radios, the Samaj's own chosen, with a drawn tick.
+    const swatches = page.getByRole("radiogroup", { name: "Suggested primary colours", exact: true }).locator("visible=true").last();
+    const orange = swatches.getByRole("radio", { name: "Orange, #c2410c", exact: true });
+    await expectChoice(orange, "the Samaj's own colour among the suggested ones", { checked: true });
+    await expectSvgNoEmoji(orange, "the chosen suggested colour");
+
+    // The preview follows the tagline as it's typed, and Save sends it.
+    const changed = `Community, culture and connection ${unique}`;
+    await tagline.fill(changed);
+    const preview = page.getByRole("img", { name: /^Preview, / }).locator("visible=true").last();
+    await preview.getByText(changed, { exact: true }).waitFor();
+    if (!(await preview.getAttribute("aria-label")).endsWith(`, ${changed}`)) throw new Error(`the preview is read as "${await preview.getAttribute("aria-label")}"`);
+    if ((await saved()).tagline !== changed) throw new Error("Save didn't send the tagline typed");
+
+    // Nothing from here to Teal is saved.
+    const sent = [];
+    const counted = (request) => {
+      if (request.method() === "PATCH" && request.url().endsWith("/admin/branding")) sent.push(request);
+    };
+    page.on("request", counted);
+    const held = async () => (await save().getAttribute("aria-disabled")) === "true";
+
+    // Save waits for an upload: held while the logo is being prepared (the script holds it), and free again once it's
+    // cancelled, with nothing uploaded.
+    const logo = page.getByRole("group", { name: "Logo", exact: true }).locator("visible=true").last();
+    const camera = await bigPhoto(page);
+    const hold = await holdPhotoPreparation(page);
+    const chooser = page.waitForEvent("filechooser");
+    await logo.getByRole("button", { name: "Upload logo", exact: true }).click();
+    await (await chooser).setFiles(camera);
+    await hold.held();
+    await page.getByText("Save waits for the upload to finish.", { exact: true }).locator("visible=true").first().waitFor();
+    if (!(await held())) throw new Error("Save branding can be pressed while the logo is being prepared");
+    await logo.getByRole("button", { name: "Cancel upload", exact: true }).click();
+    await logo.getByText("Upload cancelled.", { exact: true }).waitFor({ state: "attached" });
+    await logo.getByRole("button", { name: "Upload logo", exact: true }).waitFor();
+    await hold.release();
+    if (await held()) throw new Error("Save branding stayed held after the logo's upload was cancelled");
+    // Long enough for the prepared logo to have gone up, had the cancel not stopped it.
+    await page.waitForTimeout(1500);
+    hold.stop();
+    if (hold.uploads()) throw new Error("a logo cancelled while it was being prepared was uploaded anyway");
+
+    // A colour too light for white text says what it does to buttons and links, and never stops a save.
+    await primary.fill("#fef9c3");
+    await page.getByText(/^White text is hard to read on this colour \(\d+\.\d:1\), so buttons filled with it use dark text/).locator("visible=true").first().waitFor();
+    if (await held()) throw new Error("the contrast warning held Save branding");
+
+    // A colour that isn't one is refused under its box, said by Save too, and nothing is sent.
+    await primary.fill("#12");
+    await save().click();
+    await page.getByText("Use a #RRGGBB colour", { exact: true }).locator("visible=true").first().waitFor();
+    await page.getByText("Primary colour: Use a #RRGGBB colour", { exact: true }).locator("visible=true").first().waitFor();
+    page.off("request", counted);
+    if (sent.length) throw new Error("a colour that isn't #RRGGBB was sent to the API");
+
+    // A suggested colour is chosen and written in the box, and once saved the whole app takes it, with no reload.
+    const teal = swatches.getByRole("radio", { name: "Teal, #0f766e", exact: true });
+    await expectChoice(teal, "the Teal swatch before it's picked", { checked: false });
+    const swatchBox = await teal.boundingBox();
+    if (!swatchBox || swatchBox.height < 44 || swatchBox.width < 44) throw new Error(`a suggested colour is ${swatchBox?.width}×${swatchBox?.height}px, under 44px`);
+    await teal.click();
+    await expectChoice(teal, "the Teal swatch once picked", { checked: true });
+    if ((await primary.inputValue()) !== "#0f766e") throw new Error(`picking Teal wrote ${await primary.inputValue()} in the box`);
+    await page.getByText("Use a #RRGGBB colour", { exact: true }).locator("visible=true").first().waitFor({ state: "hidden" });
+    if ((await saved()).primaryColor !== "#0f766e") throw new Error("Save didn't send Teal");
+    await expectBrand(save(), "rgb(15, 118, 110)", "Save branding after Teal was saved");
+    await shot("m11b-admin-branding");
+    // Settings underneath has taken it too.
+    await backButton().click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings");
+    await expectBrand(page.getByRole("button", { name: "Save settings", exact: true }).locator("visible=true").last(), "rgb(15, 118, 110)", "Save settings after Teal was saved");
+
+    // The Samaj's own look back, for the steps after.
+    await link.click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/settings/branding");
+    await orange.click();
+    await tagline.fill(original.tagline);
+    const restored = await saved();
+    if (restored.primaryColor !== "#c2410c" || (restored.tagline ?? "") !== original.tagline) throw new Error(`putting the Samaj's look back sent ${JSON.stringify(restored)}`);
+    await expectBrand(save(), "rgb(194, 65, 12)", "Save branding once the Samaj's colour is back");
+    await page.goto(SAMAJ + "/more");
+    await consoleRow().waitFor();
   });
 
   await step("the console's profile fields: a question added in the modal editor, moved up and down, archived after asking, and listed under Show archived", async () => {

@@ -26,7 +26,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   from"; `lib/jobs.ts` a job's facts, place and open or closed state; `lib/skills.ts` `normalizeSkills` and `skillKey`;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
   of an institution colour (`brandTones`); `lib/appearance.ts` a member's background (`resolveAppearance`,
-  `pageBackdrop` and the tiles both apps offer).
+  `pageBackdrop` and the tiles both apps offer); `lib/branding.ts` the console's Branding form (`brandingSave`,
+  `BRAND_SWATCHES`, `brandContrastWarnings`) and the time zones a picker offers (`timeZoneOptions`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -279,7 +280,7 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - no dark mode: the apps are light only, and members choose just their pages' background;
   - UI polish still open: admin branding preview / deeper tenant theming, skeleton loaders and purposeful motion tokens;
   - admin pages not yet in the phone app, which show there as on the web console for now: moderation, reports, chat
-    reports, invitations, branding and analytics (README → Known gaps lists them too);
+    reports, invitations and analytics (README → Known gaps lists them too);
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

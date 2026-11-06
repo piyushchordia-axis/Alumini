@@ -146,6 +146,9 @@ Covers:
   nothing of the admin's), and a pending business listing whose contact details show only once opened; resolving the
   spam report by removing content;
 - settings, saving only the switches that changed: unchecking Messaging unchecks Mentorship, and both come back on;
+  Branding with Demo College's green chosen among the suggested colours (a drawn tick), a near-white colour typed
+  showing the contrast warning with Save branding still enabled, and Save held, saying why, while the script holds a
+  large logo's preparation, then free once the logo is in, with nothing saved;
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
@@ -260,7 +263,13 @@ Covers:
   refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
   Mentorship and holding it with "Needs Messaging", and Funding saved off (sending only that switch) with More dropping
-  it at once, then back on; Profile fields, adding "Seva team …" in the modal editor (the key following the question,
+  it at once, then back on;
+  Branding, from Settings' 44px row: the Samaj's orange chosen among the suggested colours, the tagline saved with the
+  preview following it, Save held (saying why) while the script holds a large logo's preparation and free again once
+  it's cancelled, with nothing uploaded, a near-white colour showing the contrast warning without holding Save, "#12"
+  refused under its box (and by Save) with nothing sent, Teal (a 44px radio) chosen and saved, the screen's and
+  Settings' buttons taking it at once, and the Samaj's colour and tagline put back;
+  Profile fields, adding "Seva team …" in the modal editor (the key following the question,
   options added by Return and by Add, the directory filter box disabled for short text and for admin-only answers),
   moving it up (in its new place, said, with the arrows waiting, while the script holds the move) and down, a move the
   script refuses put back with "Couldn't move it" while the list's refetch is held, archiving it after the confirm sheet
@@ -613,6 +622,23 @@ waiting for approval. Sign Rahul back in afterwards.
       form starts over from the saved settings). Back to More: Funding has gone without a pull to refresh. Switch it back
       on. (Signed in as the demo-school admin, `+91 90000 00003`, the last paragraph under the switches reads
       "Messaging, Groups and Mentorship start off for schools…" on the phone as on the web.)
+- [ ] Settings → Branding, on the smallest phone you have: tap each box down the form in turn (Tagline, Welcome
+      message, Website, City, the colour codes). Each stays in view above the keyboard while you type, Website brings up
+      the keyboard for web addresses, and Save branding can be reached with the keyboard up. Country and Time zone open
+      their lists over the form, and closing one leaves the form where it was.
+- [ ] Branding's logo and cover: on the iPhone a HEIC photo (Settings → Camera → Formats → High Efficiency), on Android
+      a full-resolution photo of 50 megapixels or more, first as the logo, then as the cover. Each uploads with no
+      message under its button and shows in its preview the right way up (the logo round, the cover wide). While one is
+      going up, Save branding is dimmed with "Save waits for the upload to finish." above it. Cancel upload while a
+      large one is still being prepared: "Upload cancelled." is read out and nothing changes. Don't save: leave with
+      Back, and the logo and cover stay as they were (the Samaj has none).
+- [ ] Branding: choose Teal among the suggested colours and save. The console's buttons take it at once, and Back to
+      More, the tab bar's chosen tab and the buttons and links in the app have it too, without restarting the app or
+      pulling to refresh, and the status bar stays readable. Choose Orange (the Samaj's own) and save to put it back.
+- [ ] Branding, TalkBack or VoiceOver: the preview is read once, as "Preview, Shri Gujarati Samaj, …" with the tagline;
+      the suggested colours as radio buttons by name and code ("Teal, #0f766e"), saying which is checked. Type #fef9c3
+      in Primary colour: the warning under it is read when you reach it, and Save branding stays enabled (leave with
+      Back, without saving).
 - [ ] Profile fields → Add field: the editor opens as a modal sheet (swiping it down, on the iPhone, closes it and
       keeps nothing). Type a question: the box stays above the keyboard and the key fills in. Choose "Choose one" in
       Answer type (its list opens over the sheet). In "Add an option…", type an option and press Return: it's added,

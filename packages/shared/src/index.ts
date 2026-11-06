@@ -10,6 +10,7 @@ export * from "./lib/richText";
 export * from "./lib/salary";
 export * from "./lib/color";
 export * from "./lib/appearance";
+export * from "./lib/branding";
 export * from "./lib/jobs";
 export * from "./lib/digest";
 export * from "./schemas/common";

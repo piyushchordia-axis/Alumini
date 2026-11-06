@@ -200,7 +200,11 @@ before showing the demo.
   The app opens only for an institution's members, so Illuminize staff who aren't one use its console on the web.
 - Per-tenant **features** can be switched on and off (see below), and **branding** (name, colours, logo, cover,
   tagline, welcome message) drives the landing page and the apps' colours and accents (buttons, links, chosen states).
-  It doesn't set the background of a member's pages: each member chooses their own (see **Appearance**).
+  It doesn't set the background of a member's pages: each member chooses their own (see **Appearance**). Admins edit
+  it under **Admin → Settings → Branding** on both apps (its own screen on the phone, through Settings): a preview,
+  suggested colours, and a warning that never stops a save when a primary colour is too light for white text (buttons
+  then use dark text, and links a darker shade) or so dark it reads as black (`lib/branding.ts`, on `lib/color.ts`).
+  Logo and cover photos are prepared like any other upload, and Save waits for one still going up.
 - A trigger (migration 0005) stamps `memberships.approved_at` when a membership becomes approved.
 
 ### Feature switches
@@ -1321,7 +1325,7 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     suspended admin's copy stays unread, still saying the request waits, until they read it.
 - The admin console in the phone app:
   - Admin pages not yet in the phone app, which its console's home lists as on the web console for now: moderation,
-    reports, chat reports, invitations, branding (Settings says so where it would link to it) and analytics. Until each
+    reports, chat reports, invitations and analytics. Until each
     lands, its tile on the console's home (moderation and both kinds of report have one) opens nothing, and its admin
     notices open the console's home.
   - Illuminize staff who aren't members of an institution can't use its console in the phone app; they use the web.
