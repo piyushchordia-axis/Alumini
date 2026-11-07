@@ -103,6 +103,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `chatReportViewStep` in shared `lib/chatReports.ts`), and a link to a report only scrolls to it.
 - **Invisible blocks.** A request or invitation that meets a block gets the normal answer and is stored suppressed
   (`withheld`, `suppressed`, `invite_suppressed`); nobody is told. Tests deep-equal the blocked and unblocked views.
+  What a thread says under it (the box and its intro, or a panel and its date to ask again) is shared `threadFooter`
+  (`chat/labels.ts`), a function of the thread's DTO and the clock only, on both apps, so those tests compare it too
+  (`comparableFooter`); requester-side copy goes there, and `chatRequestNotices.test.ts` keeps it from hinting at a
+  decline or a block. The timer that brings the box back at the date (`watchRerequest`, `chat/rerequest.ts`) reads
+  the same DTO alone.
 - **Ways out.** A gated connection (mentorship, referrals) keeps its ways out (own lists, withdraw, end, report, stop)
   outside the feature gate and the pupil check, and the apps keep the section reachable while something is left there.
   An empty list's create action follows the switches and the pupil check too (`mayCreate`), and a list shown as a way
@@ -224,6 +229,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     tone's fill, edge and ink. A field's error is the danger ink, as web `FormField` (with its required `*`) and mobile
     `Input`/`FieldError` draw it (the phone's `*` is part of the label), toasts sit on the solids, and the phone's
     `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders.
+  - **Notices.** A note above a box or a form is `Notice` (both apps): `info` on the info tone with `IconInfo`, for what
+    is worth knowing before acting (not live; on the web the box it's about lists it in `aria-describedby`), and
+    `warning` on the warning tone with `IconAlert`, for what went wrong, which replaces the info note while it shows
+    and is read out from a region that stays mounted (web `role="status"`; mobile `StatusLine tone="warning"
+    persistent`). Never the brand's colours. e2e finds the web's by `data-tone`.
   - **Elevation.** Page background (web `--surface-page`, mobile `useTheme().page.color`) is quieter than content.
     Level 1: posts and list modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write
     surfaces (`elevation={2}`). Do not flatten feed cards into the page, and never tint a post card: a pinned post is

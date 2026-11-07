@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull } from "drizzle-orm";
 import request from "supertest";
 import type { ChatConversationDto, ChatDirectResultDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
+import { threadFooter } from "@illuminize/shared/chat";
 import { chatConversations, chatParticipants } from "../../src/db/schema";
 import { runInTransaction } from "../../src/lib/transaction";
 import { lockConversation, type ChatMessageRow } from "../../src/repositories/chat.repo";
@@ -117,6 +118,22 @@ export async function conversationRow(ctx: TestContext, id: string) {
 /** The parts of a thread's DTO that differ between two threads for no reason a member could act on, so two can be compared. */
 export function comparable(dto: ChatConversationDto) {
   return { ...dto, id: "<id>", peer: dto.peer && { ...dto.peer, id: "<id>", fullName: "<name>" }, lastMessageAt: "<at>", lastMessage: dto.lastMessage && { ...dto.lastMessage, createdAt: "<at>" }, canRerequestAt: dto.canRerequestAt && "<at>" };
+}
+
+/** The time comparableFooter draws footers at, the same for both threads being compared. */
+const FOOTER_NOW = new Date("2026-11-07T09:00:00.000Z");
+const MINUTE_MS = 60_000;
+
+/**
+ * What the apps draw under a thread (`threadFooter`), with the other member's name set aside as `comparable` sets it
+ * aside, so two threads' footers can be compared. It's drawn at a fixed time, its last message then, and the date to ask
+ * again keeps its distance from that message, to the minute: two footers are equal only if each requester is shown the
+ * same date after their own request (29 days isn't 30), or no date at all.
+ */
+export function comparableFooter(dto: ChatConversationDto, now = FOOTER_NOW) {
+  const after = dto.canRerequestAt === null ? null : Math.round((Date.parse(dto.canRerequestAt) - Date.parse(dto.lastMessageAt)) / MINUTE_MS) * MINUTE_MS;
+  const canRerequestAt = after === null ? null : new Date(now.getTime() + after).toISOString();
+  return threadFooter({ ...dto, peer: dto.peer && { ...dto.peer, fullName: "<name>" }, canRerequestAt }, now);
 }
 
 export function comparableMessage(dto: ChatMessageDto) {

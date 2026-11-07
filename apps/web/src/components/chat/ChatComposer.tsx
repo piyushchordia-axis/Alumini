@@ -1,7 +1,7 @@
 import { CHAT_MESSAGE_MAX_LENGTH } from "@illuminize/shared";
 import clsx from "clsx";
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { Spinner } from "@/components/ui";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
+import { Notice, Spinner } from "@/components/ui";
 import { useChatStore } from "@/stores/chatStore";
 
 /** About five lines, then it scrolls. */
@@ -15,21 +15,28 @@ const enterSends = () => window.matchMedia("(pointer: fine)").matches;
 
 /**
  * The message box. Its text is the draft for `draftKey`, held in memory only, so it survives leaving the thread, a failed
- * send and a failed refetch, and goes with sign-out. The caller decides when a send clears it.
+ * send and a failed refetch, and goes with sign-out. The caller decides when a send clears it. Above it, `notice` (a
+ * warning, read out as it appears) takes the place of `intro` (an info note the box is described by) while it shows.
  */
 export function ChatComposer({
   draftKey,
   onSend,
   sending = false,
   notice,
+  intro,
+  describedBy,
   autoFocus = false,
   keyboardOpen = false,
 }: {
   draftKey: string;
   onSend: (text: string) => void;
   sending?: boolean;
-  /** Shown above the box, such as why the last send didn't go. */
-  notice?: ReactNode;
+  /** A warning above the box, such as why the last send didn't go. */
+  notice?: string | null;
+  /** What sending here does, when that's worth knowing first, such as asking again. */
+  intro?: string | null;
+  /** The id of anything else on the screen that describes the box. */
+  describedBy?: string;
   autoFocus?: boolean;
   /** The safe area at the bottom of a phone is behind the keyboard while it's open, so it would only leave a gap. */
   keyboardOpen?: boolean;
@@ -38,7 +45,10 @@ export function ChatComposer({
   const setDraft = useChatStore((s) => s.setDraft);
   const box = useRef<HTMLTextAreaElement>(null);
   const [fileNotice, setFileNotice] = useState(false);
+  const introId = useId();
   const empty = draft.trim().length === 0;
+  const warning = fileNotice ? NO_FILES : notice;
+  const showIntro = !warning && !!intro;
 
   // Grows with what's written, up to the limit.
   useLayoutEffect(() => {
@@ -82,15 +92,18 @@ export function ChatComposer({
     // autoComplete off on the form and the box: browsers otherwise keep a box's text for session restore, on disk, where a
     // draft would outlast sign-out. Drafts live in memory only.
     <form onSubmit={submit} autoComplete="off" className="border-t border-slate-200 bg-white px-3 pt-2">
-      {(notice || fileNotice) && (
-        <div role="status" className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {fileNotice ? NO_FILES : notice}
-        </div>
+      {/* Always there, so a warning that appears in it is read out. */}
+      <div role="status">{warning && <Notice tone="warning" className="mb-2">{warning}</Notice>}</div>
+      {showIntro && (
+        <Notice tone="info" id={introId} className="mb-2">
+          {intro}
+        </Notice>
       )}
       <div className="flex items-end gap-2">
         <textarea
           ref={box}
           aria-label="Write a message"
+          aria-describedby={[showIntro && introId, describedBy].filter(Boolean).join(" ") || undefined}
           placeholder="Write a message"
           rows={1}
           autoComplete="off"

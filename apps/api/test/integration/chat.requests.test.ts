@@ -5,7 +5,8 @@ import { chatConversations, chatMessages, notifications, tenantSettings } from "
 import { keys } from "../../src/redis/keys";
 import { runInTransaction } from "../../src/lib/transaction";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
-import { acceptedThread, ageRequest, bareMember, chatApi, comparable, comparableMessage, conversationRow, newKey, openRequest, participantRow, type Session } from "../helpers/chat";
+import { threadFooter } from "@illuminize/shared/chat";
+import { acceptedThread, ageRequest, bareMember, chatApi, comparable, comparableFooter, comparableMessage, conversationRow, newKey, openRequest, participantRow, type Session } from "../helpers/chat";
 import { createTenant, memberSession } from "../helpers/factories";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
@@ -42,6 +43,8 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const [thread, list, messages, requests, badge, resend] = [await api.get(id), await api.list(), await api.messages(id), await api.list("REQUESTS"), await api.badge(), await api.send(id, "One more")];
       return {
         thread: thread.body.data as ChatConversationDto,
+        // What the apps draw under the thread, so the screen is compared as well as the data.
+        footer: comparableFooter(thread.body.data),
         listRow: (list.body.data as ChatConversationDto[]).find((t) => t.id === id),
         messages: messages.body.data as ChatMessageDto[],
         requests: requests.body.data,
@@ -55,6 +58,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const { conversation } = await openRequest(ctx, tenant.slug, a, b.membership.id, "Hello");
       const pending = await requesterView(chat(a), conversation.id);
       expect(pending.thread).toMatchObject({ state: "REQUEST_SENT", canSend: false });
+      expect(pending.footer).toMatchObject({ kind: "panel", title: "Request sent", when: { lead: "You can ask again from " } });
       expect(pending.resend).toMatchObject({ status: 409, error: { code: "CHAT_REQUEST_PENDING" } });
 
       expect((await chat(b).decline(conversation.id)).status).toBe(200);
@@ -81,12 +85,14 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const blocked = await chat(c).direct(d.membership.id, "The same words", "key-for-comparing-2");
       expect(blocked.status).toBe(normal.status);
       expect(comparable(blocked.body.data.conversation)).toEqual(comparable(normal.body.data.conversation));
+      expect(comparableFooter(blocked.body.data.conversation)).toEqual(comparableFooter(normal.body.data.conversation));
       expect(comparableMessage(blocked.body.data.message)).toEqual(comparableMessage(normal.body.data.message));
       expect(Object.keys(blocked.body.data.message).sort()).toEqual(Object.keys(normal.body.data.message).sort());
       expect(JSON.stringify(blocked.body)).not.toContain("withheld");
 
       const [normalView, blockedView] = [await requesterView(chat(a), normal.body.data.conversation.id), await requesterView(chat(c), blocked.body.data.conversation.id)];
       expect(comparable(blockedView.thread)).toEqual(comparable(normalView.thread));
+      expect(blockedView.footer).toEqual(normalView.footer);
       expect(comparable(blockedView.listRow!)).toEqual(comparable(normalView.listRow!));
       expect(blockedView.messages.map(comparableMessage)).toEqual(normalView.messages.map(comparableMessage));
       expect(blockedView.resend).toEqual(normalView.resend);
@@ -117,6 +123,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const [declinedView, blockedView] = [await requesterView(chat(declined.from), declined.id), await requesterView(chat(blocked.from), blocked.id)];
       expect(declinedView.thread).toMatchObject({ state: "REQUEST_SENT", canSend: false });
       expect(comparable(blockedView.thread)).toEqual(comparable(declinedView.thread));
+      expect(blockedView.footer).toEqual(declinedView.footer);
       expect(comparable(blockedView.listRow!)).toEqual(comparable(declinedView.listRow!));
       expect(blockedView.messages.map(comparableMessage)).toEqual(declinedView.messages.map(comparableMessage));
       expect(blockedView.resend).toEqual(declinedView.resend);
@@ -144,6 +151,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const [normalView, blockedView] = [await requesterView(chat(normal.from), normal.id), await requesterView(chat(blocked.from), blocked.id)];
       expect(normalView.thread).toMatchObject({ state: "REQUEST_SENT", canSend: false, origin: "MESSAGE_REQUEST" });
       expect(comparable(blockedView.thread)).toEqual(comparable(normalView.thread));
+      expect(blockedView.footer).toEqual(normalView.footer);
       expect(comparable(blockedView.listRow!)).toEqual(comparable(normalView.listRow!));
       expect(blockedView.messages.map(comparableMessage)).toEqual(normalView.messages.map(comparableMessage));
       expect(blockedView.requests).toEqual(normalView.requests);
@@ -167,6 +175,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
         const [thread, list, requests, messages, badge, accept, decline] = [await chat(m).get(id), await chat(m).list(), await chat(m).list("REQUESTS"), await chat(m).messages(id), await chat(m).badge(), await chat(m).accept(id), await chat(m).decline(id)];
         return {
           thread: comparable(thread.body.data),
+          footer: comparableFooter(thread.body.data),
           list: list.body.data.map(comparable),
           requests: requests.body.data,
           messages: messages.body.data.map(comparableMessage),
@@ -177,6 +186,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       };
       const expected = await read(normal.to, normal.id);
       expect(expected.thread).toMatchObject({ state: "ACCEPTED", canSend: true });
+      expect(expected.footer).toEqual({ kind: "composer", intro: null });
       expect(expected.decline.status).toBe(409);
       expect(await read(blocked.to, blocked.id)).toEqual(expected);
       expect((await chat(blocked.to).send(blocked.id, "Another")).status).toBe((await chat(normal.to).send(normal.id, "Another")).status);
@@ -388,7 +398,14 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       const expected = new Date(row.requestedAt!.getTime() + 30 * 86_400_000).toISOString();
       expect(conversation.canRerequestAt).toBe(expected);
       await chat(b).decline(conversation.id);
-      expect((await chat(a).get(conversation.id)).body.data.canRerequestAt).toBe(expected);
+      const view: ChatConversationDto = (await chat(a).get(conversation.id)).body.data;
+      expect(view.canRerequestAt).toBe(expected);
+      // The apps give that date a line of its own under "Request sent".
+      expect(threadFooter(view, new Date())).toMatchObject({ kind: "panel", title: "Request sent", when: { iso: expected } });
+      // And the footers the privacy tests compare tell a day sooner from it, or no date at all.
+      const sooner = new Date(Date.parse(expected) - 86_400_000).toISOString();
+      expect(comparableFooter({ ...view, canRerequestAt: sooner })).not.toEqual(comparableFooter(view));
+      expect(comparableFooter({ ...view, canRerequestAt: null })).not.toEqual(comparableFooter(view));
     });
 
     it("while blocked looks the same but is withheld and stays declined, consuming seq and counting", async () => {

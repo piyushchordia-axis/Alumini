@@ -5,7 +5,7 @@ import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Plat
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
 import { StackHeader } from "@/components/StackHeader";
-import { IconAlert, IconCheck, IconProfile, type IconProps } from "@/components/icons";
+import { IconAlert, IconCheck, IconInfo, IconProfile, type IconProps } from "@/components/icons";
 import { initials } from "@/lib/format";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -446,6 +446,23 @@ export function Badge({ label, tone = "neutral", icon }: { label: string; tone?:
 }
 
 /**
+ * A note in one of two shared tones (STATUS_TONES), never the brand's, as the web draws it: `info` (sky, IconInfo) for
+ * something worth knowing before acting, `warning` (amber, IconAlert) for what went wrong or needs waiting for. It isn't
+ * live: a warning that appears later is a StatusLine, which screen readers hear. The text is a direct child of the box.
+ */
+export function Notice({ tone, text, icon }: { tone: "info" | "warning"; text: string; icon?: (color: string) => ReactNode }) {
+  const look = STATUS_TONES[tone];
+  return (
+    <View style={[styles.notice, { backgroundColor: look.fill }]}>
+      <View aria-hidden style={{ paddingTop: 1 }}>
+        {icon ? icon(look.ink) : tone === "info" ? <IconInfo size={16} color={look.ink} /> : <IconAlert size={16} color={look.ink} />}
+      </View>
+      <Text style={{ flexShrink: 1, fontSize: 13, color: look.ink }}>{text}</Text>
+    </View>
+  );
+}
+
+/**
  * A photo, or initials in its place, as on the web app. A member's initials pass `toneKey`, their membership id, for a
  * colour of their own (avatarTone) that is the same on every screen; a list of several institutions passes each one's
  * `brandColor`. Otherwise (this institution, a business, a group) they are the brand's ink on its solid tint.
@@ -655,6 +672,7 @@ const styles = StyleSheet.create({
   // The edge takes a pixel of the padding, so it doesn't make the tag bigger.
   badge: { borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, alignSelf: "flex-start" },
   badgeWithIcon: { flexDirection: "row", alignItems: "center", gap: 4 },
+  notice: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   // The web's text-xs font-medium.
   badgeText: { fontSize: 12, fontWeight: "500" },
   empty: { alignItems: "center", gap: spacing.xs, padding: spacing.xl, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, borderRadius: radius.lg, backgroundColor: "#fff" },

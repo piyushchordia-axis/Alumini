@@ -2,7 +2,7 @@ import { avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
 import clsx from "clsx";
 import { forwardRef, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
-import { IconCheck, IconChevronRight, IconProfile } from "@/components/icons";
+import { IconAlert, IconCheck, IconChevronRight, IconInfo, IconProfile } from "@/components/icons";
 import { initials } from "@/lib/format";
 
 /* ---------- Button ---------- */
@@ -268,6 +268,22 @@ const toneClass: Record<Tone, string> = {
 /** A tag. Its 1px edge keeps its shape where the fill doesn't show (forced colours), and takes a pixel off the padding. */
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return <span className={clsx("inline-flex items-center rounded-full border px-[7px] py-px text-xs font-medium", toneClass[tone], className)}>{children}</span>;
+}
+
+/**
+ * A note in one of two shared tones, never the brand's: `info` (sky, IconInfo) for something worth knowing before acting,
+ * `warning` (amber, IconAlert) for what went wrong or needs waiting for. It isn't live: a warning that appears later goes
+ * inside a region that's always mounted with role="status", so screen readers hear it. `data-tone` is for e2e.
+ */
+export function Notice({ tone, icon, id, className, children }: { tone: "info" | "warning"; icon?: ReactElement; id?: string; className?: string; children: ReactNode }) {
+  return (
+    <div id={id} data-tone={tone} className={clsx("flex items-start gap-2 rounded-lg px-3 py-2 text-sm", tone === "info" ? "bg-tone-info-fill text-tone-info-ink" : "bg-tone-warning-fill text-tone-warning-ink", className)}>
+      <span aria-hidden className="mt-0.5 flex shrink-0">
+        {icon ?? (tone === "info" ? <IconInfo size={16} /> : <IconAlert size={16} />)}
+      </span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
 }
 
 export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {

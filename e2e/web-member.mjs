@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -39,6 +39,13 @@ const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_C
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.setDefaultTimeout(15000);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
+
+/** Fails unless a thread's footer `panel` gives the date to ask again in a <time>, thirty days on, as a request or a close sets it. */
+async function expectRerequestIn30Days(panel, where) {
+  const at = await panel.locator("time").getAttribute("datetime");
+  const days = (Date.parse(at) - Date.now()) / 86_400_000;
+  if (!(days > 29 && days < 31)) throw new Error(`${where} says to ask again in ${days.toFixed(1)} days, not 30 (${at})`);
+}
 
 /** Fails unless the phone field's box shows `box` and its country picker has `country` selected. */
 async function expectPhoneField(p, { box, country }) {
@@ -1770,6 +1777,38 @@ try {
     if (await pageA.getByLabel("Write a message").count()) throw new Error("the requester can write more before an answer");
     await shot("10a-chat-request-sent");
 
+    // "Request sent" is a group named by its title, with the date to ask again on a line of its own: a clock and the date
+    // in a <time>, thirty days on. Nothing in it hints at what became of the request.
+    const sentPanel = pageA.getByRole("group", { name: "Request sent" });
+    await sentPanel.getByText("You can ask again from", { exact: false }).waitFor();
+    await expectSvgNoEmoji(sentPanel, "the Request sent panel");
+    await expectRerequestIn30Days(sentPanel, "Request sent");
+    if (HINTS_AT_A_DECLINE.test(await sentPanel.innerText())) throw new Error(`Request sent hints at a decline or a block: "${await sentPanel.innerText()}"`);
+
+    // Left open past its date, the thread offers the box by itself, with an info note on the sky tone and an announcement.
+    // The date is scripted a few seconds on and the box goes by the real time, so an early refetch can't open it sooner.
+    const rerequest = await scriptConversation(pageA, "demo-university", pageA.url().split("/").pop());
+    const soon = Date.now() + 10_000;
+    rerequest.rewrite((c) => ({ ...c, canRerequestAt: new Date(soon).toISOString(), canSend: Date.now() >= soon }));
+    await pageA.reload();
+    await sentPanel.locator("time", { hasText: / (today|tomorrow)$/ }).waitFor({ timeout: 9000 });
+    await pageA.getByLabel("Write a message").waitFor({ timeout: 20000 });
+    // Said in a toast, which lasts four seconds, and in a hidden status line, which a toast isn't.
+    await pageA.getByRole("button", { name: "You can ask Sneha Kulkarni again now." }).waitFor();
+    await pageA.locator('p[role="status"]', { hasText: "You can ask Sneha Kulkarni again now." }).waitFor({ state: "attached" });
+    const intro = pageA.locator('[data-tone="info"]', { hasText: "Your next message asks Sneha Kulkarni again, as a new request." });
+    await intro.waitFor();
+    if (!(await pageA.getByLabel("Write a message").getAttribute("aria-describedby"))?.split(" ").includes(await intro.getAttribute("id"))) throw new Error("the box isn't described by the note on asking again");
+    const introLook = await paintedColour(intro, "backgroundColor");
+    if (introLook.colour !== "224 242 254") throw new Error(`the note on asking again isn't on the info tone: ${introLook.colour}`);
+    await expectReadable(intro.locator(":scope > div"), "the note on asking again");
+    await expectSvgNoEmoji(intro, "the note on asking again");
+    await pageA.screenshot({ path: `${SHOTS}/10a2-chat-ask-again.png` });
+    await rerequest.stop();
+    await pageA.reload();
+    await sentPanel.waitFor();
+    if (await pageA.getByLabel("Write a message").count()) throw new Error("the thread offers the box again before its date");
+
     // B: the badge and the Requests tab change with no reload.
     await pageB.locator('nav[aria-label="Main"]:visible a[aria-label="Messages, 1 unread"]').waitFor(live);
     const request = pageB.locator('[role="tabpanel"] a', { hasText: "Meera Iyer" });
@@ -1858,7 +1897,12 @@ try {
     const tooFast = `One more thing ${unique}`;
     await boxA.fill(tooFast);
     await boxA.press("Enter");
-    await pageA.waitForSelector("text=You're sending messages quickly");
+    // A warning, on the amber tone, in the region that's always there to be read out.
+    const tooFastNote = pageA.locator('[role="status"] > [data-tone="warning"]', { hasText: "You're sending messages quickly" });
+    await tooFastNote.waitFor();
+    const tooFastLook = await paintedColour(tooFastNote, "backgroundColor");
+    if (tooFastLook.colour !== "254 243 199") throw new Error(`the too-fast warning isn't on the warning tone: ${tooFastLook.colour}`);
+    await expectReadable(tooFastNote.locator(":scope > div"), "the too-fast warning");
     if ((await boxA.inputValue()) !== tooFast) throw new Error("a send refused for going too fast lost its words");
     if (await log(pageA).getByText(tooFast).count()) throw new Error("a send refused for going too fast stayed in the thread");
     await pageA.unroute(sendUrl);
@@ -2401,9 +2445,15 @@ try {
     if ((await mentee.evaluate(() => document.activeElement?.tagName)) !== "ARTICLE") throw new Error("ending a mentorship lost the focus");
     await mentor.getByText("This conversation has closed").waitFor(live);
     if (await mentor.getByLabel("Write a message").count()) throw new Error("the chat of an ended mentorship still offers the mentor a message box");
+    // Either of them can ask again thirty days on, which the panel says on a line of its own.
+    const closedFor = (p) => p.getByRole("group", { name: "This conversation has closed" });
+    await closedFor(mentor).getByText("You can send a new request from", { exact: false }).waitFor();
+    await expectRerequestIn30Days(closedFor(mentor), "the mentor's closed thread");
     await sent.getByRole("link", { name: "Open chat", exact: true }).click();
     await mentee.waitForURL(new RegExp(`/app/messages/${threadId}$`));
     await mentee.getByText("This conversation has closed").waitFor();
+    await closedFor(mentee).getByText("You can send a new request from", { exact: false }).waitFor();
+    await expectRerequestIn30Days(closedFor(mentee), "the mentee's closed thread");
     await log(mentee).getByText(fromMentor).waitFor();
     if (await mentee.getByLabel("Write a message").count()) throw new Error("the chat of an ended mentorship still offers the mentee a message box");
     await mentor.goto(`${app}/mentors?tab=requests`);

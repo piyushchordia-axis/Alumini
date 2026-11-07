@@ -1,9 +1,9 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, newClientKey, sendLimitNotice, threadFooter, threadItems, type OutboxEntry, type RerequestLine, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BlockConfirmDialog, BlockMemberButton } from "@/components/chat/BlockMemberButton";
 import { ChatComposer } from "@/components/chat/ChatComposer";
@@ -11,14 +11,15 @@ import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane
 import { ConversationOptions } from "@/components/chat/ConversationOptions";
 import { MessageList, type MessageActions } from "@/components/chat/MessageList";
 import { ReportMessageDialog } from "@/components/chat/ReportMessageDialog";
+import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
 import { Button, EmptyState, Loading } from "@/components/ui";
-import { useDocumentVisible, useNow, useOpenConversation } from "@/hooks/useChat";
+import { useDocumentVisible, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { chatSync, inboxFromParams, inboxQuery, isMuted, patchConversation } from "@/lib/chat";
-import { formatDate, pluralize } from "@/lib/format";
+import { pluralize } from "@/lib/format";
 import { groupPath, groupsPath, refreshGroup } from "@/lib/groups";
 import { useRealtimeStatus } from "@/lib/realtime";
 import { draftKey, useChatStore } from "@/stores/chatStore";
@@ -67,11 +68,16 @@ function useMarkRead(slug: string, id: string, conversation: ChatConversationDto
   }, [visible, loaded, target, readSoFar, slug, id, qc]);
 }
 
-function Panel({ title, children, actions }: { title: string; children?: ReactNode; actions?: ReactNode }) {
+/** In place of the composer: why there's nothing to write in, when that may change, and what can be done instead. */
+function Panel({ title, text, when, actions }: { title: string; text: string; when: RerequestLine | null; actions?: ReactNode }) {
+  const titleId = useId();
   return (
-    <div className="border-t border-slate-200 bg-slate-50 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      {children && <div className="mt-0.5 text-sm text-slate-600">{children}</div>}
+    <div role="group" aria-labelledby={titleId} className="border-t border-slate-200 bg-slate-50 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <p id={titleId} className="text-sm font-semibold text-slate-900">
+        {title}
+      </p>
+      <p className="mt-0.5 text-sm text-slate-600">{text}</p>
+      {when && <RerequestWhen when={when} />}
       {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
     </div>
   );
@@ -87,6 +93,17 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   useOpenConversation(slug, id);
 
   const conversation = useQuery({ queryKey: chatKeys.conversation(slug, id), queryFn: () => api.chat.conversation(slug, id) });
+  // Said out loud as well as in a toast, which isn't a live region.
+  const [opened, setOpened] = useState("");
+  const footerNow = useRerequestRefetch(conversation.data, now, conversation.refetch, (text) => {
+    toast.info(text);
+    setOpened(text);
+  });
+  useEffect(() => {
+    if (!opened) return;
+    const timer = setTimeout(() => setOpened(""), 6000);
+    return () => clearTimeout(timer);
+  }, [opened]);
   // A group's own details, for the one thing only they say: why its owner can't send yet. Shared with its details screen.
   const group = useQuery({ queryKey: chatKeys.group(slug, id), queryFn: () => api.chat.groups.get(slug, id), enabled: !!conversation.data?.group && !conversation.data.canSend });
   const messages = useInfiniteQuery({
@@ -189,71 +206,38 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   const name = conversationTitle(c);
   const muted = isMuted(c, now);
   const profileHref = c.peer && tenant.settings.features.directory ? `/t/${slug}/app/directory/${c.peer.id}` : null;
-  const composer = (keyboardOpen: boolean, intro?: string) => <ChatComposer draftKey={dk} onSend={send} notice={notice ?? intro} keyboardOpen={keyboardOpen} autoFocus />;
+  const composer = (keyboardOpen: boolean, intro: string | null) => <ChatComposer draftKey={dk} onSend={send} notice={notice} intro={intro} keyboardOpen={keyboardOpen} autoFocus />;
   const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : directThreadSubtitle(c, muted);
 
-  const footer = (keyboardOpen: boolean): ReactNode => {
-    if (c.group) {
-      if (c.canSend) return composer(keyboardOpen);
-      if (c.group.archived) return <Panel title="This group has been archived">You can read it, but nobody can send messages in it any more.</Panel>;
-      return <GroupClosedPanel group={group.data} />;
-    }
-    if (!c.peer) return <Panel title="This member deleted their account">You can read the conversation, but not reply.</Panel>;
-    if (c.blockedByMe)
-      return (
-        <Panel title={`You blocked ${name}`} actions={<BlockMemberButton slug={slug} member={c.peer} blocked size="md" />}>
-          Unblock them to send messages. Anything they sent while blocked stays hidden.
-        </Panel>
-      );
-    switch (c.state) {
-      case "REQUEST_RECEIVED":
+  const f = threadFooter(c, footerNow, group.data);
+  const footerActions = (): ReactNode => {
+    if (f.kind !== "panel" || !c.peer) return undefined;
+    switch (f.action) {
+      case "UNBLOCK":
+        return <BlockMemberButton slug={slug} member={c.peer} blocked size="md" />;
+      case "ANSWER_REQUEST":
         return (
-          <Panel
-            title={`${name} wants to send you a message`}
-            actions={
-              <>
-                <Button className="min-h-11" onClick={() => accept.mutate()} loading={accept.isPending}>
-                  Accept request
-                </Button>
-                <Button variant="outline" className="min-h-11" onClick={() => setConfirmDecline(true)}>
-                  Decline request
-                </Button>
-                <BlockMemberButton slug={slug} member={c.peer} blocked={false} variant="ghost" size="md" />
-              </>
-            }
-          >
-            Accept to reply. If you decline, they won't be told.
-          </Panel>
+          <>
+            <Button className="min-h-11" onClick={() => accept.mutate()} loading={accept.isPending}>
+              Accept request
+            </Button>
+            <Button variant="outline" className="min-h-11" onClick={() => setConfirmDecline(true)}>
+              Decline request
+            </Button>
+            <BlockMemberButton slug={slug} member={c.peer} blocked={false} variant="ghost" size="md" />
+          </>
         );
-      case "REQUEST_DECLINED":
+      case "ACCEPT_DECLINED":
         return (
-          <Panel
-            title="You declined this request"
-            actions={
-              <Button variant="outline" className="min-h-11" onClick={() => accept.mutate()} loading={accept.isPending}>
-                Accept request
-              </Button>
-            }
-          >
-            {name} hasn't been told.
-          </Panel>
+          <Button variant="outline" className="min-h-11" onClick={() => accept.mutate()} loading={accept.isPending}>
+            Accept request
+          </Button>
         );
-      case "REQUEST_SENT":
-        if (c.canSend) return composer(keyboardOpen, `Request sent. Sending another message asks ${name} again.`);
-        return (
-          <Panel title="Request sent">
-            You can send more once {name} accepts.
-            {c.canRerequestAt && ` If they haven't by ${formatDate(c.canRerequestAt)}, you can ask again then.`}
-          </Panel>
-        );
-      case "CLOSED":
-        if (c.canSend) return composer(keyboardOpen, `This conversation closed. Sending a message asks ${name} again.`);
-        return <Panel title="This conversation has closed">{c.canRerequestAt ? `You can send a new request from ${formatDate(c.canRerequestAt)}.` : "You can read it, but not reply."}</Panel>;
-      case "ACCEPTED":
-        if (c.canSend) return composer(keyboardOpen);
-        return <Panel title={`You can't message ${name} right now`}>You can still read the conversation.</Panel>;
+      default:
+        return undefined;
     }
   };
+  const footer = (keyboardOpen: boolean): ReactNode => (f.kind === "composer" ? composer(keyboardOpen, f.intro) : <Panel title={f.title} text={f.text} when={f.when} actions={footerActions()} />);
 
   const loadingFirst = messages.isLoading;
   const firstLoadFailed = !messages.data && !!messages.error;
@@ -310,6 +294,9 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
             />
           )}
           {footer(keyboardOpen)}
+          <p role="status" className="sr-only">
+            {opened}
+          </p>
           <ConversationOptions slug={slug} conversation={c} open={optionsOpen} onClose={() => setOptionsOpen(false)} onBlock={() => setConfirmBlock(true)} />
           {c.peer && <BlockConfirmDialog slug={slug} member={c.peer} open={confirmBlock} onClose={() => setConfirmBlock(false)} />}
           <ReportMessageDialog slug={slug} messageId={reporting} onClose={() => setReporting(null)} />
@@ -327,23 +314,6 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
       )}
     </ChatPane>
   );
-}
-
-/**
- * Why the owner of a group can't send in it: only an owner reaches its thread while moderation keeps it from everyone else.
- * Members never see these, because to them such a group isn't there at all.
- */
-function GroupClosedPanel({ group }: { group: ChatGroupDto | undefined }) {
-  switch (group?.review?.moderationStatus) {
-    case "PENDING":
-      return <Panel title="Waiting for an admin to approve this group">Nobody else can see it yet. Messages can be sent once it's approved.</Panel>;
-    case "REJECTED":
-      return <Panel title="An admin didn't approve this group">Members can't see it, and nobody can send messages in it. You can edit it from Group details and send it for review again.</Panel>;
-    case "REMOVED":
-      return <Panel title="An admin removed this group">Members can't see it, and nobody can send messages in it.</Panel>;
-    default:
-      return <Panel title="You can't send messages here right now">You can still read the conversation.</Panel>;
-  }
 }
 
 /** What a group thread this member can't open says about why, from the group's own details where they may see those. */

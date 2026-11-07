@@ -1,8 +1,8 @@
-import { chatAvailable } from "@illuminize/shared";
-import { chatKeys } from "@illuminize/shared/chat";
+import { chatAvailable, type ChatConversationDto } from "@illuminize/shared";
+import { chatKeys, rerequestDrawAt, watchRerequest, type RerequestWatch } from "@illuminize/shared/chat";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import { AppState, Keyboard, Platform } from "react-native";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -79,4 +79,28 @@ export function useNow(everyMs = 60_000): Date {
     return () => clearInterval(timer);
   }, [everyMs]);
   return now;
+}
+
+/**
+ * Brings the box back by itself in a thread left open past its date to ask again (shared `watchRerequest`, which says how),
+ * announcing it through `announce`. Gives the time to draw the footer at (`rerequestDrawAt`): the minute clock, or the
+ * moment the date passed if that's later, so the date's line goes at once.
+ */
+export function useRerequestRefetch(c: ChatConversationDto | undefined, now: Date, refetch: () => Promise<{ data?: ChatConversationDto }>, announce: (text: string) => void): Date {
+  const [passedAt, setPassedAt] = useState<Date | null>(null);
+  const fetchAgain = useEffectEvent(refetch);
+  const say = useEffectEvent(announce);
+  const watch = useRef<RerequestWatch | null>(null);
+  useEffect(() => {
+    const w = watchRerequest({ refetch: () => fetchAgain(), announce: (text) => say(text), passed: setPassedAt });
+    watch.current = w;
+    return () => {
+      w.stop();
+      watch.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    watch.current?.update(c, now);
+  }, [c, now]);
+  return rerequestDrawAt(now, passedAt);
 }

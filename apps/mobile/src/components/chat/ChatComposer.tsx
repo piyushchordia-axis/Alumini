@@ -2,9 +2,12 @@ import { CHAT_MESSAGE_MAX_LENGTH } from "@illuminize/shared";
 import { useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { IconAlert } from "@/components/icons";
+import { StatusLine } from "@/components/Sheet";
+import { Notice } from "@/components/ui";
 import { useKeyboardVisible } from "@/hooks/useChat";
 import { useChatStore } from "@/stores/chatStore";
-import { colors, radius, spacing, useTheme } from "@/theme";
+import { colors, spacing, useTheme } from "@/theme";
 
 const MIN_HEIGHT = 44;
 /** About five lines, then it scrolls. */
@@ -15,9 +18,10 @@ const SHOW_COUNT_FROM = CHAT_MESSAGE_MAX_LENGTH - 500;
 /**
  * The message box. Its text is the draft for `draftKey`, held in memory only, so it survives leaving the thread, a failed
  * send and a failed refetch, and goes with sign-out. Return makes a new line, as on any touch keyboard, so it never sends in
- * the middle of an IME composition. The caller decides when a send clears it.
+ * the middle of an IME composition. The caller decides when a send clears it. Above it, `notice` (a warning, read out as it
+ * appears) takes the place of `intro` (what sending here does, such as asking again) while it shows.
  */
-export function ChatComposer({ draftKey, onSend, sending = false, notice }: { draftKey: string; onSend: (text: string) => void; sending?: boolean; notice?: string | null }) {
+export function ChatComposer({ draftKey, onSend, sending = false, notice, intro }: { draftKey: string; onSend: (text: string) => void; sending?: boolean; notice?: string | null; intro?: string | null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
@@ -35,9 +39,13 @@ export function ChatComposer({ draftKey, onSend, sending = false, notice }: { dr
   return (
     // The safe area at the bottom of a phone is behind the keyboard while it's up, so it would only leave a gap.
     <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: keyboardVisible ? spacing.sm : Math.max(insets.bottom, spacing.sm) }}>
-      {notice ? (
-        <View role="status" accessibilityLiveRegion="polite" style={{ marginBottom: spacing.sm, borderRadius: radius.md, backgroundColor: "#fef3c7", paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-          <Text style={{ fontSize: 13, color: "#92400e" }}>{notice}</Text>
+      {/* Mounted while empty, so a warning that appears in it is read out. */}
+      <View style={notice ? { marginBottom: spacing.sm } : null}>
+        <StatusLine tone="warning" flush persistent text={notice ?? null} icon={(color) => <IconAlert size={16} color={color} />} />
+      </View>
+      {!notice && intro ? (
+        <View style={{ marginBottom: spacing.sm }}>
+          <Notice tone="info" text={intro} />
         </View>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing.sm }}>

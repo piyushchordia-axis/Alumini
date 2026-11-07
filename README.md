@@ -1000,14 +1000,24 @@ already means outbound WhatsApp, SMS and email.
   read it and accept, decline or block. The sender sees "Request sent" and can't write more until it's accepted.
   Replying accepts a request. A decline is silent: the sender may ask again 30 days after their last request, three
   times in all, and can start 20 new requests a day.
+- **Asking again.** Under "Request sent", the date the sender may ask again has a line of its own, with a clock: "You
+  can ask again from **Mon, 7 Dec** if they haven't accepted by then." It's a time when that's today or tomorrow
+  ("6:40 pm tomorrow"), has the year when it isn't this one, and never shows a date gone by. A thread a mentorship or
+  referral closed says "You can send a new request from …" the same way. A thread left open past its date fetches
+  itself a second after it (and once more 30 seconds later, for a clock ahead of the server's; shared `watchRerequest`,
+  which both apps use), offers the box with a note that the next message asks again, and says so ("You can ask Priya
+  Nair again now."). Notes above the box are on the info tone and warnings, such as a send refused for going too fast,
+  on the warning tone (`Notice`), never the brand's colours.
 - **Blocks are invisible.** "Block member" is in each thread's **Conversation options** and on profiles, and
   **Messages → Blocked members** lifts them. The blocked member is never told. A first message to someone who blocked
   them looks sent and stays theirs alone. In an accepted thread, what they send looks normal to them and reaches only
   their own devices (stored `withheld`), and stays hidden from the blocker for good, even after an unblock. The
   requester's view of their thread and of their own messages is the same whether the request is waiting, declined or
-  blocked, and tests compare the two with deep equality. The blocker can't send until they unblock. Blocking also
-  withdraws or silently suppresses mentorship and referral requests between the two, and their group invitations to
-  each other.
+  blocked, and tests compare the two with deep equality. What the apps say under a thread comes from shared
+  `threadFooter` (`@illuminize/shared/chat`), over the thread's DTO and the clock alone, so the tests compare that too
+  (`comparableFooter`), and a unit test checks that nothing a requester reads mentions a decline or a block. The
+  blocker can't send until they unblock. Blocking also withdraws or silently suppresses mentorship and referral
+  requests between the two, and their group invitations to each other.
 - **Ordering and retries.** Each conversation has a gapless `seq`, handed out under the conversation's row lock, and
   pages are read by `seq`, never by time. Every send carries a `clientKey`: a retry with the same key gets the original
   message back and uses no `seq`. The apps keep unsent messages in an outbox, send one at a time per thread, and offer
@@ -1525,6 +1535,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     it succeeds when tried again.
   - Deleting an account sends no `chat:changed` to the other member of each 1:1 thread, so an open thread shows the
     deleted member until it next refetches.
+  - The web app's toasts aren't a live region, so screen readers don't hear them. A chat thread whose box comes back by
+    itself repeats its toast in a hidden status line; other toasts don't yet.
 - Mentorship: while mentorship or messaging is off, or the mentor is a current pupil, the decline route is gated but
   report and stop aren't, so a mentee told "declined" in that state knows it came from a report or from stopping.
   Referrals let a decline through with messaging off; moving mentorship's decline outside the gate would close this.

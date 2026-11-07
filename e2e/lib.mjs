@@ -94,21 +94,31 @@ const fulfillJson = (route, status, body) => route.fulfill({ status, contentType
 
 /**
  * Takes over a GET so a script can test the route guards. `answer(status, code)` makes it fail, and `answer(null)` goes
- * back to the real API. `refetch()` makes the query stale by moving the page's clock, which is all a query looks at (a
- * reload puts it back), then reconnects and waits until the query has given up.
+ * back to the real API. `rewrite(fn)` serves the real answer with its `data` passed through `fn`, worked out afresh for
+ * each request (so it can go by the time), and `rewrite(null)` stops. `refetch()` makes the query stale by moving the
+ * page's clock, which is all a query looks at (a reload puts it back), then reconnects and waits until the query has given up.
  */
 async function scriptGet(page, path, { staleMs, triesOn5xx }) {
   const url = `**/api/v1${path}`;
   let reply = null;
+  let edit = null;
   let requests = 0;
-  await page.route(url, (route) => {
+  await page.route(url, async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     requests += 1;
-    return reply ? fulfillJson(route, reply.status, { error: { code: reply.code, message: `e2e ${reply.code}` } }) : route.fallback();
+    if (reply) return fulfillJson(route, reply.status, { error: { code: reply.code, message: `e2e ${reply.code}` } });
+    if (!edit) return route.fallback();
+    const response = await route.fetch();
+    if (!response.ok()) return route.fulfill({ response });
+    const body = await response.json();
+    return route.fulfill({ response, json: { ...body, data: edit(body.data) } });
   });
   return {
     answer: (status, code) => {
       reply = status === null ? null : { status, code };
+    },
+    rewrite: (fn) => {
+      edit = fn;
     },
     refetch: async () => {
       const expected = requests + (reply?.status >= 500 ? triesOn5xx : 1);
@@ -142,6 +152,9 @@ export const scriptJob = (page, slug, id) => scriptGet(page, `/t/${slug}/jobs/${
 
 /** A chat thread's details (not its messages): stale after 30 seconds, and a 5xx is tried three times. */
 export const scriptConversation = (page, slug, id) => scriptGet(page, `/t/${slug}/chat/conversations/${id}`, { staleMs: 31_000, triesOn5xx: 3 });
+
+/** Words a requester must never read about their request, which would give a decline or a block away (as chatRequestNotices.test.ts checks). */
+export const HINTS_AT_A_DECLINE = /declin|block|reject|ignor|refus|turned down|unavailable/i;
 
 /**
  * Serves the institution with only some sections on. No demo institution has one off, and this needs no admin sign-in.

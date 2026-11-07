@@ -106,3 +106,100 @@ export function conversationPreview(c: Pick<ChatConversationDto, "state" | "last
   const text = last.body ?? REMOVED;
   return last.mine ? `You: ${text}` : text;
 }
+
+/**
+ * When a request can be sent again, as a thread's footer says it: "6:40 pm today", "6:40 pm tomorrow", otherwise the day
+ * and date ("Fri, 4 Dec"), with the year when it isn't this one. Written with formatChatTime's Intl options only, which the
+ * phone's Hermes has. `now` comes from the caller, because a render can't read the clock.
+ */
+export function formatRerequestAt(iso: string, now: Date): string {
+  const at = new Date(iso);
+  const time = () => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(at);
+  if (at.toDateString() === now.toDateString()) return `${time()} today`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (at.toDateString() === tomorrow.toDateString()) return `${time()} tomorrow`;
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(at);
+  const date = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", ...(at.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) }).format(at);
+  return `${weekday}, ${date}`;
+}
+
+/** A footer's line saying when a request can be sent again: `lead`, the date (`at`, emphasised, for `iso`), then `tail`, read as one sentence. */
+export interface RerequestLine {
+  lead: string;
+  at: string;
+  tail: string;
+  iso: string;
+}
+
+/** What a footer panel offers, which each app draws as its own buttons. */
+export type ThreadFooterAction = "UNBLOCK" | "ANSWER_REQUEST" | "ACCEPT_DECLINED";
+
+/**
+ * What goes under a thread: the message box, with an intro when sending asks again, or a panel saying why there's no box.
+ * Everything the composer says to a requester belongs here, so the tests comparing a waiting, a declined and a blocked
+ * request cover it.
+ */
+export type ThreadFooter = { kind: "composer"; intro: string | null } | { kind: "panel"; title: string; text: string; when: RerequestLine | null; action: ThreadFooterAction | null };
+
+type FooterThread = Pick<ChatConversationDto, "group" | "peer" | "blockedByMe" | "state" | "canSend" | "canRerequestAt">;
+
+const panel = (title: string, text: string, extra: { when?: RerequestLine | null; action?: ThreadFooterAction } = {}): ThreadFooter => ({ kind: "panel", title, text, when: extra.when ?? null, action: extra.action ?? null });
+
+/** The date to ask again, while it's still to come: once it has passed, the line goes rather than show a date gone by. */
+function rerequestLine(c: FooterThread, now: Date, lead: string, tail: string): RerequestLine | null {
+  if (!c.canRerequestAt || new Date(c.canRerequestAt).getTime() <= now.getTime()) return null;
+  return { lead, at: formatRerequestAt(c.canRerequestAt, now), tail, iso: c.canRerequestAt };
+}
+
+/**
+ * A thread's footer on both apps, from its DTO and the clock alone, so what a requester reads can't differ between a
+ * request waiting, declined or met by a block. An owner's group that can't send says why from `group`'s review, which
+ * only its owner gets.
+ */
+export function threadFooter(c: FooterThread, now: Date, group?: Pick<ChatGroupDto, "review"> | null): ThreadFooter {
+  const name = conversationTitle(c);
+  if (c.group) {
+    if (c.canSend) return { kind: "composer", intro: null };
+    if (c.group.archived) return panel("This group has been archived", "You can read it, but nobody can send messages in it any more.");
+    switch (group?.review?.moderationStatus) {
+      case "PENDING":
+        return panel("Waiting for an admin to approve this group", "Nobody else can see it yet. Messages can be sent once it's approved.");
+      case "REJECTED":
+        return panel("An admin didn't approve this group", "Members can't see it, and nobody can send messages in it. You can edit it from Group details and send it for review again.");
+      case "REMOVED":
+        return panel("An admin removed this group", "Members can't see it, and nobody can send messages in it.");
+      default:
+        return panel("You can't send messages here right now", "You can still read the conversation.");
+    }
+  }
+  if (!c.peer) return panel("This member deleted their account", "You can read the conversation, but not reply.");
+  if (c.blockedByMe) return panel(`You blocked ${name}`, "Unblock them to send messages. Anything they sent while blocked stays hidden.", { action: "UNBLOCK" });
+  switch (c.state) {
+    case "REQUEST_RECEIVED":
+      return panel(`${name} wants to send you a message`, "Accept to reply. If you decline, they won't be told.", { action: "ANSWER_REQUEST" });
+    case "REQUEST_DECLINED":
+      return panel("You declined this request", `${name} hasn't been told.`, { action: "ACCEPT_DECLINED" });
+    case "REQUEST_SENT":
+      if (c.canSend) return { kind: "composer", intro: `Your next message asks ${name} again, as a new request.` };
+      return panel("Request sent", `You can send more once ${name} accepts.`, { when: rerequestLine(c, now, "You can ask again from ", " if they haven't accepted by then.") });
+    case "CLOSED": {
+      if (c.canSend) return { kind: "composer", intro: `This conversation has closed. Sending a message asks ${name} to chat again.` };
+      // Read-only only when its requests are used up. A date gone by while the answer still can't send (as the box is
+      // about to come back, or with a clock ahead of the server's) loses its line, but not the promise of one.
+      const when = rerequestLine(c, now, "You can send a new request from ", ".");
+      return panel("This conversation has closed", c.canRerequestAt ? "You can still read it." : "You can read it, but not reply.", { when });
+    }
+    case "ACCEPTED":
+      if (c.canSend) return { kind: "composer", intro: null };
+      return panel(`You can't message ${name} right now`, "You can still read the conversation.");
+  }
+}
+
+/** What a thread says when its box comes back while it's open, because the date to ask again has come. */
+export function rerequestOpenedText(c: Pick<ChatConversationDto, "state" | "peer" | "group">): string | null {
+  if (c.group || !c.peer) return null;
+  if (c.state === "REQUEST_SENT") return `You can ask ${peerName(c.peer)} again now.`;
+  if (c.state === "CLOSED") return `You can send ${peerName(c.peer)} a new request now.`;
+  return null;
+}

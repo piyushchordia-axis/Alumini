@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1342,6 +1342,9 @@ try {
     const hit = shown(pageA.getByText("Vikram Desai"));
     await hit.waitFor();
     await hit.dispatchEvent("click");
+    await pageA.waitForURL(/\/directory\/[0-9a-f-]+$/);
+    // Back from the thread comes here further on, so the steps that reload the thread come back through it.
+    const profileUrl = pageA.url();
     await shown(pageA.getByRole("link", { name: "Message this member" })).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
     await shown(pageA.getByText("Your first message is a request")).waitFor();
@@ -1355,7 +1358,11 @@ try {
         : route.fallback(),
     );
     await send(pageA, asked);
-    await shown(pageA.getByText("You're sending messages quickly. Wait a moment, then send again.", { exact: true })).waitFor();
+    const tooFast = shown(pageA.getByText("You're sending messages quickly. Wait a moment, then send again.", { exact: true }));
+    await tooFast.waitFor();
+    // A warning, on the amber tone.
+    const tooFastLook = await paintedColour(tooFast.locator("xpath=.."), "backgroundColor");
+    if (tooFastLook.colour !== "254 243 199") throw new Error(`the too-fast warning isn't on the warning tone: ${tooFastLook.colour}`);
     if ((await shown(pageA.getByLabel("Write a message")).inputValue()) !== asked) throw new Error("a first message refused for going too fast lost its words");
     await pageA.unroute(directUrl);
     await shown(pageA.getByRole("button", { name: "Send message" })).click();
@@ -1365,6 +1372,39 @@ try {
     if (await pageA.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the requester can write more before an answer");
     if (await tabBar(pageA).count()) throw new Error("a thread shows the tab bar");
     await pageA.screenshot({ path: `${SHOTS}/m10a-chat-request-sent.png` });
+
+    // The date to ask again is on a line of its own, with a clock, and nothing in the panel hints at what became of the
+    // request. The line's parent is its row, and the row's the panel.
+    const askAgain = (when = ".+") => shown(pageA.getByText(new RegExp(`^You can ask again from ${when} if they haven't accepted by then\\.$`)));
+    await askAgain().waitFor();
+    await expectSvgNoEmoji(askAgain().locator("xpath=.."), "the date to ask again");
+    const sentPanelText = await askAgain().locator("xpath=../..").innerText();
+    if (!sentPanelText.includes("Request sent") || HINTS_AT_A_DECLINE.test(sentPanelText)) throw new Error(`Request sent hints at a decline or a block: "${sentPanelText}"`);
+
+    // Left open past its date, the thread offers the box by itself, with an info note on the sky tone and an announcement.
+    // The date is scripted a few seconds on and the box goes by the real time, so an early refetch can't open it sooner.
+    const rerequest = await scriptConversation(pageA, "demo-university", pageA.url().split("/").pop());
+    const soon = Date.now() + 10_000;
+    rerequest.rewrite((c) => ({ ...c, canRerequestAt: new Date(soon).toISOString(), canSend: Date.now() >= soon }));
+    await pageA.reload();
+    await askAgain(".+ (today|tomorrow)").waitFor({ timeout: 9000 });
+    await shown(pageA.getByLabel("Write a message")).waitFor({ timeout: 20000 });
+    await shown(pageA.getByText("You can ask Vikram Desai again now.", { exact: true })).waitFor();
+    const intro = shown(pageA.getByText("Your next message asks Vikram Desai again, as a new request.", { exact: true }));
+    await intro.waitFor();
+    const introLook = await paintedColour(intro.locator("xpath=.."), "backgroundColor");
+    if (introLook.colour !== "224 242 254") throw new Error(`the note on asking again isn't on the info tone: ${introLook.colour}`);
+    await expectReadable(intro, "the note on asking again");
+    await expectSvgNoEmoji(intro.locator("xpath=.."), "the note on asking again");
+    await pageA.screenshot({ path: `${SHOTS}/m10a2-chat-ask-again.png` });
+    await rerequest.stop();
+    // The reload was a cold start, which left nothing under the thread: open it again from Vikram's profile, as before, so
+    // Back goes there. Unscripted, it has no box until its real date.
+    await pageA.goto(profileUrl);
+    await shown(pageA.getByRole("link", { name: "Message this member" })).click();
+    await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+    await shown(pageA.getByText("Request sent", { exact: true })).waitFor();
+    if (await pageA.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the thread offers the box again before its date");
 
     // B: the tab's badge and the Requests list change with no reload. The badge sits on the icon, so the label stays put.
     const badged = pageB.locator('a[role="tab"][aria-label="Messages, 1 unread"]').locator("visible=true").first();
@@ -1982,11 +2022,14 @@ try {
     // Said in the row it's about, where the member tapped.
     await sent.getByText("Mentorship ended", { exact: true }).waitFor();
     await shown(mentor.getByText("This conversation has closed")).waitFor(live);
+    // Either of them can ask again thirty days on, which the panel says on a line of its own.
+    await shown(mentor.getByText("You can send a new request from", { exact: false })).waitFor();
     if (await mentor.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the chat of an ended mentorship still offers the mentor a message box");
     await mentor.screenshot({ path: `${SHOTS}/m12f-mentorship-ended-thread.png` });
     await sent.getByRole("link", { name: "Open chat", exact: true }).click();
     await mentee.waitForURL(new RegExp(`/messages/${threadId}$`));
     await shown(mentee.getByText("This conversation has closed")).waitFor();
+    await shown(mentee.getByText("You can send a new request from", { exact: false })).waitFor();
     await log(mentee).getByText(fromMentor).waitFor();
     if (await mentee.getByLabel("Write a message").locator("visible=true").count()) throw new Error("the chat of an ended mentorship still offers the mentee a message box");
     await mentor.goto(`${app}/mentors?tab=requests`);

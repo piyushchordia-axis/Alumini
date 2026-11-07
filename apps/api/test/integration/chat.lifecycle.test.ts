@@ -10,7 +10,7 @@ import { runInTransaction } from "../../src/lib/transaction";
 import { chatRecipients } from "../../src/services/chat/fanout";
 import { closeOriginConversation, openDirectFromOrigin } from "../../src/services/chat/open";
 import { invalidateTenantCache } from "../../src/services/tenant.service";
-import { acceptedThread, ageRequest, chatApi, comparable, comparableMessage, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
+import { acceptedThread, ageRequest, chatApi, comparable, comparableFooter, comparableMessage, conversationRow, createGroup, groupsApi, openRequest, type Session } from "../helpers/chat";
 import { PROFILE, auth, createTenant, loginAs, memberSession } from "../helpers/factories";
 import { acceptedMentorship, askMentor, mentorshipApi, NOTE, offerToMentor } from "../helpers/mentorship";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
@@ -102,12 +102,18 @@ describe.skipIf(!dbAvailable)("chat lifecycle", () => {
       expect(blocked.status).toBe(normal.status);
       expect(blocked.body.data.conversation.id).not.toBe(id);
       expect(comparable(blocked.body.data.conversation)).toEqual(comparable(normal.body.data.conversation));
+      expect(comparableFooter(blocked.body.data.conversation)).toEqual(comparableFooter(normal.body.data.conversation));
       expect(comparableMessage(blocked.body.data.message)).toEqual(comparableMessage(normal.body.data.message));
-      const view = async (as: ReturnType<typeof chatApi>, conversationId: string) => ({
-        thread: comparable((await as.get(conversationId)).body.data),
-        listRow: comparable(((await as.list()).body.data as ChatConversationDto[]).find((t) => t.id === conversationId)!),
-        badge: (await as.badge()).body.data,
-      });
+      const view = async (as: ReturnType<typeof chatApi>, conversationId: string) => {
+        const thread: ChatConversationDto = (await as.get(conversationId)).body.data;
+        return {
+          thread: comparable(thread),
+          // What the apps draw under the thread, so the screen is compared as well as the data.
+          footer: comparableFooter(thread),
+          listRow: comparable(((await as.list()).body.data as ChatConversationDto[]).find((t) => t.id === conversationId)!),
+          badge: (await as.badge()).body.data,
+        };
+      };
       expect(await view(back, blocked.body.data.conversation.id)).toEqual(await view(chat(c), normal.body.data.conversation.id));
       const [stored] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.conversationId, blocked.body.data.conversation.id));
       expect(stored!.withheld).toBe(true);

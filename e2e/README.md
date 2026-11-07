@@ -173,10 +173,13 @@ Covers:
   stay the composer's and a post's), with no sideways scrolling and Funding's chip opening its page with More current;
   and no Explore row at all on a wide screen or with nothing behind More;
 - direct messages between two seeded members (Meera and Sneha): a request (refused once for going too fast, keeping
-  its words in the box), accepted live, replies both ways with exactly one bubble each, a thread in a background tab
-  not marking anything read, Try again reusing the client key, a refusal for sending too fast, a draft surviving a
-  failed refetch, a report (and a second one), a block (the blocked member's messages never arrive, even after the
-  unblock), a lost socket frame recovered by the gap fill, and the thread on a phone;
+  its words in the box), its Request sent panel giving the date to ask again on a line of its own (a clock, thirty
+  days on in a `<time>`, nothing hinting at a decline or a block), the thread left open past that date (answered by
+  the script a few seconds on) offering the box with its note on the info tone and saying so, accepted live, replies
+  both ways with exactly one bubble each, a thread in a background tab not marking anything read, Try again reusing
+  the client key, a refusal for sending too fast (a warning on the warning tone), a draft surviving a failed refetch, a
+  report (and a second one), a block (the blocked member's messages never arrive, even after the unblock), a lost
+  socket frame recovered by the gap fill, and the thread on a phone;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on,
   and the feed's Explore row offering Businesses and Funding;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
@@ -186,9 +189,10 @@ Covers:
   the feed's Explore chip, named "Groups, 1 invitation" with its count) accepted from Invitations (with the history
   before it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
-  with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
-  Mentor badge in the directory and on the new mentor's own profile; switched off, Mentors kept as a way out, on the
-  feed's Explore row and as the More sheet's tile at a phone's width saying "Your requests and mentorships";
+  with the longest note accepted into a live chat that opens with the note, ending it read-only (each side told the date
+  a new request can be sent from, thirty days on), the bell, and the Mentor badge in the directory and on the new
+  mentor's own profile; switched off, Mentors kept as a way out, on the feed's Explore row and as the More sheet's tile
+  at a phone's width saying "Your requests and mentorships";
 - referrals: a job offered for referral, the Can refer filter, a request reported, one accepted into a live chat that
   opens with the note, closing a job closing a waiting request, and the bell;
 - a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
@@ -379,8 +383,9 @@ Covers:
 - notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
   and a notification tap landing on its target;
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including the request refused once for
-  going too fast, a report from tapping a message, a block, a cold start on a thread, and a lost socket frame
-  recovered by the gap fill;
+  going too fast (on the warning tone), the date to ask again on a line of its own, the thread left open past it
+  offering the box with its note on the info tone, a report from tapping a message, a block, a cold start on a thread,
+  and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
   (the invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
   kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
@@ -833,6 +838,10 @@ the console (part 14).
       Messages → Blocked members.
 - [ ] The web app in iPhone Safari and Android Chrome: open a chat, tap the message box, and the box stays in view
       above the keyboard.
+- [ ] Send a first message to a member you haven't messaged. Under Request sent, the line with the clock reads like
+      "You can ask again from Mon, 7 Dec if they haven't accepted by then." (no "Invalid Date", and the day and date as
+      the web shows them: Hermes writes it with the same `Intl` options as the chat times), and TalkBack or VoiceOver
+      read it as one sentence.
 
 ### 8. Groups
 
