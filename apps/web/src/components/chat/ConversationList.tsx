@@ -1,11 +1,12 @@
 import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, peerYears } from "@illuminize/shared/chat";
+import { chatKeys, conversationPreview, conversationTitle, emptyChatsActions, emptyChatsHint, peerYears, type EmptyChatsTarget } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
 import { Avatar, Badge, Button, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatChatTime, inboxQuery, isMuted } from "@/lib/chat";
 import { groupsPath } from "@/lib/groups";
@@ -64,16 +65,20 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
   );
 }
 
+const EMPTY_CHATS_PATHS: Readonly<Record<EmptyChatsTarget, (slug: string) => string>> = { directory: (slug) => `/t/${slug}/app/directory`, groups: (slug) => groupsPath(slug) };
+
 /**
  * The inbox: conversations, groups' among them, under Chats, and requests waiting for an answer under Requests. With
  * direct messages off there are no requests, so there's no Requests tab.
  */
 export function ConversationList({ slug, inbox: asked, onInboxChange, features }: { slug: string; inbox: ChatInbox; onInboxChange: (inbox: ChatInbox) => void; features: TenantFeatures }) {
   const now = useNow();
+  const { membership } = useMembership();
   const badge = useChatBadge(slug, true);
   const inbox: ChatInbox = features.messaging ? asked : "MAIN";
   const list = useInfiniteList(chatKeys.list(slug, inbox), (cursor) => api.chat.conversations(slug, { inbox, cursor, limit: 20 }));
   const requests = badge.data?.requests ?? 0;
+  const emptyActions = emptyChatsActions(features, membership.chatEligible);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -114,11 +119,13 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
                 title="No conversations yet"
                 description={emptyChatsHint(features)}
                 action={
-                  features.groups ? (
-                    <LinkButton to={groupsPath(slug)} variant="outline" className="min-h-11">
-                      Find a group
-                    </LinkButton>
-                  ) : undefined
+                  emptyActions.length > 0
+                    ? emptyActions.map((a) => (
+                        <LinkButton key={a.target} to={EMPTY_CHATS_PATHS[a.target](slug)} variant={a.variant}>
+                          {a.label}
+                        </LinkButton>
+                      ))
+                    : undefined
                 }
               />
             ) : (

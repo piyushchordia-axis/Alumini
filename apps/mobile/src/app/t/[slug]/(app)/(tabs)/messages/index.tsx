@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatInbox } from "@illuminize/shared";
-import { chatKeys, conversationPreview, conversationTitle, emptyChatsHint, formatChatTime, isMuted, peerYears } from "@illuminize/shared/chat";
+import { chatKeys, conversationPreview, conversationTitle, emptyChatsActions, emptyChatsHint, formatChatTime, isMuted, peerYears, type EmptyChatsTarget } from "@illuminize/shared/chat";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
@@ -8,6 +8,7 @@ import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { groupsHref } from "@/lib/groups";
 import { useChatStore } from "@/stores/chatStore";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -64,12 +65,14 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
   );
 }
 
+const EMPTY_CHATS_HREFS: Readonly<Record<EmptyChatsTarget, (slug: string) => `/t/${string}`>> = { directory: (slug) => `/t/${slug}/directory`, groups: (slug) => groupsHref(slug) };
+
 /**
  * The inbox: conversations, groups' among them, under Chats, and requests waiting for an answer under Requests. With direct
  * messages off there are no requests, so there's no Requests tab.
  */
 export default function MessagesScreen() {
-  const { tenant } = useMembership();
+  const { tenant, membership } = useMembership();
   const slug = tenant.slug;
   const features = tenant.settings.features;
   const router = useRouter();
@@ -81,6 +84,7 @@ export default function MessagesScreen() {
   const badge = useChatBadge(slug, true);
   const list = useInfiniteList(chatKeys.list(slug, inbox), (cursor) => api.chat.conversations(slug, { inbox, cursor, limit: 20 }));
   const requests = badge.data?.requests ?? 0;
+  const emptyActions = emptyChatsActions(features, membership.chatEligible);
 
   return (
     <SectionScreen>
@@ -121,7 +125,7 @@ export default function MessagesScreen() {
                   icon={<IconMessages />}
                   title="No conversations yet"
                   description={emptyChatsHint(features)}
-                  action={features.groups ? <Button title="Find a group" variant="outline" accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups`)} /> : undefined}
+                  action={emptyActions.length > 0 ? emptyActions.map((a) => <Button key={a.target} title={a.label} variant={a.variant} accessibilityRole="link" onPress={() => router.push(EMPTY_CHATS_HREFS[a.target](slug))} />) : undefined}
                 />
               ) : (
                 <EmptyState icon={<IconMail />} title="No message requests" description="When someone you haven't talked to messages you, it waits here until you accept or decline." />

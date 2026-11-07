@@ -20,8 +20,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React, the navigation's badges (`sectionBadges`, `moreBadgeLabel`) and `chat/empty.ts` what an empty inbox says
-  (`emptyChatsHint`); `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member
-  sections and their names (`SECTION_LABELS`);
+  and offers (`emptyChatsHint`, `emptyChatsActions`) and an empty thread's line (`emptyThreadText`);
+  `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections and their
+  names (`SECTION_LABELS`);
   `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
@@ -303,6 +304,8 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - react-native-web ignores `accessibilityState`: use `aria-checked` on checkboxes and radios and `aria-selected` on
   tabs so state is exposed on the web build. A toggle button needs `toggleState` (`components/ui.tsx`), which adds
   `aria-pressed`, because `aria-selected` isn't valid on `role="button"` in a browser.
+- A FlatList hands its `ListEmptyComponent` a `style` (an inverted list's flip back the right way up) and an `onLayout`.
+  `EmptyState` takes neither, so in a list put it in a plain `View`, or an inverted thread draws it upside down.
 - `Alert.alert` does nothing on the web export and e2e dismisses `window.confirm`: new flows use `ConfirmSheet` (mobile)
   and `ConfirmDialog` (web).
 - On the web export, expo-document-picker clicks a hidden file input of its own and `Linking.openURL` opens a new tab:

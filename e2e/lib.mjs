@@ -183,6 +183,12 @@ export async function scriptNotification(page, slug, { type, data, title, body =
   };
 }
 
+/** Answers a list's GETs (`url`, a RegExp) with nothing in it, for an empty box a member who has some can't otherwise reach. */
+export async function scriptEmptyList(page, url) {
+  await page.route(url, (route) => (route.request().method() === "GET" ? fulfillJson(route, 200, { data: [], nextCursor: null }) : route.fallback()));
+  return { stop: () => page.unroute(url) };
+}
+
 /**
  * Puts the page's live connection through a proxy that loses any server frame containing `text`, as a flaky network would.
  * Set it up before the page connects (a reload does). `opened()` waits until the connection is up and has had a moment to

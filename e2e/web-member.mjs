@@ -1198,6 +1198,21 @@ try {
     if (!ring.includes("rgb(153, 175, 237) 0px 0px 0px 1px inset")) throw new Error(`${where} has no inset ring in Demo University's ring colour (box-shadow ${ring})`);
     await expectReadable(link, where);
   };
+  // Smoke Tester has no conversations until the messaging step. With messages, the Directory and groups on, the box
+  // offers both ways to start one, Find people first and filled, each a link to its section.
+  const emptyInbox = page.locator('div:has(> h3:text-is("No conversations yet"))');
+  const expectEmptyInbox = async () => {
+    await expectEmptyState(emptyInbox, "the empty inbox", { actions: ["Find people", "Find a group"], tones: BRAND_TONES.demoUniversity });
+    const links = emptyInbox.getByRole("link");
+    const offered = await links.evaluateAll((all) => all.map((a) => [a.textContent.trim(), a.getAttribute("href")]));
+    const expected = [
+      ["Find people", "/t/demo-university/app/directory"],
+      ["Find a group", "/t/demo-university/app/groups"],
+    ];
+    if (JSON.stringify(offered) !== JSON.stringify(expected)) throw new Error(`the empty inbox offers ${JSON.stringify(offered)}`);
+    const filled = async (i) => (await paintedColour(links.nth(i), "backgroundColor")).colour !== "255 255 255";
+    if (!(await filled(0)) || (await filled(1))) throw new Error("the empty inbox should lead with Find people, filled, and offer Find a group in outline");
+  };
 
   await step("phone layout: every section opens, with Events and Funding behind More", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1214,6 +1229,7 @@ try {
       await page.waitForURL(url);
       await page.waitForSelector(content);
       await expectMoreActive(false, label);
+      if (label === "Messages") await expectEmptyInbox();
     }
 
     await moreButton.click();
@@ -1344,6 +1360,15 @@ try {
     await page.goto(app + "/my-content");
     await page.locator('[role="tab"]:has-text("Posts")').waitFor();
     if (await page.locator('[role="tab"]:has-text("Businesses")').count()) throw new Error("My posts has a tab for a section that is switched off");
+
+    // The empty inbox offers only the ways to start a chat that are on: Find a group without the Directory, and Find
+    // people without groups.
+    features.only("feed", "messaging", "groups");
+    await page.goto(app + "/messages");
+    await expectEmptyState(emptyInbox, "the empty inbox with the Directory off", { actions: ["Find a group"], absent: ["Find people"], tones: BRAND_TONES.demoUniversity });
+    features.only("feed", "messaging", "directory");
+    await page.goto(app + "/messages");
+    await expectEmptyState(emptyInbox, "the empty inbox with groups off", { actions: ["Find people"], absent: ["Find a group"], tones: BRAND_TONES.demoUniversity });
 
     // Everything off: the profile is home, and More stands in for it on the bar.
     features.only();
@@ -1816,6 +1841,10 @@ try {
 
     // An open group, with a message from before the second member arrives: they get the whole history.
     const openId = await createGroup(openName, "Open group");
+    // Nothing is written yet: the thread says so in a box of its own, naming the group.
+    const emptyThread = log(owner).locator('div:has(> h3:text-is("No messages yet"))');
+    await expectEmptyState(emptyThread, "a new group's empty thread", { tones: BRAND_TONES.demoUniversity });
+    await emptyThread.getByText(`Messages in ${openName} show here.`, { exact: true }).waitFor();
     const before = `Who's in for Saturday? ${unique}`;
     await send(owner, before);
     await owner.screenshot({ path: `${SHOTS}/11a-group-created.png` });

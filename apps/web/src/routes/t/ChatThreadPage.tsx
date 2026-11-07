@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, directThreadSubtitle, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, newClientKey, sendLimitNotice, threadItems, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -13,7 +13,7 @@ import { MessageList, type MessageActions } from "@/components/chat/MessageList"
 import { ReportMessageDialog } from "@/components/chat/ReportMessageDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, Loading } from "@/components/ui";
+import { Button, EmptyState, Loading } from "@/components/ui";
 import { useDocumentVisible, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -306,7 +306,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
               loadingOlder={messages.isFetchingNextPage}
               loadOlder={() => void messages.fetchNextPage()}
               actions={actions}
-              before={rows.length === 0 ? <p className="py-10 text-center text-sm text-slate-500">No messages yet.</p> : undefined}
+              before={rows.length === 0 ? <EmptyState inline icon={<IconMessages />} title="No messages yet" description={emptyThreadText(c)} /> : undefined}
             />
           )}
           {footer(keyboardOpen)}

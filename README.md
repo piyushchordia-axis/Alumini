@@ -942,6 +942,11 @@ already means outbound WhatsApp, SMS and email.
   message's `seq` jumps, or after a reconnect (and again three seconds later, as the server joins rooms after
   connecting), the apps fetch what they missed (`?afterSeq=`). The shared logic (`@illuminize/shared/chat`: query keys, cache reducers, `createChatSync`) has no React
   dependency, so web and mobile run the same code.
+- **Empty inbox and threads.** An empty Chats tab says how a conversation starts and offers **Find people** (the
+  Directory, whose profiles have Message this member) beside **Find a group**, the first as the main button: each only
+  while its sections are on and the member may chat, so a current pupil gets neither (`emptyChatsActions` in
+  `packages/shared/src/chat/empty.ts`). A thread with nothing in it says "No messages yet" and whose messages would
+  show there, from its name alone, so it reads the same whatever the thread's state or a block (`emptyThreadText`).
 - **Unread and the badge.** Chat writes nothing to the bell. `GET /chat/badge` returns `{ unread, requests, invites }`:
   conversations with something unread (muted ones left out), requests waiting, and group invitations, which badge
   Groups rather than Messages. A thread is marked read only while it's actually on screen.

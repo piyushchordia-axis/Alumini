@@ -169,9 +169,11 @@ Covers:
   pending screen; and a forced sign-out leaving nothing cached;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
   "match" box with Show all members, which empties the search and Open to, and the businesses' with Show all
-  businesses, which empties the search, the category and the city, each putting focus back in the search box, an empty
-  Requests tab, a mentor search with Clear filters inside the box
-  (its title matched exactly, as a live box repeats its words in a hidden status line), a job's empty referral
+  businesses, which empties the search, the category and the city, each putting focus back in the search box, the
+  empty inbox with Find people (filled, first, to the Directory) and Find a group (to Groups), and with the Directory
+  or groups switched off only the other, a new group's empty thread naming it, an empty Requests tab, a mentor search
+  with Clear filters inside the box (its title matched exactly, as a live box repeats its words in a hidden status
+  line), a job's empty referral
   requests, My posts' own box on each of its tabs but Posts, which Smoke Tester's post fills (Past events with nothing
   to add; Jobs with Post a job, Businesses with Add a business, Groups with Create group and Upcoming events with Plan a
   gathering, each linking to its section's form; Funding with I'm raising and I'm investing, each to the form for its
@@ -485,9 +487,12 @@ Covers:
   shri-gujarati-samaj-members-<date>.csv with one byte order mark, Start year and End year after Email (Hetal Shah's
   2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`), with the
-  buttons that used to sit beside them inside the box: the empty inbox with Find a group, Received referrals with Post
-  a job, Sent referrals with Find jobs that can refer, a mentor search with Clear filters, the directory's "match" box
-  with Show all members, the businesses' with Show all businesses (which empties the search, the category and the
+  buttons that used to sit beside them inside the box: the empty inbox with Find people (filled, first, opening the
+  Directory's tab) and Find a group, and with the Directory or groups switched off (the inbox answered empty) only
+  the other, a new group's empty thread naming it, its icon above its title in the upside-down list, Received
+  referrals with Post a job, Sent referrals with Find jobs that can refer, a mentor search with Clear filters, the
+  directory's "match" box with Show all members, the businesses' with Show all businesses (which empties the search,
+  the category and the
   city and puts focus back in the search box), an empty Requests tab, My posts' own box on each of its tabs but Posts,
   which the member's post fills (Past events with nothing to add, Upcoming events with Plan a gathering, Jobs with Post
   a job, Businesses with Add a business, Groups with Create group, Funding with I'm raising and I'm investing), I'm
@@ -737,6 +742,10 @@ the console (part 14).
       send a message: after about 20 seconds it offers Try again. Reconnect and tap Try again: it arrives once. (On
       Android this checks that the app's fetch honours its abort signal.)
 - [ ] The message box and the search boxes offer no saved passwords or autofill suggestions on either keyboard.
+- [ ] Create a group and open it before anyone writes: "No messages yet" and "Messages in {the group} show here."
+      read the right way up, under the icon in the brand's round tint, just above the message box. Send a message:
+      the box goes and the message takes its place. As a new member, Messages offers Find people and Find a group,
+      and Find people opens the Directory's tab, with Back (Android) returning to Messages.
 - [ ] Tap one of Priya's messages and choose Report message: the sheet opens. In Conversation options, choose Block
       member: the confirm sheet opens once the first one has closed (iPhone especially). Unblock her afterwards under
       Messages → Blocked members.

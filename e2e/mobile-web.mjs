@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -591,8 +591,17 @@ try {
       await openSection(label);
       await page.waitForURL(`**/t/demo-university/${path}`);
       await content.locator("visible=true").first().waitFor();
-      // The title's parent is the box: its icon in Demo University's ink on the wash, and Find a group inside it.
-      if (label === "Messages") await expectEmptyState(content.locator("visible=true").first().locator("xpath=.."), "the empty inbox", { actions: ["Find a group"], tones: BRAND_TONES.demoUniversity });
+      // The title's parent is the box: its icon in Demo University's ink on the wash, and both ways to start a chat inside
+      // it, Find people first and filled.
+      if (label === "Messages") {
+        const inbox = content.locator("visible=true").first().locator("xpath=..");
+        await expectEmptyState(inbox, "the empty inbox", { actions: ["Find people", "Find a group"], tones: BRAND_TONES.demoUniversity });
+        const links = inbox.getByRole("link");
+        const offered = await links.allInnerTexts();
+        if (offered.join() !== "Find people,Find a group") throw new Error(`the empty inbox offers ${offered.join(", ")}`);
+        const filled = async (i) => (await paintedColour(links.nth(i), "backgroundColor")).colour !== "255 255 255";
+        if (!(await filled(0)) || (await filled(1))) throw new Error("the empty inbox should lead with Find people, filled, and offer Find a group in outline");
+      }
       if (label === "Funding" || label === "Events" || label === "Groups" || label === "Mentors") continue;
       await selectedBarTab(label).waitFor();
       if (await selectedBarTab("More").count()) throw new Error(`More shows as selected on ${label}`);
@@ -601,6 +610,12 @@ try {
     await selectedBarTab("More").waitFor();
     if ((await moreColor()) === moreColorOnFeed) throw new Error("More isn't tinted on an overflow section");
     await shot("m04e-funding");
+    // Find people opens the Directory's own tab.
+    await openSection("Messages");
+    await page.waitForURL("**/t/demo-university/messages");
+    await page.getByRole("link", { name: "Find people", exact: true }).locator("visible=true").first().click();
+    await page.waitForURL("**/t/demo-university/directory");
+    await selectedBarTab("Directory").waitFor();
   });
 
   await step("My posts opens from the More hub and its tabs scroll rather than truncate", async () => {
@@ -1437,6 +1452,14 @@ try {
 
     // An open group, with a message from before the second member arrives: they get the whole history.
     const openId = await createGroup(openName, "Open group");
+    // Nothing is written yet: the thread says so in a box of its own, naming the group. The list is drawn upside down
+    // (newest at the bottom) and turns its empty box back, so the icon sits above the title.
+    const emptyTitle = shown(owner.getByText("No messages yet", { exact: true }));
+    const emptyThread = emptyTitle.locator("xpath=..");
+    await expectEmptyState(emptyThread, "a new group's empty thread", { tones: BRAND_TONES.demoUniversity });
+    await emptyThread.getByText(`Messages in ${openName} show here.`, { exact: true }).waitFor();
+    const [badge, title] = [await emptyThread.locator("svg").first().boundingBox(), await emptyTitle.boundingBox()];
+    if (badge.y + badge.height > title.y) throw new Error("a new group's empty thread is drawn upside down: its icon isn't above its title");
     const before = `Who's in for Sunday? ${unique}`;
     await send(owner, before);
     await owner.screenshot({ path: `${SHOTS}/m11a-group-created.png` });
@@ -2329,6 +2352,20 @@ try {
     await open("/profile/my-content");
     await page.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
     if (await page.locator('[role="tab"]').getByText("Businesses", { exact: true }).locator("visible=true").count()) throw new Error("My posts has a tab for a section that is switched off");
+
+    // The empty inbox offers only the ways to start a chat that are on: Find a group without the Directory, and Find
+    // people without groups. The referrals step gave this member a chat, so the inbox is answered empty.
+    const noChats = await scriptEmptyList(page, /\/api\/v1\/t\/demo-university\/chat\/conversations\?/);
+    const emptyInbox = () => page.getByText("No conversations yet", { exact: true }).locator("visible=true").first().locator("xpath=..");
+    features.only("feed", "messaging", "groups");
+    await open("/messages");
+    await page.waitForURL("**/t/demo-university/messages");
+    await expectEmptyState(emptyInbox(), "the empty inbox with the Directory off", { actions: ["Find a group"], absent: ["Find people"], tones: BRAND_TONES.demoUniversity });
+    features.only("feed", "messaging", "directory");
+    await open("/messages");
+    await page.waitForURL("**/t/demo-university/messages");
+    await expectEmptyState(emptyInbox(), "the empty inbox with groups off", { actions: ["Find people"], absent: ["Find a group"], tones: BRAND_TONES.demoUniversity });
+    await noChats.stop();
 
     // Everything off: the profile is home, and More stands in for it on the bar.
     features.only();

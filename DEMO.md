@@ -93,6 +93,13 @@ phone-sized preview in the browser. Port 4000 must still be public.
   RSVP to the Mumbai coffee meetup: your answer is drawn in its colour (green for **I'm going**, amber for **Maybe**)
   with a check, and a poll marks your vote with a check too. Errors under a field are a darker red that reads on the
   page, and toasts read better.
+- **Empty screens that say what's next.** Join Demo University with a new number and open **Messages**: the empty
+  inbox offers **Find people**, which opens the Directory (each profile there has **Message this member**), and **Find
+  a group**. Create a group, and its thread says "No messages yet" until someone writes. In **My posts** (under More on
+  the phone), each empty tab says what it would hold and offers the way to add one: **Post a job**, **Add a business**,
+  **I'm raising** and **I'm investing**, **Plan a gathering**. Search the Directory for "zzzz": **No members match**
+  offers **Show all members**, which clears the search and the filters and puts you back in the search box, as Jobs and
+  Businesses do.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 

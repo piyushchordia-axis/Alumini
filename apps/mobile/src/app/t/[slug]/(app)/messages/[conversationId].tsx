@@ -1,5 +1,5 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, directThreadSubtitle, groupMessages, isMuted, newClientKey, sendLimitNotice, threadItems, type ChatRow, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
+import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, isMuted, newClientKey, sendLimitNotice, threadItems, type ChatRow, type OutboxEntry, type ThreadItem } from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
@@ -13,7 +13,7 @@ import { ConversationOptionsSheet, ReportMessageSheet } from "@/components/chat/
 import { DayRow, MessageRow, type MessageActions } from "@/components/chat/MessageRow";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconAlert, IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, ErrorText, Spinner } from "@/components/ui";
+import { Button, EmptyState, ErrorText, Spinner } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -350,7 +350,12 @@ function Thread({ id }: { id: string }) {
                 </View>
               ) : undefined
             }
-            ListEmptyComponent={<Text style={{ textAlign: "center", color: colors.muted, paddingVertical: spacing.xl }}>No messages yet.</Text>}
+            // In a View, which takes the style that turns the inverted list's empty cell the right way up (EmptyState has none).
+            ListEmptyComponent={
+              <View>
+                <EmptyState inline icon={<IconMessages />} title="No messages yet" description={emptyThreadText(c)} />
+              </View>
+            }
             renderItem={({ item: row }) =>
               row.type === "day" ? <DayRow label={row.label} /> : <MessageRow row={row} me={me} showSenders={!!c.group} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
             }
