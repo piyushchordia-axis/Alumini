@@ -466,9 +466,14 @@ try {
     await card.locator("a", { hasText: "comments" }).click();
     await page.waitForURL(/\/app\/feed\/[0-9a-f-]+$/);
     await page.waitForSelector('h2:has-text("Comments")');
+    // Nothing under the new post yet: a box of its own says so and invites the first reply, and goes once there is one.
+    const noComments = page.locator('div:has(> h3:text-is("No comments yet"))');
+    await expectEmptyState(noComments, "the new post's empty comments", { tones: BRAND_TONES.demoUniversity });
+    await noComments.getByText("Be the first to reply.", { exact: true }).waitFor();
     await page.fill('textarea[placeholder="Write a comment…"]', "First comment!");
     await page.click('button:has-text("Reply")');
     await page.waitForSelector("text=First comment!");
+    await noComments.waitFor({ state: "detached" });
     await shot("05-post-detail");
   });
 
@@ -840,10 +845,24 @@ try {
     await page.locator(`text=Smoke Test Engineer ${unique}`).waitFor({ state: "detached" });
   });
 
+  // An attendee list's box, found by its title: an h3 directly inside it.
+  const attendeesBox = (title) => page.locator(`div:has(> h3:text-is("${title}"))`);
+  const attendeeTab = (label) => page.getByRole("tab", { name: new RegExp(`^${label}`) });
+
   await step("RSVP to a seeded event", async () => {
+    // Its lists answered with no one at first (scripted), as for an event nobody has answered yet: while answers are
+    // open, Going invites the member to be first under the button's own name, and Maybe says who it would list.
+    const noAttendees = await scriptEmptyList(page, /\/api\/v1\/t\/demo-university\/events\/[0-9a-f-]+\/attendees\?/);
     await page.click('nav >> text=Events');
     await page.click("text=Mumbai alumni coffee meetup");
     await page.waitForSelector("text=Who's coming");
+    await expectEmptyState(attendeesBox("No one has said yes yet"), "an open event's empty Going list", { tones: BRAND_TONES.demoUniversity });
+    await attendeesBox("No one has said yes yet").getByText("Choose I'm going to be the first.", { exact: true }).waitFor();
+    await attendeeTab("Maybe").click();
+    await expectEmptyState(attendeesBox("No maybes yet"), "an open event's empty Maybe list", { tones: BRAND_TONES.demoUniversity });
+    await attendeesBox("No maybes yet").getByText("Members who might come are listed here.", { exact: true }).waitFor();
+    await attendeeTab("Going").click();
+    await noAttendees.stop();
     const before = await page.locator("strong").first().textContent();
     await page.click("button:has-text(\"I'm going\")");
     await page.locator("strong").first().filter({ hasText: new RegExp(`^${Number(before) + 1}$`) }).waitFor({ timeout: 10000 });
@@ -870,6 +889,25 @@ try {
     if ((await mail.getAttribute("target")) !== null || !(await mail.getAttribute("rel")).includes("nofollow")) throw new Error("a member's email link should open in place, with nofollow");
     await expectSvgNoEmoji(page.getByText("Mumbai · Blue Tokai, Bandra West", { exact: true }).locator("xpath=.."), "the event's city line");
     await shot("07-event");
+  });
+
+  await step("a past event's empty lists say only that nobody answered, inviting no one to be first", async () => {
+    // London pub night is over, with one Can't make it and nobody going or maybe.
+    await page.locator("a", { hasText: "All events" }).click();
+    await page.getByRole("tab", { name: "Past", exact: true }).click();
+    await page.click("text=London pub night");
+    await page.getByText("RSVPs are closed: this event has started.", { exact: true }).waitFor();
+    for (const [tab, title] of [
+      ["Going", "No one has said yes yet"],
+      ["Maybe", "No maybes yet"],
+    ]) {
+      await attendeeTab(tab).click();
+      const box = attendeesBox(title);
+      await expectEmptyState(box, `a past event's empty ${tab} list`, { tones: BRAND_TONES.demoUniversity });
+      const said = (await box.innerText()).trim();
+      if (said !== title) throw new Error(`a past event's empty ${tab} list reads "${said}", not just "${title}"`);
+    }
+    await shot("07b-past-event-no-attendees");
   });
 
   await step("directory search and profile", async () => {

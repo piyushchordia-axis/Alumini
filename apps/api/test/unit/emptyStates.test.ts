@@ -3,9 +3,12 @@ import {
   MY_CONTENT,
   MY_CONTENT_OFF,
   MY_CONTENT_TABS,
+  RSVP_LABELS,
   SEEKERS_EMPTY,
   TENANT_FEATURES,
+  attendeesEmpty,
   businessesEmpty,
+  commentsEmpty,
   directoryEmpty,
   eventsEmpty,
   feedEmpty,
@@ -17,11 +20,16 @@ import {
   myContentTabs,
   notificationsEmpty,
   peersWord,
+  postTakesComments,
   referralsReceivedEmpty,
+  rsvpChoices,
   tenantSearchEmpty,
+  type AttendeeList,
+  type AttendeesEmptyEvent,
   type EmptyCopy,
   type EmptyCreate,
   type EmptyViewer,
+  type ModerationStatus,
   type MyContentTab,
   type TenantFeature,
   type TenantFeatures,
@@ -208,6 +216,91 @@ describe("tenantSearchEmpty", () => {
   it("suggests another search only while there is one", () => {
     expect(tenantSearchEmpty(true).description).toBe("Try a different search, or ask your alumni office to join Illuminize.");
     expect(tenantSearchEmpty(false).description).toBe("Ask your alumni office to join Illuminize.");
+  });
+});
+
+describe("commentsEmpty", () => {
+  it("invites the first reply under a published post, whose page holds the comment box, and offers nothing", () => {
+    expect(commentsEmpty(true)).toEqual({ title: "No comments yet", description: "Be the first to reply.", live: false });
+    expect(commentsEmpty(true).action).toBeUndefined();
+  });
+
+  it("says when comments open under a post that isn't published, which has no comment box", () => {
+    expect(commentsEmpty(false)).toEqual({ title: "No comments yet", description: "Comments open once the post is published.", live: false });
+    expect(commentsEmpty(false).action).toBeUndefined();
+  });
+});
+
+describe("postTakesComments", () => {
+  // Both apps gate the comment box and the empty box's line on it, as the API refuses a comment on any post but these.
+  it.each([
+    ["APPROVED", true],
+    ["PENDING", false],
+    ["REJECTED", false],
+    ["REMOVED", false],
+  ] as [ModerationStatus, boolean][])("a post that's %s takes comments: %s", (moderationStatus, takes) => {
+    expect(postTakesComments({ moderationStatus })).toBe(takes);
+    expect(commentsEmpty(postTakesComments({ moderationStatus })).description).toBe(takes ? "Be the first to reply." : "Comments open once the post is published.");
+  });
+});
+
+describe("attendeesEmpty", () => {
+  const NOW = Date.parse("2026-11-07T06:30:00Z");
+  const event = (over: Partial<AttendeesEmptyEvent> = {}): AttendeesEmptyEvent => ({
+    isCancelled: false,
+    startAt: "2026-11-07T18:00:00.000Z",
+    moderationStatus: "APPROVED",
+    maxAttendees: null,
+    yesCount: 0,
+    myRsvp: null,
+    ...over,
+  });
+  /** Both lists as the page draws them for `e` at NOW. */
+  const lists = (e: AttendeesEmptyEvent) => (["YES", "MAYBE"] as AttendeeList[]).map((list) => attendeesEmpty(list, e, NOW));
+  const OPEN_MAYBE = { title: "No maybes yet", description: "Members who might come are listed here.", live: false };
+
+  it("while answers are open, invites the member to be first, under the button's own name, and says who Maybe lists", () => {
+    expect(lists(event())).toEqual([{ title: "No one has said yes yet", description: "Choose I'm going to be the first.", live: false }, OPEN_MAYBE]);
+    expect(attendeesEmpty("YES", event(), NOW).description).toBe(`Choose ${RSVP_LABELS.YES} to be the first.`);
+    // A capped event with places left still takes an I'm going.
+    expect(lists(event({ maxAttendees: 5, yesCount: 4 }))[0]?.description).toBe("Choose I'm going to be the first.");
+  });
+
+  it.each([
+    ["has begun", event({ startAt: "2026-11-07T06:00:00.000Z" })],
+    ["begins now", event({ startAt: new Date(NOW).toISOString() })],
+    ["is cancelled", event({ isCancelled: true })],
+    ["waits for approval", event({ moderationStatus: "PENDING" })],
+    ["was turned down", event({ moderationStatus: "REJECTED" })],
+  ])("once an event %s, says only that nobody has answered, inviting no one", (_, e) => {
+    expect(lists(e)).toEqual([
+      { title: "No one has said yes yet", live: false },
+      { title: "No maybes yet", live: false },
+    ]);
+    for (const copy of lists(e)) expect(copy.description).toBeUndefined();
+  });
+
+  it("invites no one to be first going where I'm going is Full, as a full event's count can take in members it doesn't list", () => {
+    // One place, taken by a member who was suspended after answering: counted, not listed, so Going lists nobody.
+    const full = event({ maxAttendees: 1, yesCount: 1 });
+    expect(rsvpChoices(full)[0]).toMatchObject({ value: "YES", full: true });
+    expect(lists(full)).toEqual([{ title: "No one has said yes yet", live: false }, OPEN_MAYBE]);
+  });
+
+  it("invites no one to be first going once I'm going is the member's own answer, as it is before the list catches up", () => {
+    expect(lists(event({ myRsvp: "YES", yesCount: 1 }))).toEqual([{ title: "No one has said yes yet", live: false }, OPEN_MAYBE]);
+    // Their answer is still theirs at a full event, which Full doesn't cover.
+    expect(lists(event({ myRsvp: "YES", yesCount: 1, maxAttendees: 1 }))[0]?.description).toBeUndefined();
+    // A maybe or a no can still be changed to I'm going.
+    for (const myRsvp of ["MAYBE", "NO"] as const) expect(lists(event({ myRsvp }))[0]?.description, myRsvp).toBe("Choose I'm going to be the first.");
+  });
+
+  it("keeps each list's title whether answers are open or not, and offers nothing, the RSVP buttons being just above", () => {
+    const begun = event({ startAt: "2026-11-07T06:00:00.000Z" });
+    for (const list of ["YES", "MAYBE"] as AttendeeList[]) {
+      expect(attendeesEmpty(list, event(), NOW).title).toBe(attendeesEmpty(list, begun, NOW).title);
+      for (const e of [event(), begun]) expect(attendeesEmpty(list, e, NOW).action, `${list} ${e.startAt}`).toBeUndefined();
+    }
   });
 });
 

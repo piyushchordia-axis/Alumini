@@ -1,6 +1,7 @@
 import type { FundingKind, TenantFeature, TenantFeatures, TenantType } from "../constants";
-import type { TenantSummaryDto } from "../types/dto";
+import type { EventDto, PostDto, TenantSummaryDto } from "../types/dto";
 import { CAN_REFER_LABEL } from "./referrals";
+import { RSVP_LABELS, rsvpChoices, rsvpsOpen, type AttendeeList } from "./rsvp";
 
 // What the member lists say when they're empty, and when each offers a way on, the same on both apps. Each app draws one
 // with its EmptyState: the section's icon, or the search icon on a search or a filter's result (`live`).
@@ -162,6 +163,45 @@ export function tenantSearchEmpty(searching: boolean): EmptyCopy {
     action: { label: "Clear search", kind: "showAll", variant: "outline" },
     live: true,
   };
+}
+
+/* ---------- Under a post or an event ---------- */
+
+/**
+ * Whether a post takes comments, so whether its page shows the box to write one: once it's published, as the API has it.
+ * One waiting for approval, turned down or removed doesn't (yet). Both apps gate the comment box and commentsEmpty on it.
+ */
+export function postTakesComments(post: Pick<PostDto, "moderationStatus">): boolean {
+  return post.moderationStatus === "APPROVED";
+}
+
+/**
+ * A post's comments, on its page, which holds the box to write one, so it offers nothing. `canComment` is
+ * postTakesComments: only then is the member invited to reply first.
+ */
+export function commentsEmpty(canComment: boolean): EmptyCopy {
+  return { title: "No comments yet", description: canComment ? "Be the first to reply." : "Comments open once the post is published.", live: false };
+}
+
+/** What attendeesEmpty reads of the event: what rsvpsOpen and the RSVP buttons (rsvpChoices) read. */
+export type AttendeesEmptyEvent = Pick<EventDto, "isCancelled" | "startAt" | "moderationStatus" | "maxAttendees" | "yesCount" | "myRsvp">;
+
+/**
+ * One of an event's attendee lists, as its page draws it at `now`, the time the page opened (as the RSVP buttons go by).
+ * Going invites the member to answer first only while they can choose I'm going, just above: the event takes answers
+ * (rsvpsOpen), it isn't Full, and it isn't their answer already. A full event can list nobody going, as its count also
+ * takes in members who aren't listed, such as one suspended after answering. Maybe says who it would list while the
+ * event takes answers. Otherwise, as once the event has begun, is cancelled or isn't approved, they say only that nobody
+ * has.
+ */
+export function attendeesEmpty(list: AttendeeList, event: AttendeesEmptyEvent, now: number | Date): EmptyCopy {
+  const open = rsvpsOpen(event, now);
+  if (list === "YES") {
+    const going = rsvpChoices(event).find((c) => c.value === "YES");
+    const invite = open && going !== undefined && !going.full && !going.chosen;
+    return { title: "No one has said yes yet", description: invite ? `Choose ${RSVP_LABELS.YES} to be the first.` : undefined, live: false };
+  }
+  return { title: "No maybes yet", description: open ? "Members who might come are listed here." : undefined, live: false };
 }
 
 /* ---------- My posts & listings ---------- */

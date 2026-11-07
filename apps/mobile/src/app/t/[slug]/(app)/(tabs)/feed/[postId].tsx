@@ -1,12 +1,14 @@
+import { commentsEmpty, postTakesComments } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
+import { IconComment } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { PostCard } from "@/components/PostCard";
 import { ReportButton } from "@/components/ReportButton";
-import { Button, Input, ListEmpty, LoadError, Muted, Row, Spinner, StackScreen } from "@/components/ui";
+import { Button, EmptyState, headingRole, Input, ListEmpty, LoadError, Muted, Row, Spinner, StackScreen } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -49,7 +51,8 @@ export default function PostDetailScreen() {
         <LoadError error={post.error ?? "Not found"} onRetry={() => void post.refetch()} onBack={() => router.back()} backLabel="Back" />
       </StackScreen>
     );
-  const canComment = post.data.moderationStatus === "APPROVED";
+  const canComment = postTakesComments(post.data);
+  const empty = commentsEmpty(canComment);
   return (
     <StackScreen title="Post">
       {/* In-tree StackHeader is above this view, so the keyboard offset is zero. */}
@@ -64,14 +67,15 @@ export default function PostDetailScreen() {
           ListHeaderComponent={
             <View style={{ gap: spacing.md, marginBottom: spacing.sm }}>
               <PostCard slug={slug} post={post.data} detail onDeleted={() => router.back()} />
-              <Text style={{ fontWeight: "700", color: colors.text }}>
+              {/* A heading, as on the web, over the empty box's own (level 3). */}
+              <Text {...headingRole(2)} style={{ fontWeight: "700", color: colors.text }}>
                 Comments
               </Text>
             </View>
           }
           ListEmptyComponent={
             <ListEmpty loading={comments.isLoading} error={comments.error} onRetry={() => void comments.refetch()}>
-              <Muted>No comments yet.</Muted>
+              <EmptyState inline icon={<IconComment />} title={empty.title} description={empty.description} />
             </ListEmpty>
           }
           renderItem={({ item: c }) => (

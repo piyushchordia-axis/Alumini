@@ -55,3 +55,17 @@ export function rsvpsOpen(event: Pick<EventDto, "isCancelled" | "startAt" | "mod
 export function rsvpClosedText(event: Pick<EventDto, "isCancelled" | "startAt">, now: number | Date): string | null {
   return !event.isCancelled && hasStarted(event, now) ? RSVP_CLOSED_TEXT : null;
 }
+
+/** The lists an event's page shows of who's coming: those going, and the maybes. Nobody lists who can't make it. */
+export type AttendeeList = Exclude<RsvpStatus, "NO">;
+
+/** The heading over them on both apps. */
+export const ATTENDEES_TITLE = "Who's coming";
+
+/** Going and Maybe, the tabs over the attendee lists, each with its count, in the order both apps show them. */
+export function attendeeTabs(event: Pick<EventDto, "yesCount" | "maybeCount">): { value: AttendeeList; label: string; count: number }[] {
+  return [
+    { value: "YES", label: "Going", count: event.yesCount },
+    { value: "MAYBE", label: "Maybe", count: event.maybeCount },
+  ];
+}

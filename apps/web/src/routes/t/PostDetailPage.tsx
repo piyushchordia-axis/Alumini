@@ -1,3 +1,4 @@
+import { postTakesComments } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CommentList } from "@/components/feed/CommentList";
@@ -22,7 +23,7 @@ export function PostDetailPage() {
       <PostCard slug={tenant.slug} post={post.data} detail onDeleted={() => navigate(`/t/${tenant.slug}/app/feed`)} />
       <Card className="p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Comments</h2>
-        <CommentList postId={postId} canComment={post.data.moderationStatus === "APPROVED"} />
+        <CommentList postId={postId} canComment={postTakesComments(post.data)} />
       </Card>
     </div>
   );

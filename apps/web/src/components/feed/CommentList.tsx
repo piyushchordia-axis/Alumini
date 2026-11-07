@@ -1,9 +1,11 @@
+import { commentsEmpty } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MemberLink } from "@/components/common/MemberLink";
+import { IconComment } from "@/components/icons";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Button, LoadMore, Textarea } from "@/components/ui";
+import { Button, EmptyState, ErrorBox, LoadMore, Textarea } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -17,6 +19,7 @@ export function CommentList({ postId, canComment }: { postId: string; canComment
   const qc = useQueryClient();
   const list = useInfiniteList(qk.comments(slug, postId), (cursor) => api.posts.comments.list(slug, postId, { cursor, limit: 20 }));
   const [body, setBody] = useState("");
+  const empty = commentsEmpty(canComment);
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: qk.comments(slug, postId) });
     void qc.invalidateQueries({ queryKey: qk.post(slug, postId) });
@@ -66,7 +69,8 @@ export function CommentList({ postId, canComment }: { postId: string; canComment
           </li>
         ))}
       </ul>
-      {list.items.length === 0 && !list.isLoading && <p className="text-sm text-slate-400">No comments yet.</p>}
+      {list.error && <ErrorBox error={list.error} />}
+      {list.items.length === 0 && !list.isLoading && !list.error && <EmptyState inline icon={<IconComment />} title={empty.title} description={empty.description} />}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

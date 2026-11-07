@@ -124,8 +124,9 @@ Covers:
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
-  and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); the
-  pinned strip, a region named "Pinned posts" holding the seeded announcement and welcome, each a white card saying
+  and the count in that ink), comment (the new post's "No comments yet" box, its icon in the institution's ink on a
+  round wash, inviting the first reply and gone once there is one) and edit; the live bell (a second member's reaction
+  arrives with no reload); the pinned strip, a region named "Pinned posts" holding the seeded announcement and welcome, each a white card saying
   Pinned once (an SVG pin, in the ink) above its author and framed 1px in Demo University's edge (3:1 on white,
   `cardEdges`), the announcement with its badge (its ink readable and its edge at 3:1) and a 4px left edge in the ink,
   the welcome with neither (Demo University's ink is its brand blue, so the line's and the edge's classes are checked
@@ -151,7 +152,10 @@ Covers:
 - rich text: the seeded meetup's bullets, its link opening in a new tab, and its email opening in place with nofollow;
   the Zylo Labs listing's bullets as one list with no dash left, its link, and a numbered list keeping its start;
 - an RSVP, the chosen answer in its tone (the success fill, its ink readable, an edge at 3:1, a drawn check and no ✓)
-  and every answer 44px tall; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
+  and every answer 44px tall; the meetup's Going and Maybe lists answered empty (scripted), "No one has said yes yet"
+  saying "Choose I'm going to be the first." and "No maybes yet" who it would list, each its own box with the icon
+  in the institution's ink on a round wash; and London pub night, which is over, saying only that nobody has, inviting
+  no one; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
   More filters leaving Priya out, Were there in beside the search ("Were there in 2012" and so on) leaving Priya
   (2008–2012) out in 2013, finding her in 2012, and Any year taking it off, and Priya's card with her headline, then
   her profile: headline, skills, her current role before her past one, studies here and elsewhere, and a LinkedIn link
@@ -247,7 +251,8 @@ Covers:
   kind), and with every section off its "Nothing to show" under the page's header and no wider than the page, at Demo
   University (blue); the pupil's three "aren't available" boxes, each with Go to the app, and her empty Posts tab in My
   posts, with Write a post (no Create group anywhere there) opening the feed with focus in its composer, once (a reload
-  keeps the state but doesn't focus it again), at Demo School (amber).
+  keeps the state but doesn't focus it again), at Demo School (amber); and the new post's comments and the events'
+  attendee lists, inside their cards (above).
 
 ## Web (tenant admin + platform console)
 
@@ -381,7 +386,9 @@ Covers:
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
   taking it back, the author's initials on the post in the member's own tone, not the institution's colours, the same as
-  on the app bar's My profile, beside the app bar's Demo University initials in its ink on its tint, the celebrations
+  on the app bar's My profile, beside the app bar's Demo University initials in its ink on its tint, the post's page
+  saying "No comments yet" under a level-2 Comments heading, in its own box (the icon in the institution's ink on a round wash) with "Be the first to
+  reply.", as on the web, the celebrations
   card (a birthday row and an anniversary row with years) and a poll vote, marked with a drawn check rather than a ✓,
   with "your vote" in the row's hidden text; a poll with several choices, its drawn boxes saying which are chosen
   (`aria-checked`) before the vote;
@@ -416,7 +423,9 @@ Covers:
   skills"; and "You have 0 of 4 skills" with no marks on Associate Product Manager;
 - an RSVP, with the description's bullets, link and mail link as on the web, and the chosen answer as on the web (its
   tone's fill, ink and edge, a drawn check and no ✓) in a "Your RSVP" group of three 44px buttons, then "You: yes" on
-  the feed's strip;
+  the feed's strip; Who's coming with the web's Going and Maybe tabs, 44px tall, and the same empty lists as on the
+  web: the meetup's answered empty (scripted) inviting the member to be first and saying who Maybe would list, and
+  London pub night's, which is over, saying only that nobody has;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
   name, the Investing filter leaving Priya out, Were there in chosen from a list behind Filters and counted with them
   (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
@@ -625,8 +634,8 @@ Covers:
   investing opening the investing form and Plan a gathering the event form, each with Back on its section's list, and
   with every section off its "Nothing to show", at Demo University (blue); the pupil's "aren't available" screens at
   Demo School (amber), each with its way out, and her empty Posts tab in My posts, with Write a post (no Create group on
-  the screen) opening the new-post screen; and the console's empty chat reports, Pending tab and invitations at the
-  Samaj (orange).
+  the screen) opening the new-post screen; the new post's comments and the events' attendee lists (above); and the
+  console's empty chat reports, Pending tab and invitations at the Samaj (orange).
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -842,6 +851,9 @@ the console (part 14).
       chosen RSVP is its colour (green for I'm going) with a check, the label not cut off at the largest text size, and
       TalkBack or VoiceOver reads the buttons as a "Your RSVP" group, the chosen one as selected. In a poll you voted
       in, each result is one item, and yours ends "your vote".
+- [ ] On London pub night (Events → Past), Who's coming shows Going and Maybe tabs that are easy to hit, each empty
+      list saying only "No one has said yes yet" or "No maybes yet" under the icon in the brand's round tint. Your own
+      new post's page says "No comments yet" and "Be the first to reply." the same way.
 - [ ] A search that finds nothing, with TalkBack or VoiceOver on: type "zzzz" in the Directory's search box, and
       "No members match. Try removing a filter." is read once, not once a letter. With the keyboard still up, one tap
       on Show all members empties the search and the filters and puts the reader on the Search members box. The same on

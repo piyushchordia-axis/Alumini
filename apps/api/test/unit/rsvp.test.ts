@@ -1,10 +1,12 @@
 import {
+  ATTENDEES_TITLE,
   MY_RSVP_LABELS,
   RSVP_CLOSED_TEXT,
   RSVP_GROUP_LABEL,
   RSVP_STATUSES,
   RSVP_TONES,
   STATUS_TONES,
+  attendeeTabs,
   myRsvpLabel,
   rsvpBadge,
   rsvpChoices,
@@ -103,5 +105,16 @@ describe("rsvpsOpen and rsvpClosedText", () => {
   it.each<ModerationStatus>(["PENDING", "REJECTED", "REMOVED"])("close for an event that is %s, before it begins too", (moderationStatus) => {
     expect(rsvpsOpen(event({ moderationStatus }), NOW)).toBe(false);
     expect(rsvpClosedText(event({ moderationStatus }), NOW)).toBeNull();
+  });
+});
+
+describe("the attendee lists", () => {
+  it("are Going and Maybe under Who's coming, in that order, each with its count, and never who can't make it", () => {
+    expect(ATTENDEES_TITLE).toBe("Who's coming");
+    expect(attendeeTabs({ yesCount: 3, maybeCount: 1 })).toEqual([
+      { value: "YES", label: "Going", count: 3 },
+      { value: "MAYBE", label: "Maybe", count: 1 },
+    ]);
+    expect(attendeeTabs({ yesCount: 0, maybeCount: 0 }).map((t) => t.count)).toEqual([0, 0]);
   });
 });

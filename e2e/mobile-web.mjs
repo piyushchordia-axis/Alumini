@@ -474,6 +474,22 @@ try {
     await card.locator('[aria-label="Like"][aria-pressed="false"]').waitFor();
   });
 
+  // An empty state's box, found by its title, a direct child of the box.
+  const emptyBox = (title) => page.getByText(title, { exact: true }).locator("visible=true").first().locator("xpath=..");
+
+  await step("a new post's comments say there are none yet and invite the first reply", async () => {
+    await page.getByText(`Edited on mobile ${unique}`, { exact: true }).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/feed\/[0-9a-f-]{36}$/);
+    // Under a level-2 Comments heading, as on the web, over the box's own.
+    await page.getByRole("heading", { name: "Comments", exact: true, level: 2 }).locator("visible=true").first().waitFor();
+    const noComments = emptyBox("No comments yet");
+    await expectEmptyState(noComments, "a new post's empty comments", { tones: BRAND_TONES.demoUniversity });
+    await noComments.getByText("Be the first to reply.", { exact: true }).waitFor();
+    await shot("m04b3-no-comments");
+    await page.getByLabel(/back$/i).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/feed$/);
+  });
+
   await step("celebrations card and a poll vote on the feed", async () => {
     const card = page.getByText("Celebrating today", { exact: true }).locator("visible=true").first();
     await card.waitFor();
@@ -785,7 +801,7 @@ try {
     // bar) rather than a screen with nowhere to go; the Feed tab comes back.
     await mumbai.click();
     await page.waitForURL(/\/t\/demo-university\/events\/[0-9a-f-]{36}$/);
-    await page.getByText("Who's going").locator("visible=true").first().waitFor();
+    await page.getByText("Who's coming").locator("visible=true").first().waitFor();
     await page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last().click();
     await page.waitForURL("**/t/demo-university/events");
     await mumbaiCard().waitFor();
@@ -1079,10 +1095,23 @@ try {
     await page.waitForURL(/\/t\/demo-university\/jobs$/);
   });
 
+  // The event page's Going and Maybe tabs (not links, as the bar's are), whose names end in their counts.
+  const attendeeTab = (label) => page.locator('[role="tab"]:not(a)').filter({ hasText: new RegExp(`^${label}`) }).locator("visible=true").first();
+
   await step("RSVP to an event", async () => {
+    // Its lists answered with no one at first (scripted), as for an event nobody has answered yet: as on the web, while
+    // answers are open Going invites the member to be first under the button's own name, and Maybe says who it would list.
+    const noAttendees = await scriptEmptyList(page, /\/api\/v1\/t\/demo-university\/events\/[0-9a-f-]+\/attendees\?/);
     await openSection("Events");
     await mumbaiCard().click();
-    await page.getByText("Who's going").waitFor();
+    await page.getByText("Who's coming").waitFor();
+    await expectEmptyState(emptyBox("No one has said yes yet"), "an open event's empty Going list", { tones: BRAND_TONES.demoUniversity });
+    await emptyBox("No one has said yes yet").getByText("Choose I'm going to be the first.", { exact: true }).waitFor();
+    await attendeeTab("Maybe").click();
+    await expectEmptyState(emptyBox("No maybes yet"), "an open event's empty Maybe list", { tones: BRAND_TONES.demoUniversity });
+    await emptyBox("No maybes yet").getByText("Members who might come are listed here.", { exact: true }).waitFor();
+    await attendeeTab("Going").click();
+    await noAttendees.stop();
     // The seeded description's bullets are list items, and its web address a link.
     await page.getByRole("listitem").filter({ hasText: "Partners and kids welcome" }).locator("visible=true").first().waitFor();
     await page.getByRole("link", { name: "https://example.com/maps/blue-tokai-bandra", exact: true }).locator("visible=true").first().waitFor();
@@ -1116,6 +1145,31 @@ try {
     await page.waitForURL("**/t/demo-university/feed");
     const answered = upcomingStrip().getByRole("link", { name: /^Mumbai alumni coffee meetup, .+, Mumbai, You: yes$/ });
     await answered.getByText("You: yes", { exact: true }).waitFor();
+  });
+
+  await step("a past event's empty lists say only that nobody answered, inviting no one to be first, as on the web", async () => {
+    // London pub night is over, with one Can't make it and nobody going or maybe. The RSVP step ends on the feed, so
+    // Events opens from More.
+    await openSection("Events");
+    await page.waitForURL(/\/t\/demo-university\/events$/);
+    await page.locator('[role="tab"]:not(a)').getByText("Past", { exact: true }).locator("visible=true").first().click();
+    await page.getByText("London pub night", { exact: true }).locator("visible=true").first().click();
+    await page.waitForURL(/\/t\/demo-university\/events\/[0-9a-f-]{36}$/);
+    await page.getByText("RSVPs are closed: this event has started.", { exact: true }).locator("visible=true").first().waitFor();
+    for (const [tab, title] of [
+      ["Going", "No one has said yes yet"],
+      ["Maybe", "No maybes yet"],
+    ]) {
+      await attendeeTab(tab).click();
+      // Each a 44pt target, as the RSVP buttons are.
+      const { height } = await attendeeTab(tab).boundingBox();
+      if (height < 44) throw new Error(`the ${tab} tab is ${height}px tall, under 44px`);
+      const box = emptyBox(title);
+      await expectEmptyState(box, `a past event's empty ${tab} list`, { tones: BRAND_TONES.demoUniversity });
+      const said = (await box.innerText()).trim();
+      if (said !== title) throw new Error(`a past event's empty ${tab} list reads "${said}", not just "${title}"`);
+    }
+    await shot("m06b-past-event-no-attendees");
   });
 
   await step("directory search, its new filters and a member's full profile", async () => {

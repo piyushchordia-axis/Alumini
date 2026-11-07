@@ -101,7 +101,9 @@ phone-sized preview in the browser. Port 4000 must still be public.
   the phone), each empty tab says what it would hold and offers the way to add one: **Post a job**, **Add a business**,
   **I'm raising** and **I'm investing**, **Plan a gathering**. Search the Directory for "zzzz": **No members match**
   offers **Show all members**, which clears the search and the filters and puts you back in the search box, as Jobs and
-  Businesses do.
+  Businesses do. Open a post you've just written: "No comments yet" invites the first reply. On the phone, an event's
+  **Who's coming** now has the web's **Going** and **Maybe** tabs; on **London pub night** (Events → Past), which is
+  over, both say only that nobody answered, where an upcoming event's empty list invites you to be the first.
 - **A first message, welcomed** (on fresh demo data: run `pnpm db:reset` first, because once Priya has written to Sneha,
   as Wave 2's Messages walk-through does, the page opens their thread instead). As Priya, choose **Message this member**
   on Sneha Kulkarni's profile: in place of the old warning, a note, **Say hello to Sneha Kulkarni**, says her first

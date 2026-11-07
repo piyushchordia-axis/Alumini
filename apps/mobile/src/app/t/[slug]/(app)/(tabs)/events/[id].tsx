@@ -1,15 +1,15 @@
-import { EVENT_KIND_LABELS, GREYS, memberYearsLabel, RSVP_GROUP_LABEL, rsvpChoices, rsvpClosedText, rsvpsOpen, STATUS_TONES, type RsvpStatus } from "@illuminize/shared";
+import { ATTENDEES_TITLE, attendeesEmpty, attendeeTabs, EVENT_KIND_LABELS, GREYS, memberYearsLabel, RSVP_GROUP_LABEL, rsvpChoices, rsvpClosedText, rsvpsOpen, STATUS_TONES, type AttendeeList, type RsvpStatus } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
-import { IconCheck, IconMapPin } from "@/components/icons";
+import { IconCheck, IconEvents, IconMapPin } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { RichText } from "@/components/RichText";
-import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner, toggleState } from "@/components/ui";
+import { Avatar, Badge, Button, Card, EmptyState, headingRole, ListEmpty, LoadError, Muted, Row, Screen, Spinner, Tabs, toggleState } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -25,7 +25,9 @@ export default function EventDetailScreen() {
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
   const [openedAt] = useState(() => Date.now());
-  const attendees = useInfiniteList(qk.attendees(slug, id), (cursor) => api.events.attendees(slug, id, { status: "YES", cursor, limit: 30 }), !!ev.data);
+  const [who, setWho] = useState<AttendeeList>("YES");
+  // Under the event's key, so an RSVP refreshes both lists.
+  const attendees = useInfiniteList([...qk.attendees(slug, id), who], (cursor) => api.events.attendees(slug, id, { status: who, cursor, limit: 30 }), !!ev.data);
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["events", slug] });
     void qc.invalidateQueries({ queryKey: qk.event(slug, id) });
@@ -43,6 +45,7 @@ export default function EventDetailScreen() {
   const e = ev.data;
   const disabled = !rsvpsOpen(e, openedAt) || rsvp.isPending;
   const closedText = rsvpClosedText(e, openedAt);
+  const noOne = attendeesEmpty(who, e, openedAt);
   return (
     <Screen title="Event">
       <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -115,8 +118,15 @@ export default function EventDetailScreen() {
         </View>
       </Card>
       <Card>
-        <Text style={{ fontWeight: "700", color: colors.text }}>Who&apos;s going</Text>
-        {attendees.items.length === 0 && !attendees.isLoading && <Muted>No RSVPs yet — be the first!</Muted>}
+        <Text {...headingRole(2)} style={{ fontWeight: "700", color: colors.text }}>
+          {ATTENDEES_TITLE}
+        </Text>
+        <Tabs tall value={who} onChange={setWho} tabs={attendeeTabs(e)} />
+        {attendees.items.length === 0 && (
+          <ListEmpty loading={attendees.isLoading} error={attendees.error} onRetry={() => void attendees.refetch()}>
+            <EmptyState inline icon={<IconEvents />} title={noOne.title} description={noOne.description} />
+          </ListEmpty>
+        )}
         {attendees.items.map((m) => (
           <Pressable key={m.id} onPress={() => router.push(`/t/${slug}/directory/${m.id}`)} accessibilityRole="link">
             <Row gap={8}>

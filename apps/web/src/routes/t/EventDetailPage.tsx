@@ -1,4 +1,4 @@
-import { EVENT_KIND_LABELS, memberYearsLabel } from "@illuminize/shared";
+import { ATTENDEES_TITLE, attendeesEmpty, attendeeTabs, EVENT_KIND_LABELS, memberYearsLabel, type AttendeeList } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -7,10 +7,10 @@ import { ReasonModal } from "@/components/admin/ReasonModal";
 import { MemberLink } from "@/components/common/MemberLink";
 import { RichText } from "@/components/common/RichText";
 import { RsvpButtons } from "@/components/events/RsvpButtons";
-import { IconMapPin } from "@/components/icons";
+import { IconEvents, IconMapPin } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Card, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -25,7 +25,9 @@ export function EventDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
-  const [who, setWho] = useState<"YES" | "MAYBE">("YES");
+  const [who, setWho] = useState<AttendeeList>("YES");
+  // As RsvpButtons does: whether the event takes answers goes by when the page opened.
+  const [openedAt] = useState(() => Date.now());
   const [cancelOpen, setCancelOpen] = useState(false);
   const attendees = useInfiniteList(qk.attendees(slug, id, who), (cursor) => api.events.attendees(slug, id, { status: who, cursor, limit: 30 }), !!ev.data);
   const invalidate = () => {
@@ -53,6 +55,7 @@ export function EventDetailPage() {
   if (ev.isLoading) return <Loading />;
   if (ev.error || !ev.data) return <ErrorBox error={ev.error ?? "Not found"} />;
   const e = ev.data;
+  const noOne = attendeesEmpty(who, e, openedAt);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Link to={`/t/${slug}/app/events`} className="text-sm text-slate-500 hover:text-slate-800">
@@ -117,19 +120,12 @@ export function EventDetailPage() {
       </Card>
       <Card className="p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">Who's coming</h2>
-          <Tabs
-            value={who}
-            onChange={setWho}
-            tabs={[
-              { value: "YES", label: "Going", count: e.yesCount },
-              { value: "MAYBE", label: "Maybe", count: e.maybeCount },
-            ]}
-          />
+          <h2 className="text-sm font-semibold text-slate-700">{ATTENDEES_TITLE}</h2>
+          <Tabs value={who} onChange={setWho} tabs={attendeeTabs(e)} />
         </div>
         {attendees.isLoading && <Loading />}
         {attendees.error && <ErrorBox error={attendees.error} />}
-        {attendees.items.length === 0 && !attendees.isLoading && !attendees.error && <p className="text-sm text-slate-400">{who === "YES" ? "No one has said yes yet. Be the first!" : "No maybes yet."}</p>}
+        {attendees.items.length === 0 && !attendees.isLoading && !attendees.error && <EmptyState inline icon={<IconEvents />} title={noOne.title} description={noOne.description} />}
         <ul className="grid gap-3 sm:grid-cols-2">
           {attendees.items.map((m) => (
             <li key={m.id}>

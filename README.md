@@ -261,6 +261,11 @@ hides it and deletes nothing. The rules live in `packages/shared/src/lib/feature
   member who may chat (not a current pupil), and Referrals shown as a way out offers no Post a job. Each tab of My posts
   has its own box (`MY_CONTENT`), shown only while its section is on: Funding offers I'm raising and I'm investing,
   Past events nothing, and Write a post opens the feed with focus in its composer on the web, New post on the phone.
+  A post's comments and an event's Going and Maybe lists say they're empty in a small box of their own
+  (`commentsEmpty`, `attendeesEmpty`): the attendees inside their card on both apps, the comments inside theirs on the
+  web and under the post, on the page, on the phone. The first reply is invited only under a published post
+  (`postTakesComments`), and the first I'm going only while it can be chosen (`rsvpsOpen`, not Full and not the
+  member's answer already); a past or cancelled event's lists say only that nobody has.
 
 ### Current pupils
 
@@ -700,6 +705,7 @@ looks the same on the web and the phone and stays readable in any institution co
   cancelled and not begun when the page opened), the line once it has begun (`rsvpClosedText`) and the card's badge
   (`rsvpBadge`: "You: yes" and so on). The chosen answer is its tone's fill, edge and ink, semibold, after a drawn
   check; the others are white with a light border. Each is a 44px target, in a group named "Your RSVP" on both apps.
+  Under them, Who's coming has Going and Maybe tabs with their counts (`attendeeTabs`) on both apps.
 - **Status text.** A field's error is the danger ink `#991b1b` on both apps (web `FormField`, mobile `Input` and
   `FieldError`), and so, on the web, are the required `*` and a removed comment's "Removed"; the phone writes its `*`
   into the label, in the label's grey, and shows no "Removed" on comments. The reds the ink replaced fell under 4.5:1 on

@@ -39,7 +39,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `lib/layout.ts` the columns text laid side by side takes, from its longest word (`longestWordLength`,
   `wordColumnWidth`; web `fitColumns` and mobile `FitGrid` build on it), and how far the phone's control labels grow
   (`CONTROL_TEXT_MAX_SCALE`);
-  `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
+  `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, whether it takes answers (`rsvpsOpen`) and its Going
+  and Maybe tabs (`attendeeTabs`);
   `lib/events.ts` the phone feed's Upcoming events strip (`UPCOMING_EVENTS_STRIP`, its title and links' names);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
   `lib/branding.ts` the console's Branding form (`brandingSave`, `BRAND_SWATCHES`, `brandContrastWarnings`) and the
@@ -47,8 +48,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `lib/invitations.ts` the console's invitations: an imported CSV read (`readInvitationCsv`), the template, the import
   in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`;
   `lib/charts.ts` the charts' palette, ticks, layouts and hand-written number and week text; `lib/analytics.ts` the
-  Analytics page's figures and chart cards; `lib/emptyStates.ts` what the member lists say when empty and which way on
-  each offers (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`).
+  Analytics page's figures and chart cards; `lib/emptyStates.ts` what the member lists say when empty (a post's
+  comments, with whether it takes them, `postTakesComments`, and an event's attendees too) and which way on each offers
+  (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
