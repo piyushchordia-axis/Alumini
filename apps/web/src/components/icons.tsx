@@ -461,6 +461,15 @@ export function IconAlert(p: IconProps) {
     </Svg>
   );
 }
+/** More about something, as a group thread's link to Group details: the alert mark turned over. */
+export function IconInfo(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 7.5h.01" />
+    </Svg>
+  );
+}
 
 /* Job facts, contacts and company details. The mobile set draws each the same way. */
 export function IconMapPin(p: IconProps) {

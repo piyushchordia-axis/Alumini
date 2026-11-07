@@ -1,5 +1,5 @@
 import { memberYearsLine } from "@illuminize/shared";
-import { chatKeys, newClientKey, unsentRemainder } from "@illuminize/shared/chat";
+import { chatKeys, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -92,7 +92,7 @@ export function NewConversationPage() {
       if (mounted.current) navigate(`${inbox}/${id}`, { replace: true });
     } catch (err) {
       // The words stay in the box, and the same key goes with the next try.
-      setNotice(isApiClientError(err) && err.code === "RATE_LIMITED" ? "You're sending messages quickly. Wait a moment, then send again." : errorMessage(err));
+      setNotice(sendLimitNotice(isApiClientError(err) ? err.code : null) ?? errorMessage(err));
       setSending(false);
     }
   };

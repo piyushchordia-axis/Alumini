@@ -374,7 +374,7 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     and event covers take any http(s) address), only those are ever deleted, and a CDN may serve a deleted one until it
     expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
-  - typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls (close, back, send, checkmarks) rather than
+  - typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls (close, back, send, checkmarks) rather than
     the SVG set;
   - UI polish still open: deeper tenant theming (Branding previews only a gradient card), skeleton loaders and
     purposeful motion tokens;

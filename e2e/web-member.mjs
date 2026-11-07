@@ -1447,7 +1447,18 @@ try {
     await pageA.waitForSelector("text=Your first message is a request");
     await pageA.locator("header h2").getByText("2004–2008 · New conversation", { exact: true }).waitFor();
     const asked = `Hello Sneha, could I ask about Seattle? ${unique}`;
+    // A first message refused for going too fast says so as a thread does, and keeps its words in the box to send again.
+    const directUrl = /\/api\/v1\/t\/demo-university\/chat\/direct$/;
+    await pageA.route(directUrl, (route) =>
+      route.request().method() === "POST"
+        ? route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: { code: "RATE_LIMITED", message: "e2e RATE_LIMITED" } }) })
+        : route.fallback(),
+    );
     await pageA.getByLabel("Write a message").fill(asked);
+    await pageA.getByRole("button", { name: "Send message" }).click();
+    await pageA.getByText("You're sending messages quickly. Wait a moment, then send again.", { exact: true }).waitFor();
+    if ((await pageA.getByLabel("Write a message").inputValue()) !== asked) throw new Error("a first message refused for going too fast lost its words");
+    await pageA.unroute(directUrl);
     await pageA.getByRole("button", { name: "Send message" }).click();
     await pageA.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
     await pageA.waitForSelector("text=Request sent");
@@ -1783,7 +1794,11 @@ try {
     await send(owner, early);
     const groupsLink = joiner.locator('nav[aria-label="Main"]:visible a[href$="/app/groups"]');
     if (await groupsLink.getAttribute("aria-label")) throw new Error(`the joiner starts with something on Groups: ${await groupsLink.getAttribute("aria-label")}`);
-    await owner.getByRole("link", { name: "Group details" }).click();
+    // The thread's link to its details is the shared info icon. A ⓘ isn't an emoji to expectSvgNoEmoji, so it's looked for.
+    const details = owner.getByRole("link", { name: "Group details" });
+    await expectSvgNoEmoji(details, "a group thread's Group details link");
+    if ((await details.innerText()).includes("ⓘ")) throw new Error("a group thread's Group details link still draws a ⓘ");
+    await details.click();
     await owner.waitForURL(new RegExp(`/app/groups/${closedId}$`));
     await owner.getByRole("button", { name: "Invite members" }).click();
     const inviting = owner.locator('[role="dialog"]', { hasText: "Invite members" });

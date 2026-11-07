@@ -528,6 +528,15 @@ export function IconAlert({ size = 20, color }: Props) {
     </Base>
   );
 }
+/** More about something, as a group thread's link to Group details: the alert mark turned over. */
+export function IconInfo({ size = 20, color }: Props) {
+  return (
+    <Base size={size} color={color}>
+      <Circle cx="12" cy="12" r="9" {...stroke(color)} />
+      <Path d="M12 11v5M12 7.5h.01" {...stroke(color)} />
+    </Base>
+  );
+}
 
 export type NavIconName =
   | "feed"

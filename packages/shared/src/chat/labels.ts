@@ -30,8 +30,9 @@ export const BLOCKED_LIST_EXPLAINED =
   "Blocked members aren't told. Nothing they send you directly reaches you, and unblocking doesn't bring back what they sent while blocked. In groups, their messages show again once you unblock them.";
 
 /**
- * What a thread says when a send was turned away for going too fast, which puts the words back to send again: the member's
- * own limit, or a busy group's, which isn't theirs to slow down for. Null for any other failure.
+ * What a thread, or the screen writing a first message, says when a send was turned away for going too fast, which puts
+ * the words back to send again: the member's own limit, or a busy group's, which isn't theirs to slow down for. Null for
+ * any other failure, which the caller words itself.
  */
 export function sendLimitNotice(code: string | null | undefined): string | null {
   if (code === "RATE_LIMITED") return "You're sending messages quickly. Wait a moment, then send again.";

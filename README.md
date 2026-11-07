@@ -1507,9 +1507,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     skeleton loaders and purposeful motion.
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
-  - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ⓘ ➤) still draw some controls on both
-    apps and in the consoles (close, back, send, checkmarks, a chat's options and details, and a few arrows) rather
-    than the shared SVG set.
+  - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
+    apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
+    SVG set.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

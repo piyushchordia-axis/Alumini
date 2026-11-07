@@ -147,16 +147,17 @@ Covers:
 - the phone layout: every section opens its own page, the More sheet, its active state, sections the institution has
   switched off, and the guards keeping the open screen when a refetch fails (the registration form keeping what's
   typed, even when the account details fail too);
-- direct messages between two seeded members (Meera and Sneha): a request, accepted live, replies both ways with
-  exactly one bubble each, a thread in a background tab not marking anything read, Try again reusing the client key, a
-  refusal for sending too fast, a draft surviving a failed refetch, a report (and a second one), a block (the blocked
-  member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap fill, and the
-  thread on a phone;
+- direct messages between two seeded members (Meera and Sneha): a request (refused once for going too fast, keeping
+  its words in the box), accepted live, replies both ways with exactly one bubble each, a thread in a background tab
+  not marking anything read, Try again reusing the client key, a refusal for sending too fast, a draft surviving a
+  failed refetch, a report (and a second one), a block (the blocked member's messages never arrive, even after the
+  unblock), a lost socket frame recovered by the gap fill, and the thread on a phone;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
-  description readable on the wash; an open group found in Discover and joined, live messages both ways, an
-  invite-only group's invitation (the invitee's box in Demo University's ink with a drawn tick, `expectChoiceLook`)
-  accepted from Invitations (with the history before it hidden), leaving, archiving and My posts;
+  description readable on the wash; an open group found in Discover and joined, live messages both ways, the thread's
+  Group details link drawn with an SVG icon rather than a glyph, an invite-only group's invitation (the invitee's box
+  in Demo University's ink with a drawn tick, `expectChoiceLook`) accepted from Invitations (with the history before
+  it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
   Mentor badge in the directory and on the new mentor's own profile;
@@ -318,8 +319,9 @@ Covers:
   edit, My posts and delete through the confirm sheet;
 - notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
   and a notification tap landing on its target;
-- direct messages between two seeded members (Arjun and Vikram), as on the web, including a report from tapping a
-  message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
+- direct messages between two seeded members (Arjun and Vikram), as on the web, including the request refused once for
+  going too fast, a report from tapping a message, a block, a cold start on a thread, and a lost socket frame
+  recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers;
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a

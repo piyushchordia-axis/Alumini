@@ -12,7 +12,7 @@ import { ChatHeader, ChatNotice, ChatOff, ChatScreen, iconButton, StatusLine, us
 import { ConversationOptionsSheet, ReportMessageSheet } from "@/components/chat/ChatSheets";
 import { DayRow, MessageRow, type MessageActions } from "@/components/chat/MessageRow";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
-import { IconAlert, IconGroups, IconLock, IconMessages } from "@/components/icons";
+import { IconAlert, IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
 import { Button, ErrorText, Spinner } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
@@ -306,9 +306,7 @@ function Thread({ id }: { id: string }) {
           <>
             {c.group && (
               <Pressable onPress={() => router.push(groupHref(slug, c.id))} accessibilityRole="link" accessibilityLabel="Group details" style={({ pressed }) => [iconButton, pressed ? { backgroundColor: colors.bg } : null]}>
-                <Text accessible={false} style={{ fontSize: 20, color: colors.muted }}>
-                  ⓘ
-                </Text>
+                <IconInfo size={22} color={colors.muted} />
               </Pressable>
             )}
             <Pressable onPress={() => setOptionsOpen(true)} accessibilityRole="button" accessibilityLabel="Conversation options" style={({ pressed }) => [iconButton, pressed ? { backgroundColor: colors.bg } : null]}>
