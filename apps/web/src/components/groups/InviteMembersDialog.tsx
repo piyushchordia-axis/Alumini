@@ -1,7 +1,7 @@
 import { CHAT_GROUP_INVITES_PER_CALL, memberYearsLabel, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Avatar, Button, ChoiceInput, ErrorBox, Input, Loading, Modal } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -22,6 +22,9 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
     queryKey: chatKeys.groupCandidates(slug, group.id, search),
     queryFn: () => api.chat.groups.inviteCandidates(slug, group.id, { q: search || undefined, limit: 20 }),
     enabled: open,
+    // The rows shown stay until the new search answers: someone chosen just before it does keeps their row (and the focus
+    // on it), rather than the list giving way to a spinner and coming back as new rows.
+    placeholderData: keepPreviousData,
   });
   const full = chosen.size >= CHAT_GROUP_INVITES_PER_CALL;
 
@@ -105,7 +108,7 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
         ) : list.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">{search ? "No one to invite matches that name." : "There's no one else to invite right now."}</p>
         ) : (
-          <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+          <ul aria-busy={candidates.isPlaceholderData} className="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
             {list.map((m) => {
               const on = chosen.has(m.id);
               return (

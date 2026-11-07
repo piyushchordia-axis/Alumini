@@ -1830,10 +1830,43 @@ try {
     await owner.waitForURL(new RegExp(`/groups/${closedId}$`));
     await shown(owner.getByRole("button", { name: "Invite members" })).click();
     const inviting = shown(owner.getByRole("dialog", { name: "Invite members" }));
-    await inviting.getByLabel("Search members").fill(joinerName);
     // Named with their years, which the row shows in grey under the name.
     const candidate = inviting.getByRole("checkbox", { name: new RegExp(`^${joinerName}, ${joinerYears}$`) });
-    await candidate.click();
+    // The joiner is among the first rows before any search. While the search for their name is on its way (its answer held
+    // here until they're chosen), those rows stay, and the one chosen is the row kept once it answers: no spinner in
+    // between and no new rows, which would drop the focus on it.
+    await candidate.waitFor();
+    const isSearch = (request) => request.method() === "GET" && request.url().includes("/invite-candidates?") && new URL(request.url()).searchParams.get("q") === joinerName;
+    let answer;
+    const held = new Promise((resolve) => (answer = resolve));
+    const hold = async (route) => {
+      if (!isSearch(route.request())) return route.fallback();
+      await held;
+      return route.continue();
+    };
+    const candidatesUrl = (url) => url.pathname.endsWith("/invite-candidates");
+    await owner.route(candidatesUrl, hold);
+    const searching = owner.waitForRequest(isSearch);
+    const searched = owner.waitForResponse((response) => isSearch(response.request()));
+    // Awaited below; if the step fails first, their later rejection mustn't crash the run past its report.
+    for (const waiting of [searching, searched]) waiting.catch(() => {});
+    let row;
+    try {
+      await inviting.getByLabel("Search members").fill(joinerName);
+      await searching;
+      await candidate.click({ timeout: 5000 }).catch((error) => {
+        throw new Error(`the invite list gave way while the search was on its way, so nobody could be chosen: ${error.message.split("\n")[0]}`);
+      });
+      row = await candidate.elementHandle();
+    } finally {
+      answer();
+    }
+    const found = (await (await searched).json()).data.length;
+    await owner.unroute(candidatesUrl, hold);
+    // Once the answer is drawn, the list holds its rows alone.
+    await inviting.getByRole("checkbox").nth(found).waitFor({ state: "detached" });
+    if (!(await row.evaluate((el) => el.isConnected))) throw new Error("the chosen member's row was drawn again from scratch when the search answered, losing the focus on it");
+    await row.dispose();
     if ((await candidate.getAttribute("aria-checked")) !== "true") throw new Error("the chosen member doesn't show as chosen");
     await expectChoiceLook(candidate, ":scope > div", "a chosen invitee", { checked: true, tile: false, label: ":scope > :last-child > :first-child", tones: BRAND_TONES.demoUniversity });
     await owner.screenshot({ path: `${SHOTS}/m11d-group-invite.png` });

@@ -373,6 +373,9 @@ export function contrastOf(a, b) {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
+/** How many times paintedColour finds an element that a re-render keeps replacing before it gives up. */
+const PAINT_ATTEMPTS = 5;
+
 /**
  * What the eye gets from `locator` (one element) once any transition on it or around it ends, each as "r g b": `colour`,
  * the element's `property` ("color" for text, an SVG's "stroke" or "fill", "backgroundColor", "borderTopColor" or
@@ -383,9 +386,29 @@ export function contrastOf(a, b) {
  * inwards, so translucent washes count. It sees no photo or gradient and not what scrolls under a see-through header,
  * and it refuses a faded element (an opacity under 1, as a disabled control has), whose styles say a darker colour than
  * the eye gets. The one place both apps paint colours this way: build other colour checks on it and contrastOf.
+ *
+ * Playwright finds the element and then reads it, and a re-render can put a new copy in its place in between (or while
+ * a fade settles). A copy that has left the page has no styles at all, which is no reading, so the locator finds the
+ * element again and reads that, a few times, before giving up and saying so.
  */
 export async function paintedColour(locator, property = "color") {
-  const look = await locator.evaluate(async (el, property) => {
+  let look;
+  for (let attempt = 1; attempt <= PAINT_ATTEMPTS; attempt++) {
+    look = await paintedColourOnce(locator, property);
+    if (!look.gone) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (look.gone) throw new Error(`paintedColour can't read its ${property}: it left the page each of the ${PAINT_ATTEMPTS} times it was found (replaced by a re-render), so there was nothing steady to read`);
+  if (look.problem) throw new Error(`paintedColour can't read its ${property}: ${look.problem}`);
+  return look;
+}
+
+/** One reading for paintedColour: { colour, behind }, { problem } for a real refusal, or { gone } for an element that left the page. */
+function paintedColourOnce(locator, property) {
+  return locator.evaluate(async (el, property) => {
+    // Out of the page, every computed style is "", which would read as an opacity of 0: no reading, not a fade.
+    const gone = () => !el.isConnected || getComputedStyle(el).opacity === "";
+    if (gone()) return { gone: true };
     const boxes = [];
     for (let box = el; box; box = box.parentElement) boxes.push(box);
     const running = [...el.getAnimations({ subtree: true }), ...boxes.slice(1).flatMap((box) => box.getAnimations())];
@@ -395,10 +418,12 @@ export async function paintedColour(locator, property = "color") {
     // Web Animation, so a fade that is still settling gets up to 1.5s. A disabled control stays faded and is refused.
     let faded;
     for (let tries = 0; tries < 30; tries++) {
+      if (gone()) return { gone: true };
       faded = boxes.find((box) => Number(getComputedStyle(box).opacity) < 1);
       if (!faded) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+    if (gone()) return { gone: true };
     if (faded) return { problem: `it is faded (opacity ${getComputedStyle(faded).opacity}), so its colours aren't what the eye gets` };
     const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
     const paint = (base, colours) => {
@@ -437,8 +462,6 @@ export async function paintedColour(locator, property = "color") {
     }
     return { colour: colour.join(" "), behind: surface.join(" ") };
   }, property);
-  if (look.problem) throw new Error(`paintedColour can't read its ${property}: ${look.problem}`);
-  return look;
 }
 
 /**

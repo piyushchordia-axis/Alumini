@@ -2352,7 +2352,34 @@ try {
     await owner.waitForURL(new RegExp(`/app/groups/${closedId}$`));
     await owner.getByRole("button", { name: "Invite members" }).click();
     const inviting = owner.locator('[role="dialog"]', { hasText: "Invite members" });
-    await inviting.getByLabel("Search members").fill(LISTENER);
+    // While the search is on its way (its answer held here), the rows already shown stay, with no spinner in their place:
+    // someone chosen then keeps their row, and the focus on it, once it answers.
+    const firstRow = await inviting.getByRole("checkbox").first().elementHandle();
+    const isSearch = (request) => request.method() === "GET" && request.url().includes("/invite-candidates?") && new URL(request.url()).searchParams.get("q") === LISTENER;
+    let answer;
+    const held = new Promise((resolve) => (answer = resolve));
+    const hold = async (route) => {
+      if (!isSearch(route.request())) return route.fallback();
+      await held;
+      return route.continue();
+    };
+    const candidatesUrl = (url) => url.pathname.endsWith("/invite-candidates");
+    await owner.route(candidatesUrl, hold);
+    const searching = owner.waitForRequest(isSearch);
+    const searched = owner.waitForResponse((response) => isSearch(response.request()));
+    // Awaited below; if the step fails first, their later rejection mustn't crash the run past its report.
+    for (const waiting of [searching, searched]) waiting.catch(() => {});
+    try {
+      await inviting.getByLabel("Search members").fill(LISTENER);
+      await searching;
+      if (await inviting.getByText("Finding members…").count()) throw new Error("the invite list gave way to a spinner while the search was on its way");
+      if (!(await firstRow.evaluate((el) => el.isConnected))) throw new Error("the invite list's rows were drawn again from scratch while the search was on its way");
+    } finally {
+      answer();
+    }
+    await searched;
+    await owner.unroute(candidatesUrl, hold);
+    await firstRow.dispose();
     // Named with the years they registered with, which the row shows in grey under the name.
     const invitee = { name: new RegExp(`^${LISTENER} 2011–2015$`) };
     await inviting.getByRole("checkbox", invitee).check();

@@ -1,6 +1,6 @@
 import { CHAT_GROUP_INVITES_PER_CALL, memberYearsLabel, type ChatGroupDto, type ChatMemberDto } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Sheet } from "@/components/chat/ChatFrame";
@@ -66,6 +66,9 @@ export function InviteMembersSheet({
     queryKey: chatKeys.groupCandidates(slug, group.id, search),
     queryFn: () => api.chat.groups.inviteCandidates(slug, group.id, { q: search || undefined, limit: 20 }),
     enabled: open,
+    // The rows shown stay until the new search answers: someone chosen just before it does keeps their row (and the focus
+    // on it), rather than the list giving way to a spinner and coming back as new rows.
+    placeholderData: keepPreviousData,
   });
   const full = chosen.size >= CHAT_GROUP_INVITES_PER_CALL;
 
@@ -135,7 +138,7 @@ export function InviteMembersSheet({
         <Text style={{ textAlign: "center", fontSize: 14, color: colors.muted, paddingVertical: spacing.lg }}>{search ? "No one to invite matches that name." : "There's no one else to invite right now."}</Text>
       ) : (
         // A plain list, not a FlatList: it sits in the sheet's own scroll view, and holds 20 at most.
-        <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" }}>
+        <View aria-busy={candidates.isPlaceholderData} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" }}>
           {list.map((m, i) => {
             const on = chosen.has(m.id);
             return (

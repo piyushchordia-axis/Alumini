@@ -50,7 +50,9 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   background, border or outline colour over the backgrounds behind it, and `contrastOf` gives their WCAG contrast.
   `expectReadable` (text at 4.5:1), `expectEdge` (an edge at 3:1) and `cardEdges` (a card's own colour and its top
   and left edges: colour, width and contrast with the card) are built on them, and a new colour check should be too.
-  They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
+  They don't see a photo under the page's veil, and they refuse a faded (disabled) element. An element a re-render
+  replaced between being found and being read has left the page, which isn't a fade: `paintedColour` finds it again
+  and reads that, a few times, before saying it kept leaving.
 - `expectEmptyState(box, where, { actions, absent, tones })` checks an empty state or a chat notice, found from its
   title (the web's `h3` directly inside it, the phone's title as a direct child), or the note before a first message
   (the web's `role="note"` named by its title; on the phone the card two levels above the title, which sits in a column
@@ -202,10 +204,11 @@ Covers:
   Founders' Day assembly with Events on the bar, each day in Demo School's ink on its wash;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
   description readable on the wash; an open group found in Discover and joined, live messages both ways, the thread's
-  Group details link drawn with an SVG icon rather than a glyph, an invite-only group's invitation (the invitee's box
-  in Demo University's ink with a drawn tick, `expectChoiceLook`; its badge arriving live, and at a phone's width on
-  the feed's Explore chip, named "Groups, 1 invitation" with its count) accepted from Invitations (with the history
-  before it hidden), leaving, archiving and My posts;
+  Group details link drawn with an SVG icon rather than a glyph, an invite-only group's invitation (the invite list
+  keeping its rows, with no spinner, while a search is on its way; the invitee's box in Demo University's ink with a
+  drawn tick, `expectChoiceLook`; its badge arriving live, and at a phone's width on the feed's Explore chip, named
+  "Groups, 1 invitation" with its count) accepted from Invitations (with the history before it hidden), leaving,
+  archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only (each side told the date
   a new request can be sent from, thirty days on), the bell, and the Mentor badge in the directory and on the new
@@ -414,7 +417,8 @@ Covers:
   again on a line of its own, the thread left open past it offering the box with its note on the info tone, a report
   from tapping a message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
-  (the invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
+  (the invitee chosen while the search for their name is on its way keeping that same row once it answers; the
+  invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
   kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
