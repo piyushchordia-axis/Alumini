@@ -118,10 +118,10 @@ export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
 });
 
 /**
- * One choice as a 44px tile: a checkbox or radio and its label. Chosen, it takes the wash, a thin ring and the ink box;
- * the label stays slate-900, since the brand's ink may read only 3:1 on its own wash. Disabled, ticked or not, it is the
- * plain grey tile with a faded box and a meta-grey label, as the phone's is. It draws its state from `checked` and
- * `disabled`, so it is for controlled inputs.
+ * One choice as a 44px tile: a checkbox or radio and its label. Chosen, it takes the wash, a thin ring and the ink box,
+ * which show it's chosen, and the label stays slate-900. Disabled, ticked or not, it is the plain grey tile with a
+ * faded box and a meta-grey label, as the phone's is. It draws its state from `checked` and `disabled`, so it is for
+ * controlled inputs.
  */
 export const Choice = forwardRef<HTMLInputElement, ChoiceInputProps & { label: ReactNode }>(function Choice({ type, label, className, ...rest }, ref) {
   return (

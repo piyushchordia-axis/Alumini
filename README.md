@@ -538,9 +538,10 @@ Only they see it: their own membership carries it, and no admin, directory or "U
   phone's `theme.pageMuted` and `Muted`), so it reads at least as well as on the plain page. Brand-coloured text on the
   page (the phone's Filters toggles) takes `pageInk` on any background, the plain one included: the brand's ink,
   darkened as far as it must be to read at 4.5:1 under a soft 12% wash on the darkest the page gets. The web's current
-  links, in the sidebar and the More sheet, sit on the opaque chosen-state wash instead, where the brand's ink is sure
-  only of 3:1, so their text takes `pageInk` too, which reads at 4.5:1 there for any brand. Without its photo (an
-  institution that took its cover away) the page is plain, and the choice comes back with the photo.
+  links, in the sidebar and the More sheet, sit on the opaque chosen-state wash instead; their text takes `pageInk`
+  too, which reads at 4.5:1 there for any brand, as the brand's ink itself does (`brandTones` darkens it until it reads
+  on its own wash). Without its photo (an institution that took its cover away) the page is plain, and the choice comes
+  back with the photo.
 - **Where it's drawn.** The rules are in `packages/shared/src/lib/appearance.ts`: `resolveAppearance` reads a missing or
   unknown key as Plain, `pageBackdrop` says what to draw, and the helpers beside it say which tiles to offer. The web
   draws it in `HomeLayout`, the member app's own layout. The phone app's `(app)` layout gives every page under it a

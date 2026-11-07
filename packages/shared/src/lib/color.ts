@@ -109,9 +109,9 @@ export function onColor(bg: string): string {
 
 export interface BrandTones {
   /**
-   * The brand colour as text or a chosen icon, darkened only where it has to be: to 4.5:1 on white, on the plain page
-   * and on the brand's soft tint (a reaction count, a ghost button, a badge), and to 3:1 on `wash` (the icon of
-   * something chosen). Most brands keep their colour; a light one gets a darker shade.
+   * The brand colour as text or a chosen icon, darkened only where it has to be: to 4.5:1 on white, on the plain page,
+   * on the brand's soft tint (a reaction count, a ghost button, a badge) and on its own `wash` (the text and icon of
+   * something chosen). Most brands keep their colour or a shade close to it; a light one gets a darker shade.
    */
   ink: string;
   /** A light tint (14% of the ink on white) behind something chosen, such as the member's reaction. */
@@ -140,15 +140,23 @@ export interface BrandTones {
  */
 export function brandTones(primary: string): BrandTones {
   const brand = parseHex(primary) ? primary : FALLBACK_PRIMARY;
-  const text = inkOn(inkOn(brand, PLAIN_PAGE, TEXT_CONTRAST), mixHex(brand, WHITE, SOFT_TINT), TEXT_CONTRAST);
-  const wash = mixHex(text, WHITE, 0.14);
-  const ring = mixHex(text, WHITE, 0.45);
+  const tint = mixHex(brand, WHITE, SOFT_TINT);
+  const washOf = (ink: string) => mixHex(ink, WHITE, 0.14);
+  let ink = inkOn(inkOn(brand, PLAIN_PAGE, TEXT_CONTRAST), tint, TEXT_CONTRAST);
+  // The wash is mixed from the ink, so a darker ink makes a darker wash: darken until the ink reads on the wash it
+  // makes. Each round moves toward slate-900, which reads on any wash, so this ends.
+  for (;;) {
+    const darker = inkOn(ink, washOf(ink), TEXT_CONTRAST);
+    if (darker === ink) break;
+    ink = darker;
+  }
+  const ring = mixHex(ink, WHITE, 0.45);
   return {
-    ink: inkOn(text, wash, ICON_CONTRAST),
-    wash,
+    ink,
+    wash: washOf(ink),
     ring,
     edge: inkOn(ring, PLAIN_PAGE, ICON_CONTRAST),
-    tint: mixHex(brand, WHITE, SOFT_TINT),
+    tint,
     onPrimary: onColor(brand),
   };
 }

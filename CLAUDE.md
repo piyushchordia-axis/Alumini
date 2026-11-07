@@ -169,15 +169,17 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     over when touched). A chosen state is a wash, a thin ring and the ink, as the reaction chips are (web
     `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
     a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
-    they can't outrank it.
+    they can't outrank it. The ink reads at 4.5:1 on white, the plain page, the brand's 12% tint and its own wash, in
+    any colour (`brandTones` darkens it until it does; `color.test.ts` checks the colour cube), so text in the ink on a
+    chosen thing's wash reads.
   - **Choices.** Checkboxes and radios are `Choice` / `ChoiceMark` on the phone and `Choice` (a 44px tile) /
     `ChoiceInput` / `Checkbox` on the web, never a bare input, `accent-*` or a "✓" glyph. A clear box has a meta-grey
     edge (3:1 on white and the page); a chosen one is an ink box holding a white `IconCheck` (a radio: an ink ring and
     dot). A chosen tile (`Choice`, the group visibility cards) also takes the wash and the ring, and its text stays
-    dark, the label `slate-900` / `colors.text` and any grey on it the secondary one: the ink is only sure of 3:1 on its
-    own wash, which text needs 4.5:1 on (the one place the ink isn't on the chosen thing's text). A bare row
-    (`Checkbox`, the invite lists) has the box alone. Disabled, ticked or not, the box fades to half, the label is the
-    meta grey and a tile goes plain (no wash or ring), all drawn by the component, so callers don't fade the row.
+    dark, the label `slate-900` / `colors.text` and any grey on it the secondary one, with the box, the wash and the
+    ring showing it's chosen (the one place the ink isn't on the chosen thing's text). A bare row (`Checkbox`, the
+    invite lists) has the box alone. Disabled, ticked or not, the box fades to half, the label is the meta grey and a
+    tile goes plain (no wash or ring), all drawn by the component, so callers don't fade the row.
     `ChoiceInput` stays a real input (forced colours get the native control back); a `Checkbox` row that must be a 44px
     target passes `min-h-11 py-3`, which keeps a one-line label centred. `color.test.ts` pins the pairs across the
     colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`).
@@ -214,10 +216,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Nav.** Sidebar / tabs need ≥40–44px targets, clear active weight (primary wash + stronger text), and SVG icons.
     The member sections, their badges and More's come from one `useMemberSections` hook per app (web `HomeLayout`, the
     phone's tabs and More), never worked out again in place. A current link is chosen: web `bg-primary-wash ring-1
-    ring-inset ring-primary-ring`, with its text in `text-page-ink`, in the sidebar and the More sheet alike: text on
-    the opaque wash needs 4.5:1, which pageInk reaches for any brand (`appearance.test.ts`) and the brand's ink may not
-    (it is sure only of 3:1 there). `text-primary-ink` stays for text on white: the web bottom bar and the phone's
-    tabs tint in the ink (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work
+    ring-inset ring-primary-ring`, with its text in `text-page-ink`, in the sidebar and the More sheet alike, as brand
+    text on the page is; like the ink, pageInk reads at 4.5:1 on the opaque wash for any brand (`appearance.test.ts`).
+    `text-primary-ink` stays for text on white: the web bottom bar and the phone's tabs tint in the ink
+    (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work
     waiting in the warning fill, edge and ink (web `NavBadge`, the bell included; the phone's tab badges and `HubRow`).
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its

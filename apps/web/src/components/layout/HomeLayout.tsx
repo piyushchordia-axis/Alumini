@@ -65,8 +65,8 @@ export function HomeLayout() {
   };
 
   // A current link is chosen: the wash, a thin ring and the ink, with hover only on the others. Its text, in the sidebar
-  // and the sheet alike, takes the page's ink (pageInk): the wash is opaque, and the brand's ink is sure only of 3:1 on
-  // it, where pageInk reads at 4.5:1 for any brand (appearance.test.ts).
+  // and the sheet alike, takes the page's ink (pageInk), as brand text on the page does, which reads at 4.5:1 on the
+  // opaque wash for any brand (appearance.test.ts).
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
       "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-[var(--duration-fast)]",
@@ -78,7 +78,7 @@ export function HomeLayout() {
   // The member's own background. Set here, on the member app's root, and not on the document, so the admin console and
   // the platform console (other layouts) stay plain. On a tint or a photo (dimText), grey text on the page steps one
   // shade darker (index.css). Brand text on the page takes pageInk on every page, the plain one included, where a pale
-  // brand's ink still needs darkening under a current link's wash.
+  // brand's ink still needs darkening under a soft wash of the brand.
   const backdrop = pageBackdrop(membership.appearance, tenant);
   const ink = parseHex(pageInk(tenant.primaryColor, backdrop));
   const rootStyle = { "--surface-page": backdrop.color, ...(ink ? { "--c-page-ink": `${ink.r} ${ink.g} ${ink.b}` } : {}) } as CSSProperties;

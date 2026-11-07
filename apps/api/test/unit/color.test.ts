@@ -102,20 +102,25 @@ describe("brandTones", () => {
     expect(brandTones("#1d4ed8")).toEqual({ ink: "#1d4ed8", wash: "#dfe6fa", ring: "#99afed", edge: "#788bbe", tint: "#e4eafa", onPrimary: WHITE });
   });
 
-  it("keeps the seeded institutions' colour as their ink, or a shade so close it can't be told apart, with white on their buttons", () => {
+  it("keeps the seeded institutions' colour as their ink, or a shade close to it, with white on their buttons", () => {
     for (const c of SEEDED) {
       const tones = brandTones(c);
-      expect(contrastRatio(tones.ink, c), c).toBeLessThan(1.1);
+      expect(contrastRatio(tones.ink, c), c).toBeLessThan(1.15);
       expect(tones.onPrimary).toBe(WHITE);
     }
-    expect(brandTones("#1d4ed8").ink).toBe("#1d4ed8");
-    expect(brandTones("#047857").ink).toBe("#047857");
+    // Demo College, Demo School and the Samaj take a shade darker than they did when the ink only had to show (3:1) on
+    // its wash: Demo College's own colour reads at 4.49:1 there, and the old inks of the other two at 4.48 and 4.45.
+    expect(contrastRatio("#047857", brandTones("#047857").wash)).toBeLessThan(4.5);
+    // As e2e's BRAND_TONES has them.
+    expect(SEEDED.map((c) => brandTones(c).ink)).toEqual(["#1d4ed8", "#047656", "#a74e0c", "#b83e0e"]);
+    expect(SEEDED.map((c) => brandTones(c).wash)).toEqual(["#dfe6fa", "#dcece7", "#f3e6dd", "#f5e4dd"]);
   });
 
-  it("has an icon that reads on its wash (3:1) and text that reads (4.5:1) on white, the page and a badge's tint, for every brand", () => {
+  it("has text and icons that read (4.5:1) on its wash, white, the page and a badge's tint, for every brand", () => {
     for (const c of ALL) {
       const { ink, wash } = brandTones(c);
-      expect(contrastRatio(ink, wash), `${c}'s ink on its wash`).toBeGreaterThanOrEqual(3);
+      // A chosen thing may draw its text in the ink on the wash, as a chosen Appearance tile does its name.
+      expect(contrastRatio(ink, wash), `${c}'s ink on its wash`).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(ink, WHITE), `${c}'s ink on white`).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(ink, PAGE), `${c}'s ink on the page`).toBeGreaterThanOrEqual(4.5);
       // A primary Badge: mobile primarySoft is 12% of the brand, web bg-primary/10.
@@ -136,7 +141,7 @@ describe("brandTones", () => {
   it("keeps those rules across the colour cube", () => {
     for (const c of sampledColours()) {
       const { ink, wash, ring } = brandTones(c);
-      expect(contrastRatio(ink, wash), c).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(ink, wash), c).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(ink, PAGE), c).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(ink, mixHex(c, WHITE, 0.12)), c).toBeGreaterThanOrEqual(4.5);
       expect(relativeLuminance(wash), c).toBeLessThan(relativeLuminance(PAGE));

@@ -47,7 +47,10 @@ export interface Theme {
   primary: string;
   secondary: string;
   primarySoft: string;
-  /** The brand as text or a chosen icon, darkened if it's too light to read on white, the page or `primarySoft` (`brandTones`). */
+  /**
+   * The brand as text or a chosen icon, darkened if it's too light to read on white, the page, `primarySoft` or
+   * `primaryWash` (`brandTones`).
+   */
   primaryInk: string;
   /** A light tint of the ink behind something chosen, such as the member's reaction. */
   primaryWash: string;
@@ -66,7 +69,10 @@ export interface Theme {
   page: PageBackdropSpec;
   /** Grey text written on the page itself, not in a card: `colors.muted`, one shade darker on a tint or a photo (`Muted` uses it). */
   pageMuted: string;
-  /** The brand as text written on the page itself (a Filters toggle): the ink, darkened where the page or a current link's wash needs it (pageInk). */
+  /**
+   * The brand as text written on the page itself (a Filters toggle): the ink, darkened where the page, under a soft
+   * wash of the brand, needs it (pageInk).
+   */
   pageInk: string;
 }
 

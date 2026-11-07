@@ -300,9 +300,9 @@ export function ChoiceMark({ kind, checked, disabled = false, size = 20, style }
 /**
  * One choice, as a checkbox or a radio: 44 points tall, its state in aria-checked, which React Native maps on devices and
  * react-native-web emits. `hint` says what choosing it does, for a screen reader, when that's written beside it too.
- * Chosen, it takes the wash, a thin ring and the ink box; the label stays `colors.text`, since the brand's ink may read
- * only 3:1 on its own wash. Disabled, ticked or not, it is the plain grey tile with a faded box and a meta-grey label, as
- * the web's Choice and Checkbox are.
+ * Chosen, it takes the wash, a thin ring and the ink box, which show it's chosen, and the label stays `colors.text`.
+ * Disabled, ticked or not, it is the plain grey tile with a faded box and a meta-grey label, as the web's Choice and
+ * Checkbox are.
  */
 export function Choice({
   kind,

@@ -382,14 +382,15 @@ export async function expectEdge(locator, where, min = 3) {
 }
 
 /**
- * The seeded institutions' ink and wash ("r g b"), as brandTones gives them for their colours (Demo University's #1d4ed8,
- * also both apps' default and the platform console's, is pinned in color.test.ts) and both apps draw them.
+ * The seeded institutions' ink and wash ("r g b"), as brandTones gives them for their colours (Demo University's
+ * #1d4ed8 is also both apps' default and the platform console's; color.test.ts pins all four inks and washes) and both
+ * apps draw them.
  */
 export const BRAND_TONES = {
   demoUniversity: { ink: "29 78 216", wash: "223 230 250" },
-  demoCollege: { ink: "4 120 87", wash: "220 236 231" },
-  demoSchool: { ink: "170 79 11", wash: "243 230 221" },
-  samaj: { ink: "187 63 13", wash: "245 228 221" },
+  demoCollege: { ink: "4 118 86", wash: "220 236 231" },
+  demoSchool: { ink: "167 78 12", wash: "243 230 221" },
+  samaj: { ink: "184 62 14", wash: "245 228 221" },
 };
 
 /**
@@ -431,7 +432,7 @@ export async function expectEmptyState(box, where, { actions = [], absent = [], 
  *   that reads at 4.5:1 on it, with no "✓" glyph, and a radio's ring a dot in the same colour. A tile (`tile`; the
  *   web's Checkbox is a bare row) is a wash, not white. `tones` ({ ink, wash }, one of BRAND_TONES) pins the box and a
  *   radio's dot to the institution's ink and the tile to its wash.
- * - Either way the label reads at 4.5:1, which is why it stays the text grey: the ink may read only 3:1 on its wash.
+ * - Either way the label reads at 4.5:1, in the text grey: the box, the wash and the ring show that it's chosen.
  * Not for a disabled choice, whose faded box paintedColour refuses. Gives { box, tile, label }: the box's colour (a
  * clear one's edge), what it sits on, and the label's colour.
  */

@@ -137,8 +137,7 @@ describe("pageInk", () => {
         const under = mixHex(primary, darkest ?? page.color, 0.12);
         expect(contrastRatio(ink, under), `${primary} on ${page.imageUrl ? "a photo" : page.dimText ? "its tint" : "the plain page"}`).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(ink, darkest ?? page.color)).toBeGreaterThanOrEqual(4.5);
-        // The web's current links (the sidebar, the More sheet) on the opaque chosen-state wash: the seeded Samaj,
-        // college and school brands' own ink reads at only 4.45 to 4.49 there.
+        // The web's current links (the sidebar, the More sheet), on the opaque chosen-state wash.
         expect(contrastRatio(ink, brandTones(primary).wash), `${primary}'s current link`).toBeGreaterThanOrEqual(4.5);
       }
     }
@@ -160,8 +159,7 @@ describe("pageInk", () => {
         [pageBackdrop({ backdrop: "COVER" }, institution), darkPhoto, "a photo"],
       ] as const) {
         expect(contrastRatio(pageInk(primary, page), mixHex(primary, darkest, 0.12)), `${primary} on ${where}`).toBeGreaterThanOrEqual(4.5);
-        // The web's current links, in the sidebar and the More sheet, on the opaque chosen-state wash, where the ink
-        // alone is sure only of 3:1.
+        // The web's current links, in the sidebar and the More sheet, on the opaque chosen-state wash.
         expect(contrastRatio(pageInk(primary, page), brandTones(primary).wash), `${primary}'s current link on ${where}`).toBeGreaterThanOrEqual(4.5);
       }
     }
