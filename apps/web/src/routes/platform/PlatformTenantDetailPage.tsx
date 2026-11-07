@@ -19,8 +19,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
-import { IconExternalLink } from "@/components/icons";
-import { Avatar, Badge, Button, Card, Checkbox, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { IconAdmin, IconAudit, IconExternalLink, IconWallet } from "@/components/icons";
+import { Avatar, Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -182,7 +182,11 @@ function AdminsTab({ tenantId, admins, onChange }: { tenantId: string; admins: A
         <p className="mt-2 text-xs text-slate-500">Existing members are promoted and approved; new numbers get an approved admin membership they can log into immediately.</p>
       </Card>
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {admins.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-400">No admins yet.</li>}
+        {admins.length === 0 && (
+          <li>
+            <EmptyState inline icon={<IconAdmin />} title="No admins yet" description="Add one above. They can sign in straight away." />
+          </li>
+        )}
         {admins.map((a) => (
           <li key={a.id} className="flex items-center gap-3 px-4 py-3">
             <Avatar name={a.fullName} src={a.avatarUrl} size="sm" toneKey={a.id} />
@@ -572,7 +576,11 @@ function BillingTab({ tenantId }: { tenantId: string }) {
               {p.notes && <span className="w-full text-xs text-slate-500">{p.notes}</span>}
             </li>
           ))}
-          {b.plans.length === 0 && <li className="py-2 text-slate-400">No plans yet.</li>}
+          {b.plans.length === 0 && (
+            <li>
+              <EmptyState inline icon={<IconWallet />} title="No plans yet" description="Record a plan above so this institution's usage can be priced." />
+            </li>
+          )}
         </ul>
       </Card>
 
@@ -589,7 +597,11 @@ function BillingTab({ tenantId }: { tenantId: string }) {
               {s.notes && <span className="w-full text-xs text-slate-500">{s.notes}</span>}
             </li>
           ))}
-          {b.snapshots.length === 0 && <li className="py-2 text-slate-400">No snapshots yet.</li>}
+          {b.snapshots.length === 0 && (
+            <li>
+              <EmptyState inline icon={<IconAudit />} title="No snapshots yet" description="Freeze a snapshot from the usage above when you invoice this institution." />
+            </li>
+          )}
         </ul>
       </Card>
       {editing && <PlanEditModal plan={editing.plan} mode={editing.mode} timeZone={zone} onClose={() => setEditing(null)} onSaved={refresh} />}

@@ -117,6 +117,17 @@ export function chatReportEmptyTitle(status: ReportStatus): string {
   return `No ${REPORT_STATUS_LABELS[status].toLowerCase()} chat reports`;
 }
 
+const CHAT_REPORT_EMPTY: Readonly<Record<ReportStatus, string>> = {
+  OPEN: "When members report a private message, the report waits here for you.",
+  RESOLVED: "Chat reports you resolve are kept here.",
+  DISMISSED: "Chat reports you dismiss are kept here.",
+};
+
+/** Under chatReportEmptyTitle, what the tab holds. */
+export function chatReportEmptyText(status: ReportStatus): string {
+  return CHAT_REPORT_EMPTY[status];
+}
+
 /** The status tabs, Open with the dashboard's count of open reports once it has loaded (the dashboard counts only those). */
 export function chatReportTabs(d: Pick<DashboardDto, "openChatReports"> | undefined): StatusTab<ReportStatus>[] {
   return statusTabs(REPORT_STATUSES, REPORT_STATUS_LABELS, d ? { OPEN: d.openChatReports } : undefined);

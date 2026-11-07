@@ -339,9 +339,16 @@ Covers:
   without being a member, a school's settings starting with Messaging, Groups and Mentorship off and saying why (and
   Chat attachments on, waiting for nothing), and
   the admin console stacking on a phone;
-- empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): Demo College's
-  empty reports (green), Demo University's empty chat reports (blue), and the platform console's empty escalated
-  reports in the default blue.
+- empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`), each saying
+  what its list holds: Demo College's empty reports (green), Kiran Joshi's empty recent activity (a small box on his
+  page), its empty Pending tab with Invite members (to Invitations), and a member search and an invitation search that
+  find nobody, each offering Clear search in its place (the web's own: the phone's search box clears itself), which
+  empties the box and puts focus back in it; Demo University's empty chat reports (blue) and an audit filter that finds
+  nothing, whose Show all activity shows the whole log again, All chosen and focus back in the box; and in the platform
+  console, in the default blue, the empty escalated reports (Open and Resolved), an institution search with Show all
+  institutions, a user search with Clear search and an audit filter with Show all activity (each emptying its box and
+  putting focus back in it), a new institution's empty plan history and snapshots, small boxes inside their cards, and
+  its console's empty Profile fields, whose Add field opens the editor (Cancel adds nothing).
 
 ## Mobile (Expo app exported for the web)
 
@@ -635,7 +642,10 @@ Covers:
   with every section off its "Nothing to show", at Demo University (blue); the pupil's "aren't available" screens at
   Demo School (amber), each with its way out, and her empty Posts tab in My posts, with Write a post (no Create group on
   the screen) opening the new-post screen; the new post's comments and the events' attendee lists (above); and the
-  console's empty chat reports, Pending tab and invitations at the Samaj (orange).
+  console's at the Samaj (orange), each saying what its list holds: the empty chat reports and reports, Nisha Modi's
+  empty recent activity (a small box on her page), the empty Pending tab with Invite members (opening Invitations, and
+  Back returning to the tab), a member search and an audit filter that find nothing, with neither Clear search nor Show
+  all activity in the box (the search box's own Clear search does it), and the empty invitations.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -1048,6 +1058,9 @@ Still the Samaj admin on both phones, except for Chat reports. Sign Rahul back i
       console's screens stay on the plain page. Choose Plain again.
 - [ ] Any empty tab in the console (Reports → Dismissed, say): its icon sits in a round, light orange tint and is drawn
       in orange, as in part 5.
+- [ ] On Members → Approved, search for a name nobody has: the box says what the search looks at, TalkBack or
+      VoiceOver reads its title and that line once when it appears, and the only Clear search is the search box's own.
+      On Pending with nobody waiting, Invite members opens Invitations, and Back returns to the empty tab.
 
 **Members and a member's page**
 

@@ -38,11 +38,25 @@ export function parseAuditAction(raw: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, AUDIT_ACTION_MAX) : "";
 }
 
-/** The audit log with nothing to show: "No activity yet.", or for a filter, what nothing starts with. */
+/** The audit log with nothing to show: "No activity yet", or for a filter, what nothing starts with. */
 export function auditEmptyTitle(filter?: string | null): string {
   const f = filter?.trim();
-  return f ? `Nothing starts with “${f}”` : "No activity yet.";
+  return f ? `Nothing starts with “${f}”` : "No activity yet";
 }
+
+/** Under auditEmptyTitle on the institution's log, whose chips include All. */
+export function auditEmptyText(filter?: string | null): string {
+  return filter?.trim() ? "Try a shorter start, or choose All." : "Approvals, removals and changes to settings are recorded here.";
+}
+
+/**
+ * Clears a filter that found nothing, on the web console only: the phone's filter box has a Clear search of its own, and
+ * a second one in the box would be the same button twice.
+ */
+export const AUDIT_SHOW_ALL = "Show all activity";
+
+/** Under auditEmptyTitle in a member's own recent activity, on their admin page. */
+export const MEMBER_ACTIVITY_EMPTY_TEXT = "Approvals, suspensions and other changes to this member are recorded here.";
 
 /** Who did it: their name at the institution, Illuminize staff or the system acting without one, or nobody recorded. */
 export function auditActorLabel(a: Pick<AuditDto, "actorName" | "actorUserId">): string {

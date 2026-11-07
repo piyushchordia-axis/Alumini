@@ -1,11 +1,11 @@
-import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, auditEmptyTitle, parseAuditAction } from "@illuminize/shared";
+import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, AUDIT_SHOW_ALL, auditEmptyText, auditEmptyTitle, parseAuditAction } from "@illuminize/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
-import { EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination } from "@/components/ui";
-import { IconAudit } from "@/components/icons";
+import { Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination } from "@/components/ui";
+import { IconAudit, IconSearch } from "@/components/icons";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
@@ -43,6 +43,11 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
   const [params, setParams] = useSearchParams();
   const [action, setAction] = useState(initialAction);
   const filter = useDebounced(action.trim());
+  const filterBox = useRef<HTMLInputElement>(null);
+  const showAll = () => {
+    setAction("");
+    filterBox.current?.focus();
+  };
   const [page, setPage] = useState(1);
   useEffect(() => {
     if (parseAuditAction(params.get("action")) === filter) return;
@@ -85,6 +90,7 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
         {AUDIT_ACTION_FILTERS.map((f) => chip(f.prefix, f.label))}
       </div>
       <Input
+        ref={filterBox}
         aria-label="Filter by action"
         placeholder="Action starts with…, e.g. membership. or content."
         value={action}
@@ -96,7 +102,18 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
       {(q.isLoading || (emptyNow && q.isPlaceholderData)) && <Loading />}
       {q.error && !q.data && <ErrorBox error={q.error} />}
       {emptyNow ? (
-        !q.isPlaceholderData && <EmptyState icon={<IconAudit />} title={auditEmptyTitle(filter)} />
+        !q.isPlaceholderData && (
+          <EmptyState
+            icon={filter ? <IconSearch /> : <IconAudit />}
+            title={auditEmptyTitle(filter)}
+            description={auditEmptyText(filter)}
+            live={!!filter}
+            action={
+              // The phone's filter box has its own Clear search, so only the web offers this here.
+              filter && <Button onClick={showAll}>{AUDIT_SHOW_ALL}</Button>
+            }
+          />
+        )
       ) : q.data ? (
         <div className={clsx(q.isPlaceholderData && "opacity-60")}>
           <AuditTable rows={q.data.data} memberHref={(id) => `/t/${slug}/admin/members/${id}`} />

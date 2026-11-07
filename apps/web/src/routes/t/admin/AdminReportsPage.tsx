@@ -8,6 +8,7 @@ import {
   REPORT_STATUS_LABELS,
   parseReportStatus,
   queueTabCounts,
+  reportEmptyText,
   reportEmptyTitle,
   reportShowsTitle,
   reportedByText,
@@ -127,7 +128,7 @@ export function AdminReportsPage() {
       <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={statusTabs(REPORT_STATUSES, REPORT_STATUS_LABELS, queueTabCounts(dashboard.data)?.reports)} className="w-fit" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={reportEmptyTitle(status)} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={reportEmptyTitle(status)} description={reportEmptyText(status)} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((r) => (
           <ReportRow key={r.id} slug={slug} report={r} />

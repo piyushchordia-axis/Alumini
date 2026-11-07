@@ -1,4 +1,4 @@
-import { memberFacts, uuidSchema } from "@illuminize/shared";
+import { MEMBER_ACTIVITY_EMPTY_TEXT, auditEmptyTitle, memberFacts, uuidSchema } from "@illuminize/shared";
 import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -10,10 +10,10 @@ import { AuditRow } from "@/components/admin/AuditRow";
 import { MemberActionButtons } from "@/components/admin/MemberActionButtons";
 import { MemberFacts, MentorProfileCard, RoleChangeButton } from "@/components/admin/MemberDetail";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
-import { IconDirectory } from "@/components/icons";
+import { IconAudit, IconDirectory } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { StatusLine } from "@/components/Sheet";
-import { Badge, Button, Card, EmptyState, ErrorText, Muted, Spinner, headingRole } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorText, Spinner, headingRole } from "@/components/ui";
 import { useMemberActions, type MemberActionOutcome } from "@/hooks/useMemberActions";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -140,9 +140,7 @@ function AdminMember({ id }: { id: string }) {
       </Text>
       <Card style={styles.activity}>
         {m.audit.length === 0 ? (
-          <View style={{ padding: spacing.lg }}>
-            <Muted size={13}>No activity yet.</Muted>
-          </View>
+          <EmptyState inline icon={<IconAudit />} title={auditEmptyTitle()} description={MEMBER_ACTIVITY_EMPTY_TEXT} />
         ) : (
           m.audit.map((entry, i) => (
             <View key={entry.id}>

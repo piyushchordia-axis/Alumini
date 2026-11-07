@@ -1,4 +1,17 @@
-import { MEMBERSHIP_STATUSES, MEMBER_SEARCH_HINT, MEMBER_STATUS_TAB_LABELS, approveAllCopy, formatCount, memberEmptyTitle, memberTabCounts, onlySearchChanged, parseMemberStatus, statusTabs } from "@illuminize/shared";
+import {
+  MEMBERSHIP_STATUSES,
+  MEMBER_EMPTY_INVITE,
+  MEMBER_STATUS_TAB_LABELS,
+  approveAllCopy,
+  formatCount,
+  memberEmptyInvites,
+  memberEmptyText,
+  memberEmptyTitle,
+  memberTabCounts,
+  onlySearchChanged,
+  parseMemberStatus,
+  statusTabs,
+} from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
@@ -15,6 +28,7 @@ import { useMemberActions, type MemberActionOutcome } from "@/hooks/useMemberAct
 import { useMembership } from "@/hooks/useMembership";
 import { usePagedList } from "@/hooks/usePagedList";
 import { useStatus } from "@/hooks/useStatus";
+import { adminSectionHref } from "@/lib/admin";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
@@ -111,7 +125,14 @@ export default function AdminMembersScreen() {
             <View style={styles.empty}>
               {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
               <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
-                <EmptyState icon={search ? <IconSearch /> : <IconDirectory />} title={memberEmptyTitle(status, search)} description={search ? MEMBER_SEARCH_HINT : undefined} />
+                {/* No Clear search here: the search box above has its own. */}
+                <EmptyState
+                  icon={search ? <IconSearch /> : <IconDirectory />}
+                  title={memberEmptyTitle(status, search)}
+                  description={memberEmptyText(status, search, tenant.settings.memberApprovalMode)}
+                  live={!!search}
+                  action={memberEmptyInvites(status, search) ? <Button title={MEMBER_EMPTY_INVITE} accessibilityRole="link" onPress={() => router.push(adminSectionHref(slug, "invitations"))} /> : undefined}
+                />
               </ListEmpty>
             </View>
           }

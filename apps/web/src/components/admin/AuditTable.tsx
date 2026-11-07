@@ -1,6 +1,7 @@
-import { auditActorLabel, auditDetailLines, auditTargetLabel, type AuditDto } from "@illuminize/shared";
+import { auditActorLabel, auditDetailLines, auditEmptyTitle, auditTargetLabel, type AuditDto } from "@illuminize/shared";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui";
+import { IconAudit } from "@/components/icons";
+import { Badge, EmptyState } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 
 /** How many detail lines a stacked row shows, as on the phone app. */
@@ -9,10 +10,16 @@ const STACKED_LINES = 4;
 /**
  * Audit rows: a table from `sm` up, and below it the same stacked rows as the phone app, so a phone never scrolls
  * sideways. `memberHref` links a row whose target is a membership to that member's admin page (not `selfId`, the page
- * already open); the platform console, with no institution, passes none.
+ * already open); the platform console, with no institution, passes none. With no rows, a small empty state in the
+ * table's white box, as the phone's card holds it, saying `emptyText` under its title.
  */
-export function AuditTable({ rows, memberHref, selfId }: { rows: AuditDto[]; memberHref?: (membershipId: string) => string; selfId?: string }) {
-  if (rows.length === 0) return <p className="py-8 text-center text-sm text-slate-400">No activity yet.</p>;
+export function AuditTable({ rows, memberHref, selfId, emptyText }: { rows: AuditDto[]; memberHref?: (membershipId: string) => string; selfId?: string; emptyText?: string }) {
+  if (rows.length === 0)
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <EmptyState inline icon={<IconAudit />} title={auditEmptyTitle()} description={emptyText} />
+      </div>
+    );
   const target = (a: AuditDto) => {
     const t = auditTargetLabel(a);
     return t.membershipId && memberHref && t.membershipId !== selfId ? (

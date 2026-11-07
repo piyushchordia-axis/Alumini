@@ -304,5 +304,16 @@ export function reportEmptyTitle(status: ReportStatus): string {
   return `No ${REPORT_STATUS_LABELS[status].toLowerCase()} reports`;
 }
 
+const REPORT_EMPTY: Readonly<Record<ReportStatus, string>> = {
+  OPEN: "When members report a post, comment or listing, it waits here for you.",
+  RESOLVED: "Reports you resolve are kept here.",
+  DISMISSED: "Reports you dismiss are kept here.",
+};
+
+/** Under reportEmptyTitle, what the tab holds. */
+export function reportEmptyText(status: ReportStatus): string {
+  return REPORT_EMPTY[status];
+}
+
 /** In place of a report's content once that has been deleted. */
 export const REPORT_CONTENT_GONE_TEXT = "Content no longer exists";

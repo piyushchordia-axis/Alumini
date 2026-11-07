@@ -1,11 +1,11 @@
-import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, auditEmptyTitle, formatCount, parseAuditAction } from "@illuminize/shared";
+import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, auditEmptyText, auditEmptyTitle, formatCount, parseAuditAction } from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { AdminListScreen } from "@/components/admin/AdminListScreen";
 import { AuditRow } from "@/components/admin/AuditRow";
 import { SearchField } from "@/components/admin/SearchField";
-import { IconAudit } from "@/components/icons";
+import { IconAudit, IconSearch } from "@/components/icons";
 import { ChipSelect, EmptyState, ListEmpty, Muted, Spinner } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useMembership } from "@/hooks/useMembership";
@@ -78,7 +78,8 @@ export default function AdminAuditScreen() {
           <View style={styles.empty}>
             {/* An empty filter's answer, kept while the next one loads, would name the wrong filter. */}
             <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
-              <EmptyState icon={<IconAudit />} title={auditEmptyTitle(filter)} />
+              {/* No Show all activity here: the filter box above has its own Clear search, and All is a chip. */}
+              <EmptyState icon={filter ? <IconSearch /> : <IconAudit />} title={auditEmptyTitle(filter)} description={auditEmptyText(filter)} live={!!filter} />
             </ListEmpty>
           </View>
         }

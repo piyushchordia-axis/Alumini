@@ -1,7 +1,8 @@
 import { BILLING_MODEL_LABELS, TENANT_TYPE_LABELS, type TenantStatus, countryName } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { IconBuilding, IconSearch } from "@/components/icons";
 import { Avatar, Badge, Button, EmptyState, ErrorBox, Input, LinkButton, Loading, PageHeader, Pagination, Select } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -10,15 +11,24 @@ const statusTone = { ACTIVE: "success", SUSPENDED: "warning", ARCHIVED: "neutral
 
 export function PlatformTenantsPage() {
   const [q, setQ] = useState("");
+  const search = q.trim();
+  const searchBox = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<TenantStatus | "">("");
   const [page, setPage] = useState(1);
-  const query = { q: q || undefined, status: status || undefined, page, pageSize: 25 };
+  const query = { q: search || undefined, status: status || undefined, page, pageSize: 25 };
   const list = useQuery({ queryKey: qk.platform.tenants(query), queryFn: () => api.platform.tenants.list(query) });
+  const filtered = !!(query.q || query.status);
+  const showAll = () => {
+    setQ("");
+    setStatus("");
+    setPage(1);
+    searchBox.current?.focus();
+  };
   return (
     <div className="space-y-4">
       <PageHeader title="Institutions" subtitle="Every university, college and school on Illuminize" actions={<LinkButton to="/platform/tenants/new">+ Onboard institution</LinkButton>} />
       <div className="flex flex-wrap gap-2">
-        <Input aria-label="Search institutions" placeholder="Search name, slug or city" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-xs" />
+        <Input ref={searchBox} aria-label="Search institutions" placeholder="Search name, slug or city" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="max-w-xs" />
         <Select aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value as TenantStatus | ""); setPage(1); }} className="w-40">
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
@@ -28,7 +38,24 @@ export function PlatformTenantsPage() {
       </div>
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState title="No institutions yet" action={<Button onClick={() => (window.location.href = "/platform/tenants/new")}>Onboard the first one</Button>} />}
+      {list.data &&
+        list.data.data.length === 0 &&
+        (filtered ? (
+          <EmptyState
+            icon={<IconSearch />}
+            title="No institutions match"
+            description="Try another name, slug or city, or another status."
+            live
+            action={<Button onClick={showAll}>Show all institutions</Button>}
+          />
+        ) : (
+          <EmptyState
+            icon={<IconBuilding />}
+            title="No institutions yet"
+            description="Onboard a university, college, school or community to get started."
+            action={<LinkButton to="/platform/tenants/new">Onboard the first one</LinkButton>}
+          />
+        ))}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">

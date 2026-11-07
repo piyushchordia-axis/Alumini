@@ -482,6 +482,30 @@ export function memberEmptyTitle(status: MembershipStatus, q?: string | null): s
 /** Under an empty search's title, what the members search looks at. */
 export const MEMBER_SEARCH_HINT = "Search looks at names, companies and phone numbers.";
 
+const MEMBER_TAB_HOLDS: Readonly<Record<Exclude<MembershipStatus, "PENDING">, string>> = {
+  APPROVED: "Members you approve are listed here.",
+  REJECTED: "Requests you turn down are kept here.",
+  SUSPENDED: "Members you suspend are listed here until you restore them.",
+};
+
+/**
+ * Under memberEmptyTitle: what the search looks at, or what the tab holds. Pending says how people join, as nobody waits
+ * there when they join straight away.
+ */
+export function memberEmptyText(status: MembershipStatus, q: string | null | undefined, approvalMode: ApprovalMode): string {
+  if (q?.trim()) return MEMBER_SEARCH_HINT;
+  if (status !== "PENDING") return MEMBER_TAB_HOLDS[status];
+  return approvalMode === "ADMIN_APPROVAL" ? "When someone asks to join, they wait here for your decision." : "New members join straight away here, so nobody waits for a decision.";
+}
+
+/** The way on from an empty members list, to the console's Invitations. */
+export const MEMBER_EMPTY_INVITE = "Invite members";
+
+/** Whether an empty members list offers MEMBER_EMPTY_INVITE: on Pending, with nothing searched. */
+export function memberEmptyInvites(status: MembershipStatus, q?: string | null): boolean {
+  return status === "PENDING" && !q?.trim();
+}
+
 export type ContentAction = "approve" | "reject" | "remove" | "restore";
 
 /** The moderation state machine: the API's transitions and both apps' buttons. */

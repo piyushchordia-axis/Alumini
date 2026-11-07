@@ -117,6 +117,10 @@ try {
     await page.getByText("Automation engineer", { exact: true }).waitFor();
     await page.getByText("IIT Bombay", { exact: true }).waitFor();
     await page.getByText("Open to hiring", { exact: true }).waitFor();
+    // Nothing has been done to him or by him yet, so his recent activity says what it will hold, in a small box.
+    const noActivity = page.locator('div:has(> h3:text-is("No activity yet"))');
+    await noActivity.getByText("Approvals, suspensions and other changes to this member are recorded here.", { exact: true }).waitFor();
+    await expectEmptyState(noActivity, "Kiran Joshi's empty recent activity", { tones: BRAND_TONES.demoCollege });
     await shot("a02b-member-detail");
   });
 
@@ -307,6 +311,27 @@ try {
     await page.locator("li", { hasText: "Pooja Bhatt" }).first().waitFor();
   });
 
+  await step("an empty Pending tab says who waits there and offers Invite members, and a search that finds nobody offers Clear search", async () => {
+    // Pooja was the last one waiting.
+    await page.goto(`${BASE}/t/demo-college/admin/members?status=PENDING`);
+    const none = page.locator('div:has(> h3:text-is("No pending members"))');
+    await none.getByText("When someone asks to join, they wait here for your decision.", { exact: true }).waitFor();
+    await expectEmptyState(none, "the empty Pending tab", { actions: ["Invite members"], absent: ["Clear search"], tones: BRAND_TONES.demoCollege });
+    const invite = none.getByRole("link", { name: "Invite members", exact: true });
+    if ((await invite.getAttribute("href")) !== "/t/demo-college/admin/invitations") throw new Error(`Invite members links to ${await invite.getAttribute("href")}`);
+    // The phone's search box clears itself; on the web the box that found nobody offers it, and puts focus back.
+    const search = page.getByLabel("Search members");
+    await search.fill("Zzyzx");
+    const nobody = page.locator('div:has(> h3:text-is("No pending members match “Zzyzx”"))');
+    await nobody.getByText("Search looks at names, companies and phone numbers.", { exact: true }).waitFor();
+    await expectEmptyState(nobody, "the Pending tab's empty search", { actions: ["Clear search"], absent: ["Invite members"], tones: BRAND_TONES.demoCollege });
+    await shot("a02d-members-empty");
+    await nobody.getByRole("button", { name: "Clear search", exact: true }).click();
+    if ((await search.inputValue()) !== "") throw new Error("Clear search left the search box filled");
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Clear search didn't put focus back in the search box");
+    await none.waitFor();
+  });
+
   await step("approve a pending job from the moderation queue", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/moderation`);
     const row = page.locator("li", { hasText: "Robotics Intern" }).first();
@@ -425,7 +450,9 @@ try {
     await page.waitForSelector("text=Report resolved");
     await page.waitForSelector("text=No open reports");
     // The console draws its empty states in the institution's colour too: Demo College's green ink on its wash.
-    await expectEmptyState(page.locator('div:has(> h3:text-is("No open reports"))'), "the empty reports queue", { tones: BRAND_TONES.demoCollege });
+    const noReports = page.locator('div:has(> h3:text-is("No open reports"))');
+    await noReports.getByText("When members report a post, comment or listing, it waits here for you.", { exact: true }).waitFor();
+    await expectEmptyState(noReports, "the empty reports queue", { tones: BRAND_TONES.demoCollege });
     await shot("a04-reports");
   });
 
@@ -686,6 +713,19 @@ try {
     }
     await page.reload();
     await page.locator("tr", { hasText: "Kavita Invitee" }).first().locator("text=Joined").waitFor();
+
+    // A search that finds nobody says what it looks at, and Clear search (the web's own: the phone's box clears itself)
+    // brings the list back with focus in the box.
+    const search = page.getByLabel("Search invitations");
+    await search.fill("Zzyzx");
+    const nobody = page.locator('div:has(> h3:text-is("No invitations match “Zzyzx”"))');
+    await nobody.getByText("Search looks at names, phone numbers and email addresses.", { exact: true }).waitFor();
+    await expectEmptyState(nobody, "the invitations' empty search", { actions: ["Clear search"], tones: BRAND_TONES.demoCollege });
+    await nobody.getByRole("button", { name: "Clear search", exact: true }).click();
+    if ((await search.inputValue()) !== "") throw new Error("Clear search left the invitations' search box filled");
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Clear search didn't put focus back in the invitations' search box");
+    await page.locator("tr", { hasText: "Kavita Invitee" }).first().waitFor();
+    await nobody.waitFor({ state: "detached" });
   });
 
   await step("revoking an invitation asks first in a dialog, and Cancel keeps it", async () => {
@@ -875,6 +915,21 @@ try {
     if (new URL(page.url()).searchParams.has("action")) throw new Error(`the audit log's link kept a filter: ${page.url()}`);
     if ((await page.getByRole("button", { name: "All", exact: true }).getAttribute("aria-pressed")) !== "true") throw new Error("the audit log's link didn't choose All");
     if ((await chip.getAttribute("aria-pressed")) === "true") throw new Error("the Chat reports chip stayed chosen");
+
+    // A prefix that finds nothing says how to widen it, and Show all activity (the web's own: the phone's box clears
+    // itself) shows the whole log again with focus back in the box.
+    const filterBox = page.getByLabel("Filter by action");
+    await filterBox.fill("zzz.");
+    await page.waitForURL(/[?&]action=zzz\./);
+    const nothing = page.locator('div:has(> h3:text-is("Nothing starts with “zzz.”"))');
+    await nothing.getByText("Try a shorter start, or choose All.", { exact: true }).waitFor();
+    await expectEmptyState(nothing, "the audit log's empty filter", { actions: ["Show all activity"], tones: BRAND_TONES.demoUniversity });
+    await nothing.getByRole("button", { name: "Show all activity", exact: true }).click();
+    await page.waitForURL((url) => !url.searchParams.has("action"));
+    await page.locator("tbody tr").first().waitFor();
+    if ((await filterBox.inputValue()) !== "") throw new Error("Show all activity left the filter filled");
+    if (!(await filterBox.evaluate((el) => el === document.activeElement))) throw new Error("Show all activity didn't put focus back in the filter box");
+    if ((await page.getByRole("button", { name: "All", exact: true }).getAttribute("aria-pressed")) !== "true") throw new Error("Show all activity didn't choose All");
   });
 
   await step("leaving the chat reports page discards the messages", async () => {
@@ -920,7 +975,9 @@ try {
     await page.click('div[role="dialog"] button:has-text("Remove")');
     await page.waitForSelector("text=Report resolved");
     await page.waitForSelector("text=No open chat reports");
-    await expectEmptyState(page.locator('div:has(> h3:text-is("No open chat reports"))'), "the empty chat reports", { tones: BRAND_TONES.demoUniversity });
+    const noChatReports = page.locator('div:has(> h3:text-is("No open chat reports"))');
+    await noChatReports.getByText("When members report a private message, the report waits here for you.", { exact: true }).waitFor();
+    await expectEmptyState(noChatReports, "the empty chat reports", { tones: BRAND_TONES.demoUniversity });
     await page.getByRole("tab", { name: /^Open\s*0$/ }).waitFor();
     await page.click('[role="tab"]:has-text("Resolved")');
     const closed = page.locator("li", { hasText: "Arjun" }).first();
@@ -1179,6 +1236,18 @@ try {
       if (!box || box.height < 40) throw new Error(`the platform nav's ${label} link is ${box?.height}px tall, under 40px`);
     }
     await shot("p01-tenants");
+
+    // A search that finds none says so, and Show all institutions brings the list back with focus in the search box.
+    const search = page.getByLabel("Search institutions");
+    await search.fill("Zzyzx");
+    const none = page.locator('div:has(> h3:text-is("No institutions match"))');
+    await none.getByText("Try another name, slug or city, or another status.", { exact: true }).waitFor();
+    // The platform console has no institution's colour, so this is the default blue.
+    await expectEmptyState(none, "the platform's empty institution search", { actions: ["Show all institutions"], absent: ["Onboard the first one"], tones: BRAND_TONES.demoUniversity });
+    await none.getByRole("button", { name: "Show all institutions", exact: true }).click();
+    await page.locator("main tr", { hasText: "Demo University" }).first().waitFor();
+    if ((await search.inputValue()) !== "") throw new Error("Show all institutions left the search box filled");
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Show all institutions didn't put focus back in the search box");
   });
 
   await step("onboard a new institution with an initial admin", async () => {
@@ -1209,6 +1278,13 @@ try {
   await step("record a billing plan and see usage", async () => {
     await page.click("text=Billing");
     await page.waitForSelector("text=Record a new plan");
+    // A new institution has neither yet: each says so in a small box inside its card, pointing at the part above.
+    const noPlans = page.locator('div:has(> h3:text-is("No plans yet"))');
+    await noPlans.getByText("Record a plan above so this institution's usage can be priced.", { exact: true }).waitFor();
+    await expectEmptyState(noPlans, "a new institution's empty plan history", { tones: BRAND_TONES.demoUniversity });
+    const noSnapshots = page.locator('div:has(> h3:text-is("No snapshots yet"))');
+    await noSnapshots.getByText("Freeze a snapshot from the usage above when you invoice this institution.", { exact: true }).waitFor();
+    await expectEmptyState(noSnapshots, "a new institution's empty snapshots", { tones: BRAND_TONES.demoUniversity });
     await page.fill('input[type="number"][step="0.01"]', "50");
     await page.click('button:has-text("Record plan")');
     await page.waitForSelector("text=Billing plan recorded");
@@ -1235,6 +1311,33 @@ try {
     await page.fill('input[placeholder="Search by phone digits"]', "9000000002");
     await page.waitForSelector("text=Suresh Patil");
     await shot("p04-users");
+    // Longer than any number, so it finds nobody; Clear search empties the box and puts focus back in it.
+    const search = page.getByLabel("Search by phone");
+    await search.fill("1234567890123");
+    const nobody = page.locator('div:has(> h3:text-is("No users found"))');
+    await nobody.getByText("Try fewer digits, or check the number.", { exact: true }).waitFor();
+    await expectEmptyState(nobody, "the platform's empty user search", { actions: ["Clear search"], tones: BRAND_TONES.demoUniversity });
+    await nobody.getByRole("button", { name: "Clear search", exact: true }).click();
+    if ((await search.inputValue()) !== "") throw new Error("Clear search left the search box filled");
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Clear search didn't put focus back in the search box");
+    await nobody.waitFor({ state: "detached" });
+  });
+
+  await step("the platform audit log says when a filter finds nothing, and Show all activity shows the whole log again", async () => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${BASE}/platform/audit`);
+    await page.locator("main tbody tr").first().waitFor();
+    const filterBox = page.getByLabel("Filter by action");
+    await filterBox.fill("zzz.");
+    const nothing = page.locator('div:has(> h3:text-is("Nothing starts with “zzz.”"))');
+    await nothing.getByText("Try a shorter start.", { exact: true }).waitFor();
+    // The platform console has no institution's colour, so this is the default blue.
+    await expectEmptyState(nothing, "the platform audit log's empty filter", { actions: ["Show all activity"], tones: BRAND_TONES.demoUniversity });
+    await nothing.getByRole("button", { name: "Show all activity", exact: true }).click();
+    await page.locator("main tbody tr").first().waitFor();
+    await nothing.waitFor({ state: "detached" });
+    if ((await filterBox.inputValue()) !== "") throw new Error("Show all activity left the platform audit filter filled");
+    if (!(await filterBox.evaluate((el) => el === document.activeElement))) throw new Error("Show all activity didn't put focus back in the platform audit filter");
   });
 
   await step("compare institutions for chargeback and download the CSV", async () => {
@@ -1255,10 +1358,15 @@ try {
     await page.waitForSelector("h1:has-text('Chat reports')");
     await page.waitForSelector("text=No open escalated reports");
     // The platform console has no institution's colour, so this is the default blue.
-    await expectEmptyState(page.locator('div:has(> h3:text-is("No open escalated reports"))'), "the platform's empty chat reports", { tones: BRAND_TONES.demoUniversity });
+    const noOpen = page.locator('div:has(> h3:text-is("No open escalated reports"))');
+    await noOpen.getByText("Reports about an institution's admin, or with no other admin to take them, wait here.", { exact: true }).waitFor();
+    await expectEmptyState(noOpen, "the platform's empty chat reports", { tones: BRAND_TONES.demoUniversity });
     // The seeded report sits on this tab now and isn't escalated, so only the filter can keep it off.
     await page.click('[role="tab"]:has-text("Resolved")');
     await page.waitForSelector("text=No resolved escalated reports");
+    const noResolved = page.locator('div:has(> h3:text-is("No resolved escalated reports"))');
+    await noResolved.getByText("Escalated reports that were resolved are kept here.", { exact: true }).waitFor();
+    await expectEmptyState(noResolved, "the platform's empty resolved chat reports", { tones: BRAND_TONES.demoUniversity });
 
     // The seed has no escalated report, so these rows are answered here, to measure them and to follow where they link.
     // The nav's count reads the same list, so it answers 3 as well.
@@ -1308,6 +1416,21 @@ try {
     await page.waitForURL(/\/t\/demo-school\/admin\/members$/);
     await page.waitForSelector('nav[aria-label="Admin sections"] >> text=Moderation');
     await page.waitForSelector("text=Platform console");
+  });
+
+  await step("a new institution's empty Profile fields offers Add field, which opens the editor", async () => {
+    // The institution onboarded above has no questions yet, and kept the default colour: the console's default blue.
+    await page.goto(`${BASE}/t/smoke-institute-${unique}/admin/profile-fields`);
+    const none = page.locator('div:has(> h3:text-is("No profile fields yet"))');
+    await none.getByText("Add questions members answer when they join and on their profile.", { exact: true }).waitFor();
+    await expectEmptyState(none, "a new institution's empty profile fields", { actions: ["Add field"], tones: BRAND_TONES.demoUniversity });
+    await none.getByRole("button", { name: "Add field", exact: true }).click();
+    const editor = page.getByRole("dialog", { name: "Add a profile field", exact: true });
+    await editor.getByPlaceholder("e.g. House, Roll number, Hostel").waitFor();
+    // Cancel adds nothing, and the empty state is back.
+    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+    await editor.waitFor({ state: "detached" });
+    await none.waitFor();
   });
 
   await step("messaging, groups and mentorship start off at a school, with the reason shown", async () => {

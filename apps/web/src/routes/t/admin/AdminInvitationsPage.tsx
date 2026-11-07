@@ -23,6 +23,7 @@ import {
   invitationStatusFilter,
   invitationStatusView,
   invitationTemplateCsv,
+  invitationsEmpty,
   inviteShareText,
   partialImportText,
   readInvitationCsv,
@@ -45,7 +46,7 @@ import {
 } from "@illuminize/shared";
 import { errorMessage, isApiClientError, isOutOfDate } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconCopy, IconDownload, IconExternalLink, IconMail, IconSearch } from "@/components/icons";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Stat, Tabs } from "@/components/ui";
@@ -222,8 +223,15 @@ export function AdminInvitationsPage() {
   const [status, setStatus] = useState<InvitationTab>("ALL");
   const [q, setQ] = useState("");
   const search = useDebounced(q.trim());
+  const searchBox = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
   const filters = { status: invitationStatusFilter(status), q: search || undefined, page, pageSize: 25 };
+  const empty = invitationsEmpty(search);
+  const clearSearch = () => {
+    setQ("");
+    setPage(1);
+    searchBox.current?.focus();
+  };
   const summary = useQuery({ queryKey: qk.admin.invitationSummary(slug), queryFn: () => api.admin.invitations.summary(slug) });
   const list = useQuery({ queryKey: qk.admin.invitations(slug, filters), queryFn: () => api.admin.invitations.list(slug, filters) });
   const fields = useQuery({ queryKey: qk.admin.profileFields(slug), queryFn: () => api.admin.profileFields.list(slug) });
@@ -338,6 +346,7 @@ export function AdminInvitationsPage() {
           className="w-fit"
         />
         <Input
+          ref={searchBox}
           aria-label="Search invitations"
           placeholder="Name, phone or email"
           value={q}
@@ -354,11 +363,20 @@ export function AdminInvitationsPage() {
       ) : list.error || !list.data ? (
         <ErrorBox error={list.error ?? "Failed"} />
       ) : list.data.data.length === 0 ? (
-        search ? (
-          <EmptyState icon={<IconSearch />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
-        ) : (
-          <EmptyState icon={<IconMail />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
-        )
+        <EmptyState
+          icon={empty.live ? <IconSearch /> : <IconMail />}
+          title={empty.title}
+          description={empty.description}
+          live={empty.live}
+          action={
+            // The phone's search box has its own Clear search, so only the web offers one here.
+            empty.live && (
+              <Button variant="outline" onClick={clearSearch}>
+                Clear search
+              </Button>
+            )
+          }
+        />
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

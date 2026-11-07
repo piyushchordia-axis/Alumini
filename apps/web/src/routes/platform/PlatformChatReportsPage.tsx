@@ -19,6 +19,13 @@ function leftToOtherStaff(r: PlatformChatReportDto): string | null {
   return r.noStaffCanTake ? `${NEEDS_OTHER_STAFF_TEXT} No other member of staff can take it yet: make someone a platform admin under Users.` : NEEDS_OTHER_STAFF_TEXT;
 }
 
+/** Under an empty tab's title, what it holds. */
+const EMPTY_TEXT: Readonly<Record<ReportStatus, string>> = {
+  OPEN: "Reports about an institution's admin, or with no other admin to take them, wait here.",
+  RESOLVED: "Escalated reports that were resolved are kept here.",
+  DISMISSED: "Escalated reports that were dismissed are kept here.",
+};
+
 export function PlatformChatReportsPage() {
   const [status, setStatus] = useState<ReportStatus>("OPEN");
   const [page, setPage] = useState(1);
@@ -38,7 +45,7 @@ export function PlatformChatReportsPage() {
       />
       {q.isLoading && <Loading />}
       {q.error && <ErrorBox error={q.error} />}
-      {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={`No ${REPORT_STATUS_LABELS[status].toLowerCase()} escalated reports`} />}
+      {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={`No ${REPORT_STATUS_LABELS[status].toLowerCase()} escalated reports`} description={EMPTY_TEXT[status]} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {q.data?.data.map((r) => (
           <ReportRow key={r.id} report={r} />

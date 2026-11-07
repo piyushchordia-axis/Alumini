@@ -10,6 +10,7 @@ import {
   MEMBERSHIP_STATUSES,
   MEMBERSHIP_STATUS_LABELS,
   MEMBER_ACTION_COPY,
+  MEMBER_EMPTY_INVITE,
   MEMBER_SEARCH_HINT,
   MEMBER_STATUS_TAB_LABELS,
   MEMBER_STATUS_TONE,
@@ -42,6 +43,8 @@ import {
   memberActionErrorText,
   memberActionLabel,
   memberActionsFor,
+  memberEmptyInvites,
+  memberEmptyText,
   memberEmptyTitle,
   memberListMeta,
   memberStatusNowText,
@@ -828,6 +831,35 @@ describe("memberEmptyTitle", () => {
     expect(memberEmptyTitle("APPROVED", "  ")).toBe("No approved members");
     expect(memberEmptyTitle("APPROVED", " Nisha ")).toBe("No approved members match “Nisha”");
     expect(MEMBER_SEARCH_HINT).toBe("Search looks at names, companies and phone numbers.");
+  });
+});
+
+describe("memberEmptyText", () => {
+  it("says what the search looks at on every tab, however members join", () => {
+    for (const status of MEMBERSHIP_STATUSES) for (const mode of APPROVAL_MODES) expect(memberEmptyText(status, " Nisha ", mode), `${status} ${mode}`).toBe(MEMBER_SEARCH_HINT);
+  });
+
+  it("says what each tab holds with nothing searched, and a blank search is none", () => {
+    expect(Object.fromEntries(MEMBERSHIP_STATUSES.map((s) => [s, memberEmptyText(s, "  ", "ADMIN_APPROVAL")]))).toEqual({
+      PENDING: "When someone asks to join, they wait here for your decision.",
+      APPROVED: "Members you approve are listed here.",
+      REJECTED: "Requests you turn down are kept here.",
+      SUSPENDED: "Members you suspend are listed here until you restore them.",
+    });
+    expect(memberEmptyText("APPROVED", null, "AUTO_APPROVE")).toBe("Members you approve are listed here.");
+  });
+
+  it("says nobody waits on Pending where members join straight away", () => {
+    expect(memberEmptyText("PENDING", undefined, "AUTO_APPROVE")).toBe("New members join straight away here, so nobody waits for a decision.");
+  });
+});
+
+describe("memberEmptyInvites", () => {
+  it("offers Invite members on Pending only, and never under a search", () => {
+    expect(MEMBER_EMPTY_INVITE).toBe("Invite members");
+    expect(MEMBERSHIP_STATUSES.filter((s) => memberEmptyInvites(s))).toEqual(["PENDING"]);
+    expect(memberEmptyInvites("PENDING", "  ")).toBe(true);
+    expect(memberEmptyInvites("PENDING", "Nisha")).toBe(false);
   });
 });
 

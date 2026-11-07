@@ -8,6 +8,7 @@ import {
   chatReportActionsFor,
   chatReportCloseRequest,
   chatReportDoneText,
+  chatReportEmptyText,
   chatReportEmptyTitle,
   chatReportHeadline,
   chatReportLinkStep,
@@ -105,6 +106,14 @@ describe("a chat report's buttons", () => {
 describe("the chat reports list", () => {
   it("keeps the web console's empty title for each tab", () => {
     expect(REPORT_STATUSES.map(chatReportEmptyTitle)).toEqual(["No open chat reports", "No resolved chat reports", "No dismissed chat reports"]);
+  });
+
+  it("says what each empty tab holds", () => {
+    expect(Object.fromEntries(REPORT_STATUSES.map((s) => [s, chatReportEmptyText(s)]))).toEqual({
+      OPEN: "When members report a private message, the report waits here for you.",
+      RESOLVED: "Chat reports you resolve are kept here.",
+      DISMISSED: "Chat reports you dismiss are kept here.",
+    });
   });
 
   it("counts the Open tab from the dashboard once it has loaded, and no other", () => {

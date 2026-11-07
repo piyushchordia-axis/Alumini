@@ -20,6 +20,7 @@ import {
   invitationMeta,
   invitationName,
   invitationStatusFilter,
+  invitationsEmpty,
   invitationStatusView,
   invitationTemplateCsv,
   inviteShareText,
@@ -445,6 +446,19 @@ describe("the list's tabs", () => {
     expect(parseInvitationTab(undefined)).toBe("ALL");
     expect(invitationStatusFilter("ALL")).toBeUndefined();
     expect(invitationStatusFilter("EXPIRED")).toBe("EXPIRED");
+  });
+});
+
+describe("the empty list", () => {
+  it("names a search that found nobody, read out, and says what it looks at", () => {
+    expect(invitationsEmpty(" Mitesh ")).toEqual({ title: "No invitations match “Mitesh”", description: "Search looks at names, phone numbers and email addresses.", live: true });
+  });
+
+  it("says how to invite on a tab with none, and a blank search is none", () => {
+    const none = { title: "No invitations here", description: "Import a CSV of alumni phone numbers to invite them.", live: false };
+    expect(invitationsEmpty()).toEqual(none);
+    expect(invitationsEmpty("   ")).toEqual(none);
+    expect(invitationsEmpty(null)).toEqual(none);
   });
 });
 

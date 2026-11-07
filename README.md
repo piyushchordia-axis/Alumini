@@ -266,6 +266,13 @@ hides it and deletes nothing. The rules live in `packages/shared/src/lib/feature
   web and under the post, on the page, on the phone. The first reply is invited only under a published post
   (`postTakesComments`), and the first I'm going only while it can be chosen (`rsvpsOpen`, not Full and not the
   member's answer already); a past or cancelled event's lists say only that nobody has.
+- **The consoles' empty lists say what each tab holds too** (`memberEmptyText`, `reportEmptyText`,
+  `chatReportEmptyText`, `auditEmptyText` and `invitationsEmpty` in `packages/shared`), the same on both apps. An empty
+  Pending tab offers Invite members, and Profile fields with none offers Add field. On the web console a search or a
+  filter that found nothing offers Clear search (Members, Invitations) or Show all activity (the audit log), which puts
+  focus back in the box; the phone console's search box has its own Clear search, so its empty states offer none. The
+  platform console's lists do the same on the web: Show all institutions, Clear search on Users, Show all activity on
+  its audit log.
 
 ### Current pupils
 

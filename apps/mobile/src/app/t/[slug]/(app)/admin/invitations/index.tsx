@@ -4,6 +4,7 @@ import {
   channelsSentence,
   formatCount,
   invitationStatusFilter,
+  invitationsEmpty,
   inviteShareText,
   onlySearchChanged,
   parseInvitationTab,
@@ -76,6 +77,7 @@ export default function AdminInvitationsScreen() {
   const s = summary.data;
   const channels = s?.channels ?? [];
   const filters = { status: invitationStatusFilter(tab), q: search || undefined };
+  const empty = invitationsEmpty(search);
   const key = qk.admin.invitations(slug, filters);
   // The rows stay while a search is refined, never across tabs: a Not sent row's Send must not show under Revoked.
   const list = usePagedList(key, (page) => api.admin.invitations.list(slug, { ...filters, page, pageSize: PAGE_SIZE }), { keepPreviousWhile: (previous) => onlySearchChanged(previous, key) });
@@ -248,11 +250,8 @@ export default function AdminInvitationsScreen() {
           <View style={styles.empty}>
             {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
             <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
-              {search ? (
-                <EmptyState icon={<IconSearch />} title={`No invitations match “${search}”`} description="Search looks at names, phone numbers and email addresses." />
-              ) : (
-                <EmptyState icon={<IconMail />} title="No invitations here" description="Import a CSV of alumni phone numbers to invite them." />
-              )}
+              {/* No Clear search here: the search box above has its own. */}
+              <EmptyState icon={empty.live ? <IconSearch /> : <IconMail />} title={empty.title} description={empty.description} live={empty.live} />
             </ListEmpty>
           </View>
         }

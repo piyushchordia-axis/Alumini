@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AUDIT_ACTION_FILTERS, auditActorLabel, auditDetailLines, auditEmptyTitle, auditTargetLabel, isPrivateAuditKey, parseAuditAction } from "@illuminize/shared";
+import { AUDIT_ACTION_FILTERS, AUDIT_SHOW_ALL, MEMBER_ACTIVITY_EMPTY_TEXT, auditActorLabel, auditDetailLines, auditEmptyText, auditEmptyTitle, auditTargetLabel, isPrivateAuditKey, parseAuditAction } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 import { phoneHash } from "../../src/lib/phoneHash";
 
@@ -195,9 +195,19 @@ describe("the audit log's filter text", () => {
     expect(parseAuditAction("x".repeat(100))).toHaveLength(80);
   });
 
-  it("says nothing happened yet, or what nothing starts with", () => {
-    expect(auditEmptyTitle()).toBe("No activity yet.");
-    expect(auditEmptyTitle("  ")).toBe("No activity yet.");
-    expect(auditEmptyTitle("chat_report.")).toBe("Nothing starts with “chat_report.”");
+  it("says nothing happened yet, or what nothing starts with, as a title with no full stop", () => {
+    expect(auditEmptyTitle()).toBe("No activity yet");
+    expect(auditEmptyTitle("  ")).toBe("No activity yet");
+    expect(auditEmptyTitle(" chat_report. ")).toBe("Nothing starts with “chat_report.”");
+  });
+
+  it("says under it what the log records, or how to widen a filter that found nothing", () => {
+    expect(auditEmptyText()).toBe("Approvals, removals and changes to settings are recorded here.");
+    expect(auditEmptyText("  ")).toBe("Approvals, removals and changes to settings are recorded here.");
+    expect(auditEmptyText("chat_report.")).toBe("Try a shorter start, or choose All.");
+    // The All the text names is the log's own chip.
+    expect(AUDIT_ACTION_FILTERS.map((f) => f.label)).not.toContain("All");
+    expect(AUDIT_SHOW_ALL).toBe("Show all activity");
+    expect(MEMBER_ACTIVITY_EMPTY_TEXT).toBe("Approvals, suspensions and other changes to this member are recorded here.");
   });
 });

@@ -1,4 +1,4 @@
-import { MENTOR_REMOVE_CONFIRM, memberFacts, mentorListedText, mentorProfileRows, mentorshipKeys, roleChangeCopy, type AdminMemberDetailDto, type MembershipRole, type MentorProfileDto } from "@illuminize/shared";
+import { MEMBER_ACTIVITY_EMPTY_TEXT, MENTOR_REMOVE_CONFIRM, memberFacts, mentorListedText, mentorProfileRows, mentorshipKeys, roleChangeCopy, type AdminMemberDetailDto, type MembershipRole, type MentorProfileDto } from "@illuminize/shared";
 import { errorMessage, isOutOfDate } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -77,7 +77,7 @@ function AdminMemberDetail({ membershipId }: { membershipId: string }) {
       {m.mentorProfile && <MentorProfileCard slug={slug} membershipId={m.id} profile={m.mentorProfile} />}
       <section>
         <h2 className="mb-2 text-sm font-semibold text-slate-700">Recent activity</h2>
-        <AuditTable rows={m.audit} memberHref={(id) => `/t/${slug}/admin/members/${id}`} selfId={m.id} />
+        <AuditTable rows={m.audit} memberHref={(id) => `/t/${slug}/admin/members/${id}`} selfId={m.id} emptyText={MEMBER_ACTIVITY_EMPTY_TEXT} />
       </section>
     </div>
   );

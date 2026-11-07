@@ -5,6 +5,7 @@ import {
   REPORT_STATUS_LABELS,
   chatReportCloseRequest,
   chatReportDoneText,
+  chatReportEmptyText,
   chatReportEmptyTitle,
   chatReportLinkStep,
   chatReportNotDoneText,
@@ -215,7 +216,7 @@ function ChatReportsQueue({ slug, status, itemId, say, refreshCounts }: { slug: 
         )}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} />
+            <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} description={chatReportEmptyText(status)} />
           </ListEmpty>
         }
         ListFooterComponent={

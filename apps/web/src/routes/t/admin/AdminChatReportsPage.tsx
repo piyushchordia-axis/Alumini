@@ -8,6 +8,7 @@ import {
   chatReportActionsFor,
   chatReportCloseRequest,
   chatReportDoneText,
+  chatReportEmptyText,
   chatReportEmptyTitle,
   chatReportHeadline,
   chatReportMemberLinkText,
@@ -194,7 +195,7 @@ export function AdminChatReportsPage() {
       <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={chatReportTabs(dashboard.data)} className="w-fit max-w-full" />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} />}
+      {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} description={chatReportEmptyText(status)} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.data?.data.map((r) => (
           <ChatReportRow key={r.id} slug={slug} report={r} />

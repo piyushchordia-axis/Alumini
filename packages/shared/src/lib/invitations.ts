@@ -310,6 +310,16 @@ export function invitationStatusFilter(tab: InvitationTab): InvitationsQuery["st
   return tab === "ALL" ? undefined : tab;
 }
 
+/**
+ * The list with nothing to show: a search that found nobody (`live`, read out, under the search icon), or a tab with none.
+ * The import sits just above the list on both apps, so neither offers it again.
+ */
+export function invitationsEmpty(search?: string | null): { title: string; description: string; live: boolean } {
+  const q = search?.trim();
+  if (q) return { title: `No invitations match “${q}”`, description: "Search looks at names, phone numbers and email addresses.", live: true };
+  return { title: "No invitations here", description: "Import a CSV of alumni phone numbers to invite them.", live: false };
+}
+
 export type InvitationTone = "neutral" | "warning" | "info" | "success" | "danger";
 
 /** An invitation's badge. Expiry comes first: an expired invitation keeps the status it had (Not sent, Sent). */

@@ -33,6 +33,7 @@ import {
   pinOutcomeText,
   queueTabCounts,
   reportCountLabel,
+  reportEmptyText,
   reportEmptyTitle,
   reportShowsTitle,
   reportedByText,
@@ -245,6 +246,11 @@ describe("the queues' words", () => {
       REMOVED: "No removed content.",
     });
     expect(REPORT_STATUSES.map(reportEmptyTitle)).toEqual(["No open reports", "No resolved reports", "No dismissed reports"]);
+    expect(Object.fromEntries(REPORT_STATUSES.map((s) => [s, reportEmptyText(s)]))).toEqual({
+      OPEN: "When members report a post, comment or listing, it waits here for you.",
+      RESOLVED: "Reports you resolve are kept here.",
+      DISMISSED: "Reports you dismiss are kept here.",
+    });
   });
 
   it("word every reason sheet as the web console's dialogs did", () => {

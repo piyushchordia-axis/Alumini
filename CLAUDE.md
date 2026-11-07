@@ -176,7 +176,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `routes/t/admin`, mobile `(app)/admin`), ships on **web and mobile** in the same change — including visual design.
   Logic both consoles need (labels, state machines, query keys, tiles, counts and formatters) lives in
   `packages/shared` (`lib/admin.ts` and its siblings), not in either app. Only the platform (Illuminize staff) console
-  is web only; staff who aren't members of an institution use its admin console on the web.
+  is web only; staff who aren't members of an institution use its admin console on the web. A deliberate
+  difference: an empty state that a search or filter emptied offers Clear search (or Show all …) in the web consoles
+  only, because the phone console's `SearchField` already has its own.
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
   full glassmorphism. Prefer opaque high-contrast content; soft blur only on sticky chrome (header / tab bar).
   - **Icons.** Chrome uses the shared SVG stroke set (`components/icons.tsx` on web and mobile). Do not use emoji as

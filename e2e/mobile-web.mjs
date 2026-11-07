@@ -3233,7 +3233,9 @@ try {
       await page.waitForURL("**/t/shri-gujarati-samaj/admin/chat-reports?status=OPEN&item=00000000-0000-4000-8000-0000000000c1");
       await page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().waitFor();
       // The console's empty states take the institution's colour too: the Samaj's orange ink on its wash.
-      await expectEmptyState(page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().locator("xpath=.."), "the Samaj's empty chat reports", { tones: BRAND_TONES.samaj });
+      const noChatReports = page.getByText("No open chat reports", { exact: true }).locator("visible=true").last().locator("xpath=..");
+      await noChatReports.getByText("When members report a private message, the report waits here for you.", { exact: true }).waitFor();
+      await expectEmptyState(noChatReports, "the Samaj's empty chat reports", { tones: BRAND_TONES.samaj });
       await page.getByRole("status").filter({ hasText: "That report isn't in this list any more: it may have been handled already." }).locator("visible=true").last().waitFor();
       await backButton().click();
       await page.waitForURL("**/t/shri-gujarati-samaj/profile/notifications");
@@ -3965,7 +3967,16 @@ try {
     await statusSays("Diya Raval's request rejected").waitFor();
     await sheet.waitFor({ state: "hidden" });
     await shown(page.getByText("No pending members", { exact: true })).waitFor();
-    await expectEmptyState(shown(page.getByText("No pending members", { exact: true })).locator("xpath=.."), "the Samaj's empty Pending tab", { tones: BRAND_TONES.samaj });
+    const noPending = shown(page.getByText("No pending members", { exact: true })).locator("xpath=..");
+    await noPending.getByText("When someone asks to join, they wait here for your decision.", { exact: true }).waitFor();
+    await expectEmptyState(noPending, "the Samaj's empty Pending tab", { actions: ["Invite members"], tones: BRAND_TONES.samaj });
+    // It opens the console's Invitations above the list, and Back comes back to the empty tab.
+    await noPending.getByRole("link", { name: "Invite members", exact: true }).click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/admin/invitations");
+    await shown(page.getByText("No invitations here", { exact: true })).waitFor();
+    await backButton().click();
+    await page.waitForURL(/\/admin\/members\?status=PENDING/);
+    await shown(page.getByText("No pending members", { exact: true })).waitFor();
 
     // Under Rejected with the reason she was given, and an Approve that sends the status her row shows. Answered by the
     // script as if another admin had approved her meanwhile: the line says so rather than a bare error.
@@ -4028,6 +4039,12 @@ try {
     // In the Approved list, not More's "You" heading, which may be mounted under the console.
     await shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByText("You", { exact: true }).waitFor();
     if (await page.getByRole("button", { name: /Jignesh Patel$/ }).locator("visible=true").count()) throw new Error("the admin's own row offers actions on himself");
+    // A search that finds nobody says what it looks at; its Clear search is the box's own, not a second one in the box.
+    await search.fill("Zzyzx");
+    await page.waitForURL(/q=Zzyzx/);
+    const nobody = shown(page.getByText("No approved members match “Zzyzx”", { exact: true })).locator("xpath=..");
+    await nobody.getByText("Search looks at names, companies and phone numbers.", { exact: true }).waitFor();
+    await expectEmptyState(nobody, "the members' empty search", { absent: ["Clear search", "Invite members"], tones: BRAND_TONES.samaj });
     await memberButton("Clear search").click();
     await memberButton("Suspend Parth Joshi").waitFor();
   });
@@ -4092,6 +4109,10 @@ try {
     await shown(page.getByText("Listed in Mentors", { exact: true })).waitFor();
     await shown(page.getByText("Career advice, Working abroad, Consulting", { exact: true })).waitFor();
     await shown(page.getByText("Every two weeks. Weekday evenings, US East time", { exact: true })).waitFor();
+    // Nothing has been done to her or by her yet, so her recent activity says what it will hold, in a small box.
+    const noActivity = shown(page.getByText("No activity yet", { exact: true })).locator("xpath=..");
+    await noActivity.getByText("Approvals, suspensions and other changes to this member are recorded here.", { exact: true }).waitFor();
+    await expectEmptyState(noActivity, "Nisha Modi's empty recent activity", { tones: BRAND_TONES.samaj });
     await fitsPhone("a member's page", shown(page.getByText("Listed in Mentors", { exact: true })));
     await shot("m15-admin-member");
     // Her facts two across while their longest word fits beside the next, never a word broken in two: here, and on a
@@ -4329,6 +4350,10 @@ try {
     await field.fill("chat_report.");
     await page.waitForURL(/[?&]action=chat_report\./);
     await shown(page.getByText("Nothing starts with “chat_report.”", { exact: true })).waitFor();
+    // How to widen it, but no Show all activity in the box: the web's, as the box's own Clear search does it here.
+    const nothing = shown(page.getByText("Nothing starts with “chat_report.”", { exact: true })).locator("xpath=..");
+    await nothing.getByText("Try a shorter start, or choose All.", { exact: true }).waitFor();
+    await expectEmptyState(nothing, "the audit log's empty filter", { absent: ["Show all activity", "Clear search"], tones: BRAND_TONES.samaj });
     if (!(await pressed(memberButton("Chat reports")))) throw new Error("typing the Chat reports chip's prefix didn't choose it");
     if ((await pressed(memberButton("Members"))) || (await pressed(memberButton("All")))) throw new Error("another chip stays chosen for the Chat reports prefix");
     await memberButton("Clear search").click();
@@ -4679,6 +4704,9 @@ try {
     await sheet.getByRole("button", { name: "Resolve", exact: true }).click();
     await statusSays("Report resolved").waitFor();
     await shown(page.getByText("No open reports", { exact: true })).waitFor();
+    const noReports = shown(page.getByText("No open reports", { exact: true })).locator("xpath=..");
+    await noReports.getByText("When members report a post, comment or listing, it waits here for you.", { exact: true }).waitFor();
+    await expectEmptyState(noReports, "the Samaj's empty reports", { tones: BRAND_TONES.samaj });
     await memberTab("Resolved").click();
     await page.waitForURL(/status=RESOLVED/);
     await shown(page.getByText("Resolution: Checked: not spam", { exact: true })).waitFor();
