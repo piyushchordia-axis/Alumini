@@ -7,8 +7,10 @@ import {
   JOB_TYPE_LABELS,
   JOBS_TAB_LABELS,
   JOBS_TABS,
+  SEEKERS_EMPTY,
   WORK_MODES,
   WORK_MODE_LABELS,
+  jobsEmpty,
   jobsTabFrom,
   referralBoxFrom,
   type JobSeekerDto,
@@ -20,14 +22,15 @@ import {
 } from "@illuminize/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState, type ComponentRef } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
-import { IconJobs, IconProfile } from "@/components/icons";
+import { IconJobs, IconProfile, IconSearch } from "@/components/icons";
 import { JobCard } from "@/components/jobs/JobCard";
 import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralRequests";
 import { useReferralList } from "@/components/jobs/ReferralRows";
 import { MemberRow } from "@/components/MemberRow";
 import { Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -62,7 +65,8 @@ function useJobsParams() {
 
 /** Jobs: openings, members looking for work, and referral requests both ways. The tab is in the URL, as on Mentors. */
 export default function JobsScreen() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const router = useRouter();
   const theme = useTheme();
@@ -76,6 +80,8 @@ export default function JobsScreen() {
   // straight to it (a notification, say) opens it either way, and it says what's left there.
   const showReferrals = available || tab === "referrals" || (!!wayOut && wayOut.received + wayOut.sent > 0);
   const [q, setQ] = useState("");
+  // A moment after the typing stops, so a search that finds nothing is read out once, not at every letter.
+  const search = useDebounced(q.trim());
   const [jobType, setJobType] = useState<JobType | "">("");
   const [canRefer, setCanRefer] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -85,7 +91,7 @@ export default function JobsScreen() {
   // Whole years in range, or no filter: the API refuses anything else, and a half-typed box shouldn't empty the list.
   const years = /^\d{1,2}$/.test(experience.trim()) && Number(experience) <= JOB_EXPERIENCE_MAX_YEARS ? Number(experience) : undefined;
   const filters = {
-    q: q || undefined,
+    q: search || undefined,
     jobType: jobType || undefined,
     workMode: workMode || undefined,
     seniority: seniority || undefined,
@@ -94,6 +100,19 @@ export default function JobsScreen() {
   };
   const moreActive = [workMode, seniority, years !== undefined].filter(Boolean).length;
   const filtersToggle = useRef<ComponentRef<typeof View>>(null);
+  const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
+  const empty = jobsEmpty(member, { canRefer: !!filters.canRefer, filtered: !!(moreActive || filters.q || filters.jobType) });
+  // Every filter, the ones behind Filters too, and the search; the button goes with the empty list, so focus moves to the
+  // search box.
+  const showAll = () => {
+    setQ("");
+    setJobType("");
+    setCanRefer(false);
+    setWorkMode("");
+    setSeniority("");
+    setExperience("");
+    moveFocus(searchBox.current);
+  };
   const clearMore = () => {
     setWorkMode("");
     setSeniority("");
@@ -123,7 +142,7 @@ export default function JobsScreen() {
           <>
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
               {/* Off, so the web build's browser doesn't keep what's typed here for session restore. */}
-              <Input accessibilityLabel="Search jobs" placeholder="Search title, company or skill" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
+              <Input ref={searchBox} accessibilityLabel="Search jobs" placeholder="Search title, company or skill" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
             </View>
             <FlatList
               data={jobs.items}
@@ -177,13 +196,20 @@ export default function JobsScreen() {
               }
               ListEmptyComponent={
                 <ListEmpty loading={jobs.isLoading} error={jobs.error} onRetry={() => void jobs.refetch()}>
-                  {filters.canRefer ? (
-                    <EmptyState icon={<IconJobs />} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
-                  ) : moreActive || filters.q || filters.jobType ? (
-                    <EmptyState icon={<IconJobs />} title="No openings match" description="Try removing a filter." />
-                  ) : (
-                    <EmptyState icon={<IconJobs />} title="No openings right now" description="Know of a role? Post it for your batchmates." />
-                  )}
+                  <EmptyState
+                    icon={empty.live ? <IconSearch /> : <IconJobs />}
+                    title={empty.title}
+                    description={empty.description}
+                    live={empty.live}
+                    action={
+                      empty.action &&
+                      (empty.action.kind === "showAll" ? (
+                        <Button title={empty.action.label} variant={empty.action.variant} onPress={showAll} />
+                      ) : (
+                        <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/jobs/new`)} />
+                      ))
+                    }
+                  />
                 </ListEmpty>
               }
               renderItem={({ item }) => <JobCard slug={slug} job={item} />}
@@ -211,7 +237,7 @@ export default function JobsScreen() {
               onRefresh={() => void seekers.refetch()}
               ListEmptyComponent={
                 <ListEmpty loading={seekers.isLoading} error={seekers.error} onRetry={() => void seekers.refetch()}>
-                  <EmptyState icon={<IconProfile />} title="Nobody is looking right now" />
+                  <EmptyState icon={<IconProfile />} title={SEEKERS_EMPTY.title} description={SEEKERS_EMPTY.description} />
                 </ListEmpty>
               }
               renderItem={({ item }) => <SeekerCard slug={slug} seeker={item} />}

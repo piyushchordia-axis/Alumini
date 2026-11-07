@@ -245,6 +245,13 @@ nothing. The rules live in `packages/shared/src/lib/features.ts`.
   each other's change.
 - **Off is immediate where it matters.** Sending a message, opening a chat and chat pushes read the settings fresh,
   not from the five-minute institution cache.
+- **Empty lists offer only what's on.** An empty list says what it holds and offers the way on, under the screen's
+  own name for it: Write a post, Post a job, Add a business, Plan a gathering, I'm raising or I'm investing, and Create
+  group. A search or a filter that found nothing offers to clear it ("Show all …" on Jobs, Businesses and the
+  Directory, Clear search on the institution picker, Clear filters on Mentors), which puts focus back in the search
+  box; a Groups search offers Create group instead. A create action shows only while its section is on (`mayCreate` in
+  `packages/shared/src/lib/emptyStates.ts`, which holds the lists' copy for both apps), Create group also needs a
+  member who may chat (not a current pupil), and Referrals shown as a way out offers no Post a job.
 
 ### Current pupils
 

@@ -1,3 +1,4 @@
+import { fundingEmpty } from "@illuminize/shared";
 import { useState } from "react";
 import { FundingCard } from "@/components/funding/FundingCard";
 import { IconFunding } from "@/components/icons";
@@ -8,10 +9,12 @@ import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function FundingPage() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const [kind, setKind] = useState<"SEEKING" | "OFFERING">("SEEKING");
   const list = useInfiniteList(qk.funding(slug, { kind }), (cursor) => api.funding.list(slug, { kind, cursor, limit: 20 }));
+  const empty = fundingEmpty(member, kind);
   return (
     <div className="space-y-4">
       <PageHeader
@@ -34,7 +37,9 @@ export function FundingPage() {
           <FundingCard key={f.id} slug={slug} item={f} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconFunding />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />}
+      {!list.isLoading && !list.error && list.items.length === 0 && (
+        <EmptyState icon={<IconFunding />} title={empty.title} description={empty.description} action={empty.action && <LinkButton to={`/t/${slug}/app/funding/new?kind=${kind}`} variant={empty.action.variant}>{empty.action.label}</LinkButton>} />
+      )}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

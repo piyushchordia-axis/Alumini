@@ -1,8 +1,8 @@
-import { CAN_REFER_LABEL, REFERRAL_BOX_LABELS, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
+import { REFERRAL_BOX_LABELS, referralsReceivedEmpty, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
 import { IconJobs, IconMail } from "@/components/icons";
 import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { ReferralList, useReferralList } from "@/components/jobs/ReferralList";
-import { Button, EmptyState, ErrorBox, Loading, Tabs } from "@/components/ui";
+import { Button, EmptyState, ErrorBox, LinkButton, Loading, Tabs } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 
 /**
@@ -10,15 +10,24 @@ import { useMembership } from "@/hooks/useMembership";
  * and where it stands. `limited` is for a member who can't use referrals now: only the ways out are offered.
  */
 export function ReferralRequests({ slug, box, onBoxChange, limited, onBrowse }: { slug: string; box: ReferralBox; onBoxChange: (box: ReferralBox) => void; limited: boolean; onBrowse?: () => void }) {
+  const member = useMembership();
   const list = useReferralList(slug, box);
+  const receivedEmpty = referralsReceivedEmpty(member, limited);
   // The count on Received comes from that list, whichever is open, as the Referrals tab's does.
   const waiting = useReferralList(slug, "received").first?.waiting ?? 0;
   const empty =
     box === "received" ? (
       <EmptyState
         icon={<IconMail />}
-        title="No referral requests yet"
-        description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
+        title={receivedEmpty.title}
+        description={receivedEmpty.description}
+        action={
+          receivedEmpty.action && (
+            <LinkButton to={`/t/${slug}/app/jobs/new`} variant={receivedEmpty.action.variant}>
+              {receivedEmpty.action.label}
+            </LinkButton>
+          )
+        }
       />
     ) : (
       <EmptyState

@@ -1,10 +1,10 @@
-import { EVENT_KIND_LABELS, nameWithYears, rsvpBadge, type EventDto } from "@illuminize/shared";
+import { EVENT_KIND_LABELS, eventsEmpty, nameWithYears, rsvpBadge, type EventDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { IconEvents } from "@/components/icons";
 import { ModerationBadge } from "@/components/ModerationBadge";
-import { Badge, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -47,12 +47,14 @@ function EventCard({ slug, event }: { slug: string; event: EventDto }) {
 }
 
 export default function EventsScreen() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const router = useRouter();
   const theme = useTheme();
   const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
   const list = useInfiniteList(qk.events(slug, { scope }), (cursor) => api.events.list(slug, { scope, cursor, limit: 20 }));
+  const empty = eventsEmpty(member, scope);
   return (
     <SectionScreen>
       <View style={{ padding: spacing.lg }}>
@@ -67,7 +69,12 @@ export default function EventsScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconEvents />} title={scope === "upcoming" ? "Nothing planned yet" : "No past events"} description="Heading somewhere? Post a meetup and see who wants to join." />
+            <EmptyState
+              icon={<IconEvents />}
+              title={empty.title}
+              description={empty.description}
+              action={empty.action && <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/events/new`)} />}
+            />
           </ListEmpty>
         }
         renderItem={({ item }) => <EventCard slug={slug} event={item} />}

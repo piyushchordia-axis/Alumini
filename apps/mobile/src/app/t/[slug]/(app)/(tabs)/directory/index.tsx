@@ -1,5 +1,6 @@
 import {
   countryName,
+  directoryEmpty,
   memberYearsLabel,
   memberYearsLine,
   INDUSTRY_LABELS,
@@ -14,16 +15,17 @@ import {
 } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
-import { IconDirectory } from "@/components/icons";
+import { useRef, useState, type ComponentRef } from "react";
+import { FlatList, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { IconDirectory, IconSearch } from "@/components/icons";
 import { OptionPicker } from "@/components/OptionPicker";
 import { ProfileBadges, profileBadgeWords, profileTagline } from "@/components/profile/ProfileDetails";
-import { Avatar, Badge, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
+import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { moveFocus } from "@/lib/focus";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
@@ -114,10 +116,17 @@ export default function DirectoryScreen() {
   const chosenYear = year ? Number(year) : undefined;
   const years = chosenYear !== undefined && !facets.data?.years.includes(chosenYear) ? [...(facets.data?.years ?? []), chosenYear].sort((a, b) => b - a) : (facets.data?.years ?? []);
   const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
+  const empty = directoryEmpty(!!search || active > 0);
+  const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
+  const showAll = () => {
+    setQ("");
+    clear();
+    moveFocus(searchBox.current);
+  };
   return (
     <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
-        <Input accessibilityLabel="Search members" placeholder="Name, company, role or skill" value={q} onChangeText={setQ} autoCorrect={false} />
+        <Input ref={searchBox} accessibilityLabel="Search members" placeholder="Name, company, role or skill" value={q} onChangeText={setQ} autoCorrect={false} />
         <Row style={{ justifyContent: "space-between" }}>
           <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" aria-expanded={showFilters} hitSlop={8}>
             <Text style={{ color: theme.pageInk, fontWeight: "600" }}>
@@ -154,12 +163,20 @@ export default function DirectoryScreen() {
         data={list.items}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 48 }}
+        // The keyboard is often still up after a search: one tap reaches Show all members, or a member.
+        keyboardShouldPersistTaps="handled"
         onEndReached={list.loadMore}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconDirectory />} title="No members match" description="Try removing a filter." />
+            <EmptyState
+              icon={empty.live ? <IconSearch /> : <IconDirectory />}
+              title={empty.title}
+              description={empty.description}
+              live={empty.live}
+              action={empty.action && <Button title={empty.action.label} variant={empty.action.variant} onPress={showAll} />}
+            />
           </ListEmpty>
         }
         renderItem={({ item }) => <MemberCard slug={slug} member={item} />}

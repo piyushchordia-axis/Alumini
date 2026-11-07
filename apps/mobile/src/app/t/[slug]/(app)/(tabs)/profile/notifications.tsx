@@ -1,4 +1,4 @@
-import { memberRequestOf } from "@illuminize/shared";
+import { memberRequestOf, notificationsEmpty } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,7 +17,9 @@ import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
 export default function NotificationsScreen() {
-  const { tenant, isTenantAdmin } = useMembership();
+  const member = useMembership();
+  const { tenant, isTenantAdmin } = member;
+  const empty = notificationsEmpty(member);
   const slug = tenant.slug;
   const router = useRouter();
   const qc = useQueryClient();
@@ -51,9 +53,11 @@ export default function NotificationsScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching}
         onRefresh={() => void list.refetch()}
+        // The rows run edge to edge, but the empty box needs the screen's margin.
+        contentContainerStyle={list.items.length === 0 ? { padding: spacing.lg } : undefined}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconBell />} title="You're all caught up" />
+            <EmptyState icon={<IconBell />} title={empty.title} description={empty.description} />
           </ListEmpty>
         }
         renderItem={({ item: n }) => {

@@ -168,9 +168,12 @@ Covers:
 - an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
   pending screen; and a forced sign-out leaving nothing cached;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
-  and the businesses' "match" boxes, an empty Requests tab, a mentor search with Clear filters inside the box and a
-  job's empty referral requests at Demo University (blue), and the pupil's three "aren't available" boxes, each with Go
-  to the app, at Demo School (amber).
+  "match" box with Show all members, which empties the search and Open to, and the businesses' with Show all
+  businesses, which empties the search, the category and the city, each putting focus back in the search box, an empty
+  Requests tab, a mentor search with Clear filters inside the box
+  (its title matched exactly, as a live box repeats its words in a hidden status line) and a job's empty referral
+  requests at Demo University (blue), and the pupil's three "aren't available" boxes, each with Go to the app, at Demo
+  School (amber).
 
 ## Web (tenant admin + platform console)
 
@@ -477,10 +480,12 @@ Covers:
   shri-gujarati-samaj-members-<date>.csv with one byte order mark, Start year and End year after Email (Hetal Shah's
   2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`), with the
-  buttons that used to sit beside them inside the box: the empty inbox with Find a group, Sent referrals with Find jobs
-  that can refer, a mentor search with Clear filters, the directory's and the businesses' "match" boxes and an empty
-  Requests tab at Demo University (blue); the pupil's "aren't available" screens at Demo School (amber), each with its
-  way out; and the console's empty chat reports, Pending tab and invitations at the Samaj (orange).
+  buttons that used to sit beside them inside the box: the empty inbox with Find a group, Received referrals with Post
+  a job, Sent referrals with Find jobs that can refer, a mentor search with Clear filters, the directory's "match" box
+  with Show all members, the businesses' with Show all businesses (which empties the search, the category and the
+  city and puts focus back in the search box) and an empty Requests tab at Demo University (blue); the pupil's "aren't
+  available" screens at Demo School (amber), each with its way out; and the console's empty chat reports, Pending tab
+  and invitations at the Samaj (orange).
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -675,6 +680,12 @@ the console (part 14).
       chosen RSVP is its colour (green for I'm going) with a check, the label not cut off at the largest text size, and
       TalkBack or VoiceOver reads the buttons as a "Your RSVP" group, the chosen one as selected. In a poll you voted
       in, each result is one item, and yours ends "your vote".
+- [ ] A search that finds nothing, with TalkBack or VoiceOver on: type "zzzz" in the Directory's search box, and
+      "No members match. Try removing a filter." is read once, not once a letter. With the keyboard still up, one tap
+      on Show all members empties the search and the filters and puts the reader on the Search members box. The same on
+      Jobs ("No openings match", Show all openings, the Search jobs box), Businesses (a city of "nowhere", Show all
+      businesses), Mentors (an availability nobody has, Clear filters, the Search mentors box) and, signed out, the
+      institution picker ("No institutions found", Clear search).
 
 ### 6. Navigation
 

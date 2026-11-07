@@ -633,10 +633,15 @@ try {
     // the same search finds her.
     await search.fill("Priya");
     await page.getByText("No members match", { exact: true }).waitFor();
-    // Its icon in Demo University's blue ink on the wash, not a grey glyph on white.
-    await expectEmptyState(page.locator('div:has(> h3:text-is("No members match"))'), "the directory's empty state", { tones: BRAND_TONES.demoUniversity });
+    // Its icon in Demo University's blue ink on the wash, not a grey glyph on white, and a way back to everyone.
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No members match"))'), "the directory's empty state", { actions: ["Show all members"], tones: BRAND_TONES.demoUniversity });
     if (await page.locator("a", { hasText: "Priya Nair" }).count()) throw new Error("the Open to filter kept Priya, who isn't open to investing");
-    await openTo.selectOption("");
+    // Show all members empties the search and the filters, Open to included, and puts focus back in the search box.
+    await page.getByRole("button", { name: "Show all members", exact: true }).click();
+    if ((await search.inputValue()) !== "") throw new Error(`Show all members left the search at "${await search.inputValue()}"`);
+    if ((await openTo.inputValue()) !== "") throw new Error(`Show all members left Open to at "${await openTo.inputValue()}"`);
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Show all members didn't put focus in the search box");
+    await search.fill("Priya");
     await page.click('button:has-text("Hide filters")');
 
     await page.waitForSelector("text=Priya Nair");
@@ -703,10 +708,18 @@ try {
     await city.fill("surat");
     await zylo.waitFor({ state: "detached" });
     await singh.waitFor();
+    // A search and a category too, so Show all businesses has all three to empty.
+    await search.fill("singh");
+    await category.selectOption("MANUFACTURING");
     await city.fill("nowhere at all");
-    await page.waitForSelector("text=No businesses match");
-    await expectEmptyState(page.locator('div:has(> h3:text-is("No businesses match"))'), "the businesses' empty state", { tones: BRAND_TONES.demoUniversity });
-    await city.fill("");
+    // Exact: the box reads its words out in a hidden status line too.
+    await page.getByText("No businesses match", { exact: true }).waitFor();
+    await expectEmptyState(page.locator('div:has(> h3:text-is("No businesses match"))'), "the businesses' empty state", { actions: ["Show all businesses"], tones: BRAND_TONES.demoUniversity });
+    // Show all businesses empties the search, the category and the city, and puts focus back in the search box.
+    await page.getByRole("button", { name: "Show all businesses", exact: true }).click();
+    for (const [name, box] of [["search", search], ["category", category], ["city", city]])
+      if ((await box.inputValue()) !== "") throw new Error(`Show all businesses left the ${name} at "${await box.inputValue()}"`);
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Show all businesses didn't put focus in the search box");
     await zylo.waitFor();
 
     await zylo.click();
@@ -1917,7 +1930,8 @@ try {
     await mentee.getByLabel("Area", { exact: true }).selectOption({ label: "Working abroad" });
     await card.waitFor();
     await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Weekly" });
-    await mentee.getByText("No mentors match").waitFor();
+    // Exact: the box reads its words out in a hidden status line too.
+    await mentee.getByText("No mentors match", { exact: true }).waitFor();
     await expectEmptyState(mentee.locator('div:has(> h3:text-is("No mentors match"))'), "the mentors' empty state", { actions: ["Clear filters"], tones: BRAND_TONES.demoUniversity });
     await mentee.getByLabel("Availability", { exact: true }).selectOption({ label: "Every two weeks" });
     await card.getByRole("link", { name: LISTENER }).click();

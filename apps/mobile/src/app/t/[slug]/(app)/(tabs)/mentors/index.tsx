@@ -20,8 +20,8 @@ import {
 } from "@illuminize/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { FlatList, Platform, ScrollView, Text, View } from "react-native";
+import { useRef, useState, type ComponentRef } from "react";
+import { FlatList, Platform, ScrollView, Text, TextInput, View } from "react-native";
 import { StatusLine } from "@/components/chat/ChatFrame";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconLock, IconMentors, IconSearch } from "@/components/icons";
@@ -35,6 +35,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
 import { useGroupNotice } from "@/lib/groups";
 import { api } from "@/lib/api";
+import { moveFocus } from "@/lib/focus";
 import { refreshMentorship } from "@/lib/mentors";
 import { homeHref } from "@/lib/sections";
 import { colors, radius, spacing } from "@/theme";
@@ -65,16 +66,19 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
   // The list leaves out the viewer, so an empty one says something different to someone who is listed themselves.
   const nobody = !filtered && !list.isLoading && list.items.length === 0;
   const listed = !!useMyMentorProfile(slug, nobody).data?.isActive;
+  const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
+  // The button goes with the empty list, so focus moves to the search box, as Show all does on the other lists.
   const clear = () => {
     setQ("");
     setArea("");
     setAvailability("");
+    moveFocus(searchBox.current);
   };
   return (
     <>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
         {/* Off, so the web build's browser doesn't keep what's typed here for session restore. */}
-        <Input accessibilityLabel="Search mentors" placeholder="Search by name" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
+        <Input ref={searchBox} accessibilityLabel="Search mentors" placeholder="Search by name" value={q} onChangeText={setQ} autoCorrect={false} autoComplete="off" />
       </View>
       <FlatList
         data={list.items}
@@ -106,7 +110,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             {filtered ? (
-              <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." action={<Button title="Clear filters" variant="outline" onPress={clear} />} />
+              <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." live action={<Button title="Clear filters" variant="outline" onPress={clear} />} />
             ) : listed ? (
               <EmptyState
                 icon={<IconMentors />}

@@ -1,4 +1,4 @@
-import { FUNDING_STAGE_LABELS, nameWithYears, plainExcerpt, type FundingDto } from "@illuminize/shared";
+import { FUNDING_STAGE_LABELS, fundingEmpty, nameWithYears, plainExcerpt, type FundingDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -37,11 +37,13 @@ function FundingCard({ slug, item }: { slug: string; item: FundingDto }) {
 }
 
 export default function FundingScreen() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const router = useRouter();
   const [kind, setKind] = useState<"SEEKING" | "OFFERING">("SEEKING");
   const list = useInfiniteList(qk.funding(slug, { kind }), (cursor) => api.funding.list(slug, { kind, cursor, limit: 20 }));
+  const empty = fundingEmpty(member, kind);
   return (
     <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
@@ -60,7 +62,12 @@ export default function FundingScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconFunding />} title={kind === "SEEKING" ? "No one is raising right now" : "No investors listed yet"} />
+            <EmptyState
+              icon={<IconFunding />}
+              title={empty.title}
+              description={empty.description}
+              action={empty.action && <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/funding/new?kind=${kind}`)} />}
+            />
           </ListEmpty>
         }
         renderItem={({ item }) => <FundingCard slug={slug} item={item} />}

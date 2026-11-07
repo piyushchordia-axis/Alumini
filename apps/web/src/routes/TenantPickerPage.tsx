@@ -1,8 +1,9 @@
-import { countryName } from "@illuminize/shared";
-import { useEffect, useState } from "react";
+import { countryName, tenantSearchEmpty } from "@illuminize/shared";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
-import { IconSpark } from "@/components/icons";
-import { Avatar, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
+import { IconBuilding, IconSearch, IconSpark } from "@/components/icons";
+import { Avatar, Button, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useTenantList } from "@/hooks/useTenant";
 import { resetTheme } from "@/lib/theme";
 import { useIsAuthenticated } from "@/stores/authStore";
@@ -10,7 +11,11 @@ import { useUiStore } from "@/stores/uiStore";
 
 export function TenantPickerPage() {
   const [q, setQ] = useState("");
-  const tenants = useTenantList(q.trim() || undefined);
+  // A moment after the typing stops, so a search that finds nothing is read out once, not at every letter.
+  const search = useDebounced(q.trim());
+  const tenants = useTenantList(search || undefined);
+  const searchBox = useRef<HTMLInputElement>(null);
+  const empty = tenantSearchEmpty(!!search);
   const last = useUiStore((s) => s.lastTenantSlug);
   const authed = useIsAuthenticated();
   const [params] = useSearchParams();
@@ -32,12 +37,32 @@ export function TenantPickerPage() {
       </div>
       <div className="mx-auto -mt-6 max-w-2xl px-4 pb-16">
         <Card className="p-4">
-          <Input placeholder="Search by name or city…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Search institutions" />
+          <Input ref={searchBox} placeholder="Search by name or city…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Search institutions" />
         </Card>
         <div className="mt-4 space-y-2">
           {tenants.isLoading && <Loading />}
           {tenants.error && <ErrorBox error={tenants.error} />}
-          {tenants.data?.length === 0 && <EmptyState title="No institutions found" description="Try a different search, or ask your alumni office to join Illuminize." />}
+          {tenants.data?.length === 0 && (
+            <EmptyState
+              icon={empty.live ? <IconSearch /> : <IconBuilding />}
+              title={empty.title}
+              description={empty.description}
+              live={empty.live}
+              action={
+                empty.action && (
+                  <Button
+                    variant={empty.action.variant}
+                    onClick={() => {
+                      setQ("");
+                      searchBox.current?.focus();
+                    }}
+                  >
+                    {empty.action.label}
+                  </Button>
+                )
+              }
+            />
+          )}
           {tenants.data?.map((t) => (
             <Link key={t.id} to={`/t/${t.slug}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow">
               <Avatar name={t.shortName ?? t.name} src={t.logoUrl} brandColor={t.primaryColor} />

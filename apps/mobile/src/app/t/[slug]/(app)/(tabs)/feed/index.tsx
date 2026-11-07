@@ -1,10 +1,12 @@
+import { feedEmpty } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
 import { DigestBanner } from "@/components/DigestBanner";
+import { IconFeed } from "@/components/icons";
 import { PostCard } from "@/components/PostCard";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
-import { EmptyState, ListEmpty, SectionScreen, Spinner } from "@/components/ui";
+import { Button, EmptyState, ListEmpty, SectionScreen, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -12,12 +14,14 @@ import { qk } from "@/lib/queryKeys";
 import { spacing, useTheme } from "@/theme";
 
 export default function FeedScreen() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const router = useRouter();
   const theme = useTheme();
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const data = [...(list.first?.pinned ?? []), ...list.items];
+  const empty = feedEmpty(member);
   return (
     <SectionScreen>
       <FlatList
@@ -30,7 +34,12 @@ export default function FeedScreen() {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState title={`No posts yet at ${tenant.shortName ?? tenant.name}`} description="Be the first to share an update with your batchmates." />
+            <EmptyState
+              icon={<IconFeed />}
+              title={empty.title}
+              description={empty.description}
+              action={empty.action && <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/feed/new`)} />}
+            />
           </ListEmpty>
         }
         ListHeaderComponent={

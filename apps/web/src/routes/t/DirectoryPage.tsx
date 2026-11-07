@@ -1,9 +1,10 @@
-import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type Industry, type OpenTo, type ProfessionType, countryName } from "@illuminize/shared";
+import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type Industry, type OpenTo, type ProfessionType, countryName, directoryEmpty } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MemberCard } from "@/components/directory/MemberCard";
-import { IconDirectory } from "@/components/icons";
+import { IconDirectory, IconSearch } from "@/components/icons";
 import { Button, EmptyState, ErrorBox, Input, LoadMore, Loading, PageHeader, Select } from "@/components/ui";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -13,6 +14,8 @@ export function DirectoryPage() {
   const { tenant } = useMembership();
   const slug = tenant.slug;
   const [q, setQ] = useState("");
+  // A moment after the typing stops, as on the phone, so a search that finds nothing is read out once, not at every letter.
+  const search = useDebounced(q.trim());
   const [year, setYear] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
@@ -28,7 +31,7 @@ export function DirectoryPage() {
     .filter(([, v]) => v)
     .map(([k, v]) => `${k}:${v}`);
   const filters = {
-    q: q || undefined,
+    q: search || undefined,
     year: year ? Number(year) : undefined,
     city: city || undefined,
     country: country || undefined,
@@ -56,6 +59,12 @@ export function DirectoryPage() {
     setCustom({});
   };
   const hasFilters = Object.values(filters).some((v) => v !== undefined);
+  const empty = directoryEmpty(hasFilters);
+  const searchBox = useRef<HTMLInputElement>(null);
+  const showAll = () => {
+    reset();
+    searchBox.current?.focus();
+  };
   const advancedActive = !!(city || country || professionType || company || industry || skill || fieldOfStudy || openTo || field.length);
   // Industry, skill and field of study list only what members here have, so each is left out until someone has one.
   // A filter already chosen keeps its option, so it can't vanish from under its own select.
@@ -72,7 +81,7 @@ export function DirectoryPage() {
       <PageHeader title="Directory" subtitle="Find batchmates by year, city, company, skill or profession" />
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[var(--shadow-1)]">
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-          <Input aria-label="Search members" placeholder="Name, company, role or skill" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input ref={searchBox} aria-label="Search members" placeholder="Name, company, role or skill" value={q} onChange={(e) => setQ(e.target.value)} />
           <Select aria-label="Were there in" value={year} onChange={(e) => setYear(e.target.value)} className="sm:w-48">
             <option value="">Any year</option>
             {years.map((y) => (
@@ -182,7 +191,15 @@ export function DirectoryPage() {
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
       </div>
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconDirectory />} title="No members match" description="Try removing a filter." />}
+      {!list.isLoading && !list.error && list.items.length === 0 && (
+        <EmptyState
+          icon={empty.live ? <IconSearch /> : <IconDirectory />}
+          title={empty.title}
+          description={empty.description}
+          live={empty.live}
+          action={empty.action && <Button variant={empty.action.variant} onClick={showAll}>{empty.action.label}</Button>}
+        />
+      )}
       <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
     </div>
   );

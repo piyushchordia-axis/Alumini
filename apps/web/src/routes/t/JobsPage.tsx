@@ -7,8 +7,10 @@ import {
   JOB_TYPE_LABELS,
   JOBS_TAB_LABELS,
   JOBS_TABS,
+  SEEKERS_EMPTY,
   WORK_MODES,
   WORK_MODE_LABELS,
+  jobsEmpty,
   jobsQuery,
   jobsTabFrom,
   referralBoxFrom,
@@ -20,13 +22,14 @@ import {
 } from "@illuminize/shared";
 import { useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { IconJobs, IconProfile } from "@/components/icons";
+import { IconJobs, IconProfile, IconSearch } from "@/components/icons";
 import { JobCard } from "@/components/jobs/JobCard";
 import { useReferralList } from "@/components/jobs/ReferralList";
 import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralRequests";
 import { SeekerCard } from "@/components/jobs/SeekerCard";
 import { SeekerToggleCard } from "@/components/jobs/SeekerToggleCard";
 import { Button, Checkbox, EmptyState, ErrorBox, Input, LinkButton, LoadMore, Loading, PageHeader, Select, Tabs } from "@/components/ui";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -44,7 +47,8 @@ function useJobsParams() {
 
 /** Jobs: openings, members looking for work, and referral requests both ways. The tab is in the URL, as on Mentors. */
 export function JobsPage() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const { tab, box, go } = useJobsParams();
   const available = useReferralsAvailable();
@@ -56,10 +60,13 @@ export function JobsPage() {
   // straight to it (a notification, say) opens it either way, and it says what's left there.
   const showReferrals = available || tab === "referrals" || (!!wayOut && wayOut.received + wayOut.sent > 0);
   const [q, setQ] = useState("");
+  // A moment after the typing stops, so a search that finds nothing is read out once, not at every letter.
+  const search = useDebounced(q.trim());
   const [jobType, setJobType] = useState<JobType | "">("");
   const [canRefer, setCanRefer] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
   const moreToggle = useRef<HTMLButtonElement>(null);
+  const searchBox = useRef<HTMLInputElement>(null);
   const experienceHint = useId();
   const [workMode, setWorkMode] = useState<WorkMode | "">("");
   const [seniority, setSeniority] = useState<JobSeniority | "">("");
@@ -67,7 +74,7 @@ export function JobsPage() {
   // Whole years in range, or no filter: the API refuses anything else, and a half-typed box shouldn't empty the list.
   const years = /^\d{1,2}$/.test(experience.trim()) && Number(experience) <= JOB_EXPERIENCE_MAX_YEARS ? Number(experience) : undefined;
   const filters = {
-    q: q || undefined,
+    q: search || undefined,
     jobType: jobType || undefined,
     workMode: workMode || undefined,
     seniority: seniority || undefined,
@@ -75,6 +82,18 @@ export function JobsPage() {
     canRefer: (available && canRefer) || undefined,
   };
   const moreActive = !!(workMode || seniority || years !== undefined);
+  const empty = jobsEmpty(member, { canRefer: !!filters.canRefer, filtered: moreActive || !!filters.q || !!filters.jobType });
+  // Every filter, the ones behind More filters too, and the search; the button goes with the empty list, so focus moves to
+  // the search box.
+  const showAll = () => {
+    setQ("");
+    setJobType("");
+    setCanRefer(false);
+    setWorkMode("");
+    setSeniority("");
+    setExperience("");
+    searchBox.current?.focus();
+  };
   const jobs = useInfiniteList(qk.jobs(slug, filters), (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), tab === "openings");
   const seekers = useInfiniteList(qk.seekers(slug), (cursor) => api.jobs.seekers.list(slug, { cursor, limit: 20 }), tab === "seekers");
 
@@ -93,7 +112,7 @@ export function JobsPage() {
             {/* Search, type and Can refer stay in view; the rest waits behind More filters, as on the directory. */}
             <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[var(--shadow-1)]">
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                <Input aria-label="Search jobs" placeholder="Search title, company or skill" value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input ref={searchBox} aria-label="Search jobs" placeholder="Search title, company or skill" value={q} onChange={(e) => setQ(e.target.value)} />
                 <Select aria-label="Job type" value={jobType} onChange={(e) => setJobType(e.target.value as JobType | "")} className="sm:w-44">
                   <option value="">All types</option>
                   {JOB_TYPES.map((t) => (
@@ -166,27 +185,36 @@ export function JobsPage() {
                 <JobCard key={j.id} slug={slug} job={j} />
               ))}
             </div>
-            {!jobs.isLoading && !jobs.error && jobs.items.length === 0 &&
-              (filters.canRefer ? (
-                <EmptyState icon={<IconJobs />} title="No openings can refer right now" description="When a poster offers to refer people for a job, it shows here." />
-              ) : moreActive || filters.q || filters.jobType ? (
-                <EmptyState icon={<IconJobs />} title="No openings match" description="Try removing a filter." />
-              ) : (
-                <EmptyState icon={<IconJobs />} title="No openings right now" description="Know of a role? Post it for your batchmates." />
-              ))}
+            {!jobs.isLoading && !jobs.error && jobs.items.length === 0 && (
+              <EmptyState
+                icon={empty.live ? <IconSearch /> : <IconJobs />}
+                title={empty.title}
+                description={empty.description}
+                live={empty.live}
+                action={
+                  empty.action &&
+                  (empty.action.kind === "showAll" ? (
+                    <Button variant={empty.action.variant} onClick={showAll}>{empty.action.label}</Button>
+                  ) : (
+                    <LinkButton to={`/t/${slug}/app/jobs/new`} variant={empty.action.variant}>{empty.action.label}</LinkButton>
+                  ))
+                }
+              />
+            )}
             <LoadMore hasNextPage={!!jobs.hasNextPage} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} />
           </>
         ) : tab === "seekers" ? (
           <>
             <SeekerToggleCard slug={slug} />
             {seekers.isLoading && <Loading />}
+            {seekers.error && seekers.items.length === 0 && <ErrorBox error={seekers.error} />}
             {/* Columns that may shrink, as the openings', so a long headline truncates rather than widening the page. */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {seekers.items.map((s) => (
                 <SeekerCard key={s.member.id} slug={slug} seeker={s} />
               ))}
             </div>
-            {!seekers.isLoading && seekers.items.length === 0 && <EmptyState icon={<IconProfile />} title="Nobody is looking right now" />}
+            {!seekers.isLoading && !seekers.error && seekers.items.length === 0 && <EmptyState icon={<IconProfile />} title={SEEKERS_EMPTY.title} description={SEEKERS_EMPTY.description} />}
             <LoadMore hasNextPage={!!seekers.hasNextPage} isFetchingNextPage={seekers.isFetchingNextPage} fetchNextPage={() => void seekers.fetchNextPage()} />
           </>
         ) : available ? (

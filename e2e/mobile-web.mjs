@@ -663,6 +663,8 @@ try {
     await page.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals$/);
     await tab("Received", true).waitFor();
     await page.getByText("No referral requests yet", { exact: true }).locator("visible=true").first().waitFor();
+    // Requests come about the jobs a member posts, so it offers to post one.
+    await expectEmptyState(page.getByText("No referral requests yet", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the empty Received referrals", { actions: ["Post a job"], tones: BRAND_TONES.demoUniversity });
     await tab("Sent", false).click();
     await page.waitForURL(/\/t\/demo-university\/jobs\?tab=referrals&box=sent$/);
     await page.getByText("You haven't asked for a referral yet", { exact: true }).locator("visible=true").first().waitFor();
@@ -799,7 +801,7 @@ try {
     await sneha.waitFor();
     await search.fill("Priya");
     await page.getByText("No members match", { exact: true }).locator("visible=true").first().waitFor();
-    await expectEmptyState(page.getByText("No members match", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the directory's empty state", { tones: BRAND_TONES.demoUniversity });
+    await expectEmptyState(page.getByText("No members match", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the directory's empty state", { actions: ["Show all members"], tones: BRAND_TONES.demoUniversity });
     await page.getByRole("button", { name: "Clear filters", exact: true }).locator("visible=true").first().click();
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
     await hit.waitFor();
@@ -878,10 +880,18 @@ try {
     await city.fill("surat");
     await zylo.waitFor({ state: "hidden" });
     await singh.waitFor();
+    // A search and a category too, so Show all businesses has all three to empty.
+    await search.fill("singh");
+    await chip("Manufacturing").click();
     await city.fill("nowhere at all");
     await visible(page.getByText("No businesses match", { exact: true })).waitFor();
-    await expectEmptyState(visible(page.getByText("No businesses match", { exact: true })).locator("xpath=.."), "the businesses' empty state", { tones: BRAND_TONES.demoUniversity });
-    await city.fill("");
+    await expectEmptyState(visible(page.getByText("No businesses match", { exact: true })).locator("xpath=.."), "the businesses' empty state", { actions: ["Show all businesses"], tones: BRAND_TONES.demoUniversity });
+    // Show all businesses empties the search, the category and the city, and puts focus back in the search box.
+    await visible(page.getByRole("button", { name: "Show all businesses", exact: true })).click();
+    for (const [name, box] of [["search", search], ["city", city]])
+      if ((await box.inputValue()) !== "") throw new Error(`Show all businesses left the ${name} at "${await box.inputValue()}"`);
+    if ((await chip("Any").getAttribute("aria-selected")) !== "true" || (await chip("Manufacturing").getAttribute("aria-selected")) !== "false") throw new Error("Show all businesses left the category on Manufacturing");
+    if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Show all businesses didn't put focus in the search box");
     await zylo.waitFor();
 
     await zylo.dispatchEvent("click");

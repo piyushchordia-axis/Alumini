@@ -1,8 +1,8 @@
-import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, nameWithYears, plainExcerpt, type BusinessCardDto, type BusinessCategory } from "@illuminize/shared";
+import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, businessesEmpty, nameWithYears, plainExcerpt, type BusinessCardDto, type BusinessCategory } from "@illuminize/shared";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { FlatList, Text, View } from "react-native";
-import { IconBusinesses } from "@/components/icons";
+import { useRef, useState, type ComponentRef } from "react";
+import { FlatList, Text, TextInput, View } from "react-native";
+import { IconBusinesses, IconSearch } from "@/components/icons";
 import { ModerationBadge } from "@/components/ModerationBadge";
 import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -10,6 +10,7 @@ import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { moveFocus } from "@/lib/focus";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
 
@@ -39,7 +40,8 @@ function BusinessCard({ slug, item }: { slug: string; item: BusinessCardDto }) {
 }
 
 export default function BusinessesScreen() {
-  const { tenant } = useMembership();
+  const member = useMembership();
+  const { tenant } = member;
   const slug = tenant.slug;
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -49,11 +51,19 @@ export default function BusinessesScreen() {
   const place = useDebounced(city.trim());
   const filters = { q: search || undefined, city: place || undefined, category: category || undefined };
   const list = useInfiniteList(qk.businesses(slug, filters), (cursor) => api.businesses.list(slug, { ...filters, cursor, limit: 20 }));
+  const empty = businessesEmpty(member, !!(filters.q || filters.city || filters.category));
+  const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
+  const showAll = () => {
+    setQ("");
+    setCity("");
+    setCategory("");
+    moveFocus(searchBox.current);
+  };
   return (
     <SectionScreen>
       <View style={{ padding: spacing.lg, gap: spacing.sm }}>
         <Button title="Add a business" onPress={() => router.push(`/t/${slug}/businesses/new`)} />
-        <Input accessibilityLabel="Search businesses" placeholder="Search name or description" value={q} onChangeText={setQ} autoCorrect={false} />
+        <Input ref={searchBox} accessibilityLabel="Search businesses" placeholder="Search name or description" value={q} onChangeText={setQ} autoCorrect={false} />
         <Input accessibilityLabel="City" placeholder="City" value={city} onChangeText={setCity} autoCorrect={false} />
         <ChipSelect label="Category" options={BUSINESS_CATEGORIES.map((c) => ({ value: c, label: BUSINESS_CATEGORY_LABELS[c] }))} value={category} onChange={setCategory} allowEmpty />
       </View>
@@ -61,12 +71,27 @@ export default function BusinessesScreen() {
         data={list.items}
         keyExtractor={(b) => b.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 48 }}
+        // The keyboard is often still up after a search: one tap reaches Show all businesses, or a listing.
+        keyboardShouldPersistTaps="handled"
         onEndReached={list.loadMore}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            <EmptyState icon={<IconBusinesses />} title={filters.q || filters.city || filters.category ? "No businesses match" : "No businesses listed yet"} description="Run a business? Add it for your batchmates." />
+            <EmptyState
+              icon={empty.live ? <IconSearch /> : <IconBusinesses />}
+              title={empty.title}
+              description={empty.description}
+              live={empty.live}
+              action={
+                empty.action &&
+                (empty.action.kind === "showAll" ? (
+                  <Button title={empty.action.label} variant={empty.action.variant} onPress={showAll} />
+                ) : (
+                  <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/businesses/new`)} />
+                ))
+              }
+            />
           </ListEmpty>
         }
         renderItem={({ item }) => <BusinessCard slug={slug} item={item} />}

@@ -1,4 +1,4 @@
-import { CHAT_INVITE_DECLINE_DAYS, type ChatGroupInviteDto, type CursorPage } from "@illuminize/shared";
+import { CHAT_INVITE_DECLINE_DAYS, groupsEmpty, type ChatGroupInviteDto, type CursorPage, type EmptyCopy } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,27 @@ import { toast } from "@/stores/uiStore";
 
 const PAGE = 20;
 
+/** An empty Discover or My groups, with Create group while the member may make one. */
+function GroupsEmpty({ slug, empty }: { slug: string; empty: EmptyCopy }) {
+  return (
+    <EmptyState
+      icon={empty.live ? <IconSearch /> : <IconGroups />}
+      title={empty.title}
+      description={empty.description}
+      live={empty.live}
+      action={
+        empty.action && (
+          <LinkButton to={`/t/${slug}/app/groups/new`} variant={empty.action.variant}>
+            {empty.action.label}
+          </LinkButton>
+        )
+      }
+    />
+  );
+}
+
 function Discover({ slug }: { slug: string }) {
+  const member = useMembership();
   const [q, setQ] = useState("");
   const search = useDebounced(q.trim());
   const list = useInfiniteList(chatKeys.groupList(slug, "DISCOVER", search), (cursor) => api.chat.groups.list(slug, { scope: "DISCOVER", q: search || undefined, cursor, limit: PAGE }));
@@ -29,13 +49,7 @@ function Discover({ slug }: { slug: string }) {
       <Input aria-label="Search groups" placeholder="Search groups by name" value={q} onChange={(e) => setQ(e.target.value)} type="search" autoComplete="off" />
       <ListBody
         list={{ ...list, hasNextPage: !!list.hasNextPage }}
-        empty={
-          search ? (
-            <EmptyState icon={<IconSearch />} title="No groups match" description="Try another name, or create the group yourself." />
-          ) : (
-            <EmptyState icon={<IconGroups />} title="No open groups yet" description="Create one, and any member here can find and join it." action={<LinkButton to={`/t/${slug}/app/groups/new`}>Create group</LinkButton>} />
-          )
-        }
+        empty={<GroupsEmpty slug={slug} empty={groupsEmpty(member, "discover", !!search)} />}
       >
         {(items) => items.map((g) => <GroupCard key={g.id} slug={slug} group={g} />)}
       </ListBody>
@@ -44,9 +58,10 @@ function Discover({ slug }: { slug: string }) {
 }
 
 function MyGroups({ slug }: { slug: string }) {
+  const member = useMembership();
   const list = useInfiniteList(chatKeys.groupList(slug, "MINE"), (cursor) => api.chat.groups.list(slug, { scope: "MINE", cursor, limit: PAGE }));
   return (
-    <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<EmptyState icon={<IconGroups />} title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />}>
+    <ListBody list={{ ...list, hasNextPage: !!list.hasNextPage }} empty={<GroupsEmpty slug={slug} empty={groupsEmpty(member, "mine", false)} />}>
       {(items) => items.map((g) => <GroupCard key={g.id} slug={slug} group={g} />)}
     </ListBody>
   );

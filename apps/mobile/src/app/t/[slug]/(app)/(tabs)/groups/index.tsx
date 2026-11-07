@@ -1,4 +1,4 @@
-import { CHAT_INVITE_DECLINE_DAYS, type ChatGroupInviteDto, type CursorPage } from "@illuminize/shared";
+import { CHAT_INVITE_DECLINE_DAYS, groupsEmpty, type ChatGroupInviteDto, type CursorPage, type EmptyCopy } from "@illuminize/shared";
 import { chatKeys, peerName } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,8 +21,22 @@ import { colors, spacing } from "@/theme";
 const PAGE = 20;
 const listStyle = { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 };
 
-function Discover({ slug }: { slug: string }) {
+/** An empty Discover or My groups, with Create group while the member may make one. */
+function GroupsEmpty({ slug, empty }: { slug: string; empty: EmptyCopy }) {
   const router = useRouter();
+  return (
+    <EmptyState
+      icon={empty.live ? <IconSearch /> : <IconGroups />}
+      title={empty.title}
+      description={empty.description}
+      live={empty.live}
+      action={empty.action && <Button title={empty.action.label} variant={empty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/groups/new`)} />}
+    />
+  );
+}
+
+function Discover({ slug }: { slug: string }) {
+  const member = useMembership();
   const [q, setQ] = useState("");
   const search = useDebounced(q.trim());
   const list = useInfiniteList(chatKeys.groupList(slug, "DISCOVER", search), (cursor) => api.chat.groups.list(slug, { scope: "DISCOVER", q: search || undefined, cursor, limit: PAGE }));
@@ -41,16 +55,7 @@ function Discover({ slug }: { slug: string }) {
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-            {search ? (
-              <EmptyState icon={<IconSearch />} title="No groups match" description="Try another name, or create the group yourself." />
-            ) : (
-              <EmptyState
-                icon={<IconGroups />}
-                title="No open groups yet"
-                description="Create one, and any member here can find and join it."
-                action={<Button title="Create group" variant="outline" onPress={() => router.push(`/t/${slug}/groups/new`)} />}
-              />
-            )}
+            <GroupsEmpty slug={slug} empty={groupsEmpty(member, "discover", !!search)} />
           </ListEmpty>
         }
         renderItem={({ item }) => <GroupCard slug={slug} group={item} />}
@@ -60,6 +65,7 @@ function Discover({ slug }: { slug: string }) {
 }
 
 function MyGroups({ slug }: { slug: string }) {
+  const member = useMembership();
   const list = useInfiniteList(chatKeys.groupList(slug, "MINE"), (cursor) => api.chat.groups.list(slug, { scope: "MINE", cursor, limit: PAGE }));
   return (
     <FlatList
@@ -71,7 +77,7 @@ function MyGroups({ slug }: { slug: string }) {
       onRefresh={() => void list.refetch()}
       ListEmptyComponent={
         <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
-          <EmptyState icon={<IconGroups />} title="You're not in any groups yet" description="Find one to join in Discover, or create your own." />
+          <GroupsEmpty slug={slug} empty={groupsEmpty(member, "mine", false)} />
         </ListEmpty>
       }
       renderItem={({ item }) => <GroupCard slug={slug} group={item} />}

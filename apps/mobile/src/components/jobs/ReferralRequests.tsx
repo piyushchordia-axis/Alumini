@@ -1,4 +1,5 @@
-import { CAN_REFER_LABEL, REFERRAL_BOX_LABELS, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
+import { REFERRAL_BOX_LABELS, referralsReceivedEmpty, referralsWayOutText, type ReferralBox } from "@illuminize/shared";
+import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { FlatList, Text, View } from "react-native";
 import { IconJobs, IconMail } from "@/components/icons";
@@ -37,16 +38,20 @@ export function ReferralRequests({
   header?: ReactElement;
   onBrowse?: () => void;
 }) {
+  const member = useMembership();
+  const router = useRouter();
   const list = useReferralList(slug, box);
   // The count on Received comes from that list, whichever is open, as the Referrals tab's does.
   const waiting = useReferralList(slug, "received").first?.waiting ?? 0;
   const rows = useReferralRows(slug, { limited, showJob: true });
+  const receivedEmpty = referralsReceivedEmpty(member, limited);
   const empty =
     box === "received" ? (
       <EmptyState
         icon={<IconMail />}
-        title="No referral requests yet"
-        description={limited ? "Requests about the jobs you post show here." : `When you post a job and tick “${CAN_REFER_LABEL}”, members can ask you for a referral. Their requests wait here for your answer.`}
+        title={receivedEmpty.title}
+        description={receivedEmpty.description}
+        action={receivedEmpty.action && <Button title={receivedEmpty.action.label} variant={receivedEmpty.action.variant} accessibilityRole="link" onPress={() => router.push(`/t/${slug}/jobs/new`)} />}
       />
     ) : (
       <EmptyState

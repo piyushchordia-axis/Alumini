@@ -1,10 +1,10 @@
-import { memberRequestOf, notificationTarget, type NotificationDto } from "@illuminize/shared";
+import { memberRequestOf, notificationTarget, notificationsEmpty, type NotificationDto } from "@illuminize/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { MemberRequestActions } from "@/components/admin/MemberActions";
 import { IconBell, IconSettings } from "@/components/icons";
-import { Button, EmptyState, LoadMore, Loading, PageHeader } from "@/components/ui";
+import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -18,7 +18,9 @@ function linkFor(slug: string, n: NotificationDto, isAdmin: boolean): string | n
 }
 
 export function NotificationsPage() {
-  const { tenant, isTenantAdmin } = useMembership();
+  const member = useMembership();
+  const { tenant, isTenantAdmin } = member;
+  const empty = notificationsEmpty(member);
   const slug = tenant.slug;
   const qc = useQueryClient();
   const list = useInfiniteList(qk.notifications(slug), (cursor) => api.notifications.list(slug, { cursor, limit: 30 }));
@@ -45,7 +47,9 @@ export function NotificationsPage() {
         }
       />
       {list.isLoading && <Loading />}
-      {!list.isLoading && list.items.length === 0 && <EmptyState icon={<IconBell />} title="You're all caught up" />}
+      {/* A failed list says so, as on the phone, rather than that there's nothing new. */}
+      {list.error && list.items.length === 0 && <ErrorBox error={list.error} />}
+      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon={<IconBell />} title={empty.title} description={empty.description} />}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {list.items.map((n) => {
           const to = linkFor(slug, n, isTenantAdmin);

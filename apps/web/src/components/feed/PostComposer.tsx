@@ -13,7 +13,7 @@ import {
 } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { IconAnnounce, IconPoll } from "@/components/icons";
@@ -23,7 +23,8 @@ import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
 
-export function PostComposer() {
+/** `inputRef` reaches its text box, so an empty feed's Write a post can put focus there. */
+export function PostComposer({ inputRef }: { inputRef?: Ref<HTMLTextAreaElement> }) {
   const { tenant, membership } = useMembership();
   const [body, setBody] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -64,6 +65,7 @@ export function PostComposer() {
         <Avatar name={membership.fullName} src={membership.avatarUrl} toneKey={membership.id} className="mt-0.5" />
         <div className="min-w-0 flex-1 space-y-3">
           <Textarea
+            ref={inputRef}
             aria-label="New post"
             placeholder={poll ? "Ask a question…" : `Share something with ${tenant.shortName ?? "the network"}…`}
             value={body}

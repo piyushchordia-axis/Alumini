@@ -21,7 +21,7 @@ import {
 } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ListBody } from "@/components/common/ListBody";
@@ -60,15 +60,18 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
   // The list leaves out the viewer, so an empty one says something different to someone who is listed themselves.
   const nobody = !filtered && !list.isLoading && list.items.length === 0;
   const listed = !!useMyMentorProfile(slug, nobody).data?.isActive;
+  const searchBox = useRef<HTMLInputElement>(null);
+  // The button goes with the empty list, so focus moves to the search box, as Show all does on the other lists.
   const clear = () => {
     setQ("");
     setArea("");
     setAvailability("");
+    searchBox.current?.focus();
   };
   return (
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-3">
-        <Input aria-label="Search mentors" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} type="search" autoComplete="off" className="min-h-11" />
+        <Input ref={searchBox} aria-label="Search mentors" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} type="search" autoComplete="off" className="min-h-11" />
         <Select aria-label="Area" value={area} onChange={(e) => setArea(e.target.value as MentorArea | "")} className="min-h-11">
           <option value="">{MENTOR_FILTER_ANY.area}</option>
           {MENTOR_AREAS.map((a) => (
@@ -90,7 +93,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
         list={{ ...list, hasNextPage: !!list.hasNextPage }}
         empty={
           filtered ? (
-            <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." action={<Button variant="outline" className="min-h-11" onClick={clear}>Clear filters</Button>} />
+            <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." live action={<Button variant="outline" className="min-h-11" onClick={clear}>Clear filters</Button>} />
           ) : listed ? (
             <EmptyState
               icon={<IconMentors />}
