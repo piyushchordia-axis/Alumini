@@ -1,5 +1,6 @@
 import {
   BRAND_SWATCHES,
+  BRANDING_FIELD_HINTS,
   BRANDING_FIELD_LABELS,
   blankToNull,
   brandContrastWarnings,
@@ -194,7 +195,7 @@ export function BrandingForm({ initial, onSubmit }: { initial: TenantPublicDto; 
           onChange={(hex) => set("secondaryColor", hex)}
         />
         <div className="sm:col-span-2">
-          <FormField label="Welcome message" hint="Shown on the institution's landing page." error={errors.welcomeMessage}>
+          <FormField label="Welcome message" hint={BRANDING_FIELD_HINTS.welcomeMessage} error={errors.welcomeMessage}>
             <Textarea value={v.welcomeMessage ?? ""} invalid={!!errors.welcomeMessage} onChange={(e) => set("welcomeMessage", blankToNull(e.target.value))} rows={4} maxLength={2000} />
           </FormField>
         </div>

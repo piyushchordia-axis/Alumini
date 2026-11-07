@@ -1,5 +1,6 @@
 import {
   BRAND_SWATCHES,
+  BRANDING_FIELD_HINTS,
   BRANDING_FIELD_LABELS,
   COMMON_TIME_ZONES,
   blankToNull,
@@ -64,6 +65,20 @@ describe("brandingDraft", () => {
       coverImageUrl: "https://cdn.example.com/cover.jpg",
     });
     expect(Object.keys(BRANDING_FIELD_LABELS).sort()).toEqual(Object.keys(brandingDraft(SAMAJ)).sort());
+  });
+});
+
+describe("BRANDING_FIELD_HINTS", () => {
+  it("says the welcome message shows to new members as well as on the landing page", () => {
+    // The walk-through's first screen shows it too, so a message written only for visitors reads oddly there.
+    expect(BRANDING_FIELD_HINTS.welcomeMessage).toBe("Shown on the landing page, and to each new member on their first visit.");
+  });
+
+  it("are for fields the form has, each one sentence", () => {
+    for (const [key, hint] of Object.entries(BRANDING_FIELD_HINTS)) {
+      expect(Object.keys(BRANDING_FIELD_LABELS), key).toContain(key);
+      expect(hint, key).toMatch(/^[A-Z][^.]*\.$/);
+    }
   });
 });
 

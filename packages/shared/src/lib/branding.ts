@@ -174,6 +174,14 @@ export const BRANDING_FIELD_LABELS: Readonly<Record<keyof BrandingDraft, string>
   coverImageUrl: "Cover image",
 };
 
+/**
+ * What a field is for, under it, in both consoles' Branding and the platform's onboarding form. The welcome message
+ * opens a new member's walk-through as well as the landing page, so it's written for members as well as visitors.
+ */
+export const BRANDING_FIELD_HINTS = {
+  welcomeMessage: "Shown on the landing page, and to each new member on their first visit.",
+} as const satisfies Partial<Record<keyof BrandingDraft, string>>;
+
 /** Words a person reads, in place of the schema's, where its own are written for developers. */
 const PROBLEMS: Partial<Record<keyof BrandingDraft, string>> = {
   name: "Enter a name of 2 to 120 characters",

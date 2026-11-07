@@ -239,10 +239,10 @@ Covers:
 - settings, saving only the switches that changed: every checkbox row 44px tall, a ticked switch's box in Demo
   College's ink with a drawn tick and a cleared one's grey edge at 3:1 (`expectChoiceLook`), and unchecking Messaging
   unchecking Mentorship and holding it (its label in the meta grey, unfaded), both coming back on;
-  Branding with Demo College's green chosen among the suggested colours (a drawn tick) and the preview's initials in
-  its ink on its tint, a near-white colour typed showing the contrast warning with Save branding still enabled and the
-  initials following it, readable, and Save held, saying why, while the script holds a
-  large logo's preparation, then free once the logo is in, with nothing saved;
+  Branding with the welcome message's hint saying new members see it too, Demo College's green chosen among the
+  suggested colours (a drawn tick) and the preview's initials in its ink on its tint, a near-white colour typed showing
+  the contrast warning with Save branding still enabled and the initials following it, readable, and Save held, saying
+  why, while the script holds a large logo's preparation, then free once the logo is in, with nothing saved;
 - the Profile fields page saying degree and field of study are built in, and adding a profile question (Add field and
   the move arrows drawn as icons, the directory filter box disabled for short text and saying why), moving it up (in its
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
@@ -282,9 +282,10 @@ Covers:
   the pinned strip's, its frame in the brand's edge still 3:1 against its white card on the tint); the console's
   dashboard and Branding tab staying on the plain page; and Plain putting the page and its grey text back;
 - the platform console: login, the Institutions list drawing each institution's initials in its own colour (Demo
-  University's blue, Demo College's green), onboarding an institution with its first admin, whose years are asked under a
-  college's labels, an end before the start refused on its box with nothing created, and the admin then listed with
-  2010–2014 on the Admins tab; a billing plan and usage, stats and user search, the institution comparison and its CSV,
+  University's blue, Demo College's green), onboarding an institution (the welcome message's hint saying new members
+  see it too) with its first admin, whose years are asked under a college's labels, an end before the start refused on
+  its box with nothing created, and the admin then listed with 2010–2014 on the Admins tab; a billing plan and usage,
+  stats and user search, the institution comparison and its CSV,
   the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
   staff's, "About an admin" or "No other admin", and reports another member of staff must handle, or that no member of
   staff may take yet, or that are closed, each with its note and no link), opening an institution's admin console
@@ -422,12 +423,13 @@ Covers:
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
   Mentorship and holding it with "Needs Messaging" (its label in the meta grey), and Funding saved off (sending only
   that switch) with More and the feed's Explore row dropping it at once, then back on, with Explore offering it again;
-  Branding, from Settings' 44px row: the Samaj's orange chosen among the suggested colours, the tagline saved with the
-  preview following it and its initials in the orange's ink on its tint, Save held (saying why) while the script holds
-  a large logo's preparation and free again once it's cancelled, with nothing uploaded, a near-white colour showing the
-  contrast warning without holding Save and the preview's initials following it, readable, "#12"
-  refused under its box (and by Save) with nothing sent, Teal (a 44px radio) chosen and saved, the screen's and
-  Settings' buttons taking it at once, and the Samaj's colour and tagline put back;
+  Branding, from Settings' 44px row: the welcome message's hint saying new members see it too, the Samaj's orange
+  chosen among the suggested colours, the tagline saved with the preview following it and its initials in the orange's
+  ink on its tint, Save held (saying why) while the script holds a large logo's preparation and free again once it's
+  cancelled, with nothing uploaded, a near-white colour showing the contrast warning without holding Save and the
+  preview's initials following it, readable, "#12" refused under its box (and by Save) with nothing sent, Teal (a 44px
+  radio) chosen and saved, the screen's and Settings' buttons taking it at once, and the Samaj's colour and tagline put
+  back;
   Profile fields, adding "Seva team …" in the modal editor (the key following the question,
   options added by Return and by Add, the directory filter box disabled for short text and for admin-only answers),
   moving it up (in its new place, said, with the arrows waiting, while the script holds the move) and down, a move the

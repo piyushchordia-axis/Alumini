@@ -62,7 +62,8 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
    the whole internship, its stipend included.
 3. **Reports**: remove the reported spam post.
 4. **Settings**: switch member approval or post moderation between automatic and manual, turn features on or off,
-   and change the institution's colours and logo under **Branding**.
+   and change the institution's colours, logo and welcome message under **Branding**. As its hint says, the welcome
+   message shows on the landing page and to each new member on their first visit, once they're approved.
 
 **As Illuminize staff** (open `/platform` and sign in with `+91 99999 99999`)
 1. Onboard a new institution together with its first admin.

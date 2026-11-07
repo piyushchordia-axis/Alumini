@@ -1,4 +1,5 @@
 import {
+  BRANDING_FIELD_HINTS,
   BRANDING_FIELD_LABELS,
   blankToNull,
   brandContrastWarnings,
@@ -105,7 +106,7 @@ export function BrandingForm({
           onChangeText={optional("welcomeMessage")}
           multiline
           maxLength={2000}
-          hint="Shown on the institution's landing page."
+          hint={BRANDING_FIELD_HINTS.welcomeMessage}
           error={errors.welcomeMessage}
         />
       </Card>

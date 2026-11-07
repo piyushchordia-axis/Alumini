@@ -3132,6 +3132,8 @@ try {
     const tagline = field("Tagline");
     const primary = field("Primary colour hex code");
     await tagline.waitFor();
+    // The welcome message says where it shows: new members read it on the walk-through's first screen too.
+    await page.getByText("Shown on the landing page, and to each new member on their first visit.", { exact: true }).locator("visible=true").last().waitFor();
     const original = { tagline: await tagline.inputValue(), primary: await primary.inputValue() };
     if (original.primary !== "#c2410c") throw new Error(`the Samaj's primary colour reads ${original.primary}, expected #c2410c`);
     await fitsPhone("the console's Branding", tagline);

@@ -1,4 +1,4 @@
-import { TENANT_TYPES, TENANT_TYPE_LABELS, memberYearFields, type PlatformTenantCreateInput, type TenantType } from "@illuminize/shared";
+import { BRANDING_FIELD_HINTS, TENANT_TYPES, TENANT_TYPE_LABELS, memberYearFields, type PlatformTenantCreateInput, type TenantType } from "@illuminize/shared";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -139,7 +139,7 @@ export function PlatformTenantFormPage() {
               </div>
             </FormField>
             <div className="sm:col-span-2">
-              <FormField label="Welcome message" error={errors.welcomeMessage}>
+              <FormField label="Welcome message" hint={BRANDING_FIELD_HINTS.welcomeMessage} error={errors.welcomeMessage}>
                 <Textarea value={welcome} onChange={(e) => setWelcome(e.target.value)} rows={3} />
               </FormField>
             </div>

@@ -58,7 +58,8 @@ export const SEED = {
       primaryColor: "#047857",
       secondaryColor: "#064e3b",
       tagline: "Engineering friendships for life.",
-      welcomeMessage: "Alumni of DCE: your membership is reviewed by the alumni office before you get access.",
+      // Read by visitors on the landing page and by each new member once approved (the walk-through), so it suits both.
+      welcomeMessage: "Alumni of DCE: the alumni office checks every new member, so everyone here studied with us.",
       memberApprovalMode: "ADMIN_APPROVAL" as const,
       contentModerationMode: "ADMIN_APPROVAL" as const,
       adminPhone: "+919000000002",

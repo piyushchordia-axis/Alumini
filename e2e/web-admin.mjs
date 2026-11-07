@@ -484,6 +484,8 @@ try {
 
     await page.click("text=Branding");
     await page.waitForSelector("text=Preview");
+    // The welcome message says where it shows: new members read it on the walk-through's first screen too.
+    await page.locator('label:has-text("Welcome message")').getByText("Shown on the landing page, and to each new member on their first visit.", { exact: true }).waitFor();
     // Demo College's green is a suggested colour, chosen; a near-white one says what it does to buttons and links, and
     // isn't saved until Save (this step leaves without saving).
     const swatches = page.getByRole("radiogroup", { name: "Suggested primary colours", exact: true });
@@ -1168,6 +1170,7 @@ try {
     await page.click("text=+ Onboard institution");
     await page.locator('label:has-text("Name") input').first().fill(`Smoke Institute ${unique}`);
     await page.locator('label:has-text("URL slug") input').fill(`smoke-institute-${unique}`);
+    await page.locator('label:has-text("Welcome message")').getByText("Shown on the landing page, and to each new member on their first visit.", { exact: true }).waitFor();
     await page.locator('label:has-text("Admin mobile") input').fill(`+9177${unique}0000`.slice(0, 13));
     await page.locator('label:has-text("Admin name") input').fill("Smoke Admin");
     // The admin's years, labelled for a college, checked by the API as a member's are: an end before the start is refused
