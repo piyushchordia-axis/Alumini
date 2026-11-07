@@ -29,3 +29,13 @@ export function fitCellStyle(
     minWidth: `${Math.floor(100 / (max + 1)) + 1}%`,
   };
 }
+
+/**
+ * What the phone's `Choice` (components/ui.tsx) draws around its label, in points: its padding (spacing.md) and border
+ * each side, its box (`ChoiceMark`), the gap (spacing.sm) between the box and the label, and the label's size. Plain
+ * numbers here, so the API's unit tests size a `Choice fit` chip from the same ones the component draws.
+ */
+export const CHOICE_SIZES = { paddingX: 12, border: 1, mark: 20, gap: 8, fontSize: 14 } as const;
+
+/** How much wider a `Choice` is than its label: the padding and border each side, the box and the gap. */
+export const CHOICE_CHROME = 2 * CHOICE_SIZES.paddingX + 2 * CHOICE_SIZES.border + CHOICE_SIZES.mark + CHOICE_SIZES.gap;

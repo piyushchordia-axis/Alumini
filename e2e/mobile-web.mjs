@@ -1971,16 +1971,45 @@ try {
     await tab(mentor, "Be a mentor").click();
     await mentor.waitForURL(/\/mentors\?tab=be-a-mentor$/);
     await tab(mentor, "Be a mentor", true).waitFor();
-    await shown(mentor.getByRole("heading", { name: "Offer to mentor" })).waitFor();
-    for (const area of areas) {
-      const box = shown(mentor.getByRole("checkbox", { name: area, exact: true }));
-      await box.click();
-      if ((await box.getAttribute("aria-checked")) !== "true") throw new Error(`"${area}" doesn't show as chosen`);
+    const offerHeading = shown(mentor.getByRole("heading", { name: "Offer to mentor" }));
+    await offerHeading.waitFor();
+    // The areas are chips as wide as their names, wrapping, so no name is squeezed into a box narrower than itself
+    // ("Entrepreneurshi p"): chosen here on a 320-point phone, every word whole, every chip a 44-point target inside it.
+    const areaGroup = shown(mentor.getByRole("group", { name: "Mentor areas", exact: true }));
+    const areaChips = areaGroup.getByRole("checkbox");
+    const areaChip = (name) => areaGroup.getByRole("checkbox", { name, exact: true });
+    const [lawBox, longestBox] = [await areaChip("Law").boundingBox(), await areaChip("Entrepreneurship").boundingBox()];
+    if (lawBox.width >= longestBox.width) throw new Error("the mentor areas are boxes of one width, not chips sized to their names");
+    await mentor.setViewportSize({ width: 320, height: 700 });
+    try {
+      await fitsPhone("Offer to mentor on a 320-point phone", offerHeading);
+      await expectWholeWords(areaChips, "the mentor areas on a 320-point phone");
+      for (const chip of await areaChips.all()) {
+        const box = await chip.boundingBox();
+        if (box.height < 44) throw new Error(`the mentor area "${await chip.getAttribute("aria-label")}" is ${box.height}px tall, under 44`);
+        if (box.x + box.width > 320) throw new Error(`the mentor area "${await chip.getAttribute("aria-label")}" runs past the edge of a 320-point phone`);
+      }
+      await expectChoiceLook(areaChip("Career advice"), ":scope > div", "a mentor area not chosen", { checked: false });
+      for (const area of areas) {
+        const box = shown(mentor.getByRole("checkbox", { name: area, exact: true }));
+        await box.click();
+        if ((await box.getAttribute("aria-checked")) !== "true") throw new Error(`"${area}" doesn't show as chosen`);
+      }
+      const sixth = shown(mentor.getByRole("checkbox", { name: "Law", exact: true }));
+      if ((await sixth.getAttribute("aria-disabled")) !== "true") throw new Error("a sixth mentor area can be chosen");
+      await sixth.click({ force: true });
+      if ((await sixth.getAttribute("aria-checked")) === "true") throw new Error("a sixth mentor area was chosen");
+      // The line under them says how to choose another, and the areas that can't be chosen are described by it.
+      const atLimit = "Choose up to 5. 5 chosen: untick one to choose another.";
+      await shown(mentor.getByText(atLimit, { exact: true })).waitFor();
+      await expectDescription(sixth, atLimit, "the mentor area Law, at the limit");
+      await expectReadable(sixth.locator(":scope > :last-child"), "the mentor area Law, at the limit");
+      await expectChoiceLook(areaChip("Entrepreneurship"), ":scope > div", "a chosen mentor area", { checked: true, tones: BRAND_TONES.demoUniversity });
+      await expectWholeWords(areaChips, "the mentor areas on a 320-point phone, five chosen");
+      await mentor.screenshot({ path: `${SHOTS}/m12j-be-a-mentor-320.png` });
+    } finally {
+      await mentor.setViewportSize({ width: 390, height: 844 });
     }
-    const sixth = shown(mentor.getByRole("checkbox", { name: "Law", exact: true }));
-    if ((await sixth.getAttribute("aria-disabled")) !== "true") throw new Error("a sixth mentor area can be chosen");
-    await sixth.click({ force: true });
-    if ((await sixth.getAttribute("aria-checked")) === "true") throw new Error("a sixth mentor area was chosen");
     const fortnightly = shown(mentor.getByRole("radio", { name: "Every two weeks", exact: true }));
     await fortnightly.click();
     if ((await fortnightly.getAttribute("aria-checked")) !== "true") throw new Error("the availability doesn't show as chosen");

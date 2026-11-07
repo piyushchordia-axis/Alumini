@@ -209,7 +209,12 @@ Covers:
   drawn tick, `expectChoiceLook`; its badge arriving live, and at a phone's width on the feed's Explore chip, named
   "Groups, 1 invitation" with its count) accepted from Invitations (with the history before it hidden), leaving,
   archiving and My posts;
-- mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
+- mentorship: offering to mentor (on a 320px screen, the areas as chips sized to their names, every word whole, each
+  44px tall and inside the screen; one not chosen with the meta-grey box, a chosen one in Demo University's wash and
+  ink box, `expectChoiceLook`; at five, Law disabled, its label readable and described by "Choose up to 5. 5 chosen:
+  untick one to choose another."; with the browser's text at twice its size on a 390px screen, every chip still
+  inside the form and nothing wider than the screen, though "Entrepreneurship" wraps inside its chip there, as README
+  Known gaps says), finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only (each side told the date
   a new request can be sent from, thirty days on), the bell, and the Mentor badge in the directory and on the new
   mentor's own profile; switched off, Mentors kept as a way out, on the feed's Explore row and as the More sheet's tile
@@ -418,7 +423,8 @@ Covers:
   from tapping a message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
   (the invitee chosen while the search for their name is on its way keeping that same row once it answers; the
-  invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
+  mentor areas checked on a 320-point screen as on the web, with nothing wider than the screen; the invitation's
+  badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
   kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
@@ -926,6 +932,13 @@ second copy of a screen, or back to the page the button was on.
       phone lands on Mentors → Requests → Sent, and going back never returns to the form or her page. While it waits,
       See your request on her page does the same. View full profile on a mentor's page opens their profile in
       Directory, once. (Rahul's own mentor page, reached by a link, is in part 20.)
+- [ ] Open Be a mentor on the narrowest phone you have, at the usual text size and then at the largest: every area
+      name is whole (never "Entrepreneurshi p"), each chip is at least a fingertip tall and inside the screen, and
+      chosen ones are on the wash with a filled box and tick. The labels stop growing at twice the usual size. On a
+      320-point phone (iPhone SE, first generation) "Entrepreneurship" may still break past about 1.8×: note it in the
+      run if it does.
+- [ ] TalkBack or VoiceOver, with five areas chosen: Law is read as a dimmed (disabled) checkbox, then "Choose up to 5.
+      5 chosen: untick one to choose another."
 
 ### 10. Referrals
 

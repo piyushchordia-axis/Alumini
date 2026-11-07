@@ -1,10 +1,15 @@
 import {
+  CONTROL_TEXT_MAX_SCALE,
+  MENTOR_AREA_LABELS,
+  MENTOR_MAX_AREAS,
   MENTORS_TABS,
   MENTORSHIP_BOXES,
   MENTORSHIP_CONFIRM,
   MENTORSHIP_MAX_REQUESTS_PER_PAIR,
   MENTORSHIP_REQUEST_WINDOW_DAYS,
+  longestWordLength,
   memberRoleLine,
+  mentorAreasHint,
   mentorAvailabilityText,
   mentorCardLabel,
   mentorshipNoteHelp,
@@ -15,10 +20,12 @@ import {
   mentorshipStatusLabel,
   mentorshipWhen,
   notificationTarget,
+  wordColumnWidth,
   type MentorCardDto,
   type MentorshipDto,
 } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
+import { CHOICE_CHROME, CHOICE_SIZES } from "../../../mobile/src/lib/layout";
 
 /** Where a URL with this query string lands, read back the way both apps read it. */
 const landing = (query: string) => {
@@ -111,5 +118,30 @@ describe("how a mentorship reads", () => {
       "Priya Nair, Product manager at Wise, 2008–2012 · London, Career advice, Working abroad, Availability: Every two weeks",
     );
     expect(mentorCardLabel({ member: { ...member, city: null }, areas: ["LAW"], availability: "ONE_OFF" })).toBe("Priya Nair, Product manager at Wise, 2008–2012, Law, Availability: A one-off conversation");
+  });
+});
+
+describe("Be a mentor's areas", () => {
+  it("says how many are chosen, and at the limit how to choose another", () => {
+    expect(MENTOR_MAX_AREAS).toBe(5);
+    expect(mentorAreasHint(0)).toBe("Choose up to 5. 0 chosen.");
+    expect(mentorAreasHint(2)).toBe("Choose up to 5. 2 chosen.");
+    expect(mentorAreasHint(4)).toBe("Choose up to 5. 4 chosen.");
+    expect(mentorAreasHint(5)).toBe("Choose up to 5. 5 chosen: untick one to choose another.");
+  });
+
+  it("has no area name with a word longer than Entrepreneurship, which the chips are sized for", () => {
+    expect(longestWordLength(Object.values(MENTOR_AREA_LABELS))).toBeLessThanOrEqual(16);
+  });
+
+  it("sizes the phone's area chips, from Choice's own measures, to keep each name's longest word whole on a 390-point phone at the most the labels grow", () => {
+    // WCAG 1.4.4's 200%.
+    expect(CONTROL_TEXT_MAX_SCALE).toBe(2);
+    // The chip as the phone's Choice draws it (CHOICE_SIZES: 12 of padding and a 1-point border each side, the 20-point
+    // box and the 8 between it and its 14-point label), by the shared estimate, so a roomier Choice fails here.
+    const chip = wordColumnWidth(longestWordLength(Object.values(MENTOR_AREA_LABELS)), CHOICE_SIZES.fontSize * CONTROL_TEXT_MAX_SCALE, { chrome: CHOICE_CHROME });
+    // The form's row, copied by hand from the Be a mentor screen: the screen less its ScrollView's padding (spacing.lg)
+    // and the Card's padding (spacing.lg) and 1-point border, each side. 322.8 of 324 points today.
+    expect(chip).toBeLessThanOrEqual(390 - 2 * (16 + 16 + 1));
   });
 });

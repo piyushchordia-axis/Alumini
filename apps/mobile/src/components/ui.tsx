@@ -1,4 +1,4 @@
-import { STATUS_TONES, avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
+import { CONTROL_TEXT_MAX_SCALE, STATUS_TONES, avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
 import { cloneElement, useEffect, useEffectEvent, useMemo, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
@@ -7,6 +7,7 @@ import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
 import { StackHeader } from "@/components/StackHeader";
 import { IconAlert, IconCheck, IconInfo, IconProfile, type IconProps } from "@/components/icons";
 import { initials } from "@/lib/format";
+import { CHOICE_SIZES } from "@/lib/layout";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
 /**
@@ -307,10 +308,16 @@ export function ChoiceMark({ kind, checked, disabled = false, size = 20, style }
 
 /**
  * One choice, as a checkbox or a radio: 44 points tall, its state in aria-checked, which React Native maps on devices and
- * react-native-web emits. `hint` says what choosing it does, for a screen reader, when that's written beside it too.
- * Chosen, it takes the wash, a thin ring and the ink box, which show it's chosen, and the label stays `colors.text`.
- * Disabled, ticked or not, it is the plain grey tile with a faded box and a meta-grey label, as the web's Choice and
- * Checkbox are.
+ * react-native-web emits. `hint` says what choosing it does, for a screen reader, when that's written beside it too; give
+ * that text's `nativeID` as `hintId` and the browser build, which ignores the hint, is described by it as well. Chosen,
+ * it takes the wash, a thin ring and the ink box, which show it's chosen, and the label stays `colors.text`. Disabled,
+ * ticked or not, it is the plain grey tile with a faded box and a meta-grey label, as the web's Choice and Checkbox are.
+ * The label grows with the system text size up to CONTROL_TEXT_MAX_SCALE. Its padding, border, box, gap and label size
+ * are `CHOICE_SIZES` (lib/layout.ts), which the unit tests size chips from.
+ *
+ * `fit` sizes it to its label, as a chip in a wrapping row (`flexWrap: "wrap"`), never wider than the row: chips wrap to
+ * the next line first, so a label wraps (at its spaces, and inside a word only as a last resort) only when its chip
+ * alone is wider than the row.
  */
 export function Choice({
   kind,
@@ -318,6 +325,8 @@ export function Choice({
   checked,
   disabled = false,
   hint,
+  hintId,
+  fit = false,
   onPress,
   style,
 }: {
@@ -326,6 +335,8 @@ export function Choice({
   checked: boolean;
   disabled?: boolean;
   hint?: string;
+  hintId?: string;
+  fit?: boolean;
   onPress: () => void;
   style?: ViewStyle;
 }) {
@@ -337,27 +348,32 @@ export function Choice({
       accessibilityRole={kind}
       accessibilityLabel={label}
       accessibilityHint={hint}
+      {...(hint && hintId ? describedBy(hintId) : {})}
       aria-checked={checked}
       aria-disabled={disabled}
       style={({ pressed }) => [
         {
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.sm,
+          gap: CHOICE_SIZES.gap,
           minHeight: 44,
-          borderWidth: 1,
+          borderWidth: CHOICE_SIZES.border,
           borderRadius: radius.md,
-          paddingHorizontal: spacing.md,
+          paddingHorizontal: CHOICE_SIZES.paddingX,
           paddingVertical: spacing.sm,
           borderColor: checked && !disabled ? theme.primaryRing : colors.border,
           backgroundColor: disabled ? colors.bg : checked ? theme.primaryWash : pressed ? colors.bg : colors.card,
         },
+        fit ? { maxWidth: "100%" } : null,
         style,
       ]}
     >
-      <ChoiceMark kind={kind} checked={checked} disabled={disabled} />
-      {/* Long labels wrap inside their box rather than widening it. */}
-      <Text style={{ flex: 1, fontSize: 14, color: disabled ? colors.muted : colors.text }}>{label}</Text>
+      <ChoiceMark kind={kind} checked={checked} disabled={disabled} size={CHOICE_SIZES.mark} />
+      {/* Long labels wrap inside their box rather than widening it. A chip's label shrinks rather than grows: with a
+          basis of 0, `flex: 1` would fold a chip with no width of its own down to its box. */}
+      <Text maxFontSizeMultiplier={CONTROL_TEXT_MAX_SCALE} style={[fit ? { flexShrink: 1, minWidth: 0 } : { flex: 1 }, { fontSize: CHOICE_SIZES.fontSize, color: disabled ? colors.muted : colors.text }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

@@ -1,6 +1,7 @@
 import {
   MENTOR_AREA_LABELS,
   MENTOR_AVAILABILITY_LABELS,
+  MENTOR_MAX_AREAS,
   MENTORSHIP_MAX_REQUESTS_PER_PAIR,
   MENTORSHIP_REQUEST_WINDOW_DAYS,
   PROFESSION_TYPE_LABELS,
@@ -105,6 +106,15 @@ export function mentorCardLabel(mentor: Pick<MentorCardDto, "member" | "areas" |
   const years = memberYearsLine(member, member.city);
   const areas = mentor.areas.map((a) => MENTOR_AREA_LABELS[a]).join(", ");
   return [member.fullName, memberRoleLine(member), years, areas, `Availability: ${MENTOR_AVAILABILITY_LABELS[mentor.availability]}`].join(", ");
+}
+
+/**
+ * The line under Be a mentor's areas, the same on both apps: how many may be chosen and how many are, and at the limit
+ * how to choose another, which the areas that can't be chosen then are described by.
+ */
+export function mentorAreasHint(chosen: number): string {
+  const count = `Choose up to ${MENTOR_MAX_AREAS}. ${chosen} chosen`;
+  return chosen >= MENTOR_MAX_AREAS ? `${count}: untick one to choose another.` : `${count}.`;
 }
 
 /** What the filters on Find mentors say when they filter nothing out, the same on both apps. */

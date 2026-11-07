@@ -37,7 +37,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   of an institution colour (`brandTones`); `lib/avatar.ts` initials' colours (`avatarTone`, `brandAvatarTone`);
   `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
   `lib/layout.ts` the columns text laid side by side takes, from its longest word (`longestWordLength`,
-  `wordColumnWidth`; web `fitColumns` and mobile `FitGrid` build on it);
+  `wordColumnWidth`; web `fitColumns` and mobile `FitGrid` build on it), and how far the phone's control labels grow
+  (`CONTROL_TEXT_MAX_SCALE`);
   `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
   `lib/events.ts` the phone feed's Upcoming events strip (`UPCOMING_EVENTS_STRIP`, its title and links' names);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
@@ -211,7 +212,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     tile goes plain (no wash or ring), all drawn by the component, so callers don't fade the row.
     `ChoiceInput` stays a real input (forced colours get the native control back); a `Checkbox` row that must be a 44px
     target passes `min-h-11 py-3`, which keeps a one-line label centred. `color.test.ts` pins the pairs across the
-    colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`).
+    colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`). Many short choices
+    (Be a mentor's areas) are `Choice fit` chips in a wrapping row, each as wide as its label and never wider than the
+    row, not a fixed grid that squeezes a long name; the phone's `Choice` labels stop growing at
+    `CONTROL_TEXT_MAX_SCALE` (twice the usual size), and its padding, box and gap are `CHOICE_SIZES` (mobile
+    `lib/layout.ts`), which `mentorshipLabels.test.ts` sizes the area chips from.
   - **Side-by-side text.** Text laid in columns (job and member facts, the console's tiles, the landing's sections)
     takes as many as leave room for its longest word, down to one: web `fitColumns` (`lib/layout.ts`) as a `grid`'s
     style, mobile `FitGrid`, both sized by shared `lib/layout.ts`. Not a fixed fraction (`grid-cols-2` on a phone,

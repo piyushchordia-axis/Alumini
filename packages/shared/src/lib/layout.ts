@@ -69,3 +69,10 @@ export function wordColumnWidth(chars: number, fontSize: number, { chrome = 0, f
   const word = Math.ceil(Number((chars * fontSize * em * 100).toFixed(4))) / 100;
   return Math.max(floor, word + chrome);
 }
+
+/**
+ * How far the phone lets a control's label (`Choice`, `Chip`) grow with the system text size: to twice the usual, WCAG
+ * 1.4.4's 200%, while the rest of the screen keeps growing. A label sits beside its box in a chip no wider than its row,
+ * and by the estimate above twice is as far as "Entrepreneurship" stays whole in Be a mentor's row on a 390-point phone.
+ */
+export const CONTROL_TEXT_MAX_SCALE = 2;

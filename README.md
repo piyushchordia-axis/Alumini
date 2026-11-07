@@ -1115,6 +1115,15 @@ A group is a shared chat room. Any member who can use chat creates one under **G
   can meet (weekly, every two weeks, monthly or a one-off conversation), an availability note and a note to mentees.
   Mentors appear in **Find mentors**, with search and area and availability filters, and get a Mentor badge on
   directory cards.
+- **The areas on screen.** On both apps the areas are checkbox chips at least 44 points tall, each as wide as its name,
+  wrapping onto as many lines as they need, so no name is squeezed into a box narrower than itself, on a 320-point
+  phone too. A name wraps inside its chip, which never runs past the form, only when the whole chip (box, padding and
+  name) is wider than the row. On the web the chip's padding and box and the page's margins grow with the text, so at
+  twice the text size that happens on any phone-width screen: "Entrepreneurship" wraps below about 450 pixels, and most
+  names do at 320. On the phone only the label grows, and it stops at twice the usual size (`CONTROL_TEXT_MAX_SCALE`),
+  where every name stays whole on a 390-point phone; on a 320-point one "Entrepreneurship" may wrap past about 1.8×
+  (see Known gaps). The line under them counts the chosen ones (`mentorAreasHint`). At five the others can't be chosen, and the line
+  adds "untick one to choose another", which screen readers also read for each of those areas.
 - **Asking.** A mentee sends a request with a note (10 to 500 characters). The mentor accepts or declines under
   **Requests**. Accepting opens a private chat whose first message is the note, with one notification rather than two.
 - **Ending.** Either side can end a mentorship. Its chat closes (read-only) if the mentorship opened it and no other
@@ -1690,6 +1699,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     facts go to one column on a 320-point screen where two would just fit, and a word wider than the whole row (at
     the largest text sizes) still breaks, inside the row rather than past it. The charts' label column (the phone's
     `HBarChart`, 38%) doesn't use it yet.
+  - Be a mentor's area chips at large text: on the web, at twice the text size on a screen under about 450 pixels,
+    "Entrepreneurship" wraps inside its chip (most names do at 320), because the chip's padding and box and the page's
+    margins grow with the text; on the phone, whose labels stop at twice the usual size, it may wrap on a 320-point
+    phone past about 1.8×. Each chip stays inside the form.
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
     apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
     SVG set.

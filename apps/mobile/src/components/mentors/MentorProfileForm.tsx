@@ -6,6 +6,7 @@ import {
   MENTOR_AVAILABILITY_NOTE_MAX_LENGTH,
   MENTOR_MAX_AREAS,
   MENTOR_NOTE_MAX_LENGTH,
+  mentorAreasHint,
   mentorProfileUpsertSchema,
   type MentorArea,
   type MentorAvailability,
@@ -13,7 +14,7 @@ import {
   type MentorProfileUpsert,
 } from "@illuminize/shared";
 import { isApiClientError } from "@illuminize/shared/client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Text, View } from "react-native";
 import { useFormErrors } from "@/components/forms/useFormErrors";
 import { Button, Choice, ErrorText, Input } from "@/components/ui";
@@ -21,8 +22,6 @@ import { colors, spacing } from "@/theme";
 
 const legend = { fontSize: 13, fontWeight: "600", color: "#334155" } as const;
 const hint = { fontSize: 12, color: colors.muted } as const;
-/** Areas sit two to a row; availability choices are a column, where a basis would set their height instead. */
-const twoAcross = { flexBasis: "47%", flexGrow: 1 } as const;
 
 /**
  * What a mentor offers: up to five areas from a fixed list, how often they can meet, and two optional notes. Saving lists
@@ -35,6 +34,8 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
   const [note, setNote] = useState(profile?.note ?? "");
   const { errors, setErrors, serverError, busy, fromZod, run } = useFormErrors();
   const full = areas.length >= MENTOR_MAX_AREAS;
+  const areasHint = mentorAreasHint(areas.length);
+  const areasHintId = useId();
 
   const toggleArea = (area: MentorArea) => setAreas((now) => (now.includes(area) ? now.filter((a) => a !== area) : [...now, area]));
 
@@ -56,14 +57,15 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
     <View style={{ gap: spacing.lg }}>
       <View role="group" aria-label="Mentor areas" style={{ gap: spacing.sm }}>
         <Text style={legend}>Mentor areas *</Text>
-        <Text style={hint}>
-          Choose up to {MENTOR_MAX_AREAS}. {areas.length} chosen.
+        <Text nativeID={areasHintId} style={hint}>
+          {areasHint}
         </Text>
-        {/* Two across even on a phone, or twelve choices make a very long form. */}
+        {/* Chips as wide as their names, so no name is squeezed into a box narrower than itself. */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
           {MENTOR_AREAS.map((a) => {
             const checked = areas.includes(a);
-            return <Choice key={a} kind="checkbox" label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={full && !checked} onPress={() => toggleArea(a)} style={twoAcross} />;
+            const off = full && !checked;
+            return <Choice key={a} kind="checkbox" fit label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={off} hint={off ? areasHint : undefined} hintId={areasHintId} onPress={() => toggleArea(a)} />;
           })}
         </View>
         <ErrorText error={errors.areas} />

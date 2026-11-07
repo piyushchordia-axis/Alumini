@@ -123,12 +123,18 @@ export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
  * which show it's chosen, and the label stays slate-900. Disabled, ticked or not, it is the plain grey tile with a
  * faded box and a meta-grey label, as the phone's is. It draws its state from `checked` and `disabled`, so it is for
  * controlled inputs.
+ *
+ * `fit` sizes the tile to its label, as a chip in a wrapping row (`flex flex-wrap`), never wider than the row: tiles wrap
+ * to the next line before they shrink, so a label wraps (at its spaces, and inside a word only as a last resort) only
+ * when its tile alone is wider than the row. Its padding and box are in rem and grow with the text, as the page's
+ * margins do, so at twice the text size a phone-width row can be narrower than a long name's tile.
  */
-export const Choice = forwardRef<HTMLInputElement, ChoiceInputProps & { label: ReactNode }>(function Choice({ type, label, className, ...rest }, ref) {
+export const Choice = forwardRef<HTMLInputElement, ChoiceInputProps & { label: ReactNode; fit?: boolean }>(function Choice({ type, label, fit = false, className, ...rest }, ref) {
   return (
     <label
       className={clsx(
-        "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors motion-reduce:transition-none",
+        "min-h-11 min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors motion-reduce:transition-none",
+        fit ? "inline-flex max-w-full" : "flex w-full",
         rest.disabled
           ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500"
           : rest.checked

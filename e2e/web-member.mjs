@@ -2469,8 +2469,49 @@ try {
     await mentor.getByRole("tab", { name: "Be a mentor" }).click();
     await mentor.waitForURL(/\/app\/mentors\?tab=be-a-mentor$/);
     await mentor.getByRole("heading", { name: "Offer to mentor" }).waitFor();
-    for (const area of areas) await mentor.getByLabel(area, { exact: true }).check();
-    if (await mentor.getByLabel("Law", { exact: true }).isEnabled()) throw new Error("a sixth mentor area can be chosen");
+    // The areas are chips as wide as their names, wrapping, so no name is squeezed into a box narrower than itself
+    // ("Entrepreneurshi p"): chosen here on a 320px phone, every word whole, every chip a 44px target inside it.
+    const areaChips = mentor.getByRole("group", { name: /^Mentor areas/ }).locator("label");
+    const areaChip = (name) => areaChips.filter({ hasText: new RegExp(`^${name}$`) });
+    const [lawBox, longestBox] = [await areaChip("Law").boundingBox(), await areaChip("Entrepreneurship").boundingBox()];
+    if (lawBox.width >= longestBox.width) throw new Error("the mentor areas are boxes of one width, not chips sized to their names");
+    await mentor.setViewportSize({ width: 320, height: 800 });
+    try {
+      await expectWholeWords(areaChips, "the mentor areas on a 320px phone");
+      for (const chip of await areaChips.all()) {
+        const box = await chip.boundingBox();
+        if (box.height < 44) throw new Error(`the mentor area "${await chip.innerText()}" is ${box.height}px tall, under 44`);
+        if (box.x + box.width > 320) throw new Error(`the mentor area "${await chip.innerText()}" runs past the edge of a 320px phone`);
+      }
+      const sideways = await mentor.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      if (sideways > 0) throw new Error(`Be a mentor is ${sideways}px wider than a 320px phone`);
+      await expectChoiceLook(areaChip("Career advice"), "input", "a mentor area not chosen", { checked: false });
+      for (const area of areas) await mentor.getByLabel(area, { exact: true }).check();
+      if (await mentor.getByLabel("Law", { exact: true }).isEnabled()) throw new Error("a sixth mentor area can be chosen");
+      // The line under them says how to choose another, and the areas that can't be chosen are described by it.
+      const atLimit = "Choose up to 5. 5 chosen: untick one to choose another.";
+      await mentor.getByText(atLimit, { exact: true }).waitFor();
+      await expectDescription(mentor.getByLabel("Law", { exact: true }), atLimit, "the mentor area Law, at the limit");
+      await expectReadable(areaChip("Law").locator(":scope > :last-child"), "the mentor area Law, at the limit");
+      await expectChoiceLook(areaChip("Entrepreneurship"), "input", "a chosen mentor area", { checked: true, tones: BRAND_TONES.demoUniversity });
+      await expectWholeWords(areaChips, "the mentor areas on a 320px phone, five chosen");
+      await mentor.screenshot({ path: `${SHOTS}/12d-be-a-mentor-320.png`, fullPage: true });
+      // With the browser's text at twice its size on a 390px phone, the chip's padding and box and the page's margins
+      // grow too, so "Entrepreneurship"'s chip (not the word alone) is wider than the row: it stays inside the form, the
+      // word wrapping as a last resort, rather than widening the fieldset past the card (README Known gaps).
+      await mentor.setViewportSize({ width: 390, height: 844 });
+      await mentor.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+      const form = await mentor.locator("form").filter({ has: areaChips.first() }).boundingBox();
+      for (const chip of await areaChips.all()) {
+        const box = await chip.boundingBox();
+        if (box.x + box.width > form.x + form.width + 0.5) throw new Error(`the mentor area "${await chip.innerText()}" runs past the form at twice the text size`);
+      }
+      const wider = await mentor.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      if (wider > 0) throw new Error(`Be a mentor at twice the text size is ${wider}px wider than a 390px phone`);
+    } finally {
+      await mentor.evaluate(() => (document.documentElement.style.fontSize = ""));
+      await mentor.setViewportSize({ width: 1280, height: 900 });
+    }
     await mentor.getByLabel("Every two weeks", { exact: true }).check();
     await mentor.getByLabel("Availability note").fill("Weekday evenings, India time");
     await mentor.getByLabel("Note to mentees").fill(about);

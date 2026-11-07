@@ -6,6 +6,7 @@ import {
   MENTOR_AVAILABILITY_NOTE_MAX_LENGTH,
   MENTOR_MAX_AREAS,
   MENTOR_NOTE_MAX_LENGTH,
+  mentorAreasHint,
   mentorProfileUpsertSchema,
   type MentorArea,
   type MentorAvailability,
@@ -22,7 +23,7 @@ type Field = "areas" | "availability" | "availabilityNote" | "note";
 function FieldError({ id, message }: { id: string; message: string | undefined }) {
   if (!message) return null;
   return (
-    <p id={id} className="mt-1 text-xs text-red-600" role="alert">
+    <p id={id} className="mt-1 text-xs text-tone-danger-ink" role="alert">
       {message}
     </p>
   );
@@ -74,18 +75,31 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
 
   return (
     <form className="space-y-5" noValidate onSubmit={(e) => void submit(e)}>
-      <fieldset aria-describedby={`${id}-areas-hint${errors.areas ? ` ${id}-areas-error` : ""}`}>
+      {/* min-w-0: a fieldset is as wide as its widest chip by default, which would push a chip past the card at large text. */}
+      <fieldset className="min-w-0" aria-describedby={`${id}-areas-hint${errors.areas ? ` ${id}-areas-error` : ""}`}>
         <legend className="mb-1 block text-sm font-medium text-slate-700">
-          Mentor areas<span className="text-red-500"> *</span>
+          Mentor areas<span className="text-tone-danger-ink"> *</span>
         </legend>
         <p id={`${id}-areas-hint`} className="mb-2 text-xs text-slate-500">
-          Choose up to {MENTOR_MAX_AREAS}. {areas.length} chosen.
+          {mentorAreasHint(areas.length)}
         </p>
-        {/* Two across even on a phone, or twelve choices make a very long form. Long labels wrap inside their box. */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Chips as wide as their names, so no name is squeezed into a box narrower than itself. */}
+        <div className="flex flex-wrap gap-2">
           {MENTOR_AREAS.map((a) => {
             const checked = areas.includes(a);
-            return <Choice key={a} type="checkbox" label={MENTOR_AREA_LABELS[a]} checked={checked} disabled={full && !checked} onChange={(e) => toggleArea(a, e.target.checked)} />;
+            const off = full && !checked;
+            return (
+              <Choice
+                key={a}
+                type="checkbox"
+                fit
+                label={MENTOR_AREA_LABELS[a]}
+                checked={checked}
+                disabled={off}
+                aria-describedby={off ? `${id}-areas-hint` : undefined}
+                onChange={(e) => toggleArea(a, e.target.checked)}
+              />
+            );
           })}
         </div>
         <FieldError id={`${id}-areas-error`} message={errors.areas} />
@@ -93,7 +107,7 @@ export function MentorProfileForm({ profile, onSave }: { profile: MentorProfileD
 
       <fieldset aria-describedby={errors.availability ? `${id}-availability-error` : undefined}>
         <legend className="mb-2 block text-sm font-medium text-slate-700">
-          Availability<span className="text-red-500"> *</span>
+          Availability<span className="text-tone-danger-ink"> *</span>
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {MENTOR_AVAILABILITIES.map((v) => (
