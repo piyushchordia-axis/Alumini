@@ -217,7 +217,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders.
   - **Elevation.** Page background (web `--surface-page`, mobile `useTheme().page.color`) is quieter than content.
     Level 1: posts and list modules (`Card` default / `elevation={1}`). Level 2: the feed composer and primary write
-    surfaces (`elevation={2}`). Do not flatten feed cards into the page.
+    surfaces (`elevation={2}`). Do not flatten feed cards into the page, and never tint a post card: a pinned post is
+    `Card highlight` (its border in the brand's edge, web `border-primary-edge`, mobile `theme.primaryEdge`) with the
+    Pinned line above its author, and an announcement adds a 4px left edge in the ink. Words carry the meaning (the
+    edge can fall under 3:1 against a tinted page), so a highlight never stands alone.
   - **Member background.** The page is the member's chosen background (Appearance): page shells take its colour from
     the theme (web `HomeLayout`'s `--surface-page`; mobile `useTheme().page` in `Screen`, `SectionScreen` and
     `StackScreen`, which draw `PageBackdrop`), not `colors.bg`, and a view inside a shell leaves its background clear

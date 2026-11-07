@@ -221,12 +221,26 @@ export function FormField({
 type CardElevation = 1 | 2;
 
 const cardElevationClass: Record<CardElevation, string> = {
-  1: "border border-[var(--border-subtle)] bg-[var(--surface-1)] shadow-[var(--shadow-1)]",
-  2: "border border-[var(--border-strong)] bg-[var(--surface-2)] shadow-[var(--shadow-2)]",
+  1: "border bg-[var(--surface-1)] shadow-[var(--shadow-1)]",
+  2: "border bg-[var(--surface-2)] shadow-[var(--shadow-2)]",
 };
+const cardBorderClass: Record<CardElevation, string> = { 1: "border-[var(--border-subtle)]", 2: "border-[var(--border-strong)]" };
 
-export function Card({ className, children, as: Tag = "div", elevation = 1 }: { className?: string; children: ReactNode; as?: "div" | "section" | "article"; elevation?: CardElevation }) {
-  return <Tag className={clsx("rounded-xl", cardElevationClass[elevation], className)}>{children}</Tag>;
+/**
+ * A card's surface at `elevation`. A highlighted one keeps it, white, and swaps its grey border for the brand's edge
+ * rather than adding a second border colour, whose winner would be left to the CSS order.
+ */
+function cardClass(elevation: CardElevation, highlight = false) {
+  return clsx(cardElevationClass[elevation], highlight ? "border-primary-edge" : cardBorderClass[elevation]);
+}
+
+/**
+ * `highlight` frames the card in the brand's edge (a pinned post), 3:1 against the white card for any brand. On a
+ * member's tinted page it can fall a little under 3:1 against the page outside, so it only adds to words that say the
+ * same (the post's Pinned line), never stands for them.
+ */
+export function Card({ className, children, as: Tag = "div", elevation = 1, highlight = false }: { className?: string; children: ReactNode; as?: "div" | "section" | "article"; elevation?: CardElevation; highlight?: boolean }) {
+  return <Tag className={clsx("rounded-xl", cardClass(elevation, highlight), className)}>{children}</Tag>;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -512,7 +526,7 @@ export function Pagination({ page, pageSize, total, onChange }: { page: number; 
 export function Stat({ label, value, hint, attention, linked }: { label: ReactNode; value: ReactNode; hint?: ReactNode; attention?: boolean; linked?: boolean }) {
   return (
     // Not a Card with an amber className: two border and background colours would leave the winner to the CSS order.
-    <div className={clsx("rounded-xl p-4", attention ? "border border-amber-300 bg-amber-50 shadow-[var(--shadow-1)]" : cardElevationClass[1])}>
+    <div className={clsx("rounded-xl p-4", attention ? "border border-amber-300 bg-amber-50 shadow-[var(--shadow-1)]" : cardClass(1))}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1 text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
         {linked && <IconChevronRight size={16} className="text-slate-400" />}

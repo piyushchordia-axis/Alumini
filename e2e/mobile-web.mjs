@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -4770,11 +4770,41 @@ try {
     if (await page.getByRole("alertdialog").locator("visible=true").count()) throw new Error("posting with no channels asked first");
     const card = feedCard(ANNOUNCEMENT);
     await card.waitFor();
-    for (const label of ["Announcement", "Pinned"]) await expectSvgNoEmoji(card.getByText(label, { exact: true }).locator(".."), `the announcement's ${label} badge`);
+    await expectSvgNoEmoji(card.getByText("Announcement", { exact: true }).locator(".."), "the announcement's Announcement badge");
     // First on the feed, above the Samaj's own pinned welcome: the newest pinned post leads.
     const ours = await shown(page.getByText(ANNOUNCEMENT, { exact: true })).boundingBox();
     const welcome = await shown(page.getByText(/^Welcome to the Shri Gujarati Samaj member network!/)).boundingBox();
     if (!ours || !welcome || ours.y >= welcome.y) throw new Error("the announcement isn't first on the feed, above the pinned welcome");
+    // Both white, framed in the Samaj's edge (brandTones: 3:1 on white), each saying Pinned above its author; the
+    // announcement's left edge in the Samaj's ink, the welcome's (no announcement) the frame's.
+    const { ink: INK, edge: EDGE } = BRAND_TONES.samaj;
+    const welcomeCard = feedCard(/^Welcome to the Shri Gujarati Samaj member network!/);
+    for (const [framed, name, left] of [
+      [card, "the pinned announcement", { colour: INK, width: 4 }],
+      [welcomeCard, "the pinned welcome", { colour: EDGE, width: 1 }],
+    ]) {
+      const line = framed.getByText("Pinned", { exact: true });
+      if ((await line.count()) !== 1) throw new Error(`${name} says Pinned ${await line.count()} times, not once`);
+      await expectSvgNoEmoji(line.locator(".."), `${name}'s Pinned line`);
+      const { colour } = await expectReadable(line, `${name}'s Pinned line`);
+      if (colour !== INK) throw new Error(`${name}'s Pinned line is rgb ${colour}, not the Samaj's ink`);
+      const [mark, author] = [await line.boundingBox(), await framed.getByRole("link").first().boundingBox()];
+      if (!mark || !author || mark.y + mark.height > author.y) throw new Error(`${name}'s Pinned line isn't above its author`);
+      const edges = await cardEdges(framed);
+      if (edges.own !== WHITE) throw new Error(`${name}'s card is rgb ${edges.own}, not white`);
+      if (edges.top.colour !== EDGE || edges.top.width !== 1 || edges.top.contrast < 3) throw new Error(`${name}'s frame is ${edges.top.width}px of rgb ${edges.top.colour} (${edges.top.contrast.toFixed(2)}:1 on white), not 1px of the Samaj's edge`);
+      if (edges.left.colour !== left.colour || edges.left.width !== left.width) throw new Error(`${name}'s left edge is ${edges.left.width}px of rgb ${edges.left.colour}, not ${left.width}px of rgb ${left.colour}`);
+    }
+    if (await welcomeCard.getByText("Announcement", { exact: true }).count()) throw new Error("the pinned welcome, which isn't an announcement, shows the Announcement badge");
+    // Grouped as on the web: both in the pinned strip, then the heading over the posts after it.
+    const strip = shown(page.getByRole("region", { name: "Pinned posts", exact: true }));
+    for (const text of [ANNOUNCEMENT, /^Welcome to the Shri Gujarati Samaj member network!/]) {
+      if ((await strip.getByText(text, { exact: true }).count()) !== 1) throw new Error(`the pinned strip doesn't hold "${text}"`);
+    }
+    const latest = shown(page.getByRole("heading", { name: "Latest posts", exact: true }));
+    await expectReadable(latest, "the Latest posts heading on the page");
+    const [strung, heading] = [await strip.boundingBox(), await latest.boundingBox()];
+    if (!strung || !heading || heading.y < strung.y + strung.height) throw new Error("Latest posts isn't below the pinned strip");
     await shot("m19b-announcement-feed");
   });
 
@@ -4843,6 +4873,10 @@ try {
     const card = feedCard(ANNOUNCEMENT);
     await card.getByText("Announcement", { exact: true }).waitFor();
     if (await card.getByText("Pinned", { exact: true }).count()) throw new Error("the announcement still shows as pinned after Unpin");
+    // Out of the pinned strip and its frame, back in the grey border, still with the announcement's edge in the ink.
+    if (await shown(page.getByRole("region", { name: "Pinned posts", exact: true })).getByText(ANNOUNCEMENT, { exact: true }).count()) throw new Error("the unpinned announcement is still in the pinned strip");
+    const edges = await cardEdges(card);
+    if (edges.top.colour !== "226 232 240" || edges.left.colour !== BRAND_TONES.samaj.ink || edges.left.width !== 4) throw new Error(`the unpinned announcement is framed ${edges.top.width}px of rgb ${edges.top.colour} with a ${edges.left.width}px left edge of rgb ${edges.left.colour}, not the grey border with the Samaj's ink on the left`);
   });
 
   // Invitations, as the Samaj admin: the Samaj has none and its plan sends nothing, so anything sent is answered by the

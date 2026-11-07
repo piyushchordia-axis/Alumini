@@ -56,7 +56,7 @@ const toOnePostDto = async (ctx: AppContext, actor: ContentActor, row: PostWithA
 
 export async function listTenantPosts(ctx: AppContext, tenantCtx: TenantContext, actor: ContentActor, query: PostListQuery): Promise<PostPageDto> {
   const tenantId = tenantCtx.tenant.id;
-  // Only the posts in the pinned strip are left out of the feed; any further pinned posts stay in it (with their badge).
+  // Only the posts in the pinned strip are left out of the feed; any further pinned posts stay in it, with the same Pinned line and frame.
   const pinned = query.mine ? [] : await listPinnedPosts(ctx.db, tenantId, actor.membership.id);
   const page = await listPosts(
     ctx.db,

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1086,13 +1086,17 @@ try {
     if (tintGrey !== GREY_TEXT.dim) throw new Error(`grey text on the tint is rgb ${tintGrey}, not the secondary grey (${GREY_TEXT.dim})`);
     await expectReadable(greyLine, "grey text on Demo University's tint");
     // Saved on the membership, so a fresh load has it, on the feed too, where post cards stay white: each paints white
-    // itself, so the tint can't show through one.
+    // itself, so the tint can't show through one. The first is the pinned strip's, white like the rest, its frame in the
+    // brand's edge still 3:1 against its own white card on the tint.
     await page.goto(`${BASE}/t/demo-university/app/feed`);
     const card = page.locator("main article").first();
     await card.waitFor();
     const feed = await pageColours(card);
     if (feed.page !== PAGE_COLOURS.demoUniversity) throw new Error(`the feed is rgb ${feed.page} after a reload, not Demo University's tint`);
     if (feed.own !== WHITE) throw new Error(`a post card's own background is ${feed.own ? `rgb ${feed.own}` : "clear"} on the tinted feed, not white`);
+    if (!(await card.evaluate((el) => !!el.closest('section[aria-label="Pinned posts"]')))) throw new Error("the feed's first post isn't in the pinned strip");
+    const frame = (await cardEdges(card)).top;
+    if (frame.colour !== BRAND_TONES.demoUniversity.edge || frame.contrast < 3) throw new Error(`the pinned card's frame on the tinted feed is rgb ${frame.colour}, ${frame.contrast.toFixed(2)}:1 on its white card, not Demo University's edge at 3:1`);
     await shot("a09c-appearance-colour");
     // The console, Branding included, shows the institution as everyone sees it.
     const plainConsole = async (where) => {

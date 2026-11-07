@@ -280,10 +280,12 @@ counts it.
 - **Celebrations.** Sign in as Rahul (`+91 91000 00001`): the feed shows today's birthday (Meera) and Rahul's own
   third anniversary of joining. Tap **Wish**; Meera sees them under the bell. Only the day and month are ever
   shown. Members can opt out in their profile.
-- **Polls and announcements.** Vote in Priya's London meetup poll. The pinned announcement came from the admin;
-  as Demo University's admin (`+91 90000 00001`) write a post, choose **Announce**, and tick **Also email it**.
-  Email, WhatsApp and SMS are offered only when the institution's plan includes them; in this demo they're printed in
-  the API terminal.
+- **Polls and announcements.** Vote in Priya's London meetup poll. The pinned announcement came from the admin. The
+  pinned posts lead the feed, each still a white card but framed in the institution's colour and saying **Pinned** above
+  its author, then a **Latest posts** heading over the rest; an announcement also has its Announcement badge and a
+  coloured left edge. As Demo University's admin (`+91 90000 00001`) write a post, choose **Announce**, and tick **Also
+  email it**. Email, WhatsApp and SMS are offered only when the institution's plan includes them; in this demo they're
+  printed in the API terminal.
 - **This week.** Every Monday morning members get a digest of popular posts, new jobs and upcoming events, in the app
   and by email if they have confirmed one (Profile → Email). To see it now, run `pnpm jobs:run digest demo-university
   --force` in a terminal, then open **This week** from the feed.

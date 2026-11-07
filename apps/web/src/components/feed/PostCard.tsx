@@ -64,18 +64,21 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
   const removed = post.moderationStatus === "REMOVED";
 
   return (
-    <Card as="article" elevation={1} className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary p-4" : "p-4"}>
+    // A pinned post stays white, framed in the brand's edge and saying so above its author; an announcement keeps its
+    // badge and a left edge in the ink. A pinned announcement has both.
+    <Card as="article" elevation={1} highlight={post.isPinned} className={post.kind === "ANNOUNCEMENT" ? "border-l-4 border-l-primary-ink p-4" : "p-4"}>
+      {post.isPinned && (
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
+          <IconPin size={14} />
+          Pinned
+        </p>
+      )}
       <div className="flex items-start justify-between gap-3">
         <MemberLink slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           {post.kind === "ANNOUNCEMENT" && (
             <Badge tone="primary" className="gap-1">
               <IconAnnounce size={12} /> Announcement
-            </Badge>
-          )}
-          {post.isPinned && (
-            <Badge tone="primary" className="gap-1">
-              <IconPin size={12} /> Pinned
             </Badge>
           )}
           <ModerationStatusBadge status={post.moderationStatus} note={post.moderationNote} />

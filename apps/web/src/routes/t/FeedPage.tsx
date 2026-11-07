@@ -1,4 +1,4 @@
-import { feedEmpty } from "@illuminize/shared";
+import { feedEmpty, LATEST_POSTS_TITLE, PINNED_POSTS_LABEL } from "@illuminize/shared";
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
@@ -65,9 +65,21 @@ export function FeedPage() {
       <PostComposer inputRef={composer} />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}
-      {pinned.map((p) => (
-        <PostCard key={p.id} slug={slug} post={p} />
-      ))}
+      {pinned.length > 0 && (
+        // Paints nothing of its own, so its cards stay white on the member's page; each says it's pinned.
+        <section aria-label={PINNED_POSTS_LABEL} className="space-y-4">
+          {pinned.map((p) => (
+            <PostCard key={p.id} slug={slug} post={p} />
+          ))}
+        </section>
+      )}
+      {pinned.length > 0 && list.items.length > 0 && (
+        // Grey text on the page, a shade darker on a tint or a photo ([data-backdrop]), as the phone's pageMuted is.
+        <h2 className="flex items-center gap-3 pt-1 text-sm font-semibold text-slate-500">
+          {LATEST_POSTS_TITLE}
+          <span aria-hidden className="h-px flex-1 bg-slate-300" />
+        </h2>
+      )}
       {list.items.map((p) => (
         <PostCard key={p.id} slug={slug} post={p} />
       ))}

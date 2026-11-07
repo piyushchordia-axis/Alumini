@@ -404,15 +404,15 @@ export async function expectEdge(locator, where, min = 3) {
 }
 
 /**
- * The seeded institutions' ink, wash and solid 12% tint ("r g b"), as brandTones gives them for their colours (Demo
- * University's #1d4ed8 is also both apps' default and the platform console's; color.test.ts pins all four inks and
- * washes) and both apps draw them.
+ * The seeded institutions' ink, wash, solid 12% tint and edge (3:1 on white: a pinned post's frame) ("r g b"), as
+ * brandTones gives them for their colours (Demo University's #1d4ed8 is also both apps' default and the platform
+ * console's; color.test.ts pins all four inks and washes) and both apps draw them.
  */
 export const BRAND_TONES = {
-  demoUniversity: { ink: "29 78 216", wash: "223 230 250", tint: "228 234 250" },
-  demoCollege: { ink: "4 118 86", wash: "220 236 231", tint: "225 239 235" },
-  demoSchool: { ink: "167 78 12", wash: "243 230 221", tint: "246 234 225" },
-  samaj: { ink: "184 62 14", wash: "245 228 221", tint: "248 232 226" },
+  demoUniversity: { ink: "29 78 216", wash: "223 230 250", tint: "228 234 250", edge: "120 139 190" },
+  demoCollege: { ink: "4 118 86", wash: "220 236 231", tint: "225 239 235", edge: "109 149 143" },
+  demoSchool: { ink: "167 78 12", wash: "243 230 221", tint: "246 234 225", edge: "163 135 119" },
+  samaj: { ink: "184 62 14", wash: "245 228 221", tint: "248 232 226", edge: "169 130 120" },
 };
 
 /**
@@ -549,6 +549,22 @@ export async function expectInstitutionInitials(locator, want, where) {
   const look = await expectInitials(locator, where);
   if (look.colour !== want.colour || look.behind !== want.behind) throw new Error(`${where} are rgb ${look.colour} on rgb ${look.behind}, not the institution's ink on its tint (rgb ${want.colour} on rgb ${want.behind})`);
   return look;
+}
+
+/**
+ * The edges of `card` (one element, such as a post card), as paintedColour sees them: `own`, the card's background as
+ * the eye gets it ("r g b"), and `top` and `left`, each { colour, width, contrast }: the side's colour, its width in
+ * pixels, and its contrast with `own`, the white a card's frame has to show against (WCAG 1.4.11: 3:1) whichever page
+ * the member chose. A side with no border fails, as paintedColour does.
+ */
+export async function cardEdges(card) {
+  const { colour: own } = await paintedColour(card, "backgroundColor");
+  const side = async (name) => {
+    const { colour } = await paintedColour(card, `border${name}Color`);
+    const width = await card.evaluate((el, property) => parseFloat(getComputedStyle(el)[property]), `border${name}Width`);
+    return { colour, width, contrast: contrastOf(colour, own) };
+  };
+  return { own, top: await side("Top"), left: await side("Left") };
 }
 
 async function expectContrast(locator, property, where, min, says) {

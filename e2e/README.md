@@ -48,8 +48,9 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
 
 - `lib.mjs` reads colours as the eye gets them: `paintedColour(locator, property)` lays an element's text, icon,
   background, border or outline colour over the backgrounds behind it, and `contrastOf` gives their WCAG contrast.
-  `expectReadable` (text at 4.5:1) and `expectEdge` (an edge at 3:1) are built on them, and a new colour check should
-  be too. They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
+  `expectReadable` (text at 4.5:1), `expectEdge` (an edge at 3:1) and `cardEdges` (a card's own colour and its top
+  and left edges: colour, width and contrast with the card) are built on them, and a new colour check should be too.
+  They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
 - `expectEmptyState(box, where, { actions, absent, tones })` checks an empty state or a chat notice, found from its
   title (the web's `h3` directly inside it, the phone's title as a direct child): an SVG icon and no emoji, on a badge
   that isn't white, at 3:1 on it, and the links or buttons it should and shouldn't offer. `tones` pins the badge and the
@@ -94,11 +95,16 @@ Covers:
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
-  and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); a pinned
-  announcement, its Announcement badge's ink readable and its edge at 3:1, its author's initials in the same tone,
-  readable and not the institution's tint, on the pinned welcome post she also wrote, and a poll vote, marked with a drawn check
-  (read as "your vote") rather than a ✓; a poll with several choices, its drawn boxes saying which are chosen
-  (`aria-pressed`) before the vote; the celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
+  and the count in that ink), comment and edit; the live bell (a second member's reaction arrives with no reload); the
+  pinned strip, a region named "Pinned posts" holding the seeded announcement and welcome, each a white card saying
+  Pinned once (an SVG pin, in the ink) above its author and framed 1px in Demo University's edge (3:1 on white,
+  `cardEdges`), the announcement with its badge (its ink readable and its edge at 3:1) and a 4px left edge in the ink,
+  the welcome with neither (Demo University's ink is its brand blue, so the line's and the edge's classes are checked
+  too), the announcement's author's initials in the same tone, readable and not the institution's tint, on the pinned
+  welcome post she also wrote, then a readable "Latest posts" heading between the strip and the posts after it, which
+  stay in the grey border with no Pinned; a poll vote, marked with a drawn check (read as "your vote") rather than a ✓;
+  a poll with several choices, its drawn boxes saying which are chosen (`aria-pressed`) before the vote; the
+  celebrations card (a birthday row and an anniversary row with years) and wishes; the weekly
   digest (run through the platform job endpoint, see `lib.mjs`);
 - jobs: seeded cards with pay, experience and "+1 more" skills, and with no logo, Zylo Labs's and Deloitte's initials in
   a tone from each company's name, readable, two tones apart and not the institution's; the Work mode and experience
@@ -257,8 +263,9 @@ Covers:
   status tabs, a member's page and the Branding tab;
 - Appearance on My profile, as the Demo University admin: Plain chosen and no Cover tile without a cover; Institution
   colour saved and tinting the page (Demo University's tint) with its grey text a shade darker (the meta grey, then the
-  secondary one, readable on each), on the feed after a reload too, with post cards painting their own white; the
-  console's dashboard and Branding tab staying on the plain page; and Plain putting the page and its grey text back;
+  secondary one, readable on each), on the feed after a reload too, with post cards painting their own white (the first
+  the pinned strip's, its frame in the brand's edge still 3:1 against its white card on the tint); the console's
+  dashboard and Branding tab staying on the plain page; and Plain putting the page and its grey text back;
 - the platform console: login, the Institutions list drawing each institution's initials in its own colour (Demo
   University's blue, Demo College's green), onboarding an institution with its first admin, whose years are asked under a
   college's labels, an end before the start refused on its box with nothing created, and the admin then listed with
@@ -472,13 +479,17 @@ Covers:
   admin, the audience not asked for until Announce is pressed (its SVG icon, then "Undo announce" pressed), every
   member's count, no channel boxes and the line saying the plan has none, Pin on to start with and toggling, Post
   announcement sending it pinned with no channels and no sheet, and the feed showing it first, above the Samaj's pinned
-  welcome, with its Announcement and Pinned badges drawn with SVG icons; on a plan with WhatsApp and email (the audience
+  welcome, with its Announcement badge drawn with an SVG icon; both in the pinned strip (a region named "Pinned posts",
+  as on the web), each a white card saying Pinned once (an SVG pin, in the Samaj's ink) above its author and framed 1px
+  in the Samaj's edge (3:1 on white), the announcement's left edge 4px of the ink, the welcome's the frame's and no
+  badge, then a readable "Latest posts" heading below the strip; on a plan with WhatsApp and email (the audience
   and the post answered by the script, so nothing is billed or stored), both boxes with their counts and the line saying
   each member still gets one message, email alone asking first in a sheet with its count and "Messages are billed to
   your institution.", Cancel sending nothing and keeping the text, then both asking "by WhatsApp or email?" with one
   message each to every member, by email only when WhatsApp can't be sent, and Post and send sending it pinned with both
   channels and going back to the feed; then the console's queue listing the real one with both badges, and Unpin there
-  leaving it an announcement on the feed, no longer pinned;
+  leaving it an announcement on the feed, no longer pinned: no Pinned line, out of the pinned strip, back in the grey
+  border with its left edge still in the ink;
 - the console's invitations, as the Samaj admin: none yet, Can send today read as none and no Send pending on a plan
   that sends nothing, no sideways scrolling; the import modal's hint saying a community's end year may be blank, and its
   Template downloading invitations-template.csv with its byte order mark, `start_year` and `end_year`, the questions'
@@ -1008,9 +1019,14 @@ Sign one phone in as Demo University's admin (`+91 90000 00001`), which has a se
 - [ ] New post, as the Samaj admin: TalkBack or VoiceOver reads Announce as a button, not selected, and once pressed
       as "Undo announce", selected; Pin to the top of the feed as a checked checkbox, and the line saying the plan has no
       channels. Post announcement goes back to the feed with "Announcement posted; members are being notified", the
-      post first with its Announcement and Pinned badges. Unpin it from the console's Moderation afterwards. (On Demo
-      University, whose plan includes email, as `+91 90000 00001`: ticking Also email it and posting asks first in a
-      sheet; Cancel it.)
+      post first with its Announcement badge and Pinned line, framed. Unpin it from the console's Moderation afterwards.
+      (On Demo University, whose plan includes email, as `+91 90000 00001`: ticking Also email it and posting asks first
+      in a sheet; Cancel it.)
+- [ ] The feed's pinned posts, on the Samaj with Institution colour chosen (My profile → Appearance) and the largest
+      text size: each pinned card stays white, its frame in the brand's colour showing against the card, its Pinned
+      line above the author not cut off; then "Latest posts" over the rest. VoiceOver and TalkBack read "Pinned" before
+      the author's name and "Latest posts" as a heading; on Android the frame and the announcement's left edge meet
+      cleanly at the rounded corners.
 
 ### 15. Files
 

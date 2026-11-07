@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, INSTITUTION_INITIALS, bigPhoto, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -326,23 +326,64 @@ try {
     listener = { context: other, page: pageB };
   });
 
-  await step("announcement is pinned with its badge; vote in a poll", async () => {
+  await step("the pinned strip: the announcement and the welcome say Pinned above their author, framed in the brand's edge on white, the announcement's left edge in the ink; then Latest posts; vote in a poll", async () => {
     await page.goto(BASE + "/t/demo-university/app/feed");
-    const ann = page.locator("article", { hasText: "Registrations for DemoU Alumni Day 2026" }).first();
+    const strip = page.getByRole("region", { name: "Pinned posts", exact: true });
+    const ann = strip.locator("article", { hasText: "Registrations for DemoU Alumni Day 2026" });
+    const welcome = strip.locator("article", { hasText: "Welcome to the official Demo University alumni network!" });
     await ann.waitFor();
     // A tag in the brand's tone: its ink on its tint, and an edge that shows on the card.
     const announcement = ann.getByText("Announcement", { exact: true });
     await announcement.waitFor();
     await expectReadable(announcement, "the Announcement badge");
     await expectEdge(announcement, "the Announcement badge");
+    if (await welcome.getByText("Announcement", { exact: true }).count()) throw new Error("the pinned welcome, which isn't an announcement, shows the Announcement badge");
     // One member, one colour: both pinned posts are Ananya Rao's, and her initials take the same tone on each, readable,
     // and not the institution's tint, which only the institution's own initials keep.
-    const welcome = page.locator("article", { hasText: "Welcome to the official Demo University alumni network" }).first();
     const [annAuthor, welcomeAuthor] = [ann, welcome].map((post) => post.locator('a[href*="/app/directory/"]').first());
     if ((await annAuthor.getAttribute("href")) !== (await welcomeAuthor.getAttribute("href"))) throw new Error("the two pinned posts aren't by the same member");
     const onAnnouncement = await expectInitials(annAuthor.getByText("AR", { exact: true }), "Ananya Rao's initials on the announcement");
     expectSameTone(onAnnouncement, await expectInitials(welcomeAuthor.getByText("AR", { exact: true }), "Ananya Rao's initials on the welcome post"), "Ananya Rao's initials on her two posts");
     if (onAnnouncement.behind === INSTITUTION_INITIALS.demoUniversity.behind) throw new Error("Ananya Rao's initials sit on the institution's tint, not a tone of her own");
+    // Demo University's ink and edge (brandTones: the edge 3:1 on white), and the grey border of every other card.
+    const { ink: INK, edge: EDGE } = BRAND_TONES.demoUniversity;
+    const BORDER = "226 232 240";
+    for (const [card, name, left] of [
+      [ann, "the pinned announcement", { colour: INK, width: 4 }],
+      [welcome, "the pinned welcome", { colour: EDGE, width: 1 }],
+    ]) {
+      // One Pinned, on a line of its own above the author: the header's Pinned badge has gone.
+      const line = card.getByText("Pinned", { exact: true });
+      if ((await line.count()) !== 1) throw new Error(`${name} says Pinned ${await line.count()} times, not once`);
+      await expectSvgNoEmoji(line, `${name}'s Pinned line`);
+      const { colour } = await expectReadable(line, `${name}'s Pinned line`);
+      if (colour !== INK) throw new Error(`${name}'s Pinned line is rgb ${colour}, not Demo University's ink`);
+      // Demo University's ink and primary are the same blue, so the painted colours can't tell the ink from the raw brand
+      // colour, which a pale brand would lose: the classes do, as on the Explore row.
+      const lineClasses = (await line.getAttribute("class")).split(/\s+/);
+      if (!lineClasses.includes("text-primary-ink") || lineClasses.includes("text-primary")) throw new Error(`${name}'s Pinned line isn't drawn in text-primary-ink alone`);
+      if (left.width === 4) {
+        const cardClasses = (await card.getAttribute("class")).split(/\s+/);
+        if (!cardClasses.includes("border-l-primary-ink") || cardClasses.includes("border-l-primary")) throw new Error(`${name}'s left edge isn't drawn in border-l-primary-ink alone`);
+      }
+      const [mark, author] = [await line.boundingBox(), await card.locator('a[href*="/app/directory/"]').first().boundingBox()];
+      if (!mark || !author || mark.y + mark.height > author.y) throw new Error(`${name}'s Pinned line isn't above its author`);
+      const edges = await cardEdges(card);
+      if (edges.own !== WHITE) throw new Error(`${name}'s card is rgb ${edges.own}, not white`);
+      if (edges.top.colour !== EDGE || edges.top.width !== 1) throw new Error(`${name}'s frame is ${edges.top.width}px of rgb ${edges.top.colour}, not 1px of Demo University's edge`);
+      if (edges.top.contrast < 3) throw new Error(`${name}'s frame is ${edges.top.contrast.toFixed(2)}:1 on its white card, under 3:1`);
+      if (edges.left.colour !== left.colour || edges.left.width !== left.width) throw new Error(`${name}'s left edge is ${edges.left.width}px of rgb ${edges.left.colour}, not ${left.width}px of rgb ${left.colour}`);
+    }
+    // The rest follow under a heading, unmarked and in the grey border.
+    const smoke = page.locator("article", { hasText: `Edited smoke post ${unique}` });
+    if (await strip.locator("article", { hasText: `Edited smoke post ${unique}` }).count()) throw new Error("a post that isn't pinned is in the pinned strip");
+    if (await smoke.getByText("Pinned", { exact: true }).count()) throw new Error("a post that isn't pinned says Pinned");
+    const plain = await cardEdges(smoke);
+    if (plain.own !== WHITE || plain.top.colour !== BORDER || plain.left.colour !== BORDER || plain.left.width !== 1) throw new Error(`a post that isn't pinned is drawn ${JSON.stringify(plain)}, not white in the grey border`);
+    const latest = page.getByRole("heading", { name: "Latest posts", exact: true });
+    await expectReadable(latest, "the Latest posts heading on the page");
+    const [strung, heading, after] = [await strip.boundingBox(), await latest.boundingBox(), await smoke.boundingBox()];
+    if (!strung || !heading || !after || heading.y < strung.y + strung.height || heading.y + heading.height > after.y) throw new Error("Latest posts isn't between the pinned strip and the posts after it");
     const poll = page.locator("article", { hasText: "Where should we hold the next London meetup?" }).first();
     await poll.waitFor();
     await poll.locator('[aria-label="Poll"] button:has-text("Shoreditch")').click();
@@ -1244,7 +1285,7 @@ try {
     const inked = await row.getByRole("link").evaluateAll((links) => links.map((a) => [a.getAttribute("aria-label"), a.querySelector("svg")?.classList.contains("text-primary-ink") ?? false]));
     for (const [name, ink] of inked) if (!ink) throw new Error(`Explore's ${name} icon isn't drawn in text-primary-ink`);
     const icon = await paintedColour(row.getByRole("link", { name: "Funding", exact: true }).locator("svg"));
-    if (icon.colour !== "29 78 216") throw new Error(`Explore's Funding icon is rgb ${icon.colour}, not Demo University's ink`);
+    if (icon.colour !== BRAND_TONES.demoUniversity.ink) throw new Error(`Explore's Funding icon is rgb ${icon.colour}, not Demo University's ink`);
     await expectReadable(row.getByRole("heading", { name: "Explore", exact: true }), "the Explore heading on the page");
     if (await row.locator("textarea, input, article").count()) throw new Error("the Explore row holds a text box or a post");
     if ((await page.locator("textarea").first().getAttribute("aria-label")) !== "New post") throw new Error("the phone feed's first text box isn't the composer");

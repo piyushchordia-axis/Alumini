@@ -47,13 +47,22 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
   const removed = post.moderationStatus === "REMOVED";
   const canOpen = !detail && !removed;
   return (
-    <Card style={post.kind === "ANNOUNCEMENT" ? { borderLeftWidth: 4, borderLeftColor: theme.primary } : undefined}>
+    // A pinned post stays white, framed in the brand's edge and saying so above its author; an announcement keeps its
+    // badge and a left edge in the ink. A pinned announcement has both.
+    <Card highlight={post.isPinned} style={post.kind === "ANNOUNCEMENT" ? { borderLeftWidth: 4, borderLeftColor: theme.primaryInk } : undefined}>
+      {post.isPinned && (
+        <Row gap={6}>
+          <View aria-hidden>
+            <IconPin size={14} color={theme.primaryInk} />
+          </View>
+          <Text style={{ color: theme.primaryInk, fontSize: 12, fontWeight: "600" }}>Pinned</Text>
+        </Row>
+      )}
       <Row style={{ justifyContent: "space-between" }}>
         <MemberRow slug={slug} member={post.author} meta={`${timeAgo(post.createdAt)}${post.author.role === "TENANT_ADMIN" ? " · Admin" : ""}`} />
         {/* At most half the row, wrapping onto a second line, so the author's name and when stay readable. */}
         <Row gap={6} style={{ flexShrink: 1, maxWidth: "50%", justifyContent: "flex-end" }}>
           {post.kind === "ANNOUNCEMENT" && <Badge label="Announcement" tone="primary" icon={(c) => <IconAnnounce size={12} color={c} />} />}
-          {post.isPinned && <Badge label="Pinned" tone="primary" icon={(c) => <IconPin size={12} color={c} />} />}
           <ModerationBadge status={post.moderationStatus} />
         </Row>
       </Row>

@@ -409,15 +409,22 @@ export function Tabs<T extends string>({ tabs, value, onChange, tall = false }: 
   );
 }
 
-export function Card({ children, style, onPress, accessibilityLabel }: { children: ReactNode; style?: ViewStyle; onPress?: () => void; accessibilityLabel?: string }) {
+/**
+ * `highlight` frames the card in the brand's edge (a pinned post), 3:1 against the white card for any brand. On a
+ * member's tinted page it can fall a little under 3:1 against the page outside, so it only adds to words that say the
+ * same (the post's Pinned line), never stands for them.
+ */
+export function Card({ children, style, onPress, accessibilityLabel, highlight = false }: { children: ReactNode; style?: ViewStyle; onPress?: () => void; accessibilityLabel?: string; highlight?: boolean }) {
+  const theme = useTheme();
+  const edge = highlight ? { borderColor: theme.primaryEdge } : null;
   if (onPress) {
     return (
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} style={({ pressed }) => [styles.card, pressed ? { opacity: 0.85 } : null, style]}>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} style={({ pressed }) => [styles.card, edge, pressed ? { opacity: 0.85 } : null, style]}>
         {children}
       </Pressable>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={[styles.card, edge, style]}>{children}</View>;
 }
 
 /**

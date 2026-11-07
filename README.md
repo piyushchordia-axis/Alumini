@@ -794,8 +794,14 @@ a number (Excel then saves it as 9.19876E+11, which the API refuses).
   with how many members it reaches and "Messages are billed to your institution." (`announcementConfirmCopy`). Each
   member gets one message at most: several channels are a chain, tried in the order WhatsApp, SMS, email (email only
   for a confirmed address), the next only when one can't be sent, and the composer and the confirmation say so. The send
-  runs as a background job in batches of 1000 and stops if the post is removed first. The feed's pinned strip shows
-  five; further pinned posts stay in the feed with their badge.
+  runs as a background job in batches of 1000 and stops if the post is removed first.
+- **Pinned posts.** The feed's pinned strip shows five, grouped on both apps (a region named "Pinned posts"), then a
+  "Latest posts" heading in the page's grey over the rest when there are both. A pinned post stays a white card: a
+  1px frame in the brand's edge (`brandTones().edge`, 3:1 on white for any brand; Card `highlight` on both apps) and a
+  "Pinned" line (SVG pin and the word, in the ink) above its author, the words carrying the meaning, as the frame can
+  fall a little under 3:1 against a member's tinted page. An announcement keeps its Announcement badge and a 4px left
+  edge in the ink; a pinned announcement has both. Pinned posts past the five keep the same marks further down, and on
+  the post page and My posts.
 - **Celebrations.** A feed card lists today's birthdays (day and month only, never the year) and membership
   anniversaries (from the approval date), each with the member's years here ("3 years with us · 2008–2012"), with *Send
   wishes*. The member gets one greeting, and wishes collect into one notification ("Asha and 23 others…"). Members can

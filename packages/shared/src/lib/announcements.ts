@@ -11,6 +11,13 @@ export const ANNOUNCEMENT_NO_CHANNELS = "Your plan doesn't include email, WhatsA
  */
 export const ANNOUNCEMENT_ONE_MESSAGE = "If you tick more than one, each member still gets one message: by the first of them, in the order listed, that can be sent.";
 
+/**
+ * The feed's pinned strip, a region of its own on both apps (only its name: every card in it says Pinned), and the
+ * heading over the posts after it, shown when there are both.
+ */
+export const PINNED_POSTS_LABEL = "Pinned posts";
+export const LATEST_POSTS_TITLE = "Latest posts";
+
 function members(n: number): string {
   return `${formatCount(n)} ${n === 1 ? "member" : "members"}`;
 }
