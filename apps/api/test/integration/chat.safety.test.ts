@@ -1034,7 +1034,7 @@ describe.skipIf(!dbAvailable)("chat safety", () => {
       expect(tables.length).toBeGreaterThan(0);
       // Groups are in it, through their own table, which holds a name and a description and nothing anyone said.
       expect(tables).toContain("chat_groups");
-      for (const table of ["chat_messages", "chat_conversations", "chat_participants", "chat_reports", "chat_blocks", "chat_invite_declines"]) expect(tables).not.toContain(table);
+      for (const table of ["chat_messages", "chat_attachments", "chat_conversations", "chat_participants", "chat_reports", "chat_blocks", "chat_invite_declines"]) expect(tables).not.toContain(table);
     });
 
     it("chat messages can't be filed through content reports", async () => {

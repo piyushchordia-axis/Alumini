@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { AppError } from "../../src/lib/errors";
-import { MAX_DECODED_BYTES, concurrencyLimit, decodedImageBytes, processImage } from "../../src/lib/images";
+import { MAX_DECODED_BYTES, concurrencyLimit, decodedImageBytes, makeThumbnail, processImage, sniffChatFile } from "../../src/lib/images";
+import { CAMERA_MAKE, CORRUPT_PNG, GPS_MARKER, HEIC_START, cameraJpeg } from "../helpers/images";
 
 const strip = (width: number, height: number) => sharp({ create: { width, height, channels: 3, background: "#336699" } }).png().toBuffer();
 
@@ -131,5 +132,63 @@ describe("concurrencyLimit", () => {
     expect(order.slice(2).sort()).toEqual([3, 4, 5]);
     // A failure frees its slot like a success.
     expect(await limit(async () => "after")).toBe("after");
+  });
+});
+
+describe("sniffChatFile", () => {
+  it("knows a photo and a PDF by their bytes", async () => {
+    const pixels = sharp({ create: { width: 8, height: 8, channels: 3, background: "#336699" } });
+    expect(sniffChatFile(await pixels.clone().jpeg().toBuffer())).toBe("image/jpeg");
+    expect(sniffChatFile(await pixels.clone().png().toBuffer())).toBe("image/png");
+    expect(sniffChatFile(await pixels.clone().webp().toBuffer())).toBe("image/webp");
+    expect(sniffChatFile(Buffer.from("%PDF-1.7\n%\xe2\xe3\n1 0 obj\n<<>>\nendobj\n%%EOF\n", "latin1"))).toBe("application/pdf");
+    expect(sniffChatFile(Buffer.from("%PDF-"))).toBe("application/pdf");
+  });
+
+  it("refuses anything else, whatever it is called", async () => {
+    for (const [what, bytes] of [
+      ["HTML", Buffer.from("<!doctype html><script>alert(1)</script>")],
+      ["SVG", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>')],
+      ["a zip (a Word or Excel file)", Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64)])],
+      ["a HEIC photo", HEIC_START],
+      ["a GIF", Buffer.from("GIF89a\x01\x00\x01\x00\x00\x00\x00", "latin1")],
+      ["a PDF header further in", Buffer.from("  %PDF-1.4\n")],
+      ["half a PDF header", Buffer.from("%PDF")],
+      ["nothing", Buffer.alloc(0)],
+    ] as const) {
+      expect(sniffChatFile(bytes), what).toBeNull();
+    }
+  });
+});
+
+describe("makeThumbnail", () => {
+  it("makes a WebP of at most 480 pixels on its longest side, never enlarged", async () => {
+    const wide = await makeThumbnail(await strip(2048, 1024));
+    expect(wide).toMatchObject({ mime: "image/webp", width: 480, height: 240 });
+    expect(await sharp(wide.buffer).metadata()).toMatchObject({ format: "webp", width: 480, height: 240 });
+    const tall = await makeThumbnail(await strip(600, 1200));
+    expect(tall).toMatchObject({ width: 240, height: 480 });
+    const small = await makeThumbnail(await strip(100, 50));
+    expect(small).toMatchObject({ mime: "image/webp", width: 100, height: 50 });
+  });
+
+  it("keeps no camera details or position, from the photo as stored or from a camera's own file", async () => {
+    const camera = await cameraJpeg();
+    expect(camera.toString("latin1")).toContain(GPS_MARKER);
+    const stored = await processImage(camera, "image/jpeg", "image");
+    for (const out of [stored, await makeThumbnail(stored.buffer), await makeThumbnail(camera)]) {
+      const text = out.buffer.toString("latin1");
+      expect(text).not.toContain(GPS_MARKER);
+      expect(text).not.toContain(CAMERA_MAKE);
+      const meta = await sharp(out.buffer).metadata();
+      expect(meta.exif).toBeUndefined();
+      // Upright: the camera stored it 80 by 40, turned a quarter.
+      expect(meta).toMatchObject({ width: 40, height: 80 });
+    }
+  });
+
+  it("refuses what isn't an image", async () => {
+    const refused = await refusal(makeThumbnail(CORRUPT_PNG));
+    expect(refused).toMatchObject({ status: 415, code: "UNSUPPORTED_MEDIA" });
   });
 });

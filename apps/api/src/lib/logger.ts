@@ -40,6 +40,16 @@ export function errSerializer(err: unknown): unknown {
   }
 }
 
+/**
+ * A request's address as logs may keep it. A /files link's token opens a member's photo or file until it expires, so it
+ * is left out; Express routes paths without regard to case, so this doesn't either.
+ */
+export function logUrl(url: string): string;
+export function logUrl(url: string | undefined): string | undefined;
+export function logUrl(url: string | undefined): string | undefined {
+  return url?.replace(/^\/files\/[^?#]*/i, "/files/…");
+}
+
 export function createLogger(level: string, pretty: boolean, destination?: DestinationStream): Logger {
   const serializers = { err: errSerializer };
   if (level === "silent") return pino({ level: "silent", serializers });

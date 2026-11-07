@@ -12,7 +12,7 @@ import { createMessageSenders } from "./services/messages";
 import { ExpoPushChannel } from "./services/notifications/ExpoPushChannel";
 import { createPaymentProvider, paymentPurposeHandlers } from "./services/payments";
 import { createOtpSender } from "./services/otp";
-import { createStorage } from "./services/storage";
+import { createPrivateStorage, createStorage } from "./services/storage";
 
 export interface Runtime {
   ctx: AppContext;
@@ -43,6 +43,7 @@ export async function createRuntime(o: { role: "api" | "worker"; config: Config;
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: createOtpSender(config, logger),
     storage: createStorage(config),
+    privateStorage: createPrivateStorage(config),
     jobs,
     push: new ExpoPushChannel(db, redis, logger, config.EXPO_ACCESS_TOKEN),
     messageSenders: createMessageSenders(config, logger),

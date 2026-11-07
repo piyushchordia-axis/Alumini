@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
 
@@ -46,6 +46,8 @@ const envSchema = z.object({
     }, "Unknown time zone"),
   /** Image uploads allowed per institution per day (all members together), a guard against storage abuse. */
   UPLOADS_PER_TENANT_DAILY_CAP: z.coerce.number().int().positive().default(2000),
+  /** Chat photos and files allowed per institution per day (all members together). */
+  CHAT_FILES_PER_TENANT_DAILY_CAP: z.coerce.number().int().positive().default(3000),
   /** Escape hatch for throwaway demo deployments: lets production run with the console OTP sender. Never in real use. */
   OTP_ALLOW_CONSOLE_IN_PRODUCTION: z
     .enum(["true", "false"])
@@ -73,6 +75,16 @@ const envSchema = z.object({
   EMAIL_VERIFY_GLOBAL_DAILY_CAP: z.coerce.number().int().positive().default(5000),
   CORS_ORIGINS: z.string().default("*"),
   UPLOAD_DIR: z.string().default("./uploads"),
+  /**
+   * Chat photos and files on local disk, never served as they are: /files hands each out through a signed link that
+   * lasts minutes. It must not be inside UPLOAD_DIR, which is public at /uploads, nor hold it.
+   */
+  PRIVATE_UPLOAD_DIR: z.string().default("./private-uploads"),
+  /**
+   * Signs the /files links. Defaults to a key derived from JWT_SECRET; changing either ends the links already handed out,
+   * which last minutes anyway.
+   */
+  FILE_URL_KEY: z.string().min(32, "FILE_URL_KEY must be at least 32 characters").optional(),
   TRUST_PROXY: z.string().default("loopback"),
 
   EXPO_ACCESS_TOKEN: z.string().optional(),
@@ -91,6 +103,11 @@ const envSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   /** Public URL prefix of the bucket or its CDN; image URLs are this plus the object key. */
   S3_PUBLIC_BASE_URL: z.string().optional(),
+  /**
+   * Chat photos and files with STORAGE_PROVIDER=s3: a bucket of their own, apart from S3_BUCKET, with no public access
+   * and no CDN. Members open them through presigned links that last minutes.
+   */
+  S3_PRIVATE_BUCKET: z.string().optional(),
   /** Online payments: razorpay, mock (fake checkout for development) or disabled. Default: mock outside production. */
   PAYMENTS_PROVIDER: z.enum(["disabled", "mock", "razorpay"]).optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
@@ -120,6 +137,7 @@ export type Config = z.infer<typeof envSchema> & {
   platformAdminPhones: string[];
   corsOrigins: string[] | "*";
   uploadDirAbsolute: string;
+  privateUploadDirAbsolute: string;
   /** Resolved PAYMENTS_PROVIDER. */
   paymentsProvider: "disabled" | "mock" | "razorpay";
   /** Parsed MSG91_FLOW_TEMPLATE_IDS. */
@@ -133,6 +151,15 @@ export type Config = z.infer<typeof envSchema> & {
 };
 
 const emptyToUndefined = (v: string | undefined) => (v === "" ? undefined : v);
+
+/** Whether one folder is the other or inside it. `relative` compares without case on Windows, as its file system does. */
+function overlaps(a: string, b: string): boolean {
+  const inside = (parent: string, child: string) => {
+    const rel = relative(parent, child);
+    return rel === "" || (rel.split(sep)[0] !== ".." && !isAbsolute(rel));
+  };
+  return inside(a, b) || inside(b, a);
+}
 
 export function loadConfig(overrides: Record<string, string | undefined> = {}): Config {
   const env = { ...process.env, ...overrides };
@@ -179,6 +206,7 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
     platformAdminPhones,
     corsOrigins,
     uploadDirAbsolute: resolve(process.cwd(), c.UPLOAD_DIR),
+    privateUploadDirAbsolute: resolve(process.cwd(), c.PRIVATE_UPLOAD_DIR),
   };
 
   if (config.isProduction && config.paymentsProvider === "mock") {
@@ -190,6 +218,14 @@ export function loadConfig(overrides: Record<string, string | undefined> = {}): 
   if (config.STORAGE_PROVIDER === "s3") {
     if (!config.S3_BUCKET || !config.S3_PUBLIC_BASE_URL) throw new Error("STORAGE_PROVIDER=s3 needs S3_BUCKET and S3_PUBLIC_BASE_URL");
     if (!!config.S3_ACCESS_KEY_ID !== !!config.S3_SECRET_ACCESS_KEY) throw new Error("Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither (default AWS credentials)");
+    if (!config.S3_PRIVATE_BUCKET) throw new Error("STORAGE_PROVIDER=s3 needs S3_PRIVATE_BUCKET, a bucket with no public access for chat photos and files");
+    if (config.S3_PRIVATE_BUCKET.trim().toLowerCase() === config.S3_BUCKET.trim().toLowerCase()) {
+      throw new Error("S3_PRIVATE_BUCKET must be a different bucket from S3_BUCKET, which is publicly readable");
+    }
+  }
+  if (overlaps(config.uploadDirAbsolute, config.privateUploadDirAbsolute)) {
+    // Everything under UPLOAD_DIR is served at /uploads, so a private file there would be public.
+    throw new Error("PRIVATE_UPLOAD_DIR must not be inside UPLOAD_DIR (which is public at /uploads), the same folder, or a folder holding it");
   }
   if (config.SMTP_URL && !config.EMAIL_FROM) {
     throw new Error("SMTP_URL is set but EMAIL_FROM is not; set the sender address, e.g. EMAIL_FROM=\"Illuminize <no-reply@example.com>\"");

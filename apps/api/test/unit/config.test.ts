@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/env";
 
@@ -44,6 +46,50 @@ describe("config", () => {
     expect(() => loadConfig({ ...prod, PAYMENTS_PROVIDER: "mock" })).toThrow(/not allowed in production/);
     expect(() => loadConfig({ ...dev, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_test_1" })).toThrow(/RAZORPAY_KEY_SECRET/);
     expect(loadConfig({ ...prod, PAYMENTS_PROVIDER: "razorpay", RAZORPAY_KEY_ID: "rzp_live_1", RAZORPAY_KEY_SECRET: "s", RAZORPAY_WEBHOOK_SECRET: "w" }).paymentsProvider).toBe("razorpay");
+  });
+
+  describe("private storage", () => {
+    const dev = { NODE_ENV: "development", DATABASE_URL: "postgres://x", JWT_SECRET: "x".repeat(40), OTP_PEPPER: "p".repeat(20) };
+    const root = resolve(tmpdir(), "illuminize-config");
+
+    it("keeps chat files in a folder of their own beside the public uploads", () => {
+      // The test environment sets both folders (.env.test); left unset, they take their defaults.
+      const c = loadConfig({ ...dev, UPLOAD_DIR: undefined, PRIVATE_UPLOAD_DIR: undefined });
+      expect(c.privateUploadDirAbsolute).toBe(resolve(process.cwd(), "private-uploads"));
+      expect(c.uploadDirAbsolute).toBe(resolve(process.cwd(), "uploads"));
+      expect(c.CHAT_FILES_PER_TENANT_DAILY_CAP).toBe(3000);
+      expect(loadConfig({ ...dev, UPLOAD_DIR: join(root, "uploads"), PRIVATE_UPLOAD_DIR: join(root, "uploads-private") }).privateUploadDirAbsolute).toBe(join(root, "uploads-private"));
+    });
+
+    it("refuses a private folder inside the public one, the same folder, or one holding it", () => {
+      const refusal = /PRIVATE_UPLOAD_DIR must not be inside UPLOAD_DIR/;
+      expect(() => loadConfig({ ...dev, UPLOAD_DIR: join(root, "uploads"), PRIVATE_UPLOAD_DIR: join(root, "uploads", "private") })).toThrow(refusal);
+      expect(() => loadConfig({ ...dev, UPLOAD_DIR: "./uploads", PRIVATE_UPLOAD_DIR: "./uploads/../uploads/chat" })).toThrow(refusal);
+      expect(() => loadConfig({ ...dev, UPLOAD_DIR: join(root, "files"), PRIVATE_UPLOAD_DIR: join(root, "files") })).toThrow(refusal);
+      expect(() => loadConfig({ ...dev, UPLOAD_DIR: join(root, "data", "uploads"), PRIVATE_UPLOAD_DIR: join(root, "data") })).toThrow(refusal);
+      // With S3 nothing private is written to disk, but /uploads still serves UPLOAD_DIR, so the rule stands.
+      expect(() =>
+        loadConfig({ ...dev, STORAGE_PROVIDER: "s3", S3_BUCKET: "b", S3_PUBLIC_BASE_URL: "https://cdn", S3_PRIVATE_BUCKET: "p", UPLOAD_DIR: root, PRIVATE_UPLOAD_DIR: join(root, "p") }),
+      ).toThrow(refusal);
+    });
+
+    it.runIf(process.platform === "win32")("compares folders without case on Windows", () => {
+      expect(() => loadConfig({ ...dev, UPLOAD_DIR: "C:\\Data\\Uploads", PRIVATE_UPLOAD_DIR: "c:\\data\\uploads\\chat" })).toThrow(/PRIVATE_UPLOAD_DIR/);
+    });
+
+    it("needs a private bucket of its own with S3", () => {
+      const s3 = { ...dev, STORAGE_PROVIDER: "s3", S3_BUCKET: "illuminize", S3_PUBLIC_BASE_URL: "https://cdn.example.com" };
+      expect(() => loadConfig(s3)).toThrow(/needs S3_PRIVATE_BUCKET/);
+      expect(() => loadConfig({ ...s3, S3_PRIVATE_BUCKET: "illuminize" })).toThrow(/must be a different bucket from S3_BUCKET/);
+      expect(() => loadConfig({ ...s3, S3_PRIVATE_BUCKET: " Illuminize " })).toThrow(/must be a different bucket/);
+      expect(loadConfig({ ...s3, S3_PRIVATE_BUCKET: "illuminize-private" }).S3_PRIVATE_BUCKET).toBe("illuminize-private");
+    });
+
+    it("takes a file link key of 32 characters or more", () => {
+      expect(() => loadConfig({ ...dev, FILE_URL_KEY: "short" })).toThrow(/FILE_URL_KEY must be at least 32 characters/);
+      expect(loadConfig({ ...dev, FILE_URL_KEY: "f".repeat(32) }).FILE_URL_KEY).toBe("f".repeat(32));
+      expect(loadConfig({ ...dev, FILE_URL_KEY: "" }).FILE_URL_KEY).toBeUndefined();
+    });
   });
 
   it("defaults the web app URL outside production and leaves it unset (features off) in production", () => {

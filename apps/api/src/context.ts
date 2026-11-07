@@ -10,7 +10,7 @@ import type { PaymentProvider } from "./services/payments/PaymentProvider";
 import type { PaymentPurposeRegistry } from "./services/payments/purposes";
 import type { PushChannel } from "./services/notifications/NotificationChannel";
 import type { OtpSender } from "./services/otp";
-import type { StorageProvider } from "./services/storage";
+import type { PrivateStorage, StorageProvider } from "./services/storage";
 
 export interface AppContext {
   config: Config;
@@ -20,6 +20,8 @@ export interface AppContext {
   jwt: JwtSigner;
   otpSender: OtpSender;
   storage: StorageProvider;
+  /** Chat photos and files: never public, reached only through links that expire within minutes. */
+  privateStorage: PrivateStorage;
   /** Background work: BullMQ in the app, in memory in tests. Enqueue after commit (see lib/transaction.ts). */
   jobs: JobQueue;
   /** Push delivery to devices (Expo); absent when not configured, e.g. in tests. */

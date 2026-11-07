@@ -26,7 +26,7 @@ COPY --from=build /repo/apps/api/drizzle ./drizzle
 COPY --from=build /repo/apps/api/package.json ./package.json
 # Runtime dependencies only (the shared package is bundled into dist by tsup)
 COPY --from=build /repo/node_modules ./node_modules
-RUN mkdir -p /app/uploads && chown -R app:app /app
+RUN mkdir -p /app/uploads /app/private-uploads && chown -R app:app /app
 USER app
 EXPOSE 4000
 # One image, two roles: the API answers on 4000, the worker (`node dist/worker.js`) on 4001.

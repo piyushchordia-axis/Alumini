@@ -4,7 +4,7 @@ import { MemoryJobQueue } from "../../src/jobs/MemoryJobQueue";
 import { createJwtSigner } from "../../src/lib/jwt";
 import { NoopRealtimePublisher } from "../../src/realtime/publisher";
 import { createLogger } from "../../src/lib/logger";
-import { createStorage } from "../../src/services/storage";
+import { createPrivateStorage, createStorage } from "../../src/services/storage";
 import { CapturingOtpSender, newRedisMock } from "./testContext";
 
 /** Context for pure/Redis-only unit tests: no database handle. */
@@ -19,6 +19,7 @@ export function createUnitContext(overrides: Record<string, string | undefined> 
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
     storage: createStorage(config),
+    privateStorage: createPrivateStorage(config),
     messageSenders: {},
     realtime: new NoopRealtimePublisher(),
     payments: { provider: null, purposes: {} },

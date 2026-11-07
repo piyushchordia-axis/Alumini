@@ -250,6 +250,11 @@ export const CHAT_GROUP_INVITES_PER_CALL = 25;
 export const CHAT_GROUP_INVITE_TTL_DAYS = 30;
 /** How long declining someone's invitation or message request keeps their invitations away. */
 export const CHAT_INVITE_DECLINE_DAYS = 30;
+/** What a chat message can carry: a photo (re-encoded, with a thumbnail) or a PDF file, kept in private storage. */
+export const CHAT_ATTACHMENT_KINDS = ["PHOTO", "FILE"] as const;
+export type ChatAttachmentKind = (typeof CHAT_ATTACHMENT_KINDS)[number];
+/** Longest side of a chat photo's thumbnail, which a message shows until the photo is opened. */
+export const CHAT_PHOTO_THUMB_SIDE = 480;
 
 /** What a mentor can help with. A fixed list, because free text would make the filter useless. */
 export const MENTOR_AREAS = [

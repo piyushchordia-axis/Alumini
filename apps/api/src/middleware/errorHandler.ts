@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import { ZodError } from "zod";
 import { AppError } from "../lib/errors";
-import type { Logger } from "../lib/logger";
+import { logUrl, type Logger } from "../lib/logger";
 
 export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({ error: { code: "NOT_FOUND", message: `Route ${req.method} ${req.path} not found` } });
@@ -20,7 +20,7 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
     // A streamed response (a CSV export) failed midway: the status is already sent, so cut the connection rather than
     // leave the client waiting on a body that will never finish.
     if (res.headersSent) {
-      logger.error({ err, path: req.path }, "Error after the response started");
+      logger.error({ err, path: logUrl(req.path) }, "Error after the response started");
       res.destroy(err instanceof Error ? err : undefined);
       return;
     }
@@ -66,13 +66,13 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
     const pg = pgError(err);
     if (pg?.code === "23505") {
       // Two requests raced to create the same thing (double-tap register, RSVP, slug). The first one won.
-      logger.warn({ constraint: pg.constraint, reqId: req.id, url: req.originalUrl }, "Unique constraint conflict");
+      logger.warn({ constraint: pg.constraint, reqId: req.id, url: logUrl(req.originalUrl) }, "Unique constraint conflict");
       res.status(409).json({ error: { code: "CONFLICT", message: "That already exists. Refresh and try again." } });
       return;
     }
     if (pg?.code === "55P03") {
       // Waited too long for a row lock (SET LOCAL lock_timeout). Nothing was saved, and clients can safely try again.
-      logger.warn({ reqId: req.id, url: req.originalUrl }, "Gave up waiting for a row lock");
+      logger.warn({ reqId: req.id, url: logUrl(req.originalUrl) }, "Gave up waiting for a row lock");
       res.status(503).json({ error: { code: "INTERNAL", message: "That took too long. Try again." } });
       return;
     }
@@ -82,7 +82,7 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
       return;
     }
 
-    logger.error({ err, reqId: req.id, method: req.method, url: req.originalUrl }, "Unhandled error");
+    logger.error({ err, reqId: req.id, method: req.method, url: logUrl(req.originalUrl) }, "Unhandled error");
     res.status(500).json({ error: { code: "INTERNAL", message: "Something went wrong" } });
   };
 }

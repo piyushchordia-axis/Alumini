@@ -1,4 +1,4 @@
-import { AVATAR_SIZE, BACKDROP_MAX_SIDE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
+import { AVATAR_SIZE, BACKDROP_MAX_SIDE, CHAT_PHOTO_THUMB_SIDE, MAX_IMAGE_SIDE, MAX_UPLOAD_BYTES, type UploadPurpose } from "@illuminize/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { AppError } from "./errors";
 
@@ -35,6 +35,18 @@ export function sniffImageType(buf: Buffer): ImageMime | null {
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
   if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
   return null;
+}
+
+export type ChatFileMime = ImageMime | "application/pdf";
+
+/**
+ * What a chat attachment really is, from its bytes: a JPEG, PNG or WebP photo, or a PDF. Anything else, an HTML page or
+ * an SVG named .pdf, a zip or a HEIC photo, is null.
+ */
+export function sniffChatFile(buf: Buffer): ChatFileMime | null {
+  const image = sniffImageType(buf);
+  if (image) return image;
+  return buf.length >= 5 && buf.toString("latin1", 0, 5) === "%PDF-" ? "application/pdf" : null;
 }
 
 const BYTES_PER_SAMPLE: Record<Metadata["depth"], number> = {
@@ -112,6 +124,35 @@ export function processImage(input: Buffer, mime: ImageMime, purpose: UploadPurp
       return { ...result, mime: purpose === "image" ? mime : "image/jpeg" };
     } catch (err) {
       if (err instanceof AppError) throw err;
+      if (err instanceof Error && /pixel limit/i.test(err.message)) throw tooLarge(`The image is too large. Use one under ${MAX_INPUT_PIXELS / 1_000_000} megapixels.`);
+      throw new AppError(415, "UNSUPPORTED_MEDIA", "The file could not be read as an image");
+    }
+  });
+}
+
+export const THUMBNAIL_MIME = "image/webp";
+
+export interface Thumbnail {
+  buffer: Buffer;
+  mime: typeof THUMBNAIL_MIME;
+  width: number;
+  height: number;
+}
+
+/**
+ * A chat photo's thumbnail: a WebP of at most CHAT_PHOTO_THUMB_SIDE on its longest side, never enlarged, upright and with
+ * no metadata, as sharp writes it. Made from the photo processImage returned, in the same queue as every other image.
+ */
+export function makeThumbnail(input: Buffer): Promise<Thumbnail> {
+  return imageSlot(async () => {
+    try {
+      const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
+        .autoOrient()
+        .resize(CHAT_PHOTO_THUMB_SIDE, CHAT_PHOTO_THUMB_SIDE, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 70 })
+        .toBuffer({ resolveWithObject: true });
+      return { buffer: data, mime: THUMBNAIL_MIME, width: info.width, height: info.height };
+    } catch (err) {
       if (err instanceof Error && /pixel limit/i.test(err.message)) throw tooLarge(`The image is too large. Use one under ${MAX_INPUT_PIXELS / 1_000_000} megapixels.`);
       throw new AppError(415, "UNSUPPORTED_MEDIA", "The file could not be read as an image");
     }

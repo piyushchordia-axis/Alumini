@@ -17,7 +17,9 @@ coverage/
 
 # api runtime
 apps/api/uploads/
+apps/api/private-uploads/
 apps/api/test/.uploads/
+apps/api/test/.private-uploads/
 *.log
 dump.rdb
 

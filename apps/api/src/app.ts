@@ -3,10 +3,11 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import type { AppContext } from "./context";
-import { errSerializer } from "./lib/logger";
+import { errSerializer, logUrl } from "./lib/logger";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { requestId } from "./middleware/requestId";
 import { apiRouter } from "./routes";
+import { filesRoutes } from "./routes/files.routes";
 import { webhookRoutes } from "./routes/webhooks.routes";
 
 export function createApp(ctx: AppContext): Express {
@@ -33,7 +34,8 @@ export function createApp(ctx: AppContext): Express {
         genReqId: (req) => (req as express.Request).id,
         autoLogging: { ignore: (req) => req.url?.endsWith("/health") ?? false },
         serializers: {
-          req: (req: { id: string; method: string; url: string }) => ({ id: req.id, method: req.method, url: req.url }),
+          // A /files token opens a chat photo or file, so it stays out of the logs.
+          req: (req: { id: string; method: string; url: string }) => ({ id: req.id, method: req.method, url: logUrl(req.url) }),
           res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
           // pino-http brings its own otherwise, which would log query parameters.
           err: errSerializer,
@@ -52,6 +54,8 @@ export function createApp(ctx: AppContext): Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/uploads", express.static(config.uploadDirAbsolute, { maxAge: "7d", immutable: true, fallthrough: true }));
+  // Chat photos and files, through signed links only (local private storage).
+  app.use("/files", filesRoutes(ctx));
   app.use("/api/v1", apiRouter(ctx));
 
   app.use(notFoundHandler);

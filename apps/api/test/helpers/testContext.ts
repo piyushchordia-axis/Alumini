@@ -15,7 +15,7 @@ import type { RedisClient } from "../../src/redis/client";
 import type { OtpSender, OtpSendResult } from "../../src/services/otp";
 import type { MessageSenders } from "../../src/services/messages/types";
 import { ConsoleChannelSender } from "../../src/services/messages/providers/ConsoleChannelSender";
-import { createStorage } from "../../src/services/storage";
+import { createPrivateStorage, createStorage } from "../../src/services/storage";
 
 /** Records every OTP so tests can read the code that was "sent". */
 export class CapturingOtpSender implements OtpSender {
@@ -72,7 +72,7 @@ export async function isDatabaseAvailable(): Promise<boolean> {
 }
 
 /** Providers a test can swap in (fakes with injectable fetch, capturing senders, …). */
-export type TestProviders = Partial<Pick<AppContext, "push" | "storage" | "messageSenders" | "realtime" | "payments">>;
+export type TestProviders = Partial<Pick<AppContext, "push" | "storage" | "privateStorage" | "messageSenders" | "realtime" | "payments">>;
 
 /** Console senders for every channel, so message flows run in tests without providers. */
 export function consoleMessageSenders(logger: AppContext["logger"]): MessageSenders {
@@ -98,6 +98,7 @@ export async function createTestContext(overrides: Record<string, string | undef
     jwt: createJwtSigner(config.JWT_SECRET, config.ACCESS_TOKEN_TTL_SEC),
     otpSender: otpCapture,
     storage: providers.storage ?? createStorage(config),
+    privateStorage: providers.privateStorage ?? createPrivateStorage(config),
     push: providers.push,
     messageSenders: providers.messageSenders ?? consoleMessageSenders(logger),
     realtime: providers.realtime ?? new NoopRealtimePublisher(),

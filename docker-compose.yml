@@ -52,7 +52,8 @@ services:
       timeout: 3s
       retries: 10
 
-  # Creates the "illuminize" bucket with public read access (images are served straight from it).
+  # Creates the "illuminize" bucket with public read access (images are served straight from it) and the
+  # "illuminize-private" bucket for chat photos and files, with no anonymous access (members get presigned links).
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     profiles: ["s3"]
@@ -62,7 +63,7 @@ services:
     entrypoint:
       - sh
       - -c
-      - mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/illuminize && mc anonymous set download local/illuminize
+      - mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/illuminize && mc anonymous set download local/illuminize && mc mb --ignore-existing local/illuminize-private && mc anonymous set none local/illuminize-private
 
 volumes:
   pgdata:

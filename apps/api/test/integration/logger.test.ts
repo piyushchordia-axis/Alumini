@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import { DrizzleQueryError } from "drizzle-orm/errors";
+import type { Request, Response } from "express";
 import pino from "pino";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app";
-import { errSerializer } from "../../src/lib/logger";
+import { errSerializer, logUrl } from "../../src/lib/logger";
+import { errorHandler } from "../../src/middleware/errorHandler";
 import { capturingLogger } from "../helpers/capturingLogger";
 import { acceptedThread, chatApi } from "../helpers/chat";
 import { createTenant, memberSession } from "../helpers/factories";
@@ -79,6 +81,34 @@ describe("the error serializer", () => {
     logger.error({ err: failedQuery() }, "Failed");
     expect(text()).toContain("violates check constraint");
     expect(text()).not.toContain(SECRET);
+  });
+});
+
+describe("request addresses in logs", () => {
+  it("leave out a /files link's token, however the path is written", () => {
+    const token = "eyJhIjoiMSJ9.c2lnbmF0dXJl";
+    expect(logUrl(`/files/${token}`)).toBe("/files/…");
+    expect(logUrl(`/files/${token}?download=1`)).toBe("/files/…?download=1");
+    expect(logUrl(`/FILES/${token}`)).toBe("/files/…");
+    expect(logUrl(`/files//${token}/../x#y`)).toBe("/files/…#y");
+    expect(logUrl("/api/v1/t/demo/chat/conversations")).toBe("/api/v1/t/demo/chat/conversations");
+    expect(logUrl("/uploads/a/b.png")).toBe("/uploads/a/b.png");
+    expect(logUrl(undefined)).toBeUndefined();
+  });
+
+  it("leave it out of the error handler's line when a file breaks off after its headers went out", () => {
+    // chat.files.test.ts sends the other error lines through the /files route; this one needs a response already started.
+    const { logger, text } = capturingLogger();
+    const token = "eyJhIjoiMGIwYzZhNTIifQ.c2lnbmF0dXJlLXNpZ25hdHVyZQ";
+    const destroyed: unknown[] = [];
+    const req = { id: "req-1", method: "GET", path: `/files/${token}`, originalUrl: `/files/${token}` } as unknown as Request;
+    const res = { headersSent: true, destroy: (err?: unknown) => void destroyed.push(err) } as unknown as Response;
+    const err = new Error("read failed");
+    errorHandler(logger)(err, req, res, () => undefined);
+    expect(destroyed).toEqual([err]);
+    const entry = JSON.parse(text().trim()) as { msg: string; path: string };
+    expect(entry).toMatchObject({ msg: "Error after the response started", path: "/files/…" });
+    for (const part of token.split(".")) expect(text()).not.toContain(part);
   });
 });
 

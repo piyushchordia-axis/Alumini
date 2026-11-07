@@ -1478,8 +1478,28 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   deleted photo until its cached copy expires, and files stored on local disk before a switch to S3 are never deleted
   from it. The API knows its own files by `S3_PUBLIC_BASE_URL` (or `PUBLIC_BASE_URL`) as written and as a URL parser
   writes it (a lower-case host, no default port), since a background photo's address is saved in that form.
+- Private storage, for photos and PDFs sent in chat, is never public and never goes through `/uploads` or the uploads
+  ledger: the `chat_attachments` table records each file, and members and staff open one only through a signed link
+  that lasts 10 minutes (15 for staff reviewing a report). With `STORAGE_PROVIDER=local` the files are kept in
+  `PRIVATE_UPLOAD_DIR` (default `./private-uploads`; mount a persistent volume at `/app/private-uploads` in the image)
+  and served at `PUBLIC_BASE_URL/files/<token>` with `nosniff`, `Cache-Control: private, no-store`, a sandboxing
+  `Content-Security-Policy` and no referrer. The API refuses to start if that folder is inside `UPLOAD_DIR`, is the same
+  folder, or holds it, because everything under `UPLOAD_DIR` is public. The token names an attachment and nothing about
+  the file, is checked against `FILE_URL_KEY` (optional, at least 32 characters; unset, a key derived from
+  `JWT_SECRET`, and changing either only ends the links already handed out), and is left out of the logs; the
+  attachment is looked up again on every request, so a deleted one stops opening at once. `PUBLIC_BASE_URL` must be
+  reachable from members' phones, and a proxy in front of the API passes `/files` as it passes `/uploads`. With
+  `STORAGE_PROVIDER=s3` set `S3_PRIVATE_BUCKET` too: a different bucket from `S3_BUCKET` (the API refuses the same
+  one), with no public access and no CDN in front of it. Its links are presigned GETs on the bucket's own address
+  (`S3_ENDPOINT` for MinIO, R2 or Spaces, which members' devices must reach), so the credentials need `GetObject` there
+  as well as `PutObject` and `DeleteObject`; each object is saved `private, no-store` with its type and disposition,
+  but S3 can't send `nosniff`, and a presigned link can't be revoked before it expires. Locally, `docker compose
+  --profile s3 up -d` creates `illuminize-private` with no anonymous access. Give the worker the same private storage
+  settings as the API. `CHAT_FILES_PER_TENANT_DAILY_CAP` (default 3000) limits the chat files one institution may
+  upload per day. A chat upload is held in memory while it is checked (a PDF up to 10 MB, a photo while sharp
+  re-encodes it, as above): allow for that in the API's memory.
 - The web app is static: `pnpm --filter @illuminize/web build` and serve `apps/web/dist` with `VITE_API_URL` pointing
-  at the API (or proxy `/api` and `/uploads`).
+  at the API (or proxy `/api`, `/uploads` and `/files`).
 - CI (`.github/workflows/ci.yml`) checks that sharp loads, then runs lint, typecheck, the API test-suite against
   Postgres + Redis services, and builds; its `docker` job builds the API image and processes an image inside it.
   `.github/workflows/windows.yml` runs the one-command setup, a sharp check, lint, typecheck, API tests and builds on

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import {
+  chatAttachmentKindEnum,
   chatConversationKindEnum,
   chatDirectStateEnum,
   chatGroupVisibilityEnum,
@@ -183,6 +184,50 @@ export const chatMessages = pgTable(
     uniqueIndex("chat_messages_conversation_seq_uq").on(t.conversationId, t.seq),
     uniqueIndex("chat_messages_client_key_uq").on(t.conversationId, t.senderMembershipId, t.clientKey).where(sql`${t.clientKey} is not null`),
     index("chat_messages_sender_idx").on(t.senderMembershipId),
+  ],
+);
+
+/**
+ * A photo or PDF in a chat message. Its bytes are in private storage (`ctx.privateStorage`), never under /uploads or in
+ * the uploads ledger, and are reached only through short-lived signed links. It is uploaded before the send, so
+ * `message_id` stays null until a send claims it, and an unsent one is swept a day later; once sent it lasts as long as its
+ * message. Kept out of content_types and moderation_items, like the message.
+ */
+export const chatAttachments = pgTable(
+  "chat_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ...tenantScoped(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => chatConversations.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id").references(() => chatMessages.id, { onDelete: "cascade" }),
+    uploaderMembershipId: uuid("uploader_membership_id").references(() => memberships.id, { onDelete: "set null" }),
+    kind: chatAttachmentKindEnum("kind").notNull(),
+    /** Its place in its message, from 0, set by the send that claims it. */
+    position: integer("position").notNull().default(0),
+    /** Private storage keys, `<tenantId>/<uuid>.<ext>` (PRIVATE_KEY_PATTERN); a photo's thumbnail is a WebP of its own. */
+    storageKey: text("storage_key").notNull().unique(),
+    thumbKey: text("thumb_key").unique(),
+    /** Decided by the bytes, never by what the client said. */
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    /** A file's name as its sender gave it, cleaned. Never in a link, a push, a notification, an audit row or a log. */
+    fileName: text("file_name"),
+    width: integer("width"),
+    height: integer("height"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("chat_attachments_photo_shape", sql`${t.kind} <> 'PHOTO' or (${t.thumbKey} is not null and ${t.width} is not null and ${t.height} is not null)`),
+    check("chat_attachments_file_shape", sql`${t.kind} <> 'FILE' or (${t.fileName} is not null and ${t.thumbKey} is null)`),
+    check("chat_attachments_byte_size_positive", sql`${t.byteSize} > 0`),
+    check("chat_attachments_position_not_negative", sql`${t.position} >= 0`),
+    uniqueIndex("chat_attachments_message_position_uq").on(t.messageId, t.position),
+    index("chat_attachments_conversation_idx").on(t.conversationId),
+    index("chat_attachments_uploader_idx").on(t.uploaderMembershipId),
+    // What the sweep of unsent uploads reads.
+    index("chat_attachments_unsent_created_idx").on(t.createdAt).where(sql`${t.messageId} is null`),
   ],
 );
 

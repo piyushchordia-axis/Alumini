@@ -4,6 +4,7 @@
 **/dist
 **/.turbo
 **/uploads
+**/private-uploads
 **/.expo
 **/.env
 **/.env.*
