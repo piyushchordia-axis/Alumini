@@ -77,7 +77,7 @@ export default function BusinessesScreen() {
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="listing" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState
               icon={empty.live ? <IconSearch /> : <IconBusinesses />}
               title={empty.title}

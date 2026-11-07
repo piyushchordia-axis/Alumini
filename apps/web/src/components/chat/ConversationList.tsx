@@ -2,8 +2,9 @@ import type { ChatConversationDto, ChatInbox, TenantFeatures } from "@illuminize
 import { chatKeys, conversationPreview, conversationTitle, emptyChatsActions, emptyChatsHint, peerYears, type EmptyChatsTarget } from "@illuminize/shared/chat";
 import clsx from "clsx";
 import { Link, NavLink } from "react-router-dom";
+import { ListError } from "@/components/common/ListBody";
 import { IconBellOff, IconGroups, IconMail, IconMessages } from "@/components/icons";
-import { Avatar, Badge, Button, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
+import { Avatar, Badge, EmptyState, LinkButton, ListSkeleton, LoadMore, Tabs } from "@/components/ui";
 import { useChatBadge, useNow } from "@/hooks/useChat";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -102,16 +103,11 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
         </div>
       )}
       <div role={features.messaging ? "tabpanel" : "region"} aria-label={inbox === "MAIN" ? "Chats" : "Requests"} className="min-h-0 flex-1 overflow-y-auto border-t border-slate-100">
-        {list.isLoading ? (
-          <Loading />
-        ) : list.error && list.items.length === 0 ? (
-          <div className="space-y-3 p-4">
-            <ErrorBox error={list.error} />
-            <Button variant="outline" size="sm" className="min-h-11" onClick={() => void list.refetch()}>
-              Retry loading
-            </Button>
-          </div>
-        ) : list.items.length === 0 ? (
+        {list.view === "loading" ? (
+          <ListSkeleton shape="row" frame="flush" className="px-4" />
+        ) : list.view === "error" ? (
+          <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} className="p-4" />
+        ) : list.view === "empty" ? (
           <div className="p-4">
             {inbox === "MAIN" ? (
               <EmptyState
@@ -139,7 +135,7 @@ export function ConversationList({ slug, inbox: asked, onInboxChange, features }
                 <ConversationRow key={c.id} slug={slug} c={c} now={now} query={inboxQuery(inbox)} />
               ))}
             </ul>
-            <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+            <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
           </>
         )}
       </div>

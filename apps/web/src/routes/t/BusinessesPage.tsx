@@ -1,8 +1,9 @@
 import { BUSINESS_CATEGORIES, BUSINESS_CATEGORY_LABELS, businessesEmpty, type BusinessCategory } from "@illuminize/shared";
 import { useRef, useState } from "react";
 import { BusinessCard } from "@/components/businesses/BusinessCard";
+import { ListError } from "@/components/common/ListBody";
 import { IconBusinesses, IconSearch } from "@/components/icons";
-import { Button, EmptyState, ErrorBox, Input, LinkButton, LoadMore, Loading, PageHeader, Select } from "@/components/ui";
+import { Button, EmptyState, Input, LinkButton, ListSkeleton, LoadMore, PageHeader, Select } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -43,14 +44,14 @@ export function BusinessesPage() {
         </Select>
         <Input aria-label="City" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
       </div>
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorBox error={list.error} />}
+      {list.view === "loading" && <ListSkeleton shape="listing" columns={2} />}
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
       <div className="grid gap-3 md:grid-cols-2">
         {list.items.map((b) => (
           <BusinessCard key={b.id} slug={slug} item={b} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && (
+      {list.view === "empty" && (
         <EmptyState
           icon={empty.live ? <IconSearch /> : <IconBusinesses />}
           title={empty.title}
@@ -62,7 +63,7 @@ export function BusinessesPage() {
           }
         />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

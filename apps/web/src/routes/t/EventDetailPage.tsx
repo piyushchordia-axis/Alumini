@@ -4,13 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { ListError } from "@/components/common/ListBody";
 import { MemberLink } from "@/components/common/MemberLink";
 import { RichText } from "@/components/common/RichText";
 import { RsvpButtons } from "@/components/events/RsvpButtons";
 import { IconEvents, IconMapPin } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, EmptyState, ErrorBox, LinkButton, LoadMore, Loading, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Card, EmptyState, ErrorBox, LinkButton, ListSkeleton, LoadMore, Loading, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -123,9 +124,9 @@ export function EventDetailPage() {
           <h2 className="text-sm font-semibold text-slate-700">{ATTENDEES_TITLE}</h2>
           <Tabs value={who} onChange={setWho} tabs={attendeeTabs(e)} />
         </div>
-        {attendees.isLoading && <Loading />}
-        {attendees.error && <ErrorBox error={attendees.error} />}
-        {attendees.items.length === 0 && !attendees.isLoading && !attendees.error && <EmptyState inline icon={<IconEvents />} title={noOne.title} description={noOne.description} />}
+        {attendees.view === "loading" && <ListSkeleton shape="row" frame="flush" count={3} />}
+        {attendees.view === "error" && <ListError error={attendees.error} onRetry={attendees.retry} retrying={attendees.retrying} />}
+        {attendees.view === "empty" && <EmptyState inline icon={<IconEvents />} title={noOne.title} description={noOne.description} />}
         <ul className="grid gap-3 sm:grid-cols-2">
           {attendees.items.map((m) => (
             <li key={m.id}>
@@ -139,7 +140,7 @@ export function EventDetailPage() {
             </li>
           ))}
         </ul>
-        <LoadMore hasNextPage={!!attendees.hasNextPage} isFetchingNextPage={attendees.isFetchingNextPage} fetchNextPage={() => void attendees.fetchNextPage()} />
+        <LoadMore hasNextPage={!!attendees.hasNextPage} isFetchingNextPage={attendees.isFetchingNextPage} fetchNextPage={() => void attendees.fetchNextPage()} error={attendees.nextPageError} />
       </Card>
       <ReasonModal
         open={cancelOpen}

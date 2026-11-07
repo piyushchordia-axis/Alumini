@@ -123,7 +123,7 @@ export default function EventDetailScreen() {
         </Text>
         <Tabs tall value={who} onChange={setWho} tabs={attendeeTabs(e)} />
         {attendees.items.length === 0 && (
-          <ListEmpty loading={attendees.isLoading} error={attendees.error} onRetry={() => void attendees.refetch()}>
+          <ListEmpty view={attendees.view} count={3} frame="flush" error={attendees.error} onRetry={attendees.retry} retrying={attendees.retrying}>
             <EmptyState inline icon={<IconEvents />} title={noOne.title} description={noOne.description} />
           </ListEmpty>
         )}

@@ -6,11 +6,12 @@ import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BlockConfirmDialog, BlockMemberButton } from "@/components/chat/BlockMemberButton";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ListError } from "@/components/common/ListBody";
 import { GroupUnavailable } from "@/components/groups/GroupUnavailable";
 import { InviteMembersDialog } from "@/components/groups/InviteMembersDialog";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, LoadMore, Loading, Modal } from "@/components/ui";
+import { Avatar, Badge, Button, Card, LinkButton, ListSkeleton, LoadMore, Loading, Modal } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -166,16 +167,11 @@ function Members({
       <h2 ref={headingRef} tabIndex={-1} className="border-b border-slate-100 px-4 py-3 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
         Members · {group.memberCount}
       </h2>
-      {list.isLoading ? (
-        <Loading />
-      ) : list.error && list.items.length === 0 ? (
-        <div className="space-y-3 p-4">
-          <ErrorBox error={list.error} />
-          <Button variant="outline" size="sm" className="min-h-11" onClick={() => void list.refetch()}>
-            Retry loading
-          </Button>
-        </div>
-      ) : list.items.length === 0 ? (
+      {list.view === "loading" ? (
+        <ListSkeleton shape="row" frame="flush" count={4} className="px-4" />
+      ) : list.view === "error" ? (
+        <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} className="p-4" />
+      ) : list.view === "empty" ? (
         <p className="px-4 py-6 text-sm text-slate-500">Nobody is in this group now.</p>
       ) : (
         <ul className="divide-y divide-slate-100">
@@ -184,7 +180,7 @@ function Members({
           ))}
         </ul>
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
       {options && (
         <MemberOptions
           slug={slug}

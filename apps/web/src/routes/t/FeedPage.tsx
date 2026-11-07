@@ -1,6 +1,7 @@
-import { feedEmpty, LATEST_POSTS_TITLE, PINNED_POSTS_LABEL } from "@illuminize/shared";
+import { feedEmpty, LATEST_POSTS_TITLE, listView, PINNED_POSTS_LABEL } from "@illuminize/shared";
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { ListError } from "@/components/common/ListBody";
 import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
 import { DigestBanner } from "@/components/feed/DigestBanner";
 import { ExploreRow } from "@/components/feed/ExploreRow";
@@ -9,7 +10,7 @@ import { PostComposer } from "@/components/feed/PostComposer";
 import { UpcomingEvents } from "@/components/feed/UpcomingEvents";
 import { IconFeed } from "@/components/icons";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
-import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
+import { Button, EmptyState, ListSkeleton, LoadMore, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { usePhoneLayout } from "@/hooks/useMediaQuery";
 import { useMembership } from "@/hooks/useMembership";
@@ -54,6 +55,8 @@ export function FeedPage() {
   }, [compose, key]);
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const pinned = list.first?.pinned ?? [];
+  // Pinned posts come with the first page, so they count as what the feed has.
+  const view = listView(list, list.items.length + pinned.length);
   // A wide screen's sidebar lists every section already.
   const phone = usePhoneLayout();
   return (
@@ -65,8 +68,8 @@ export function FeedPage() {
       <CelebrationsCard slug={slug} />
       {phone && <UpcomingEvents slug={slug} />}
       <PostComposer inputRef={composer} />
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorBox error={list.error} />}
+      {view === "loading" && <ListSkeleton shape="post" />}
+      {view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
       {pinned.length > 0 && (
         // Paints nothing of its own, so its cards stay white on the member's page; each says it's pinned.
         <section aria-label={PINNED_POSTS_LABEL} className="space-y-4">
@@ -85,7 +88,7 @@ export function FeedPage() {
       {list.items.map((p) => (
         <PostCard key={p.id} slug={slug} post={p} />
       ))}
-      {!list.isLoading && !list.error && list.items.length === 0 && pinned.length === 0 && (
+      {view === "empty" && (
         <EmptyState
           icon={<IconFeed />}
           title={empty.title}
@@ -94,7 +97,7 @@ export function FeedPage() {
           action={empty.action && <Button variant={empty.action.variant} onClick={() => composer.current?.focus()}>{empty.action.label}</Button>}
         />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

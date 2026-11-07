@@ -183,7 +183,7 @@ export function MentorshipRequests({
           </View>
         }
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} error={list.error} onRetry={list.retry} retrying={list.retrying}>
             {empty}
           </ListEmpty>
         }

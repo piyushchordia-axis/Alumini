@@ -2,7 +2,7 @@ import { countryName, tenantSearchEmpty } from "@illuminize/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { IconBuilding, IconSearch, IconSpark } from "@/components/icons";
-import { Avatar, Button, Card, EmptyState, ErrorBox, Input, Loading } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, ErrorBox, Input, ListSkeleton } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useTenantList } from "@/hooks/useTenant";
 import { resetTheme } from "@/lib/theme";
@@ -40,7 +40,7 @@ export function TenantPickerPage() {
           <Input ref={searchBox} placeholder="Search by name or city…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Search institutions" />
         </Card>
         <div className="mt-4 space-y-2">
-          {tenants.isLoading && <Loading />}
+          {tenants.isLoading && <ListSkeleton shape="row" count={4} />}
           {tenants.error && <ErrorBox error={tenants.error} />}
           {tenants.data?.length === 0 && (
             <EmptyState

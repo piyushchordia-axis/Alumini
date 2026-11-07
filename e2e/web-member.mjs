@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -3015,6 +3015,116 @@ try {
     await page.getByRole("link", { name: "Back to messages" }).locator("visible=true").first().click();
     await page.waitForURL(/\/t\/demo-university\/app\/messages$/);
     await removed.stop();
+  });
+
+  await step("the notifications list's first load draws its outline under the title, pulsing only when motion is welcome", async () => {
+    // Opened cold, so nothing is cached, with the list's answer held back.
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/t/demo-university/notifications"));
+    const skeleton = page.locator("main [data-testid=skeleton]");
+    try {
+      await page.goto(BASE + "/t/demo-university/app/notifications");
+      await held.asked();
+      await skeleton.waitFor();
+      await page.waitForSelector("h1:has-text('Notifications')");
+      if ((await skeleton.getAttribute("role")) !== "status" || (await skeleton.textContent()).trim() !== "Loading…") throw new Error("the notifications skeleton isn't a status saying Loading…");
+      // Nothing in it passes for a row, a post, a link or a button.
+      const inside = await skeleton.locator("article, li, a, button").count();
+      if (inside) throw new Error(`the notifications skeleton holds ${inside} article, li, link or button elements`);
+      if (await page.locator("main .animate-spin").count()) throw new Error("the notifications page shows a spinner while its skeleton is up");
+      await shot("08c-notifications-loading");
+      // Its grey blocks pulse and the white card under them doesn't (faded, a card lets a member's tint or photo
+      // through): whatever animates holds nothing.
+      const motion = () =>
+        skeleton.locator("[aria-hidden]").first().evaluate((group) => {
+          const moving = [group, ...group.querySelectorAll("*")].filter((el) => getComputedStyle(el).animationName !== "none");
+          return { names: [...new Set(moving.map((el) => getComputedStyle(el).animationName))].join(", ") || "none", count: moving.length, holders: moving.filter((el) => el.childElementCount > 0).length };
+        });
+      const moving = await motion();
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const still = await motion();
+      if (moving.names !== "pulse" || still.count) throw new Error(`the notifications skeleton's animation is ${moving.names}, and ${still.names} with less motion asked for (not pulse, then none)`);
+      if (moving.holders) throw new Error(`${moving.holders} of the notifications skeleton's surfaces pulse along with its blocks`);
+    } finally {
+      await page.emulateMedia({ reducedMotion: null });
+      held.release();
+    }
+    await skeleton.waitFor({ state: "detached" });
+    await held.stop();
+  });
+
+  await step("Retry loading keeps its error and focus while it retries, and a failed Load more says so with the rows kept", async () => {
+    const refusal = (message) => ({ status: 400, contentType: "application/json", body: JSON.stringify({ error: { code: "VALIDATION_ERROR", message } }) });
+    const notifications = (u) => u.pathname.endsWith("/t/demo-university/notifications");
+    let refuse = true;
+    const failing = (route) => (route.request().method() === "GET" && notifications(new URL(route.request().url())) && refuse ? route.fulfill(refusal("e2e list refused")) : route.fallback());
+    await page.route("**/api/v1/**", failing);
+    let held = null;
+    try {
+      await page.goto(BASE + "/t/demo-university/app/notifications");
+      const retry = page.getByRole("button", { name: "Retry loading", exact: true });
+      await retry.waitFor();
+      // Set up after the refusal, so it holds the retry and then hands it on to it.
+      held = await holdGets(page, notifications);
+      await retry.focus();
+      await page.keyboard.press("Enter");
+      await held.asked();
+      const focused = () => page.evaluate(() => ({ text: document.activeElement?.textContent?.trim(), busy: document.activeElement?.getAttribute("aria-busy") }));
+      const during = await focused();
+      if (during.text !== "Retry loading" || during.busy !== "true") throw new Error(`while Retry loading retries, focus is on ${JSON.stringify(during)}, not the busy button`);
+      if (!(await page.getByText("e2e list refused").count()) || (await page.locator("main [data-testid=skeleton]").count())) throw new Error("the skeleton took the error's place while it retried");
+      // A second press while it's busy asks nothing more.
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(200);
+      if (held.seen !== 1) throw new Error(`a busy Retry loading asked again (${held.seen} requests)`);
+      held.release();
+      await page.waitForFunction(() => document.activeElement?.getAttribute("aria-busy") !== "true");
+      if ((await focused()).text !== "Retry loading") throw new Error("focus left Retry loading when the retry failed again");
+      await held.stop();
+      held = null;
+      refuse = false;
+      await page.keyboard.press("Enter");
+      await retry.waitFor({ state: "detached" });
+    } finally {
+      if (held) await held.stop();
+      await page.unroute("**/api/v1/**", failing);
+    }
+
+    // The directory's next page refused: the cards stay, and the error shows above Load more, which tries again.
+    const directory = (u) => u.pathname.endsWith("/t/demo-university/directory");
+    let refuseNext = true;
+    const nextPage = async (route) => {
+      const u = new URL(route.request().url());
+      if (route.request().method() !== "GET" || !directory(u)) return route.fallback();
+      if (!u.searchParams.has("cursor")) {
+        // A second page to ask for, even if the directory fits on one.
+        const response = await route.fetch();
+        const json = await response.json();
+        return route.fulfill({ response, json: { ...json, nextCursor: json.nextCursor ?? "e2e-next" } });
+      }
+      if (refuseNext) return route.fulfill(refusal("e2e next page refused"));
+      return u.searchParams.get("cursor") === "e2e-next" ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [], nextCursor: null }) }) : route.fallback();
+    };
+    await page.route("**/api/v1/**", nextPage);
+    try {
+      await page.goto(BASE + "/t/demo-university/app/directory");
+      const more = page.getByRole("button", { name: "Load more", exact: true });
+      await more.waitFor();
+      const cards = page.locator("main a[href*='/app/directory/']");
+      const before = await cards.count();
+      await more.click();
+      const said = page.getByRole("alert").filter({ hasText: "e2e next page refused" });
+      await said.waitFor();
+      const [alertBox, moreBox] = await Promise.all([said.boundingBox(), more.boundingBox()]);
+      if (alertBox.y + alertBox.height > moreBox.y) throw new Error("the failed next page isn't said above Load more");
+      if ((await cards.count()) !== before || !before) throw new Error(`the directory's ${before} cards became ${await cards.count()} when its next page failed`);
+      if (await page.getByRole("button", { name: "Retry loading" }).count()) throw new Error("a failed next page took the whole list's error");
+      await shot("08d-directory-next-page-failed");
+      refuseNext = false;
+      await more.click();
+      await said.waitFor({ state: "detached" });
+    } finally {
+      await page.unroute("**/api/v1/**", nextPage);
+    }
   });
 
   await step("notifications page, notification settings + sign out", async () => {

@@ -30,7 +30,7 @@ import { IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCard";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, EmptyState, ErrorBox, Input, Loading, PageHeader, Select, Tabs } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorBox, Input, ListSkeleton, Loading, PageHeader, Select, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -58,7 +58,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
   const filtered = Object.keys(filters).length > 0;
   const list = useInfiniteList(mentorshipKeys.mentors(slug, filters), (cursor) => api.mentorship.mentors(slug, { ...filters, cursor, limit: PAGE }));
   // The list leaves out the viewer, so an empty one says something different to someone who is listed themselves.
-  const nobody = !filtered && !list.isLoading && list.items.length === 0;
+  const nobody = !filtered && list.view === "empty";
   const listed = !!useMyMentorProfile(slug, nobody).data?.isActive;
   const searchBox = useRef<HTMLInputElement>(null);
   // The button goes with the empty list, so focus moves to the search box, as Show all does on the other lists.
@@ -91,6 +91,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
       </div>
       <ListBody
         list={{ ...list, hasNextPage: !!list.hasNextPage }}
+        skeleton="member"
         empty={
           filtered ? (
             <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." live action={<Button variant="outline" className="min-h-11" onClick={clear}>Clear filters</Button>} />
@@ -228,7 +229,12 @@ function MentorsWayOut({ slug }: { slug: string }) {
   const received = useMentorshipList(slug, "received");
   const sent = useMentorshipList(slug, "sent");
   const me = useMyMentorProfile(slug);
-  if (received.isLoading || sent.isLoading || me.isLoading) return <Loading />;
+  if (received.isLoading || sent.isLoading || me.isLoading)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <ListSkeleton shape="row" />
+      </div>
+    );
   const failed = [received, sent, me].find((q) => q.error && q.data === undefined);
   if (failed)
     return (

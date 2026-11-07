@@ -203,6 +203,45 @@ export async function scriptEmptyList(page, url) {
 }
 
 /**
+ * Holds back the API GETs whose address (a `URL`) passes `test`, so a script can see what a page draws while they load,
+ * such as a list's skeleton. `asked()` waits until one has been asked for (`seen` counts them); `release()` lets them
+ * go on, and any asked for later; `stop()` takes the hold away once the answer it held has come.
+ *
+ * It hands each request on with `route.fallback()`, never `continue()`, so a scripted answer on the same GET
+ * (`scriptNotification`, `scriptEmptyList`) still answers it once released. Playwright tries the newest route first, so
+ * the hold must be set up after any such route: set up before it, the scripted answer comes first and nothing is held.
+ */
+export async function holdGets(page, test) {
+  const url = "**/api/v1/**";
+  let release = () => {};
+  const released = new Promise((resolve) => (release = resolve));
+  let seen = 0;
+  const handler = async (route) => {
+    const request = route.request();
+    if (request.method() !== "GET" || !test(new URL(request.url()))) return route.fallback();
+    seen += 1;
+    await released;
+    // The page may have gone on without it meanwhile (a reload, or a step that failed and closed it).
+    return route.fallback().catch(() => {});
+  };
+  await page.route(url, handler);
+  return {
+    get seen() {
+      return seen;
+    },
+    asked: async () => {
+      for (let i = 0; i < 100 && !seen; i++) await page.waitForTimeout(50);
+      if (!seen) throw new Error("the page didn't ask for the GET being held");
+    },
+    release: () => release(),
+    stop: () => {
+      release();
+      return page.unroute(url, handler);
+    },
+  };
+}
+
+/**
  * Puts the page's live connection through a proxy that loses any server frame containing `text`, as a flaky network would.
  * Set it up before the page connects (a reload does). `opened()` waits until the connection is up and has had a moment to
  * join its rooms, and `dropped()` says whether a frame was actually lost, so a script can't pass without testing the gap.

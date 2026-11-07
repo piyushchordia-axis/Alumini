@@ -1,9 +1,10 @@
 import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type Industry, type OpenTo, type ProfessionType, countryName, directoryEmpty } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { ListError } from "@/components/common/ListBody";
 import { MemberCard } from "@/components/directory/MemberCard";
 import { IconDirectory, IconSearch } from "@/components/icons";
-import { Button, EmptyState, ErrorBox, Input, LoadMore, Loading, PageHeader, Select } from "@/components/ui";
+import { Button, EmptyState, Input, ListSkeleton, LoadMore, PageHeader, Select } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -184,14 +185,14 @@ export function DirectoryPage() {
           </div>
         )}
       </div>
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorBox error={list.error} />}
+      {list.view === "loading" && <ListSkeleton shape="member" />}
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
       <div className="grid gap-3 md:grid-cols-2">
         {list.items.map((m) => (
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && (
+      {list.view === "empty" && (
         <EmptyState
           icon={empty.live ? <IconSearch /> : <IconDirectory />}
           title={empty.title}
@@ -200,7 +201,7 @@ export function DirectoryPage() {
           action={empty.action && <Button variant={empty.action.variant} onClick={showAll}>{empty.action.label}</Button>}
         />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

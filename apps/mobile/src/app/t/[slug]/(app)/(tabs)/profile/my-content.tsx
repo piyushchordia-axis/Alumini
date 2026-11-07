@@ -1,4 +1,4 @@
-import { MY_CONTENT_OFF, myContentEmpty, myContentTabs, type ChatGroupDto, type JobCardDto, type MyContentTab } from "@illuminize/shared";
+import { MY_CONTENT_OFF, MY_CONTENT_SKELETONS, myContentEmpty, myContentTabs, type ChatGroupDto, type JobCardDto, type MyContentTab } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useState } from "react";
 import { FlatList, View , Text } from "react-native";
@@ -60,7 +60,7 @@ export default function MyContentScreen() {
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 48 }}
         onEndReached={active.loadMore}
         ListEmptyComponent={
-          <ListEmpty loading={active.isLoading} error={active.error} onRetry={() => void active.refetch()}>
+          <ListEmpty view={active.view} skeleton={MY_CONTENT_SKELETONS[tab]} error={active.error} onRetry={active.retry} retrying={active.retrying}>
             <EmptyState
               icon={<NavIcon name={empty.icon} />}
               title={empty.title}

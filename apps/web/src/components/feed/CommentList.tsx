@@ -2,10 +2,11 @@ import { commentsEmpty } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ListError } from "@/components/common/ListBody";
 import { MemberLink } from "@/components/common/MemberLink";
 import { IconComment } from "@/components/icons";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Button, EmptyState, ErrorBox, LoadMore, Textarea } from "@/components/ui";
+import { Button, EmptyState, ListSkeleton, LoadMore, Textarea } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -69,9 +70,10 @@ export function CommentList({ postId, canComment }: { postId: string; canComment
           </li>
         ))}
       </ul>
-      {list.error && <ErrorBox error={list.error} />}
-      {list.items.length === 0 && !list.isLoading && !list.error && <EmptyState inline icon={<IconComment />} title={empty.title} description={empty.description} />}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      {list.view === "loading" && <ListSkeleton shape="row" frame="flush" count={3} />}
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
+      {list.view === "empty" && <EmptyState inline icon={<IconComment />} title={empty.title} description={empty.description} />}
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

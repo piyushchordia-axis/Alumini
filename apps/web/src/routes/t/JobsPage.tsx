@@ -22,13 +22,14 @@ import {
 } from "@illuminize/shared";
 import { useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ListError } from "@/components/common/ListBody";
 import { IconJobs, IconProfile, IconSearch } from "@/components/icons";
 import { JobCard } from "@/components/jobs/JobCard";
 import { useReferralList } from "@/components/jobs/ReferralList";
 import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralRequests";
 import { SeekerCard } from "@/components/jobs/SeekerCard";
 import { SeekerToggleCard } from "@/components/jobs/SeekerToggleCard";
-import { Button, Checkbox, EmptyState, ErrorBox, Input, LinkButton, LoadMore, Loading, PageHeader, Select, Tabs } from "@/components/ui";
+import { Button, Checkbox, EmptyState, Input, LinkButton, ListSkeleton, LoadMore, PageHeader, Select, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -177,15 +178,15 @@ export function JobsPage() {
                 </div>
               )}
             </div>
-            {jobs.isLoading && <Loading />}
-            {jobs.error && jobs.items.length === 0 && <ErrorBox error={jobs.error} />}
+            {jobs.view === "loading" && <ListSkeleton shape="listing" />}
+            {jobs.view === "error" && <ListError error={jobs.error} onRetry={jobs.retry} retrying={jobs.retrying} />}
             {/* One column that may shrink, so a long title truncates on a phone rather than widening the page. */}
             <div className="grid grid-cols-1 gap-3">
               {jobs.items.map((j) => (
                 <JobCard key={j.id} slug={slug} job={j} />
               ))}
             </div>
-            {!jobs.isLoading && !jobs.error && jobs.items.length === 0 && (
+            {jobs.view === "empty" && (
               <EmptyState
                 icon={empty.live ? <IconSearch /> : <IconJobs />}
                 title={empty.title}
@@ -201,21 +202,21 @@ export function JobsPage() {
                 }
               />
             )}
-            <LoadMore hasNextPage={!!jobs.hasNextPage} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} />
+            <LoadMore hasNextPage={!!jobs.hasNextPage} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} error={jobs.nextPageError} />
           </>
         ) : tab === "seekers" ? (
           <>
             <SeekerToggleCard slug={slug} />
-            {seekers.isLoading && <Loading />}
-            {seekers.error && seekers.items.length === 0 && <ErrorBox error={seekers.error} />}
+            {seekers.view === "loading" && <ListSkeleton shape="member" />}
+            {seekers.view === "error" && <ListError error={seekers.error} onRetry={seekers.retry} retrying={seekers.retrying} />}
             {/* Columns that may shrink, as the openings', so a long headline truncates rather than widening the page. */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {seekers.items.map((s) => (
                 <SeekerCard key={s.member.id} slug={slug} seeker={s} />
               ))}
             </div>
-            {!seekers.isLoading && !seekers.error && seekers.items.length === 0 && <EmptyState icon={<IconProfile />} title={SEEKERS_EMPTY.title} description={SEEKERS_EMPTY.description} />}
-            <LoadMore hasNextPage={!!seekers.hasNextPage} isFetchingNextPage={seekers.isFetchingNextPage} fetchNextPage={() => void seekers.fetchNextPage()} />
+            {seekers.view === "empty" && <EmptyState icon={<IconProfile />} title={SEEKERS_EMPTY.title} description={SEEKERS_EMPTY.description} />}
+            <LoadMore hasNextPage={!!seekers.hasNextPage} isFetchingNextPage={seekers.isFetchingNextPage} fetchNextPage={() => void seekers.fetchNextPage()} error={seekers.nextPageError} />
           </>
         ) : available ? (
           <ReferralRequests

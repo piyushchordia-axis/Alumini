@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { MemberRequestActions } from "@/components/admin/MemberActions";
+import { ListError } from "@/components/common/ListBody";
 import { IconBell, IconSettings } from "@/components/icons";
-import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
+import { Button, EmptyState, ListSkeleton, LoadMore, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -46,49 +47,51 @@ export function NotificationsPage() {
           </>
         }
       />
-      {list.isLoading && <Loading />}
+      {list.view === "loading" && <ListSkeleton shape="notification" />}
       {/* A failed list says so, as on the phone, rather than that there's nothing new. */}
-      {list.error && list.items.length === 0 && <ErrorBox error={list.error} />}
-      {!list.isLoading && !list.error && list.items.length === 0 && <EmptyState icon={<IconBell />} title={empty.title} description={empty.description} />}
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {list.items.map((n) => {
-          const to = linkFor(slug, n, isTenantAdmin);
-          const body = (
-            <>
-              <div className="flex items-start justify-between gap-2">
-                <span className={clsx("text-sm", n.readAt ? "text-slate-700" : "font-semibold text-slate-900")}>{n.title}</span>
-                <span className="shrink-0 text-xs text-slate-400">{timeAgo(n.createdAt)}</span>
-              </div>
-              {n.body && <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>}
-            </>
-          );
-          // A request to join that may still wait: its text links to the member, and Approve and Reject sit beside it,
-          // never inside the link.
-          const request = isTenantAdmin ? memberRequestOf(n) : null;
-          const cls = clsx("block px-4 py-3 transition hover:bg-slate-50", !n.readAt && !request && "bg-primary/5");
-          const markRead = () => !n.readAt && readOne.mutate(n.id);
-          const text = to ? (
-            <Link to={to} className={cls} onClick={markRead}>
-              {body}
-            </Link>
-          ) : (
-            <button className={clsx(cls, "w-full text-left")} onClick={markRead}>
-              {body}
-            </button>
-          );
-          return (
-            <li key={n.id} className={clsx(request && !n.readAt && "bg-primary/5")}>
-              {text}
-              {request && (
-                <div className="px-4 pb-3">
-                  <MemberRequestActions slug={slug} subject={request} />
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
+      {list.view === "empty" && <EmptyState icon={<IconBell />} title={empty.title} description={empty.description} />}
+      {list.view === "rows" && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {list.items.map((n) => {
+            const to = linkFor(slug, n, isTenantAdmin);
+            const body = (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <span className={clsx("text-sm", n.readAt ? "text-slate-700" : "font-semibold text-slate-900")}>{n.title}</span>
+                  <span className="shrink-0 text-xs text-slate-400">{timeAgo(n.createdAt)}</span>
                 </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+                {n.body && <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>}
+              </>
+            );
+            // A request to join that may still wait: its text links to the member, and Approve and Reject sit beside it,
+            // never inside the link.
+            const request = isTenantAdmin ? memberRequestOf(n) : null;
+            const cls = clsx("block px-4 py-3 transition hover:bg-slate-50", !n.readAt && !request && "bg-primary/5");
+            const markRead = () => !n.readAt && readOne.mutate(n.id);
+            const text = to ? (
+              <Link to={to} className={cls} onClick={markRead}>
+                {body}
+              </Link>
+            ) : (
+              <button className={clsx(cls, "w-full text-left")} onClick={markRead}>
+                {body}
+              </button>
+            );
+            return (
+              <li key={n.id} className={clsx(request && !n.readAt && "bg-primary/5")}>
+                {text}
+                {request && (
+                  <div className="px-4 pb-3">
+                    <MemberRequestActions slug={slug} subject={request} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

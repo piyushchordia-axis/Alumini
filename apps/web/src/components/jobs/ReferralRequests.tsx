@@ -2,7 +2,7 @@ import { REFERRAL_BOX_LABELS, referralsReceivedEmpty, referralsWayOutText, type 
 import { IconJobs, IconMail } from "@/components/icons";
 import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { ReferralList, useReferralList } from "@/components/jobs/ReferralList";
-import { Button, EmptyState, ErrorBox, LinkButton, Loading, Tabs } from "@/components/ui";
+import { Button, EmptyState, ErrorBox, LinkButton, ListSkeleton, Tabs } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 
 /**
@@ -70,7 +70,7 @@ export function ReferralsWayOut({ slug, box, onBoxChange }: { slug: string; box:
   const { tenant, membership } = useMembership();
   const received = useReferralList(slug, "received");
   const sent = useReferralList(slug, "sent");
-  if (received.isLoading || sent.isLoading) return <Loading />;
+  if (received.isLoading || sent.isLoading) return <ListSkeleton shape="row" />;
   const failed = [received, sent].find((q) => q.error && q.data === undefined);
   if (failed)
     return (

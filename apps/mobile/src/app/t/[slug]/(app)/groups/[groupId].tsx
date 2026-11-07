@@ -13,7 +13,7 @@ import { GroupUnavailable, GroupsOff, useGroupsEnabled } from "@/components/grou
 import { InviteMembersSheet } from "@/components/groups/InviteMembersSheet";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Button, ErrorText, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorText, ListSkeleton, RetryButton, Spinner } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -184,14 +184,14 @@ function Members({ slug, group, directoryOn, onStatus, onRemove }: { slug: strin
       <Text role="heading" style={{ fontSize: 16, fontWeight: "700", color: colors.text, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         Members · {group.memberCount}
       </Text>
-      {list.isLoading ? (
-        <Spinner label="Loading members…" />
-      ) : list.error && list.items.length === 0 ? (
+      {list.view === "loading" ? (
+        <ListSkeleton shape="row" frame="flush" count={4} label="Loading members…" style={{ paddingHorizontal: spacing.lg }} />
+      ) : list.view === "error" ? (
         <View style={{ padding: spacing.lg, gap: spacing.sm }}>
           <ErrorText error={list.error} />
-          <Button title="Retry loading" variant="outline" onPress={() => void list.refetch()} />
+          <RetryButton title="Retry loading" onRetry={list.retry} retrying={list.retrying} />
         </View>
-      ) : list.items.length === 0 ? (
+      ) : list.view === "empty" ? (
         <Text style={{ padding: spacing.lg, fontSize: 14, color: colors.muted }}>Nobody is in this group now.</Text>
       ) : (
         // A plain list in the screen's own scroll view, paged by the button below.

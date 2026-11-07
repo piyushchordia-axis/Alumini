@@ -9,10 +9,12 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   tests in `test/`.
 - `apps/web`: React 19, Vite, Tailwind v4, TanStack Query. Holds the member app, tenant admin (`routes/t/admin`) and
   platform console (`routes/platform`). Design tokens live in `src/index.css`; SVG icons in `src/components/icons.tsx`;
-  shared primitives in `src/components/ui`.
+  shared primitives in `src/components/ui` (skeletons in `ui/Skeleton.tsx`; a list's states in
+  `components/common/ListBody.tsx`, with `ListError`).
 - `apps/mobile`: Expo SDK 58 with expo-router: the member app and the institution admin console
   (`src/app/t/[slug]/(app)/admin`, a stack above the tabs). Screens are in `src/app`. Theme tokens in `src/theme`;
-  SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx`. Chrome:
+  SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx` (skeletons in
+  `components/Skeleton.tsx`, which `ListEmpty` draws). Chrome:
   `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen` (pushed screens), `ChatHeader` (chat
   overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
   to the console's home). Do not use native stack headers for member chrome (see Gotchas). Files the console picks or
@@ -50,7 +52,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `lib/charts.ts` the charts' palette, ticks, layouts and hand-written number and week text; `lib/analytics.ts` the
   Analytics page's figures and chart cards; `lib/emptyStates.ts` what the member lists say when empty (a post's
   comments, with whether it takes them, `postTakesComments`, and an event's attendees too) and which way on each offers
-  (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`).
+  (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`); `lib/lists.ts` how a list reads its query
+  (`listView`, `loadingFirstTime`, `LOADING_LABEL`) and `lib/skeletons.ts` the skeletons' shapes (`SKELETON_LAYOUTS`,
+  My posts' `MY_CONTENT_SKELETONS`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -324,6 +328,21 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Directory and Jobs.** Search plus a filter or two in view (web directory: "Were there in", a year; Jobs on both
     apps: type and Can refer; the mobile directory shows search alone); the rest behind More filters (web) / Filters
     (mobile), not a six-column slab.
+  - **Loading.** A list's first load draws its skeleton, never a bare spinner, under its title, search box and filters,
+    which stay up. Lists read `view` (shared `listView`, which `useInfiniteList` returns on both apps): `loading` the
+    skeleton, `error` the error and a retry only with nothing on screen (the hook's `retry`, which keeps the error up,
+    its button busy and focused, until the answer comes; a failed refetch keeps the rows, and a failed next page is said
+    beside Load more, `nextPageError`), `empty` the empty state only after a real answer, and `idle`, a query switched
+    off, nothing. The shape comes from
+    `SKELETON_LAYOUTS` (web `ListSkeleton`, or `ListBody`'s `skeleton`; mobile `ListEmpty`'s `skeleton`, `row` by
+    default, as every list's `ListEmpty` draws one). Skeletons are slate blocks on white level-1 surfaces, never the
+    brand colour or straight on the member's background, and hold no article, `li`, link or button, which e2e takes for
+    the real thing. Only the blocks pulse, never the white surfaces (faded, they'd let a background through). The web's
+    is a `role="status"` saying "Loading…" to screen readers, pulsing only under `motion-safe`; the phone's is one
+    progressbar named `LOADING_LABEL` ("Loading", or the screen's own words, such as "Finding members…"), still under
+    reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame. `data-testid` / `testID="skeleton"` is there for
+    e2e alone. Spinners stay on the guards, sign-in and landing, registration, Load more and buttons, and for now on
+    detail and form pages and the web console's and platform's lists (README → Known gaps).
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.
@@ -377,6 +396,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   tabs so state is exposed on the web build. A toggle button needs `toggleState` (`components/ui.tsx`), which adds
   `aria-pressed`, because `aria-selected` isn't valid on `role="button"` in a browser. It ignores `accessibilityHint`
   too: a description that matters also goes through `describedBy(id)` to a `nativeID`, as `HubRow` does.
+- A disabled button drops keyboard focus to the page (a phone `Button` with `loading` becomes a disabled `<button>` on
+  the web build, and so does one with `aria-disabled`). A retry that should keep focus while busy stays enabled and
+  ignores presses: web `ListError`, mobile `RetryButton`.
 - A FlatList hands its `ListEmptyComponent` a `style` (an inverted list's flip back the right way up) and an `onLayout`.
   `EmptyState` takes neither, so in a list put it in a plain `View`, or an inverted thread draws it upside down.
 - `Alert.alert` does nothing on the web export and e2e dismisses `window.confirm`: new flows use `ConfirmSheet` (mobile)
@@ -409,8 +431,17 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   a PNG.
 - Hermes may lack parts of `Intl` (compact numbers, some date formatting): shared code the phone app runs writes such
   text by hand, as `formatSalary` and `applicationsLine` do.
-- A page holding a form waits only for its queries' first answer (`isLoading && !isFetched`, see `RegisterPage`): a
-  query with no data goes back to loading on every refetch, which swaps the form, and what's typed in it, for a spinner.
+- A page holding a form waits only for its queries' first answer (`loadingFirstTime`, shared `lib/lists.ts`:
+  `isLoading && !isFetched`, as `RegisterPage` does): a query with no data goes back to loading on every refetch, which
+  swaps the form, and what's typed in it, for a spinner or a skeleton.
+- reanimated's `useReducedMotion` reads the setting once, as the app starts (on the web export, when the module loads),
+  and never re-renders: Reduce Motion turned on mid-session stills the phone's skeletons only after a restart, and an
+  e2e check asks for less motion before the page loads (`page.emulateMedia`, then a reload). The web's `motion-safe:`
+  follows the setting live.
+- e2e sees a skeleton by holding its GET (`holdGets`, `e2e/lib.mjs`). Playwright runs the newest route first, and
+  `route.fallback()` hands the request to the one set up before it, so set the hold up after any scripted answer to
+  the same GET (`scriptNotification`, `scriptEmptyList`), or the answer comes first and nothing is held. The web
+  skeleton's words stay "Loading…", naming no section, because `text=` and `hasText` match screen-reader-only text.
 - Navigate once. React Router draws each navigation as a transition, so two in quick succession can be drawn as the last
   alone: registration navigating to `/app` itself while its own `<Navigate>` (on the membership put in the cache) did
   the same left `AppHomeRedirect`'s `<Navigate>`, whose effect had already run, on `/app` with nothing to show. When a

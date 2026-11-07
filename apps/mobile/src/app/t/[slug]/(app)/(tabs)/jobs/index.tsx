@@ -195,7 +195,7 @@ export default function JobsScreen() {
                 </View>
               }
               ListEmptyComponent={
-                <ListEmpty loading={jobs.isLoading} error={jobs.error} onRetry={() => void jobs.refetch()}>
+                <ListEmpty view={jobs.view} skeleton="listing" error={jobs.error} onRetry={jobs.retry} retrying={jobs.retrying}>
                   <EmptyState
                     icon={empty.live ? <IconSearch /> : <IconJobs />}
                     title={empty.title}
@@ -236,7 +236,7 @@ export default function JobsScreen() {
               refreshing={seekers.isRefetching && !seekers.isFetchingNextPage}
               onRefresh={() => void seekers.refetch()}
               ListEmptyComponent={
-                <ListEmpty loading={seekers.isLoading} error={seekers.error} onRetry={() => void seekers.refetch()}>
+                <ListEmpty view={seekers.view} skeleton="member" error={seekers.error} onRetry={seekers.retry} retrying={seekers.retrying}>
                   <EmptyState icon={<IconProfile />} title={SEEKERS_EMPTY.title} description={SEEKERS_EMPTY.description} />
                 </ListEmpty>
               }

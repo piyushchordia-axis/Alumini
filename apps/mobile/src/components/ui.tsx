@@ -1,9 +1,10 @@
-import { CONTROL_TEXT_MAX_SCALE, STATUS_TONES, avatarTone, brandAvatarTone, type ToneName } from "@illuminize/shared";
+import { CONTROL_TEXT_MAX_SCALE, STATUS_TONES, avatarTone, brandAvatarTone, type ListView, type SkeletonShape, type ToneName } from "@illuminize/shared";
 import { cloneElement, useEffect, useEffectEvent, useMemo, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type Ref } from "react";
 import type { Href } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent, type PressableProps, type RefreshControlProps, type ScrollViewInstance, type TextInputProps, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { PageBackdrop, PageShell } from "@/components/PageBackdrop";
+import { ListSkeleton, type PhoneSkeletonFrame } from "@/components/Skeleton";
 import { StackHeader } from "@/components/StackHeader";
 import { IconAlert, IconCheck, IconInfo, IconProfile, type IconProps } from "@/components/icons";
 import { initials } from "@/lib/format";
@@ -628,17 +629,64 @@ export function EmptyState({
   );
 }
 
-/** Empty-list slot: spinner while loading, the error with a retry, otherwise the given empty state. */
-export function ListEmpty({ loading, error, onRetry, children }: { loading: boolean; error: unknown; onRetry: () => void; children: ReactNode }) {
-  if (loading) return <Spinner />;
-  if (error)
+/**
+ * Empty-list slot, on every list: the list's outline (`skeleton`, a shared shape, with `count`, `frame` and `label` where
+ * the list's own differ) while its first page loads, the error with a retry, otherwise the given empty state. `view` comes
+ * from useInfiniteList (listView), and a list switched off draws nothing; a list that reads its own state passes `loading`.
+ * With useInfiniteList's `retry`, the error stays while the retry is on its way (`retrying`), its button busy and keeping
+ * focus.
+ */
+export function ListEmpty({
+  view,
+  loading = false,
+  error,
+  onRetry,
+  retrying = false,
+  skeleton = "row",
+  count,
+  frame,
+  label,
+  children,
+}: ({ view: ListView; loading?: never } | { loading: boolean; view?: never }) & {
+  error: unknown;
+  onRetry: () => void;
+  retrying?: boolean;
+  skeleton?: SkeletonShape;
+  count?: number;
+  frame?: PhoneSkeletonFrame;
+  label?: string;
+  children: ReactNode;
+}) {
+  const state: ListView = view ?? (loading ? "loading" : error ? "error" : "empty");
+  if (state === "idle" || state === "rows") return null;
+  if (state === "loading") return <ListSkeleton shape={skeleton} count={count} frame={frame} label={label} />;
+  if (state === "error")
     return (
       <View style={{ gap: spacing.sm }}>
         <ErrorText error={error} />
-        <Button title="Try again" variant="outline" onPress={onRetry} />
+        <RetryButton onRetry={onRetry} retrying={retrying} />
       </View>
     );
   return <>{children}</>;
+}
+
+/**
+ * A list error's retry ("Try again", or `title`). While `retrying` it shows it's busy and ignores presses, but stays
+ * enabled: a disabled button drops focus (the web build makes it a disabled `<button>`), which this keeps.
+ */
+export function RetryButton({ title = "Try again", onRetry, retrying = false }: { title?: string; onRetry: () => void; retrying?: boolean }) {
+  return (
+    <Button
+      title={title}
+      variant="outline"
+      aria-busy={retrying}
+      icon={retrying ? (color) => <ActivityIndicator color={color} /> : undefined}
+      style={retrying ? { opacity: 0.7 } : undefined}
+      onPress={() => {
+        if (!retrying) onRetry();
+      }}
+    />
+  );
 }
 
 /**
@@ -747,6 +795,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, lineHeight: 22, color: "#1e293b" },
 });
 
+export { ListSkeleton, SkeletonBox, SkeletonGroup, SkeletonLines } from "@/components/Skeleton";
 export { SectionScreen } from "@/components/SectionScreen";
 export { StackScreen } from "@/components/StackScreen";
 export { StackHeader } from "@/components/StackHeader";

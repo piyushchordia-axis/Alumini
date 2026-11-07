@@ -85,6 +85,22 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
 - `GREY_TEXT` is both apps' grey text as `textColour` reads it: the meta grey (`91 107 128`) on the plain page and the
   secondary grey (`71 85 105`) on a tint or a photo.
 
+### Loading checks
+
+- `holdGets(page, test)` holds back the API GETs whose address (a `URL`) passes `test`, so a step can check what a page
+  draws while they load, and costs no sign-in. `asked()` waits for the request, `release()` lets it go on, and `stop()`
+  takes the hold away once its answer is in. It hands requests on with `route.fallback()`, so a scripted answer to the
+  same GET still answers them, but only if that route was set up first: Playwright runs the newest route first.
+- A first load needs an empty cache, so a step opens the page cold (`goto` or a reload) with the hold already set up.
+- The skeleton is `main [data-testid=skeleton]` on the web, a `role="status"` saying "Loading…", and on the phone the
+  progressbar named "Loading" (or the screen's own words), `getByTestId("skeleton")`. Neither holds an article, `li`,
+  link or button.
+- Only the grey blocks pulse, never the white surfaces under them. On the web, read `animationName` ("pulse") on
+  whatever in the skeleton animates: it holds no other element. On the phone, read the opacity of a block, a div whose
+  background is slate-200 (`rgb(226, 232, 240)`); no other div in the skeleton has an opacity under 1.
+- Reduced motion: the web's pulse follows `page.emulateMedia({ reducedMotion: "reduce" })` at once, to "none". The
+  phone's reads the setting as the app starts, so emulate it first, then reload.
+
 ## Web (member journey)
 
 ```bash
@@ -234,8 +250,12 @@ Covers:
   at a phone's width saying "Your requests and mentorships";
 - referrals: a job offered for referral, the Can refer filter, a request reported, one accepted into a live chat that
   opens with the note, closing a job closing a waiting request, and the bell;
-- a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
-  alone (its icon is silent); sign out;
+- a chat notice in the bell opening its thread; the notifications list opened cold with its answer held back
+  (`holdGets`), drawing its skeleton under the Notifications title: a status saying "Loading…", with no row, post,
+  link, button or spinner, its blocks pulsing and not its card, and still with less motion asked for; the list refused
+  (by the script), its Retry loading keeping the error and focus, busy, while the retry is held, and again when that
+  fails; the directory's next page refused, said above Load more with the cards kept, then loaded by pressing it
+  again; notification settings, through a Settings link named by its word alone (its icon is silent); sign out;
 - an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
   pending screen; and a forced sign-out leaving nothing cached;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
@@ -524,9 +544,11 @@ Covers:
   the script) keeping the sheet open with the error and the reason typed, and a refusal saying she was already
   rejected closing it, saying so and refreshing the list; then listed under Rejected with her reason, where a refusal
   (answered by the script) says she has already been approved, the Approve sent the status her row showed, and the list
-  refreshes; the Approved tab, its answer held back by the script, showing a spinner and none of Rejected's rows or
-  buttons until its own arrive; searching for Nisha, and for Jignesh, whose own row says "You" with no actions; and a
-  second page (answered by the script) loading on scroll, a row repeated across the pages shown once;
+  refreshes; the Approved tab, its answer held back by the script (`holdGets`), showing its skeleton (one progressbar
+  named "Loading", its blocks gently pulsing and not its card) and none of Rejected's rows or buttons until its own arrive; searching for Nisha,
+  and for Jignesh, whose own row says "You" with no actions; the app started again with less motion asked for, the same
+  skeleton standing still while Approved's answer is held again; and a second page (answered by the script) loading on
+  scroll, a row repeated across the pages shown once;
 - a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
   starting "Nisha Modi, Approved, 2010–present"), with her facts (her phone as the console writes it, her place by name,
   what she does; two across with every word whole, and whole again on a 320-point screen), her mentor profile listed
@@ -1018,6 +1040,11 @@ second copy of a screen, or back to the page the button was on.
       in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
       his Zylo Labs listing in Funding to add an email address and a phone number: its buttons read "Website", "Get in
       touch" and "Call …" the same way.
+- [ ] Open a list for the first time since the app started (Directory, say; on a slow connection if it loads too fast
+      to see): a grey outline in the shape of its cards stands in until they come, pulsing gently, and TalkBack or
+      VoiceOver reads it once as "Loading". Then turn on iOS Reduce Motion (Settings → Accessibility → Motion) or
+      Android's Remove animations, close the app fully and open it again (the setting is read as it starts): the
+      outline stands still.
 
 ### 13. Notices with Approve and Reject
 

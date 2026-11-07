@@ -1,8 +1,9 @@
 import { eventsEmpty } from "@illuminize/shared";
 import { useState } from "react";
+import { ListError } from "@/components/common/ListBody";
 import { EventCard } from "@/components/events/EventCard";
 import { IconEvents } from "@/components/icons";
-import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
+import { EmptyState, LinkButton, ListSkeleton, LoadMore, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -19,17 +20,17 @@ export function EventsPage() {
     <div className="space-y-4">
       <PageHeader title="Events & meetups" subtitle="Get-togethers organised by alumni, anywhere in the world" actions={<LinkButton to={`/t/${slug}/app/events/new`}>+ Plan a gathering</LinkButton>} />
       <Tabs value={scope} onChange={setScope} tabs={[{ value: "upcoming", label: "Upcoming" }, { value: "past", label: "Past" }]} className="w-fit" />
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorBox error={list.error} />}
+      {list.view === "loading" && <ListSkeleton shape="event" />}
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
       <div className="grid gap-3">
         {list.items.map((e) => (
           <EventCard key={e.id} slug={slug} event={e} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && (
+      {list.view === "empty" && (
         <EmptyState icon={<IconEvents />} title={empty.title} description={empty.description} action={empty.action && <LinkButton to={`/t/${slug}/app/events/new`} variant={empty.action.variant}>{empty.action.label}</LinkButton>} />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

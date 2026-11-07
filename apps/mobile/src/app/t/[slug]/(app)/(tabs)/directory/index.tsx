@@ -169,7 +169,7 @@ export default function DirectoryScreen() {
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="member" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState
               icon={empty.live ? <IconSearch /> : <IconDirectory />}
               title={empty.title}

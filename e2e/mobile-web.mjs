@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -4003,30 +4003,44 @@ try {
 
   await step("searching the members list, the admin's own row says You and offers nothing", async () => {
     // Approved's first answer held back: until it comes, nothing of Rejected's stands in for it, as Diya's row there has
-    // an Approve that would act on her as rejected.
-    const listUrl = /\/admin\/members\?/;
-    let release = () => {};
-    const held = new Promise((resolve) => (release = resolve));
-    let holding = false;
-    await page.route(listUrl, async (route) => {
-      if (route.request().method() !== "GET" || !route.request().url().includes("status=APPROVED")) return route.fallback();
-      holding = true;
-      await held;
-      return route.fallback();
-    });
+    // an Approve that would act on her as rejected. Its outline does, one progressbar saying Loading, gently pulsing.
+    const approved = (u) => u.pathname.endsWith("/admin/members") && u.searchParams.get("status") === "APPROVED";
+    const approvedPanel = () => shown(page.getByRole("tabpanel", { name: "Approved", exact: true }));
+    // The pulse is read on a grey block (slate-200); the white card under the blocks never fades, as a faded card would let
+    // a member's tint or photo through.
+    const outlineOpacity = () =>
+      approvedPanel()
+        .getByTestId("skeleton")
+        .evaluate((root) => {
+          const all = [...root.querySelectorAll("div")];
+          const isBlock = (el) => getComputedStyle(el).backgroundColor === "rgb(226, 232, 240)";
+          const faded = all.filter((el) => !isBlock(el) && Number(getComputedStyle(el).opacity) < 1).length;
+          if (faded) throw new Error(`${faded} of the members list's skeleton surfaces fade with its blocks`);
+          const block = all.find(isBlock);
+          if (!block) throw new Error("the members list's skeleton has no grey block");
+          return getComputedStyle(block).opacity;
+        });
+    let held = await holdGets(page, approved);
     try {
       await memberTab("Approved").click();
       await page.waitForURL(/status=APPROVED/);
-      for (let i = 0; i < 100 && !holding; i++) await page.waitForTimeout(50);
-      if (!holding) throw new Error("the Approved tab didn't ask for its rows");
-      await shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByRole("progressbar", { name: "Loading", exact: true }).waitFor();
+      await held.asked();
+      const loading = approvedPanel().getByRole("progressbar", { name: "Loading", exact: true });
+      await loading.waitFor();
+      if ((await loading.getAttribute("data-testid")) !== "skeleton") throw new Error("the Approved tab's Loading isn't its skeleton");
       if (await page.getByText("Diya Raval", { exact: true }).locator("visible=true").count()) throw new Error("the Approved tab shows Rejected's rows while its own load");
       if (await page.getByRole("button", { name: /Diya Raval$/ }).locator("visible=true").count()) throw new Error("the Approved tab offers Rejected's buttons while its own rows load");
+      const opacities = [];
+      for (let i = 0; i < 10 && !opacities.some((o) => Number(o) < 0.95); i++) {
+        opacities.push(await outlineOpacity());
+        await page.waitForTimeout(150);
+      }
+      if (!opacities.some((o) => Number(o) < 0.95)) throw new Error(`the members list's skeleton doesn't pulse (opacity ${opacities.join(", ")})`);
     } finally {
-      release();
+      held.release();
     }
     await memberButton("Suspend Parth Joshi").waitFor();
-    await page.unroute(listUrl);
+    await held.stop();
     const search = shown(page.getByLabel("Search members", { exact: true }));
     await search.fill("Nisha");
     await page.waitForURL(/q=Nisha/);
@@ -4047,6 +4061,25 @@ try {
     await expectEmptyState(nobody, "the members' empty search", { absent: ["Clear search", "Invite members"], tones: BRAND_TONES.samaj });
     await memberButton("Clear search").click();
     await memberButton("Suspend Parth Joshi").waitFor();
+    await page.waitForURL((u) => !u.searchParams.has("q"));
+    // With less motion asked for, the outline stands still. The app reads that as it starts (reanimated's
+    // useReducedMotion), so it starts again asking for it, Approved's first answer held back again.
+    held = await holdGets(page, approved);
+    try {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.reload();
+      await held.asked();
+      await approvedPanel().getByRole("progressbar", { name: "Loading", exact: true }).waitFor();
+      const first = await outlineOpacity();
+      await page.waitForTimeout(400);
+      const second = await outlineOpacity();
+      if (first !== "1" || second !== "1") throw new Error(`the members list's skeleton moves with less motion asked for (opacity ${first}, then ${second})`);
+    } finally {
+      held.release();
+      await page.emulateMedia({ reducedMotion: null });
+    }
+    await memberButton("Suspend Parth Joshi").waitFor();
+    await held.stop();
   });
 
   await step("the members list scrolls on to page 2, showing a row repeated across the pages once", async () => {

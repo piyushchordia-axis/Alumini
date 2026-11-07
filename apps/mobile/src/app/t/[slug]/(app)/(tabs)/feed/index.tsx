@@ -44,7 +44,7 @@ export default function FeedScreen() {
           void qc.invalidateQueries({ queryKey: qk.events(slug, UPCOMING_EVENTS_STRIP) });
         }}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="post" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState
               icon={<IconFeed />}
               title={empty.title}

@@ -4,7 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Sheet } from "@/components/chat/ChatFrame";
-import { Avatar, Button, ChoiceMark, ErrorText, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, ChoiceMark, ErrorText, Input, ListSkeleton } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
 import { refreshGroup } from "@/lib/groups";
@@ -128,7 +128,7 @@ export function InviteMembersSheet({
       )}
       {full && <Text style={{ fontSize: 12, color: colors.muted }}>You can invite up to {CHAT_GROUP_INVITES_PER_CALL} people at a time.</Text>}
       {candidates.isLoading ? (
-        <Spinner label="Finding members…" />
+        <ListSkeleton shape="row" frame="rows" count={4} label="Finding members…" />
       ) : candidates.error && list.length === 0 ? (
         <View style={{ gap: spacing.sm }}>
           <ErrorText error={candidates.error} />

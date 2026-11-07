@@ -28,7 +28,7 @@ import { IconLock, IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCards";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, Muted, SectionScreen, Spinner, Tabs } from "@/components/ui";
+import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, ListSkeleton, Muted, SectionScreen, Spinner, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -64,7 +64,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
   const filtered = Object.keys(filters).length > 0;
   const list = useInfiniteList(mentorshipKeys.mentors(slug, filters), (cursor) => api.mentorship.mentors(slug, { ...filters, cursor, limit: PAGE }));
   // The list leaves out the viewer, so an empty one says something different to someone who is listed themselves.
-  const nobody = !filtered && !list.isLoading && list.items.length === 0;
+  const nobody = !filtered && list.view === "empty";
   const listed = !!useMyMentorProfile(slug, nobody).data?.isActive;
   const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
   // The button goes with the empty list, so focus moves to the search box, as Show all does on the other lists.
@@ -108,7 +108,7 @@ function FindMentors({ slug, onOffer }: { slug: string; onOffer: () => void }) {
           </View>
         }
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="member" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             {filtered ? (
               <EmptyState icon={<IconSearch />} title="No mentors match" description="Try another name, area or availability." live action={<Button title="Clear filters" variant="outline" onPress={clear} />} />
             ) : listed ? (
@@ -275,7 +275,7 @@ function MentorsWayOut({ slug }: { slug: string }) {
   if (received.isLoading || sent.isLoading || me.isLoading)
     return (
       <SectionScreen>
-        <Spinner />
+        <ListSkeleton shape="row" style={{ padding: spacing.lg }} />
       </SectionScreen>
     );
   const failed = [received, sent, me].find((q) => q.error && q.data === undefined);

@@ -64,7 +64,7 @@ export default function EventsScreen() {
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="event" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState
               icon={<IconEvents />}
               title={empty.title}

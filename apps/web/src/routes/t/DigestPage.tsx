@@ -2,7 +2,7 @@ import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { IconDirectory, IconFeed } from "@/components/icons";
-import { Card, EmptyState, ErrorBox, Loading, PageHeader } from "@/components/ui";
+import { Card, EmptyState, ErrorBox, ListSkeleton, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -14,12 +14,20 @@ export function DigestPage() {
   const slug = tenant.slug;
   const base = `/t/${slug}/app`;
   const q = useQuery({ queryKey: qk.digest(slug), queryFn: () => api.celebrations.digest(slug) });
-  if (q.isLoading) return <Loading />;
+  const title = `This week at ${tenant.shortName ?? tenant.name}`;
+  // The title is known before the digest is: only what it lists waits.
+  if (q.isLoading)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <PageHeader title={title} />
+        <ListSkeleton shape="notification" count={4} />
+      </div>
+    );
   if (q.error) return <ErrorBox error={q.error} />;
   const d = q.data;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title={`This week at ${tenant.shortName ?? tenant.name}`} subtitle={d ? `Week of ${formatDate(d.weekStart)}` : undefined} />
+      <PageHeader title={title} subtitle={d ? `Week of ${formatDate(d.weekStart)}` : undefined} />
       {!d ? (
         <EmptyState icon={<IconFeed />} title="No digest yet" description="Every Monday morning we round up the week's popular posts, new jobs and upcoming events." />
       ) : (

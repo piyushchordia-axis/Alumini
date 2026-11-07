@@ -326,6 +326,7 @@ export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg";
   return <span role="status" className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-primary", s, className)} aria-label="Loading" />;
 }
 
+/** A centred spinner, only where there's no page yet to outline (the guards, sign-in); a list's first load draws ListSkeleton. */
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-3 py-12 text-slate-500" role="status" aria-live="polite">
@@ -333,6 +334,8 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
     </div>
   );
 }
+
+export { ListSkeleton, Skeleton, SkeletonLines, SkeletonStatus } from "./Skeleton";
 
 /**
  * The round badge an empty state or a chat notice draws its icon in, hidden from screen readers: the brand's wash, with
@@ -539,10 +542,16 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
   );
 }
 
-export function LoadMore({ hasNextPage, isFetchingNextPage, fetchNextPage }: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => void }) {
+/** `error`: what went wrong with the page it asked for (useInfiniteList's `nextPageError`), said above it; pressing it again tries again. */
+export function LoadMore({ hasNextPage, isFetchingNextPage, fetchNextPage, error }: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => void; error?: unknown }) {
   if (!hasNextPage) return null;
   return (
-    <div className="flex justify-center py-4">
+    <div className="flex flex-col items-center gap-3 py-4">
+      {error != null && (
+        <div role="alert" className="w-full">
+          <ErrorBox error={error} />
+        </div>
+      )}
       <Button variant="outline" onClick={fetchNextPage} loading={isFetchingNextPage}>
         Load more
       </Button>

@@ -5,7 +5,7 @@ import { FlatList, Text, View } from "react-native";
 import { IconJobs, IconMail } from "@/components/icons";
 import { ReferralsUnavailable } from "@/components/jobs/JobUnavailable";
 import { useReferralList, useReferralRows } from "@/components/jobs/ReferralRows";
-import { Button, EmptyState, ErrorText, ListEmpty, Spinner, Tabs } from "@/components/ui";
+import { Button, EmptyState, ErrorText, ListEmpty, ListSkeleton, Tabs } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { radius, spacing } from "@/theme";
 
@@ -86,7 +86,7 @@ export function ReferralRequests({
           </View>
         }
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} error={list.error} onRetry={list.retry} retrying={list.retrying}>
             {empty}
           </ListEmpty>
         }
@@ -106,7 +106,8 @@ export function ReferralsWayOut({ slug, box, onBoxChange, onBack }: { slug: stri
   const { tenant, membership } = useMembership();
   const received = useReferralList(slug, "received");
   const sent = useReferralList(slug, "sent");
-  if (received.isLoading || sent.isLoading) return <Spinner />;
+  // Padded as the requests' own list is, so its rows land where the outline was.
+  if (received.isLoading || sent.isLoading) return <ListSkeleton shape="row" style={{ padding: spacing.lg, paddingTop: spacing.sm }} />;
   const failed = [received, sent].find((q) => q.error && q.data === undefined);
   if (failed)
     return (

@@ -3,7 +3,7 @@ import { chatKeys } from "@illuminize/shared/chat";
 import { errorMessage } from "@illuminize/shared/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Avatar, Button, ChoiceInput, ErrorBox, Input, Loading, Modal } from "@/components/ui";
+import { Avatar, Button, ChoiceInput, ErrorBox, Input, ListSkeleton, Modal } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
 import { refreshGroup } from "@/lib/groups";
@@ -97,7 +97,7 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
         )}
         {full && <p className="text-xs text-slate-500">You can invite up to {CHAT_GROUP_INVITES_PER_CALL} people at a time.</p>}
         {candidates.isLoading ? (
-          <Loading label="Finding members…" />
+          <ListSkeleton shape="row" frame="rows" count={4} label="Finding members…" />
         ) : candidates.error && list.length === 0 ? (
           <div className="space-y-2">
             <ErrorBox error={candidates.error} />

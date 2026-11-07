@@ -74,7 +74,7 @@ export default function PostDetailScreen() {
             </View>
           }
           ListEmptyComponent={
-            <ListEmpty loading={comments.isLoading} error={comments.error} onRetry={() => void comments.refetch()}>
+            <ListEmpty view={comments.view} count={3} error={comments.error} onRetry={comments.retry} retrying={comments.retrying}>
               <EmptyState inline icon={<IconComment />} title={empty.title} description={empty.description} />
             </ListEmpty>
           }

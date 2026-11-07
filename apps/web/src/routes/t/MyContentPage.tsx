@@ -1,14 +1,15 @@
-import { MY_CONTENT_OFF, myContentEmpty, myContentTabs, type MyContentTab } from "@illuminize/shared";
+import { MY_CONTENT_OFF, MY_CONTENT_SKELETONS, myContentEmpty, myContentTabs, type MyContentTab } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useSearchParams } from "react-router-dom";
 import { BusinessCard } from "@/components/businesses/BusinessCard";
+import { ListError } from "@/components/common/ListBody";
 import { OwnedGroupCard } from "@/components/groups/GroupCards";
 import { EventCard } from "@/components/events/EventCard";
 import { PostCard } from "@/components/feed/PostCard";
 import { FundingCard } from "@/components/funding/FundingCard";
 import { JobCard } from "@/components/jobs/JobCard";
 import { NavIcon } from "@/components/icons";
-import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
+import { EmptyState, LinkButton, ListSkeleton, LoadMore, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -52,8 +53,9 @@ export function MyContentPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader {...HEADER} />
       <Tabs value={tab} onChange={setTab} tabs={tabs} className="max-w-full sm:w-fit" />
-      {active.isLoading && <Loading />}
-      {active.error && <ErrorBox error={active.error} />}
+      {/* Each tab outlines what its own section's list draws, in this page's one column. */}
+      {active.view === "loading" && <ListSkeleton shape={MY_CONTENT_SKELETONS[tab]} columns={1} />}
+      {active.view === "error" && <ListError error={active.error} onRetry={active.retry} retrying={active.retrying} />}
       {/* One column that may shrink, so a long job title truncates on a phone rather than widening the page. */}
       <div className="grid grid-cols-1 gap-3">
         {tab === "posts" && posts.items.map((p) => <PostCard key={p.id} slug={slug} post={p} />)}
@@ -64,7 +66,7 @@ export function MyContentPage() {
         {tab === "events" && events.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
         {tab === "pastEvents" && pastEvents.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
       </div>
-      {!active.isLoading && !active.error && active.items.length === 0 && (
+      {active.view === "empty" && (
         <EmptyState
           icon={<NavIcon name={empty.icon} />}
           title={empty.title}
@@ -82,7 +84,7 @@ export function MyContentPage() {
           }
         />
       )}
-      <LoadMore hasNextPage={!!active.hasNextPage} isFetchingNextPage={active.isFetchingNextPage} fetchNextPage={() => void active.fetchNextPage()} />
+      <LoadMore hasNextPage={!!active.hasNextPage} isFetchingNextPage={active.isFetchingNextPage} fetchNextPage={() => void active.fetchNextPage()} error={active.nextPageError} />
     </div>
   );
 }

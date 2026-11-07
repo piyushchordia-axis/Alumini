@@ -54,7 +54,7 @@ function Discover({ slug }: { slug: string }) {
         refreshing={list.isRefetching && !list.isFetchingNextPage}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <GroupsEmpty slug={slug} empty={groupsEmpty(member, "discover", !!search)} />
           </ListEmpty>
         }
@@ -76,7 +76,7 @@ function MyGroups({ slug }: { slug: string }) {
       refreshing={list.isRefetching && !list.isFetchingNextPage}
       onRefresh={() => void list.refetch()}
       ListEmptyComponent={
-        <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+        <ListEmpty view={list.view} error={list.error} onRetry={list.retry} retrying={list.retrying}>
           <GroupsEmpty slug={slug} empty={groupsEmpty(member, "mine", false)} />
         </ListEmpty>
       }
@@ -117,7 +117,7 @@ function Invitations({ slug, onStatus }: { slug: string; onStatus: (text: string
         onRefresh={() => void list.refetch()}
         ListHeaderComponent={accept.error ? <StatusLine tone="warning" text={errorMessage(accept.error)} /> : undefined}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState icon={<IconMail />} title="No invitations" description="When someone invites you to a group, the invitation waits here for you to accept or decline." />
           </ListEmpty>
         }

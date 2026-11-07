@@ -1,8 +1,9 @@
 import { fundingEmpty } from "@illuminize/shared";
 import { useState } from "react";
+import { ListError } from "@/components/common/ListBody";
 import { FundingCard } from "@/components/funding/FundingCard";
 import { IconFunding } from "@/components/icons";
-import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
+import { EmptyState, LinkButton, ListSkeleton, LoadMore, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -30,17 +31,17 @@ export function FundingPage() {
         }
       />
       <Tabs value={kind} onChange={setKind} tabs={[{ value: "SEEKING", label: "Seeking funding" }, { value: "OFFERING", label: "Investors" }]} className="w-fit" />
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorBox error={list.error} />}
+      {list.view === "loading" && <ListSkeleton shape="listing" columns={2} />}
+      {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
       <div className="grid gap-3 md:grid-cols-2">
         {list.items.map((f) => (
           <FundingCard key={f.id} slug={slug} item={f} />
         ))}
       </div>
-      {!list.isLoading && !list.error && list.items.length === 0 && (
+      {list.view === "empty" && (
         <EmptyState icon={<IconFunding />} title={empty.title} description={empty.description} action={empty.action && <LinkButton to={`/t/${slug}/app/funding/new?kind=${kind}`} variant={empty.action.variant}>{empty.action.label}</LinkButton>} />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

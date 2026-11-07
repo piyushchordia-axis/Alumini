@@ -2,8 +2,9 @@ import { chatAvailable, memberYearsLine } from "@illuminize/shared";
 import { BLOCKED_LIST_EXPLAINED, chatKeys } from "@illuminize/shared/chat";
 import { Link } from "react-router-dom";
 import { BlockMemberButton } from "@/components/chat/BlockMemberButton";
+import { ListError } from "@/components/common/ListBody";
 import { IconShield } from "@/components/icons";
-import { Avatar, Button, EmptyState, ErrorBox, LoadMore, Loading } from "@/components/ui";
+import { Avatar, EmptyState, ListSkeleton, LoadMore } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -29,16 +30,11 @@ export function BlockedMembersPage() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <p className="mb-4 text-sm text-slate-500">{BLOCKED_LIST_EXPLAINED}</p>
-        {list.isLoading ? (
-          <Loading />
-        ) : list.error && list.items.length === 0 ? (
-          <div className="space-y-3">
-            <ErrorBox error={list.error} />
-            <Button variant="outline" size="sm" className="min-h-11" onClick={() => void list.refetch()}>
-              Retry loading
-            </Button>
-          </div>
-        ) : list.items.length === 0 ? (
+        {list.view === "loading" ? (
+          <ListSkeleton shape="row" frame="rows" />
+        ) : list.view === "error" ? (
+          <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />
+        ) : list.view === "empty" ? (
           <EmptyState icon={<IconShield />} title="You haven't blocked anyone" description="You can block a member from their profile or from a conversation with them." />
         ) : (
           <>
@@ -54,7 +50,7 @@ export function BlockedMembersPage() {
                 </li>
               ))}
             </ul>
-            <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} />
+            <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
           </>
         )}
       </div>

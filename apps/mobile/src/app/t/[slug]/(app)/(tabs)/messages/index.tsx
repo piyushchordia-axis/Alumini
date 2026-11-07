@@ -117,9 +117,10 @@ export default function MessagesScreen() {
           onEndReached={list.loadMore}
           refreshing={list.isRefetching && !list.isFetchingNextPage}
           onRefresh={() => void list.refetch()}
-          contentContainerStyle={list.items.length === 0 ? { padding: spacing.lg } : undefined}
+          // The rows run edge to edge, and so does their outline; the empty box and the error need the screen's margin.
+          contentContainerStyle={list.view === "empty" || list.view === "error" ? { padding: spacing.lg } : undefined}
           ListEmptyComponent={
-            <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+            <ListEmpty view={list.view} frame="band" error={list.error} onRetry={list.retry} retrying={list.retrying}>
               {inbox === "MAIN" ? (
                 <EmptyState
                   icon={<IconMessages />}

@@ -53,10 +53,10 @@ export default function NotificationsScreen() {
         onEndReached={list.loadMore}
         refreshing={list.isRefetching}
         onRefresh={() => void list.refetch()}
-        // The rows run edge to edge, but the empty box needs the screen's margin.
-        contentContainerStyle={list.items.length === 0 ? { padding: spacing.lg } : undefined}
+        // The rows run edge to edge, and so does their outline; the empty box and the error need the screen's margin.
+        contentContainerStyle={list.view === "empty" || list.view === "error" ? { padding: spacing.lg } : undefined}
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty view={list.view} skeleton="notification" frame="band" error={list.error} onRetry={list.retry} retrying={list.retrying}>
             <EmptyState icon={<IconBell />} title={empty.title} description={empty.description} />
           </ListEmpty>
         }

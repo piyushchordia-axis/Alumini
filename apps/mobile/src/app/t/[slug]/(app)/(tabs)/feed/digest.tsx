@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { IconDirectory, IconFeed } from "@/components/icons";
-import { Card, EmptyState, LoadError, Muted, Screen, Spinner } from "@/components/ui";
+import { Card, EmptyState, ListSkeleton, LoadError, Muted, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -24,10 +24,11 @@ export default function DigestScreen() {
   const slug = tenant.slug;
   const router = useRouter();
   const q = useQuery({ queryKey: qk.digest(slug), queryFn: () => api.celebrations.digest(slug) });
+  // The title is known before the digest is: only what it lists waits.
   if (q.isLoading)
     return (
       <Screen title="This week">
-        <Spinner />
+        <ListSkeleton shape="notification" count={4} />
       </Screen>
     );
   if (q.error)

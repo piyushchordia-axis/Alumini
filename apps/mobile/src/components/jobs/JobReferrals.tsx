@@ -9,7 +9,7 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconMail } from "@/components/icons";
 import { WayOutBanner } from "@/components/jobs/ReferralRequests";
 import { useJobReferralList, useReferralRows } from "@/components/jobs/ReferralRows";
-import { Badge, Button, Card, EmptyState, ErrorText, Spinner } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorText, ListSkeleton, RetryButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
@@ -121,12 +121,12 @@ export function JobReferrals({ slug, job }: { slug: string; job: JobDetailDto })
         {available ? <Text style={body}>{jobReferralsIntro(job, now)}</Text> : <WayOutBanner text={jobReferralsWayOutText(tenant.shortName ?? tenant.name, membership.chatEligible)} />}
       </View>
       {rows.statusAbove(list.items)}
-      {list.isLoading ? (
-        <Spinner label="Loading requests…" />
+      {list.view === "loading" ? (
+        <ListSkeleton shape="row" label="Loading requests…" />
       ) : failed ? (
         <View style={{ gap: spacing.sm }}>
           <ErrorText error={list.error} />
-          <Button title="Retry loading" variant="outline" onPress={() => void list.refetch()} />
+          <RetryButton title="Retry loading" onRetry={list.retry} retrying={list.retrying} />
         </View>
       ) : list.items.length === 0 ? (
         <EmptyState icon={<IconMail />} title="No referral requests yet" description="When members ask you to refer them for this job, their requests wait here for your answer." />

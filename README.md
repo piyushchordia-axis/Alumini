@@ -722,6 +722,43 @@ looks the same on the web and the phone and stays readable in any institution co
   `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted (`expectReadable` and `expectEdge` in
   `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill, skill chips and the success toast.
 
+### Lists and loading
+
+Both apps read a list's state the same way, from `listView` in `packages/shared/src/lib/lists.ts`, which each app's
+`useInfiniteList` returns as `view`:
+
+- **First load:** the list's skeleton, an outline in the shape of what is coming: a post's author, text and reaction
+  pills; a member's photo and three lines; a job's or a listing's logo tile; an event's date block; a notification's
+  two lines and its time; or a row. The shapes are `SKELETON_LAYOUTS` in `lib/skeletons.ts`, so both apps draw the same
+  counts and widths (My posts takes each tab's from `MY_CONTENT_SKELETONS`). The page's title, search box and filters
+  stay above it, so typing carries on, and on the feed it sits under the composer.
+- **Offline:** a first load waiting for the network still shows the skeleton, never a false "nothing here".
+- **Nothing in the answer:** the list's empty state, only once a real answer has come.
+- **A failure with nothing to show:** the error and **Retry loading** (web) or **Try again** (phone). While the retry
+  is on its way the error stays and the button shows it's busy, so it keeps focus. A refetch that fails keeps the rows
+  on screen.
+- **A next page that fails** (web Load more): the rows stay and the error shows above the button, which tries again.
+- **Switched off** (a tab that isn't open, a query that waits on another): nothing at all.
+
+Skeletons are neutral slate blocks on white cards or a white group of rows, never the institution's colour and never
+straight on a member's background, so they read on any brand, tint or photo. Only the grey blocks pulse; the cards
+under them stay opaque. A list whose rows run the phone's full width (Messages, Notifications) draws its outline the
+same way, edge to edge, so nothing moves when the rows come. Screen readers hear one "Loading…" status
+on the web, with the outline hidden from them, and one progressbar named "Loading" on the phone (or the screen's own
+words, such as "Finding members…"). The web's pulses only when the device allows motion (`motion-safe`); the phone's
+stands still under iOS Reduce Motion or Android's Remove animations, read as the app starts (reanimated's
+`useReducedMotion`). On the phone, `ListEmpty` draws the skeleton for every list, the console's included, which take
+the plain row shape for now.
+
+Spinners stay where there is no page yet or the wait is a button's: the route guards, the sign-in and landing pages,
+registration, Load more and buttons. Detail and form pages on both apps, and the lists in the web console and the
+platform console, still show one too (Known gaps).
+
+`lists.test.ts` and `skeletons.test.ts` cover the rules and the shapes. The e2e journeys hold a list's request
+(`holdGets` in `e2e/lib.mjs`) to check the web notifications skeleton (a status saying "Loading…", pulsing, and still
+under reduced motion) and the phone console's Approved members skeleton (a progressbar named Loading, pulsing, and
+still when the app starts with reduced motion).
+
 ### Rich text
 
 Long descriptions take bullet lists and clickable links, with no other formatting: the parser is
@@ -1382,8 +1419,9 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   avatar.ts: the colours of initials (avatarTone, brandAvatarTone);
                   layout.ts: how many columns text laid side by side takes, from its longest word;
                   tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
-                  buttons, tones and open state; appearance.ts: a member's background; admin.ts and its siblings:
-                  what both admin consoles share)
+                  buttons, tones and open state; appearance.ts: a member's background; lists.ts: how a list reads
+                  its query (listView); skeletons.ts: the skeletons' shapes; admin.ts and its siblings: what both
+                  admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 
@@ -1709,7 +1747,11 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
   - UI follow-ups: deeper tenant theming (Branding previews a gradient card, not the landing page or the app), and
-    skeleton loaders and purposeful motion.
+    purposeful motion.
+  - Member lists draw a skeleton while they first load (see Lists and loading), but detail and form pages on both apps
+    (a job, an event, a post, the edit forms) still show a spinner in place of the page, and so do the lists in the web
+    console and the platform console; the phone console's lists draw the plain row skeleton whatever their rows look
+    like.
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
   - Text laid side by side (job and member facts, the console's tiles, the landing's sections) chooses its columns

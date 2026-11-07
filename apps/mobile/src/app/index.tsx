@@ -4,7 +4,7 @@ import { useRef, useState, type ComponentRef } from "react";
 import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconBuilding, IconSearch, IconSpark } from "@/components/icons";
-import { Avatar, Button, EmptyState, ErrorText, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, EmptyState, ErrorText, Input, ListSkeleton, Spinner } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useTenantList } from "@/hooks/useTenant";
 import { moveFocus } from "@/lib/focus";
@@ -40,7 +40,7 @@ export default function TenantPickerScreen() {
       <View style={{ padding: spacing.lg }}>
         <Input ref={searchBox} accessibilityLabel="Search institutions" placeholder="Search by name or city…" value={q} onChangeText={setQ} autoFocus />
       </View>
-      {tenants.isLoading && <Spinner />}
+      {tenants.isLoading && <ListSkeleton shape="row" count={4} style={{ paddingHorizontal: spacing.lg }} />}
       {tenants.error && (
         <View style={{ paddingHorizontal: spacing.lg }}>
           <ErrorText error={tenants.error} />
