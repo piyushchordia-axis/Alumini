@@ -246,11 +246,16 @@ describe("newClientKey", () => {
 describe("the shared chat code", () => {
   it("depends on neither React nor a TanStack package", () => {
     const dir = resolve(fileURLToPath(import.meta.url), "../../../../../packages/shared/src/chat");
+    let seen = 0;
     for (const file of readdirSync(dir)) {
       const source = readFileSync(resolve(dir, file), "utf8");
-      const imports = [...source.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
+      // Import and export statements only, so copy that ends in "from " ("You can ask again from ") isn't read as one.
+      const imports = [...source.matchAll(/^(?:import|export)\s[\w$*{}\s,]*?from\s*"([^"]+)"|^import\s*"([^"]+)"/gm)].map((m) => m[1] ?? m[2]);
+      seen += imports.length;
       expect(imports.filter((i) => !i!.startsWith(".")), file).toEqual([]);
     }
+    // The pattern still finds the statements it guards.
+    expect(seen).toBeGreaterThan(20);
   });
 });
 
