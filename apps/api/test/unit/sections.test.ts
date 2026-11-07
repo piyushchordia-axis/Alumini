@@ -1,4 +1,5 @@
 import {
+  EXPLORE_TITLE,
   HUB_GROUP_TITLES,
   homeSection,
   MEMBER_SECTIONS,
@@ -36,7 +37,7 @@ describe("SECTION_LABELS", () => {
 describe("SECTION_DESCRIPTIONS", () => {
   // Every name a link in the navigation goes by: the sections, More's own rows and the account's, More itself and the
   // feed's shortcuts to what's behind it.
-  const NAV_NAMES = [...Object.values(SECTION_LABELS), ...Object.values(MORE_HUB_ROWS).map((r) => r.label), "Switch institution", "Sign out", "More", "Explore", "Upcoming events"];
+  const NAV_NAMES = [...Object.values(SECTION_LABELS), ...Object.values(MORE_HUB_ROWS).map((r) => r.label), "Switch institution", "Sign out", "More", EXPLORE_TITLE, "Upcoming events"];
   // Each line with the name it sits under: a line may say its own row's name (Mentors' way out does), never another's.
   const lines: [string, string][] = [
     ...MEMBER_SECTIONS.map((s): [string, string] => [SECTION_LABELS[s], SECTION_DESCRIPTIONS[s]]),
@@ -103,6 +104,15 @@ describe("moreHubGroups", () => {
     expect(MORE_HUB_YOU_TITLE).toBe("You");
     expect(Object.values(HUB_GROUP_TITLES)).not.toContain(MORE_HUB_YOU_TITLE);
     expect(Object.values(MORE_HUB_ROWS).map((r) => r.label)).toEqual(["My posts", "My profile", "Admin console"]);
+  });
+});
+
+describe("EXPLORE_TITLE", () => {
+  // Both apps name the feed's row by it, and e2e finds the row by that name: a link or heading of the same name would be
+  // a second match.
+  it("names the phone feed's row Explore, which no section, group or row of More is called", () => {
+    expect(EXPLORE_TITLE).toBe("Explore");
+    expect([...Object.values(SECTION_LABELS), ...Object.values(HUB_GROUP_TITLES), MORE_HUB_YOU_TITLE, ...Object.values(MORE_HUB_ROWS).map((r) => r.label)]).not.toContain(EXPLORE_TITLE);
   });
 });
 

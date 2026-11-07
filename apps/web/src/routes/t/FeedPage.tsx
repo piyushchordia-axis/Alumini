@@ -3,12 +3,14 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
 import { DigestBanner } from "@/components/feed/DigestBanner";
+import { ExploreRow } from "@/components/feed/ExploreRow";
 import { PostCard } from "@/components/feed/PostCard";
 import { PostComposer } from "@/components/feed/PostComposer";
 import { IconFeed } from "@/components/icons";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
 import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { usePhoneLayout } from "@/hooks/useMediaQuery";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import type { FeedArrival } from "@/lib/emptyStates";
@@ -51,9 +53,12 @@ export function FeedPage() {
   }, [compose, key]);
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const pinned = list.first?.pinned ?? [];
+  // A wide screen's sidebar lists every section already.
+  const phone = usePhoneLayout();
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Community" subtitle={`What's happening at ${tenant.shortName ?? tenant.name}`} />
+      {phone && <ExploreRow />}
       <ProfileStrengthCard />
       <DigestBanner slug={slug} />
       <CelebrationsCard slug={slug} />

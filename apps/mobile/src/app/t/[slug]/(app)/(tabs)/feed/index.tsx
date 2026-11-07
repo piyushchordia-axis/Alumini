@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
 import { DigestBanner } from "@/components/DigestBanner";
+import { ExploreRow } from "@/components/ExploreRow";
 import { IconFeed } from "@/components/icons";
 import { PostCard } from "@/components/PostCard";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
@@ -44,6 +45,7 @@ export default function FeedScreen() {
         }
         ListHeaderComponent={
           <View style={{ gap: spacing.md }}>
+            <ExploreRow />
             <ProfileStrengthCard />
             <DigestBanner slug={slug} />
             <CelebrationsCard slug={slug} />

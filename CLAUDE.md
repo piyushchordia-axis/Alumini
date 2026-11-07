@@ -244,7 +244,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     line is its description, never part of its name, which stays the label or its count's: the phone gives it as the
     hint and, because react-native-web ignores `accessibilityHint`, through `describedBy` (`components/ui.tsx`) to a
     `nativeID`. No line names another nav label (`sections.test.ts`), as e2e finds links by their text; the phone's
-    More scrolls, so Sign out stays in reach.
+    More scrolls, so Sign out stays in reach. The feed alone, on a phone, starts with Explore (`ExploreRow` on each
+    app): More's sections as wrapping chips with More's badges, a labelled region and never a nav (e2e finds the bar's
+    links inside one), and nothing when nothing is behind More. The web draws phone-only modules through
+    `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`), never hidden by CSS, so a wide screen has no second copy of
+    the sidebar's links.
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
     way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row

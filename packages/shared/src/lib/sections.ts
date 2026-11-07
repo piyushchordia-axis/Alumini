@@ -103,6 +103,12 @@ export const MORE_HUB_ROWS = {
   adminConsole: { label: "Admin console", description: "Members, moderation and settings" },
 } as const satisfies Record<string, { label: string; description: string }>;
 
+/**
+ * The heading, and the name, of the phone feed's row of shortcuts to what's behind More: the same sections (`overflow`)
+ * with the same badges. A region, never a nav, so it can't be taken for the bar.
+ */
+export const EXPLORE_TITLE = "Explore";
+
 /** Phones show this many sections in the bar. More is always there too, because it also holds the profile and sign out. */
 const BAR_SECTIONS = 4;
 

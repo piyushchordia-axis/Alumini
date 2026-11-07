@@ -210,7 +210,9 @@ Demo University now has **Messages**, **Groups**, **Mentors** and **Businesses**
 **Jobs**. On a computer every section is in the menu on the left. On a phone, or a narrow window, the bar at the bottom
 shows four sections and **More** holds the rest, grouped, with a line under each saying what's there: **Connect**
 (Groups, Mentors), **Community** (Events, Businesses, Funding), then **You** (your posts, your profile and, for an
-admin, the admin console), switching institution and signing out.
+admin, the admin console), switching institution and signing out. The feed there also starts with **Explore**, a row of
+shortcuts to the same sections behind More, with the same badges: invite someone to a group, and their Groups chip
+counts it.
 
 - **Messages, with two browsers.** This walks through a message request, live messages, a report and what an admin
   sees.

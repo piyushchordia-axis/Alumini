@@ -298,6 +298,18 @@ the name; the name stays the label, or the label with its count ("Groups, 1 invi
 `SECTION_DESCRIPTIONS` and `MORE_HUB_ROWS`, and a unit test keeps every one free of another link's name. The phone's
 More scrolls, so Sign out stays in reach on a small phone at a large text size.
 
+The feed on a phone starts with **Explore**, under its title: a chip for each section behind More, in priority order,
+the bar's continued (Events, Groups, Mentors, Businesses, Funding; More groups the same sections under Connect and
+Community), and with More's badges (an invitation waiting shows on Groups, and the chip is named "Groups, 1
+invitation"), opening the section as More's row does. The chips wrap rather than scroll, so none is out of sight, and
+the row isn't there when nothing is behind More (a current pupil gets Businesses and Funding). It is a labelled region,
+never a navigation landmark, so the bar stays the page's only Main navigation, and it has no chip for the admin
+console, whose ways in stay More and My profile on the phone app, and the header's Admin link and the More sheet on the
+web. Only the feed has it: with the feed off, home is a working list whose search and filters come first, and More is
+the way to the rest. A wide screen's feed doesn't have it at all, as its sidebar lists everything: the web renders it
+through `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`) rather than hiding it with CSS, and the phone app
+always shows it.
+
 ### Profiles and onboarding
 
 A profile belongs to a membership, so someone in two institutions has two: the years, the degree and admins' edits

@@ -148,22 +148,28 @@ Covers:
   least 44px with an SVG icon and a line read as the description, not the name: Funding's "Members raising and
   investing"; hovered, a tile's icon well standing apart from the row and its line still reading), its active state,
   sections the institution has switched off, and the guards keeping the open screen when a refetch fails (the
-  registration form keeping what's typed, even when the account details fail too);
+  registration form keeping what's typed, even when the account details fail too); the feed's Explore row, a region
+  rather than a nav, offering what's behind More in priority order (Events, Groups, Mentors, Businesses, Funding) as
+  44px chips with SVG icons in the brand's ink under a readable heading, holding no text box or post (the feed's first
+  stay the composer's and a post's), with no sideways scrolling and Funding's chip opening its page with More current;
+  and no Explore row at all on a wide screen or with nothing behind More;
 - direct messages between two seeded members (Meera and Sneha): a request (refused once for going too fast, keeping
   its words in the box), accepted live, replies both ways with exactly one bubble each, a thread in a background tab
   not marking anything read, Try again reusing the client key, a refusal for sending too fast, a draft surviving a
   failed refetch, a report (and a second one), a block (the blocked member's messages never arrive, even after the
   unblock), a lost socket frame recovered by the gap fill, and the thread on a phone;
-- a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on;
+- a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on,
+  and the feed's Explore row offering Businesses and Funding;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
   description readable on the wash; an open group found in Discover and joined, live messages both ways, the thread's
   Group details link drawn with an SVG icon rather than a glyph, an invite-only group's invitation (the invitee's box
-  in Demo University's ink with a drawn tick, `expectChoiceLook`) accepted from Invitations (with the history before
-  it hidden), leaving, archiving and My posts;
+  in Demo University's ink with a drawn tick, `expectChoiceLook`; its badge arriving live, and at a phone's width on
+  the feed's Explore chip, named "Groups, 1 invitation" with its count) accepted from Invitations (with the history
+  before it hidden), leaving, archiving and My posts;
 - mentorship: offering to mentor, finding a mentor by name, area and availability, a request reported, a request
   with the longest note accepted into a live chat that opens with the note, ending it read-only, the bell, and the
-  Mentor badge in the directory and on the new mentor's own profile; switched off, Mentors kept as a way out, its
-  More sheet tile at a phone's width saying "Your requests and mentorships";
+  Mentor badge in the directory and on the new mentor's own profile; switched off, Mentors kept as a way out, on the
+  feed's Explore row and as the More sheet's tile at a phone's width saying "Your requests and mentorships";
 - referrals: a job offered for referral, the Can refer filter, a request reported, one accepted into a live chat that
   opens with the note, closing a job closing a waiting request, and the bell;
 - a chat notice in the bell opening its thread; notification settings, through a Settings link named by its word
@@ -244,8 +250,9 @@ Covers:
   weeks' answer; and the members CSV, starting Name, Phone, Email, Start year, End year, Status, with Rahul's 2008 and
   2012, and with the profile's own columns after "Last active" and Rahul's seeded headline and skills in them;
 - at a phone's width: the app header's Admin link (its icon alone, a 44px target, named with the work waiting as the
-  console's dashboard counts it, the count in amber, the More sheet's tile under You named the same, with its line and
-  its count in amber, and the sidebar's row named the same on a wider screen), and
+  console's dashboard counts it, the count in amber, the feed's Explore row offering no Admin console chip, the More
+  sheet's tile under You named the same, with its line and its count in amber, and the sidebar's row named the same on
+  a wider screen), and
   every admin page with no sideways scrolling: each section in the console's nav, the Members, Moderation and Reports
   status tabs, a member's page and the Branding tab;
 - Appearance on My profile, as the Demo University admin: Plain chosen and no Cover tile without a cover; Institution
@@ -308,6 +315,9 @@ Covers:
   row with "Check the details marked in Work." by the button, then all of it on My profile, the meter at 50 with what's
   still to add, skills no longer among it, and `?section=about` scrolling About you into view; Delete my account's
   confirm sheet, saying a suspension or blocks come back with the number, cancelled with the account still there;
+- the feed's Explore row offering what's behind More in priority order (Events, Groups, Mentors, Businesses,
+  Funding), as chips at least 44 tall with SVG icons under a readable heading and no text box, Funding's chip opening
+  its screen with More selected, and the Feed tab going back;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; the More hub grouped
   under Connect, Community and You headings, its rows at least 44 tall, each with a line exposed as its description
   (Funding's "Members raising and investing", My posts' "Everything you've shared"), and on a 320×568 screen sitting
@@ -340,7 +350,8 @@ Covers:
   going too fast, a report from tapping a message, a block, a cold start on a thread, and a lost socket frame
   recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
-  (More's Mentors row, kept as a way out, saying "Your requests and mentorships");
+  (the invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
+  kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
   list and a contact email; the job's facts after posting and after an edit of the title alone, its page comparing
@@ -348,7 +359,8 @@ Covers:
   poster's own card on Jobs unmarked though they have TypeScript, its long skills cut short with an ellipsis to stay on
   one line; a second job at the same company filling the website and industry from Use details from your last job at
   Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
-- a current pupil seeing none of them; sections switched off; the guards (the registration form keeping what's typed,
+- a current pupil seeing none of them, Explore offering Businesses and Funding; sections switched off, with no Explore
+  row once nothing is behind More; the guards (the registration form keeping what's typed,
   even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
   with the reason on each; joining Demo College from its landing screen's Join DCE (it doesn't send a signed-in
   non-member into the form, and forgets Demo College as the institution to start at, so Choose a different institution
@@ -374,7 +386,7 @@ Covers:
   refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
   Mentorship and holding it with "Needs Messaging" (its label in the meta grey), and Funding saved off (sending only
-  that switch) with More dropping it at once, then back on;
+  that switch) with More and the feed's Explore row dropping it at once, then back on, with Explore offering it again;
   Branding, from Settings' 44px row: the Samaj's orange chosen among the suggested colours, the tagline saved with the
   preview following it and its initials in the orange's ink on its tint, Save held (saying why) while the script holds
   a large logo's preparation and free again once it's cancelled, with nothing uploaded, a near-white colour showing the
@@ -734,6 +746,10 @@ the console (part 14).
       Sign out.
 - [ ] VoiceOver and TalkBack read each More row's name (with its count, such as "Groups, 1 invitation"), then its line
       ("Members raising and investing"), and the group headings as headings.
+- [ ] The feed's Explore row, on the narrowest phone you have with the largest text size: its chips wrap onto more
+      lines rather than running off the screen, no label is cut off, and a count stays beside its label. VoiceOver and
+      TalkBack read "Explore" as a heading and each chip as a link by its name ("Groups, 1 invitation").
+- [ ] Android: Back from a section opened from Explore (Funding, say) returns to the feed, not to More.
 
 ### 7. Messages
 

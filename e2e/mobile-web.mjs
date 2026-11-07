@@ -108,6 +108,15 @@ const openSection = async (label) => {
   await barTab("More").click();
   await hubRow(label).click();
 };
+// The feed's Explore row: a region, not the tab bar's kind of link. The feed's scene stays in the page under the other
+// tabs, hidden, hence the one in view. Its chips are named as More's rows are: the section, or what its badge counts.
+const exploreRow = (p = page) => p.getByRole("region", { name: "Explore", exact: true }).locator("visible=true");
+const exploreNames = async (p = page) => {
+  await exploreRow(p).getByRole("link").first().waitFor();
+  return exploreRow(p)
+    .getByRole("link")
+    .evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")));
+};
 // Live updates: record the app's Socket.IO WebSocket once it opens.
 const liveSockets = [];
 page.on("websocket", (ws) => {
@@ -570,6 +579,29 @@ try {
     // The next step starts on the feed.
     await page.goto(BASE + "/t/demo-university/feed");
     await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();
+  });
+
+  await step("the feed's Explore row opens what's behind More", async () => {
+    // What More holds, in priority order (More groups it under Connect and Community), each a 44-point chip with its SVG
+    // icon, and no text box: the first on the feed's screens stays the post form's.
+    const row = exploreRow();
+    const offered = await exploreNames();
+    if (offered.join() !== "Events,Groups,Mentors,Businesses,Funding") throw new Error(`Explore offers ${offered.join(", ")}, expected what's behind More`);
+    for (const [name, height] of await row.getByRole("link").evaluateAll((links) => links.map((a) => [a.getAttribute("aria-label"), a.getBoundingClientRect().height]))) {
+      if (height < 44) throw new Error(`Explore's ${name} chip is ${height}px tall, under 44`);
+    }
+    await expectSvgNoEmoji(row, "the Explore row");
+    await expectReadable(row.getByRole("heading", { name: "Explore", exact: true }), "the Explore heading on the page");
+    if (await row.locator("input, textarea").count()) throw new Error("the Explore row holds a text box");
+    await shot("m04f-feed-explore");
+    // A chip opens its section, which More stands in for on the bar, and the Feed tab comes back to it.
+    await row.getByRole("link", { name: "Funding", exact: true }).click();
+    await page.waitForURL("**/t/demo-university/funding");
+    await page.getByText("Seeking funding", { exact: true }).locator("visible=true").first().waitFor();
+    await selectedBarTab("More").waitFor();
+    await barTab("Feed").click();
+    await page.waitForURL("**/t/demo-university/feed");
+    await exploreRow().waitFor();
   });
 
   await step("every section opens its own screen, with Events, Groups, Mentors and Funding behind More", async () => {
@@ -1572,7 +1604,11 @@ try {
 
     // The invitee's badge arrives live, named for what it counts, and the invitation waits under Invitations.
     await joiner.locator('a[role="tab"][aria-label="More, Groups, 1 invitation"]').locator("visible=true").first().waitFor(live);
+    // The feed the joiner waits on carries it too, on Explore's Groups chip, named as More's row is.
+    await exploreRow(joiner).getByRole("link", { name: "Groups, 1 invitation", exact: true }).waitFor(live);
+    // On More, where the feed's chip of the same name is out of view, so the row below is More's.
     await more(joiner).click();
+    await joiner.waitForURL(/\/more$/);
     await shown(joiner.getByRole("link", { name: "Groups, 1 invitation", exact: true })).click();
     await joiner.waitForURL(/\/groups$/);
     await shown(joiner.locator('[role="tab"]').getByText("Invitations", { exact: true })).click();
@@ -1753,8 +1789,13 @@ try {
     const off = await scriptFeatures(mentee, "demo-university");
     off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
     await mentee.goto(`${app}/feed`);
+    // The feed's Explore row keeps Mentors too.
+    const wayOut = await exploreNames(mentee);
+    if (!wayOut.includes("Mentors")) throw new Error(`Explore drops Mentors, kept as a way out: it offers ${wayOut.join(", ")}`);
     await tabBar(mentee).filter({ hasText: "More" }).first().click();
-    // Its line says what's left there, not what the switched-off section offered.
+    // On More, where the feed's Explore chip of the same name is out of view. Its line says what's left there, not what
+    // the switched-off section offered.
+    await mentee.waitForURL(/\/t\/demo-university\/more$/);
     const mentorsRow = shown(mentee.getByRole("link", { name: "Mentors", exact: true }));
     await expectDescription(mentorsRow, "Your requests and mentorships", "More's Mentors row, kept as a way out");
     await mentorsRow.click();
@@ -2297,6 +2338,9 @@ try {
     await bar.filter({ hasText: "More" }).first().waitFor();
     const shown = await bar.evaluateAll((tabs) => tabs.map((tab) => tab.innerText.split("\n").pop()));
     if (shown.join() !== "Feed,Jobs,Directory,Events,More") throw new Error(`a pupil's tab bar shows ${shown.join(", ")}`);
+    // The feed's Explore row offers what's behind their More, which is neither Groups nor Mentors.
+    const offered = await exploreNames(pupil);
+    if (offered.join() !== "Businesses,Funding") throw new Error(`a pupil's Explore offers ${offered.join(", ")}, expected Businesses, Funding`);
     await bar.filter({ hasText: "More" }).first().click();
     await pupil.getByRole("link", { name: "Switch institution", exact: true }).locator("visible=true").first().waitFor();
     for (const section of ["Messages", "Groups", "Mentors"]) {
@@ -2388,6 +2432,9 @@ try {
     await open();
     await page.waitForURL("**/t/demo-university/feed");
     await expectBar("Feed", "Jobs", "Directory", "Events", "More");
+    // Nor an Explore row on the feed.
+    await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();
+    if (await page.getByRole("region", { name: "Explore", exact: true, includeHidden: true }).count()) throw new Error("the feed has an Explore row with nothing behind More");
     await barTab("More").click();
     await hubRow("My posts").waitFor();
     for (const section of ["Funding", "Businesses"]) {
@@ -2936,6 +2983,15 @@ try {
     await page.waitForURL("**/t/shri-gujarati-samaj/more");
     await hubRow("My profile").waitFor();
     if (await page.getByRole("link", { name: "Funding", exact: true }).locator("visible=true").count()) throw new Error("More still lists Funding after the console switched it off");
+    // And so has the feed's Explore row, read by section, so a badge on Groups can't change what's compared.
+    const exploreSections = async () => (await exploreNames()).map((name) => name.split(", ")[0]);
+    await barTab("Feed").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+    const withFundingOff = await exploreSections();
+    if (withFundingOff.join() !== "Events,Groups,Mentors,Businesses") throw new Error(`Explore offers ${withFundingOff.join(", ")} after the console switched Funding off`);
+    await barTab("More").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/more");
+    await hubRow("My profile").waitFor();
 
     // And back on, as Samaj started, for the steps after: this time by the section's row.
     await consoleRow().click();
@@ -2952,6 +3008,10 @@ try {
     await backButton().click();
     await page.waitForURL("**/t/shri-gujarati-samaj/more");
     await hubRow("Funding").waitFor();
+    await barTab("Feed").click();
+    await page.waitForURL("**/t/shri-gujarati-samaj/feed");
+    const withFundingOn = await exploreSections();
+    if (withFundingOn.join() !== "Events,Groups,Mentors,Businesses,Funding") throw new Error(`Explore offers ${withFundingOn.join(", ")} after the console switched Funding back on`);
   });
 
   await step("the console's Branding, from Settings: a tagline saved with the preview following, Save held by an upload but not by a warning, a bad colour sending nothing, a suggested colour re-theming the app at once, and the Samaj's look put back", async () => {

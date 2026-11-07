@@ -1213,11 +1213,51 @@ try {
     const filled = async (i) => (await paintedColour(links.nth(i), "backgroundColor")).colour !== "255 255 255";
     if (!(await filled(0)) || (await filled(1))) throw new Error("the empty inbox should lead with Find people, filled, and offer Find a group in outline");
   };
+  // The phone feed's Explore row: a region, never a nav, so the bar's checks (nav[aria-label="Main"]) can't meet it. Its
+  // chips are named by aria-label, the section's name or, with a badge, what it counts. `includeHidden` finds it even
+  // where CSS hides it, as a wide screen must not: there it isn't in the page at all.
+  const explore = (p, options = {}) => p.getByRole("region", { name: "Explore", exact: true, ...options });
+  const exploreNames = async (p) => {
+    await explore(p).getByRole("link").first().waitFor();
+    return explore(p)
+      .getByRole("link")
+      .evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")));
+  };
 
   await step("phone layout: every section opens, with Events and Funding behind More", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const bar = page.locator('nav[aria-label="Main"]:visible');
     if ((await bar.locator("a").count()) !== 4) throw new Error("the bottom bar should show four sections, then More");
+
+    // On the feed, Explore offers what's behind More, in priority order (More groups it under Connect and Community),
+    // each a 44px chip with its SVG icon in the brand's ink. It holds no text box and no post: the feed's first ones stay
+    // the composer's and a post's.
+    const row = explore(page);
+    const offered = await exploreNames(page);
+    if (offered.join() !== "Events,Groups,Mentors,Businesses,Funding") throw new Error(`Explore offers ${offered.join(", ")}, expected what's behind More`);
+    for (const [name, height] of await row.getByRole("link").evaluateAll((links) => links.map((a) => [a.getAttribute("aria-label"), a.getBoundingClientRect().height]))) {
+      if (height < 44) throw new Error(`Explore's ${name} chip is ${height}px tall, under 44px`);
+    }
+    await expectSvgNoEmoji(row, "the Explore row");
+    // Drawn in the ink, not the raw brand colour, which a pale brand would lose: Demo University's ink and primary are
+    // the same blue, so the painted colour alone can't tell them apart, and the class does.
+    const inked = await row.getByRole("link").evaluateAll((links) => links.map((a) => [a.getAttribute("aria-label"), a.querySelector("svg")?.classList.contains("text-primary-ink") ?? false]));
+    for (const [name, ink] of inked) if (!ink) throw new Error(`Explore's ${name} icon isn't drawn in text-primary-ink`);
+    const icon = await paintedColour(row.getByRole("link", { name: "Funding", exact: true }).locator("svg"));
+    if (icon.colour !== "29 78 216") throw new Error(`Explore's Funding icon is rgb ${icon.colour}, not Demo University's ink`);
+    await expectReadable(row.getByRole("heading", { name: "Explore", exact: true }), "the Explore heading on the page");
+    if (await row.locator("textarea, input, article").count()) throw new Error("the Explore row holds a text box or a post");
+    if ((await page.locator("textarea").first().getAttribute("aria-label")) !== "New post") throw new Error("the phone feed's first text box isn't the composer");
+    if (!(await page.locator("article").first().locator('button[aria-label="Celebrate"]').count())) throw new Error("the phone feed's first article isn't a post");
+    const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (sideways > 0) throw new Error(`the phone feed scrolls sideways by ${sideways}px`);
+    await shot("08-phone-feed-explore");
+    // A chip opens its section, for which More then stands in on the bar; the bar's Feed comes back first in the loop.
+    await row.getByRole("link", { name: "Funding", exact: true }).click();
+    await page.waitForURL(/\/app\/funding$/);
+    await page.waitForSelector("text=Alumni raising capital and alumni investing in them");
+    await expectMoreActive(true, "Funding, opened from Explore");
+
     const sections = [
       ["Feed", /\/app\/feed$/, "text=Welcome to the official Demo University alumni network"],
       ["Messages", /\/app\/messages$/, "main >> text=Messages"],
@@ -1296,6 +1336,10 @@ try {
     await sidebarCurrent.filter({ hasText: "Mentors" }).waitFor();
     if ((await sidebarCurrent.count()) !== 1) throw new Error("only the Mentors link should show as current in the sidebar");
     await expectCurrentLink(sidebarCurrent, "the sidebar's current link");
+    // The sidebar lists everything, so a wide screen's feed has no Explore row, not even a hidden one.
+    await page.goto(BASE + "/t/demo-university/app/feed");
+    await page.locator('textarea[aria-label="New post"]').waitFor();
+    if (await explore(page, { includeHidden: true }).count()) throw new Error("the feed has an Explore row on a wide screen, beside the sidebar");
   });
 
   await step("phone layout: More sheet reaches My posts and past events", async () => {
@@ -1369,6 +1413,9 @@ try {
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
     await page.click('a:has-text("Go to the app")');
     await page.waitForURL(/\/app\/feed$/);
+    // With nothing behind More, the feed has no Explore row either.
+    await page.locator('textarea[aria-label="New post"]').waitFor();
+    if (await explore(page, { includeHidden: true }).count()) throw new Error("the feed shows an Explore row with nothing behind More");
     await page.goto(app + "/businesses");
     await page.waitForSelector("text=Businesses is turned off");
     await page.goto(app + "/my-content");
@@ -1749,6 +1796,9 @@ try {
     await bar.locator("a").first().waitFor();
     const shown = (await bar.locator("a").allInnerTexts()).map((text) => text.split("\n").pop().trim());
     for (const section of ["Messages", "Groups", "Mentors"]) if (shown.includes(section)) throw new Error(`a pupil's bottom bar offers ${section}: ${shown.join(", ")}`);
+    // The feed's Explore row offers what's behind their More, which is neither Groups nor Mentors.
+    const offered = await exploreNames(pupil);
+    if (offered.join() !== "Businesses,Funding") throw new Error(`a pupil's Explore offers ${offered.join(", ")}, expected Businesses, Funding`);
     await pupil.click('nav[aria-label="Main"] >> button:has-text("More")');
     await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
     for (const section of ["Messages", "Groups", "Mentors"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);
@@ -1922,6 +1972,14 @@ try {
     // The invitee's Groups badge arrives live, named for what it counts, and the invitation waits under Invitations.
     const badge = joiner.locator('nav[aria-label="Main"]:visible a[aria-label="Groups, 1 invitation"]');
     await badge.waitFor(live);
+    // On a phone, the feed's Explore chip carries it too, named as the sheet's tile is and with the same count.
+    await joiner.setViewportSize({ width: 390, height: 844 });
+    await joiner.goto(`${app}/feed`);
+    const exploreGroups = explore(joiner).getByRole("link", { name: "Groups, 1 invitation", exact: true });
+    await exploreGroups.waitFor(live);
+    const exploreCount = (await exploreGroups.locator("span[aria-hidden]").innerText()).trim();
+    if (exploreCount !== "1") throw new Error(`Explore's Groups chip counts "${exploreCount}", expected 1`);
+    await joiner.setViewportSize({ width: 1280, height: 900 });
     await badge.click();
     await joiner.waitForURL(/\/app\/groups$/);
     await joiner.getByRole("tab", { name: "Invitations" }).click();
@@ -2062,8 +2120,11 @@ try {
     const off = await scriptFeatures(mentee, "demo-university");
     off.only("feed", "messaging", "groups", "jobs", "directory", "events", "businesses", "funding");
     await mentee.goto(`${app}/feed`);
-    // On a phone, the sheet's Mentors tile says what's left there, not what the switched-off section offered.
+    // On a phone, the feed's Explore row keeps Mentors too, and the sheet's Mentors tile says what's left there, not what
+    // the switched-off section offered.
     await mentee.setViewportSize({ width: 390, height: 844 });
+    const wayOut = await exploreNames(mentee);
+    if (!wayOut.includes("Mentors")) throw new Error(`Explore drops Mentors, kept as a way out: it offers ${wayOut.join(", ")}`);
     await moreButton.click();
     const mentorsTile = mentee.getByRole("dialog").getByRole("group", { name: "Connect", exact: true }).getByRole("link", { name: "Mentors", exact: true });
     await expectDescription(mentorsTile, "Your requests and mentorships", "the sheet's Mentors tile, kept as a way out");

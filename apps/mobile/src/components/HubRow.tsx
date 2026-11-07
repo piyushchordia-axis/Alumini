@@ -14,6 +14,20 @@ const COUNT_TONES = {
 };
 
 /**
+ * A count on a navigation row or chip (a HubRow, the feed's Explore row), as the web's NavBadge draws it. Screen readers
+ * skip it: the row's or chip's own name says what it counts. It grows with the system text size rather than holding 20
+ * points, so a large count stays inside its pill.
+ */
+export function CountPill({ count, tone = "danger" }: { count: number; tone?: keyof typeof COUNT_TONES }) {
+  const { bg, fg, edge } = COUNT_TONES[tone];
+  return (
+    <View aria-hidden style={[styles.count, { borderColor: edge, backgroundColor: bg }]}>
+      <Text style={{ color: fg, fontSize: 11, fontWeight: "700" }}>{count > 99 ? "99+" : count}</Text>
+    </View>
+  );
+}
+
+/**
  * One row of a hub (More, the admin console's home). A count shows beside it, and its accessible name says what it
  * counts, such as "Groups, 2 invitations". `danger` is a destructive row, such as Sign out. `dense` is the console's
  * tighter row, still a 44-point target. With a `description` it's a described row, as More's are: its icon in a well and
@@ -42,7 +56,6 @@ export function HubRow({
 }) {
   const descriptionId = useId();
   const tint = danger ? colors.danger : colors.text;
-  const tone = COUNT_TONES[countTone];
   return (
     <Pressable
       onPress={onPress}
@@ -67,11 +80,7 @@ export function HubRow({
           </Text>
         ) : null}
       </View>
-      {count > 0 && (
-        <View style={[styles.count, { borderColor: tone.edge, backgroundColor: tone.bg }]}>
-          <Text style={{ color: tone.fg, fontSize: 11, fontWeight: "700" }}>{count > 99 ? "99+" : count}</Text>
-        </View>
-      )}
+      {count > 0 && <CountPill count={count} tone={countTone} />}
       {!danger && <IconChevronRight size={16} color={colors.faint} />}
     </Pressable>
   );
@@ -85,5 +94,5 @@ const styles = StyleSheet.create({
   well: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: STATUS_TONES.neutral.fill, alignItems: "center", justifyContent: "center" },
   text: { flex: 1, minWidth: 0 },
   description: { fontSize: 13, lineHeight: 18, color: colors.muted, marginTop: 1 },
-  count: { minWidth: 20, height: 20, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 },
+  count: { minWidth: 20, minHeight: 20, borderRadius: radius.full, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 },
 });

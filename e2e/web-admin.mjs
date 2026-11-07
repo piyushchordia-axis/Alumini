@@ -1003,6 +1003,11 @@ try {
       await badge.waitFor();
       if (!/\bbg-tone-warning-fill\b/.test((await badge.getAttribute("class")) ?? "")) throw new Error("the header's Admin link's count isn't amber");
       await expectReadable(badge, "the header's Admin link's count");
+      // The feed's Explore row offers the sections behind More, never the console, whose ways in here are the header's
+      // Admin link and the More sheet.
+      const explore = page.getByRole("region", { name: "Explore", exact: true });
+      await explore.getByRole("link", { name: "Funding", exact: true }).waitFor();
+      if (await explore.getByRole("link", { name: /^Admin console/ }).count()) throw new Error("the feed's Explore row offers the admin console");
       // The More sheet has it under You, with the same name, its line and the amber count.
       await page.locator('nav[aria-label="Main"] button:has-text("More")').click();
       const sheetRow = page.getByRole("dialog").getByRole("group", { name: "You", exact: true }).getByRole("link", { name, exact: true });
