@@ -391,7 +391,14 @@ export async function paintedColour(locator, property = "color") {
     const running = [...el.getAnimations({ subtree: true }), ...boxes.slice(1).flatMap((box) => box.getAnimations())];
     // A spinner's endless animation never finishes, and doesn't change the colours being read.
     await Promise.all(running.filter((a) => a.effect?.getComputedTiming().endTime !== Infinity).map((a) => a.finished));
-    const faded = boxes.find((box) => Number(getComputedStyle(box).opacity) < 1);
+    // React Native Web animates opacity from JavaScript (a Pressable's press feedback, a sheet fading in), which isn't a
+    // Web Animation, so a fade that is still settling gets up to 1.5s. A disabled control stays faded and is refused.
+    let faded;
+    for (let tries = 0; tries < 30; tries++) {
+      faded = boxes.find((box) => Number(getComputedStyle(box).opacity) < 1);
+      if (!faded) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     if (faded) return { problem: `it is faded (opacity ${getComputedStyle(faded).opacity}), so its colours aren't what the eye gets` };
     const g = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
     const paint = (base, colours) => {
