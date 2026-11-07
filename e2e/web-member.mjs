@@ -1839,7 +1839,11 @@ try {
 
     // The mentee finds them by name and area, and not under an availability they didn't choose.
     await mentee.goto(`${app}/mentors`);
+    // The search goes out a moment after the typing stops, and the unfiltered list already shows the card, so wait for
+    // its answer: otherwise it lands after the filters below, and redraws the list, empty state and all, under the checks.
+    const searched = mentee.waitForResponse((r) => r.request().method() === "GET" && r.url().includes("/mentorship/mentors?") && new URL(r.url()).searchParams.get("q") === LISTENER);
     await mentee.getByLabel("Search mentors").fill(LISTENER);
+    await searched;
     const card = mentee.locator("article", { hasText: LISTENER });
     await card.waitFor();
     for (const area of areas) await card.getByText(area, { exact: true }).waitFor();

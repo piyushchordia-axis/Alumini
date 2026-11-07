@@ -24,7 +24,9 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
 /**
  * Clears the app's Redis state too: cached institutions, sessions and counters all point at rows that no longer exist,
- * and a stale tenant cache makes the next registration fail with a foreign-key error.
+ * and a stale tenant cache makes the next registration fail with a foreign-key error. db:reset runs this again with
+ * --redis-only once the seed is in, because an API left running through the reset caches what it reads meanwhile: asked
+ * for the institutions between the migration and the seed, it caches an empty list, which the picker shows for a minute.
  */
 async function resetRedis(redisUrl: string): Promise<number> {
   const redis = createRedis(redisUrl);
@@ -44,8 +46,8 @@ async function resetRedis(redisUrl: string): Promise<number> {
   return removed;
 }
 
-resetDatabase(url)
-  .then(() => console.log("Database reset"))
+const redisOnly = process.argv.includes("--redis-only");
+(redisOnly ? Promise.resolve() : resetDatabase(url).then(() => console.log("Database reset")))
   .then(() => resetRedis(process.env.REDIS_URL ?? "redis://localhost:6379/0"))
   .then((n) => console.log(`Redis cleared (${n} keys)`))
   .catch((err) => {

@@ -14,7 +14,9 @@ pnpm api                                 # http://localhost:4000, OTP_PROVIDER=c
 
 Run `pnpm db:reset` before every run of the three scripts. They change the demo data as they go (the admin script
 approves the pending fixtures and removes the reported chat message; the member scripts open chats between seeded
-members), and a second run would find those states gone.
+members), and a second run would find those states gone. The API may stay up through it: the reset clears Redis again
+once the seed is in, so nothing the API cached meanwhile (an empty institution list, asked for between the migration and
+the seed, which the picker would show for a minute) outlives it.
 
 The scripts read `API_URL` (default `http://localhost:4000`), `WEB_URL` (default `http://localhost:5173`),
 `MOBILE_WEB_URL` (default `http://localhost:8081`) and `SHOTS` (where screenshots go, default `e2e/screenshots`). A step
