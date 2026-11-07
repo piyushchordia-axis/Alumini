@@ -55,7 +55,11 @@ const tap = (text) => page.getByText(text, { exact: true }).last().click();
 // Items on the tab bar are links with role=tab. The screens' own Tabs have that role too, but no href.
 const barTab = (label) => page.locator('a[role="tab"]').getByText(label, { exact: true });
 const selectedBarTab = (label) => page.locator('a[role="tab"][aria-selected="true"]').getByText(label, { exact: true });
-const hubRow = (label) => page.getByRole("link", { name: label, exact: true }).locator("visible=true").first();
+// A row of the More hub (or the console's home), never a chip of the feed's Explore row, which is named as More's row is.
+// Tapped from the feed, More's scene draws a moment after the tap: until then the feed's chip is the only one in view,
+// and a click keeps the element it found first, waiting for it to show again once the feed's scene is hidden.
+const hubRow = (label) =>
+  page.getByRole("link", { name: label, exact: true }).and(page.locator(':not([role="region"][aria-label="Explore"] *)')).locator("visible=true").first();
 const barLabels = () => page.locator('a[role="tab"]').locator("visible=true").evaluateAll((tabs) => tabs.map((tab) => tab.innerText.split("\n").pop()));
 const expectBar = async (...labels) => {
   await barTab("More").waitFor();
