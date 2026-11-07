@@ -36,6 +36,8 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `lib/salary.ts` `formatSalary`; `lib/richText.ts` the rich-text parser; `lib/color.ts` WCAG contrast and the tones
   of an institution colour (`brandTones`); `lib/avatar.ts` initials' colours (`avatarTone`, `brandAvatarTone`);
   `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
+  `lib/layout.ts` the columns text laid side by side takes, from its longest word (`longestWordLength`,
+  `wordColumnWidth`; web `fitColumns` and mobile `FitGrid` build on it);
   `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
   `lib/events.ts` the phone feed's Upcoming events strip (`UPCOMING_EVENTS_STRIP`, its title and links' names);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
@@ -205,6 +207,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `ChoiceInput` stays a real input (forced colours get the native control back); a `Checkbox` row that must be a 44px
     target passes `min-h-11 py-3`, which keeps a one-line label centred. `color.test.ts` pins the pairs across the
     colour cube, and e2e checks the drawn look with `expectChoiceLook` (pinned to `BRAND_TONES`).
+  - **Side-by-side text.** Text laid in columns (job and member facts, the console's tiles, the landing's sections)
+    takes as many as leave room for its longest word, down to one: web `fitColumns` (`lib/layout.ts`) as a `grid`'s
+    style, mobile `FitGrid`, both sized by shared `lib/layout.ts`. Not a fixed fraction (`grid-cols-2` on a phone,
+    `width: "50%"`) or `[overflow-wrap:anywhere]` in a narrow column, which break words mid-word; a cell keeps
+    `min-w-0 break-words` (mobile: a `Text` that can shrink) for a word wider than the whole row. e2e checks with
+    `expectWholeWords` at 320px.
   - **Avatars.** A member's `Avatar` (both apps) passes `toneKey`, their membership id (`MemberCardDto.id`,
     `ChatMemberDto.id`, a celebration's `membershipId`, your own `membership.id`), so their initials have one tone
     (`avatarTone`) on every screen; never another id, or the colour changes from screen to screen. Institutions,

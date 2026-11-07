@@ -67,6 +67,9 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   its label instead.
 - `fitsPhone(where, content)` fails when a screen of the phone app's web build is wider than the phone: the page, or
   any scrolling area around `content`, which react-native-web clips rather than widening the page.
+- `expectWholeWords(locator, where)` fails when text in the elements breaks a word across lines ("Entrepreneurshi p"),
+  as a column too narrow for it does: each run between spaces, hyphens, dashes and slashes must lie on one line
+  (visually hidden text skipped). It fails too when it finds no words to check.
 - `expectInitials` reads a photo's stand-in initials the same way (4.5:1 on a circle or tile of their own, or one
   filling a rounded frame that clips it, as a company's tile does), and `expectSameTone` compares two of them: one
   member's tone in two places. `INSTITUTION_INITIALS` is the seeded institutions' initials (their ink on their tint,
@@ -124,8 +127,11 @@ Covers:
 - jobs: seeded cards with pay, experience and "+1 more" skills, and with no logo, Zylo Labs's and Deloitte's initials in
   a tone from each company's name, readable, two tones apart and not the institution's; the Work mode and experience
   filters behind More filters, checked once the list has loaded, and Clear filters; at a phone's width, the Backend
-  Engineer page offering a member with no skills "Add your skills to see which you match" in place of a count, its link
-  landing on My profile's Work (`#work`) near the top of the screen; posting a job with work mode, seniority,
+  Engineer page's facts two across (their longest word fits) with every word whole, whole again at 320px with nothing
+  scrolling sideways, and one to a row with every word whole beside a place too long for half the row
+  ("Thiruvananthapuram", scripted with `scriptJob`), and the page offering a member with no skills "Add your skills to
+  see which you match" in place of a count, its link landing on My profile's Work (`#work`) near the top of the screen;
+  posting a job with work mode, seniority,
   experience, skills (Enter adding one without posting the form), pay previewed as it will show, bullet points, a How to
   apply address and an Apply link opening in a new tab with noopener, its page offering its poster nothing to match; an
   edit of the title alone keeping every other field; Mark closed swapping the contacts and How to apply for
@@ -410,8 +416,11 @@ Covers:
   kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
 - the job form along the way: work mode, the last Seniority chip (Executive), skills (two too long for one line of a
   card), experience, pay previewed as it will show, a pay note, Responsibilities, a website, an industry chosen from a
-  list and a contact email; the job's facts after posting and after an edit of the title alone, its page comparing
-  nothing with its poster's skills; the edit form opening with Executive, last in its row, drawn on the screen; the
+  list and a contact email; the job's facts after posting and after an edit of the title alone; after posting, its facts
+  two across with every word whole, whole again on a 320-point screen with nothing wider than the screen, and one to a
+  row with every word whole beside a place too long for half the box ("Thiruvananthapuram", scripted with `scriptJob`);
+  its page comparing nothing with its poster's skills; the edit form opening with Executive, last in its row, drawn on
+  the screen; the
   poster's own card on Jobs unmarked though they have TypeScript, its long skills cut short with an ellipsis to stay on
   one line; a second job at the same company filling the website and industry from Use details from your last job at
   Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
@@ -480,7 +489,8 @@ Covers:
   second page (answered by the script) loading on scroll, a row repeated across the pages shown once;
 - a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
   starting "Nisha Modi, Approved, 2010–present"), with her facts (her phone as the console writes it, her place by name,
-  what she does), her mentor profile listed in Mentors with its areas and availability, no sideways scrolling, and
+  what she does; two across with every word whole, and whole again on a 320-point screen), her mentor profile listed
+  in Mentors with its areas and availability, no sideways scrolling, and
   Remove as mentor asking first (Cancel sends nothing); her answers edited, Chapter saved as Diaspora ("Answers saved"),
   then Surat chosen and cancelled, the saved answer standing and the next edit starting from it; View profile in the app
   leaving the console for her profile, back on the tabs; an admin-managed question (added by the script) given to the
@@ -928,6 +938,9 @@ second copy of a screen, or back to the page the button was on.
       the card for Priya's "Associate Product Manager" is read in full, title first, with its skills as "SQL (you have
       this), Product management, A/B testing, 1 more". On its page, the SQL chip is one stop read as "SQL (you have
       this)", the other skills are read by name alone, and "You have 1 of 4 skills" follows them.
+- [ ] Open Backend Engineer (Node.js) at the usual text size: its facts sit two across. Then at the largest text size
+      (and on the narrowest phone you have): they go to one column, every word whole ("Experience" never split), and
+      "Applications close …", where shown, still runs under them across the grey box.
 
 ### 12. Businesses and other screens
 
@@ -996,6 +1009,9 @@ Still the Samaj admin on both phones, except for Chat reports. Sign Rahul back i
 - [ ] On that page, TalkBack or VoiceOver reads the facts as label then value ("Phone", "+91 91000 00036"), and a
       long press on the phone number offers Copy. Make admin and Remove as mentor each open a confirmation; on Android
       the back button closes it, and on both phones Cancel changes nothing.
+- [ ] At the largest text size, Nisha's facts, the tiles on the console's home and on Analytics, and the figures above
+      Invitations go to fewer columns (one, if need be) rather than splitting a word ("Registered", "Approved"), each
+      row's tiles the same height; back at the usual size they are two across (three for Invitations' figures).
 
 **Moderation and reports**
 

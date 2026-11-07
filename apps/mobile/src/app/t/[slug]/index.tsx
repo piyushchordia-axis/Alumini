@@ -1,9 +1,10 @@
 import { isApiClientError } from "@illuminize/shared/client";
 import { Redirect, useGlobalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BRAND_COVER_OVERLAP, BrandCover } from "@/components/BrandCover";
+import { FitGrid } from "@/components/FitGrid";
 import { IconBusinesses, IconDirectory, IconEvents, IconFeed, IconFunding, IconJobs } from "@/components/icons";
 import { SignedInAs } from "@/components/SignedInAs";
 import { Button, Spinner } from "@/components/ui";
@@ -61,33 +62,40 @@ export default function TenantLandingScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["bottom", "left", "right"]}>
       <BrandCover tenant={t} />
-      <View style={{ marginHorizontal: spacing.lg, marginTop: -BRAND_COVER_OVERLAP, backgroundColor: "#fff", borderRadius: 20, padding: spacing.xl, gap: spacing.md, ...elevation[2] }}>
-        {t.welcomeMessage ? <Text style={{ color: "#475569", lineHeight: 20 }}>{t.welcomeMessage}</Text> : null}
-        {notMember ? (
-          <>
-            <Button title={`Join ${t.shortName ?? t.name}`} onPress={() => router.push(`/t/${slug}/register`)} />
-            <SignedInAs phone={phone} onUseDifferentNumber={() => void signOut(`/t/${slug}/login`)} centered />
-          </>
-        ) : (
-          <Button title="Sign in / Join with mobile number" onPress={() => router.push(`/t/${slug}/login`)} />
-        )}
-        <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>
-          {t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "New members are verified by the alumni office." : "New members get instant access."}
-        </Text>
-        {features.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
-            {features.map((item) => (
-              <View key={item.label} style={{ width: "46%", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <item.Icon size={16} color={theme.primary} />
-                <Text style={{ color: colors.muted, fontSize: 13 }}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-        <Pressable onPress={() => router.replace("/")} accessibilityRole="button" hitSlop={8}>
-          <Text style={{ textAlign: "center", color: colors.faint, fontSize: 12 }}>Choose a different institution</Text>
-        </Pressable>
-      </View>
+      {/* The card over the cover's foot scrolls: at a large text size on a small phone, with its sections one to a row, it
+          runs past the bottom of the screen, Choose a different institution with it. The cover stays put, so the status
+          bar stays on it, as the walk-through's does. */}
+      <ScrollView style={{ flex: 1, marginTop: -BRAND_COVER_OVERLAP }} contentContainerStyle={{ paddingBottom: spacing.lg }}>
+        <View style={{ marginHorizontal: spacing.lg, backgroundColor: "#fff", borderRadius: 20, padding: spacing.xl, gap: spacing.md, ...elevation[2] }}>
+          {t.welcomeMessage ? <Text style={{ color: "#475569", lineHeight: 20 }}>{t.welcomeMessage}</Text> : null}
+          {notMember ? (
+            <>
+              <Button title={`Join ${t.shortName ?? t.name}`} onPress={() => router.push(`/t/${slug}/register`)} />
+              <SignedInAs phone={phone} onUseDifferentNumber={() => void signOut(`/t/${slug}/login`)} centered />
+            </>
+          ) : (
+            <Button title="Sign in / Join with mobile number" onPress={() => router.push(`/t/${slug}/login`)} />
+          )}
+          <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center" }}>
+            {t.settings.memberApprovalMode === "ADMIN_APPROVAL" ? "New members are verified by the alumni office." : "New members get instant access."}
+          </Text>
+          {features.length > 0 && (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
+              <FitGrid texts={features.map((item) => item.label)} fontSize={13} chrome={16 + 8} gap={10} rowGap={10}>
+                {features.map((item) => (
+                  <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <item.Icon size={16} color={theme.primaryInk} />
+                    <Text style={{ flexShrink: 1, color: colors.muted, fontSize: 13 }}>{item.label}</Text>
+                  </View>
+                ))}
+              </FitGrid>
+            </View>
+          )}
+          <Pressable onPress={() => router.replace("/")} accessibilityRole="button" hitSlop={8}>
+            <Text style={{ textAlign: "center", color: colors.faint, fontSize: 12 }}>Choose a different institution</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

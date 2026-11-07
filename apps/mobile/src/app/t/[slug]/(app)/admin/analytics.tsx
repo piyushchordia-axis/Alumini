@@ -31,10 +31,11 @@ function Chart({ chart }: { chart: AnalyticsChart }) {
 
 /** The headline figures, then a card for each chart, in the web page's order, one to a row. */
 function Charts({ d, features }: { d: TenantAnalyticsDto; features: TenantFeatures }) {
+  const kpis = kpiTiles(d);
   return (
     <>
-      <StatGrid>
-        {kpiTiles(d).map((t) => (
+      <StatGrid labels={kpis.map((t) => t.label)} labelSize={11}>
+        {kpis.map((t) => (
           <Kpi key={t.key} tile={t} />
         ))}
       </StatGrid>

@@ -268,6 +268,40 @@ export async function fitsPhone(where, content) {
 }
 
 /**
+ * Fails if text in `locator`'s elements breaks a word across lines ("Entrepreneurshi p"), as a column too narrow for it
+ * does: each run of characters between spaces, hyphens, dashes and slashes, where a line may end, has to lie on one
+ * line. Visually hidden text (a screen reader's, one pixel wide) is skipped. Fails too when it finds no words, so a
+ * locator matching nothing can't pass.
+ */
+export async function expectWholeWords(locator, where) {
+  const { words, broken } = await locator.evaluateAll((elements) => {
+    let words = 0;
+    const broken = new Set();
+    for (const element of elements) {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const box = node.parentElement?.getBoundingClientRect();
+        if (!box || box.width <= 1 || box.height <= 1) continue;
+        for (const word of node.data.matchAll(/[^\s\-‐–—/]+/g)) {
+          const range = document.createRange();
+          range.setStart(node, word.index);
+          range.setEnd(node, word.index + word[0].length);
+          const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+          if (!lines.length) continue;
+          words += 1;
+          const tops = lines.map((r) => r.top);
+          // Pieces of one line share a top; the next line starts at least half a line lower.
+          if (Math.max(...tops) - Math.min(...tops) > Math.min(...lines.map((r) => r.height)) / 2) broken.add(word[0]);
+        }
+      }
+    }
+    return { words, broken: [...broken] };
+  });
+  if (!words) throw new Error(`found no words to check in ${where}`);
+  if (broken.length) throw new Error(`${where} breaks ${broken.map((w) => `"${w}"`).join(", ")} across lines`);
+}
+
+/**
  * Fails unless `locator` (one element) is described by exactly `text`: what its aria-describedby points at, which a
  * screen reader reads after its name. The phone app's rows put it there in the browser build, which ignores
  * accessibilityHint.

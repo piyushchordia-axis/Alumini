@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
+import { FitGrid } from "@/components/FitGrid";
 import { StatusLine } from "@/components/Sheet";
 import { Badge, Button, Card, headingRole } from "@/components/ui";
 import type { MemberActionOutcome } from "@/hooks/useMemberActions";
@@ -13,10 +14,13 @@ import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
 
-/** A member's facts in two columns, each a small label over its value, selectable so a phone number can be copied. */
+/**
+ * A member's facts, two across where their longest word fits and one where it doesn't (`FitGrid`), each a small label
+ * over its value, selectable so a phone number can be copied.
+ */
 export function MemberFacts({ facts }: { facts: MemberFact[] }) {
   return (
-    <View style={styles.facts}>
+    <FitGrid texts={facts.flatMap((f) => [f.label, f.value])} fontSize={14} label="Member facts">
       {facts.map((f) => (
         <View key={f.label} style={styles.fact}>
           <Text style={styles.label}>{f.label}</Text>
@@ -25,7 +29,7 @@ export function MemberFacts({ facts }: { facts: MemberFact[] }) {
           </Text>
         </View>
       ))}
-    </View>
+    </FitGrid>
   );
 }
 
@@ -154,8 +158,7 @@ export function MentorProfileCard({ slug, membershipId, profile }: { slug: strin
 }
 
 const styles = StyleSheet.create({
-  facts: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.md },
-  fact: { width: "50%", paddingRight: spacing.sm, gap: 2 },
+  fact: { gap: 2 },
   label: { fontSize: 12, color: colors.muted },
   value: { fontSize: 14, color: colors.text },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: spacing.sm },

@@ -35,6 +35,7 @@ import {
   type IconProps,
 } from "@/components/icons";
 import { CompanyLogo } from "@/components/jobs/CompanyLogo";
+import { fitColumns } from "@/lib/layout";
 
 const FACT_ICONS: Record<JobFactKey, (p: IconProps) => ReactElement> = {
   jobType: IconJobs,
@@ -171,8 +172,11 @@ export function JobDetails({
           {badges && <div className="mt-2 flex flex-wrap items-center gap-2">{badges}</div>}
         </div>
       </div>
-      {/* Each icon sits inside its term, so every row of the list is a term and its value and nothing else. */}
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+      {/*
+        Each icon sits inside its term, so every row of the list is a term and its value and nothing else. Two or three
+        across while the longest word fits beside its icon (pl-7, the chrome), else fewer, so no word breaks mid-word.
+      */}
+      <dl className="grid gap-y-3 rounded-lg bg-slate-50 p-3" style={fitColumns(facts.flatMap((f) => [f.label, f.value]), { chrome: 1.75, max: 3, gap: 1 })}>
         {facts.map(({ key, label, value }) => {
           const Icon = FACT_ICONS[key];
           return (
@@ -181,7 +185,7 @@ export function JobDetails({
                 <Icon size={18} className="absolute left-0 top-0.5 text-slate-400" />
                 {label}
               </dt>
-              <dd className="text-sm font-medium text-slate-900 [overflow-wrap:anywhere]">{value}</dd>
+              <dd className="text-sm font-medium text-slate-900 break-words">{value}</dd>
             </div>
           );
         })}

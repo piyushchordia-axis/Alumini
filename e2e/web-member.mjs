@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -624,6 +624,37 @@ try {
     // With no skills on their profile yet, a job's page offers to add them, linking to My profile's Work section.
     await page.setViewportSize({ width: 390, height: 844 });
     await backend.click();
+    await page.waitForSelector("h1:has-text('Backend Engineer (Node.js)')");
+    // Its facts sit two across while their longest word ("Experience") fits beside the next, and go to fewer columns
+    // where it wouldn't, rather than breaking a word in two: on this phone, and on a 320px one with nothing scrolling.
+    const facts = page.locator("dl").filter({ hasText: "Job type" });
+    const factCells = facts.locator(":scope > div");
+    const [firstFact, secondFact] = [await factCells.nth(0).boundingBox(), await factCells.nth(1).boundingBox()];
+    if (Math.abs(firstFact.y - secondFact.y) > 1) throw new Error("the job's facts are one to a row on a 390px phone, where two fit");
+    await expectWholeWords(facts.locator("dt, dd"), "the job's facts on a 390px phone");
+    await page.setViewportSize({ width: 320, height: 800 });
+    try {
+      await expectWholeWords(facts.locator("dt, dd"), "the job's facts on a 320px phone");
+      const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      if (sideways > 0) throw new Error(`the job's page is ${sideways}px wider than a 320px phone`);
+      await page.screenshot({ path: `${SHOTS}/06i-job-facts-320.png` });
+    } finally {
+      await page.setViewportSize({ width: 390, height: 844 });
+    }
+    // A place with no space to wrap at (scripted) takes a row to itself on this phone too, rather than breaking in a
+    // column beside another fact, as two across at any width would make it.
+    const placeGet = await scriptJob(page, "demo-university", /\/jobs\/([0-9a-f-]{36})$/.exec(page.url())[1]);
+    placeGet.rewrite((job) => ({ ...job, location: "Thiruvananthapuram" }));
+    try {
+      await page.reload();
+      await facts.getByText("Thiruvananthapuram", { exact: true }).waitFor();
+      const [placeFirst, placeSecond] = [await factCells.nth(0).boundingBox(), await factCells.nth(1).boundingBox()];
+      if (placeSecond.y < placeFirst.y + placeFirst.height) throw new Error("a job's facts stay two across on a 390px phone beside a place too long for half the row");
+      await expectWholeWords(facts.locator("dt, dd"), "a job's facts with a long place name on a 390px phone");
+    } finally {
+      await placeGet.stop();
+    }
+    await page.reload();
     await page.waitForSelector("h1:has-text('Backend Engineer (Node.js)')");
     const addSkills = page.getByRole("link", { name: "Add your skills to see which you match", exact: true });
     await addSkills.waitFor();

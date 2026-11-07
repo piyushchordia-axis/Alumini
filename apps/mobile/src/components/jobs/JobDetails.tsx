@@ -1,6 +1,7 @@
 import { COMPANY_SIZE_LABELS, INDUSTRY_LABELS, applicationsClosed, applicationsLine, jobFacts, jobPlaceLabel, jobSectionsShown, shownAddress, type JobDto, type JobFactKey } from "@illuminize/shared";
 import type { ReactElement, ReactNode } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
+import { FitGrid } from "@/components/FitGrid";
 import {
   IconClock,
   IconDirectory,
@@ -42,6 +43,9 @@ type Level = 1 | 2;
 const partHeading = (level: Level) => headingRole(level === 1 ? 2 : 3);
 const sectionHeading = { fontSize: 16, fontWeight: "700", color: colors.text } as const;
 
+/** A fact's icon and the gap after it, beside its words: FitGrid's chrome. */
+const FACT_CHROME = 18 + spacing.sm;
+
 /**
  * One fact: its icon, label and value. On a phone the three are one stop for a screen reader ("Salary: ₹25–40 LPA"); the
  * web export keeps them as text, where a label on a plain box isn't read.
@@ -49,7 +53,7 @@ const sectionHeading = { fontSize: 16, fontWeight: "700", color: colors.text } a
 function Fact({ label, value, Icon }: { label: string; value: string; Icon: (p: IconProps) => ReactElement }) {
   const grouped = Platform.OS === "web" ? {} : { accessible: true, accessibilityLabel: `${label}: ${value}` };
   return (
-    <View {...grouped} style={{ width: "50%", flexDirection: "row", gap: spacing.sm, paddingRight: spacing.sm }}>
+    <View {...grouped} style={{ flexDirection: "row", gap: spacing.sm }}>
       <View style={{ paddingTop: 1 }}>
         <Icon size={18} color={colors.faint} />
       </View>
@@ -121,12 +125,15 @@ export function JobDetails({
         </View>
       </View>
       {notice}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", rowGap: spacing.md, borderRadius: radius.md, backgroundColor: "#f8fafc", padding: spacing.md }}>
-        {facts.map(({ key, label, value }) => (
-          <Fact key={key} label={label} value={value} Icon={FACT_ICONS[key]} />
-        ))}
+      {/* When applications close sits under the facts, across the whole box, whatever their columns. */}
+      <View style={{ gap: spacing.md, borderRadius: radius.md, backgroundColor: "#f8fafc", padding: spacing.md }}>
+        <FitGrid texts={facts.flatMap((f) => [f.label, f.value])} fontSize={14} chrome={FACT_CHROME} label="Job facts">
+          {facts.map(({ key, label, value }) => (
+            <Fact key={key} label={label} value={value} Icon={FACT_ICONS[key]} />
+          ))}
+        </FitGrid>
         {closes && (
-          <View style={{ width: "100%", flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
             <IconEvents size={18} color={colors.faint} />
             <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: colors.text }}>{closes}</Text>
           </View>

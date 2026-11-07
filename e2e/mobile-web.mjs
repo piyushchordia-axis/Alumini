@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -2311,6 +2311,36 @@ try {
           await shown(poster.getByRole("button", { name: `Email ${contactEmail}`, exact: true })).waitFor();
         };
         await says(title);
+        // Its facts sit two across while their longest word ("Experience") fits beside the next, and go to fewer
+        // columns where it wouldn't, rather than breaking a word in two: here, and on a 320-point phone.
+        const facts = shown(poster.getByRole("list", { name: "Job facts", exact: true }));
+        const factCells = facts.getByRole("listitem");
+        const [firstFact, secondFact] = [await factCells.nth(0).boundingBox(), await factCells.nth(1).boundingBox()];
+        if (Math.abs(firstFact.y - secondFact.y) > 1) throw new Error("the job's facts are one to a row on a 390-point phone, where two fit");
+        await expectWholeWords(factCells, "the job's facts on a 390-point phone");
+        await poster.setViewportSize({ width: 320, height: 700 });
+        try {
+          await expectWholeWords(factCells, "the job's facts on a 320-point phone");
+          await fitsPhone("the job's page on a 320-point phone", facts);
+          await poster.screenshot({ path: `${SHOTS}/m13h-job-facts-320.png` });
+        } finally {
+          await poster.setViewportSize({ width: 390, height: 844 });
+        }
+        // A place with no space to wrap at (scripted) takes a row to itself on this phone too, rather than breaking in a
+        // column beside another fact, as half the box each would make it.
+        const placeGet = await scriptJob(poster, "demo-university", jobPage.split("/").pop());
+        placeGet.rewrite((job) => ({ ...job, location: "Thiruvananthapuram" }));
+        try {
+          await poster.reload();
+          await shown(facts.getByText("Thiruvananthapuram", { exact: true })).waitFor();
+          const [placeFirst, placeSecond] = [await factCells.nth(0).boundingBox(), await factCells.nth(1).boundingBox()];
+          if (placeSecond.y < placeFirst.y + placeFirst.height) throw new Error("a job's facts stay two across on a 390-point phone beside a place too long for half the box");
+          await expectWholeWords(factCells, "a job's facts with a long place name on a 390-point phone");
+        } finally {
+          await placeGet.stop();
+        }
+        await poster.reload();
+        await shown(poster.getByRole("heading", { name: title, exact: true })).waitFor();
         await shown(poster.getByRole("button", { name: "Edit", exact: true })).click();
         await poster.waitForURL(/\/jobs\/edit\/[0-9a-f-]{36}$/);
         // Its saved seniority, the last chip of its row, is scrolled into view rather than left off the side of the screen.
@@ -3933,6 +3963,21 @@ try {
     await shown(page.getByText("Every two weeks. Weekday evenings, US East time", { exact: true })).waitFor();
     await fitsPhone("a member's page", shown(page.getByText("Listed in Mentors", { exact: true })));
     await shot("m15-admin-member");
+    // Her facts two across while their longest word fits beside the next, never a word broken in two: here, and on a
+    // 320-point phone.
+    const facts = shown(page.getByRole("list", { name: "Member facts", exact: true }));
+    const factCells = facts.getByRole("listitem");
+    const [firstFact, secondFact] = [await factCells.nth(0).boundingBox(), await factCells.nth(1).boundingBox()];
+    if (Math.abs(firstFact.y - secondFact.y) > 1) throw new Error("a member's facts are one to a row on a 390-point phone, where two fit");
+    await expectWholeWords(factCells, "a member's facts on a 390-point phone");
+    await page.setViewportSize({ width: 320, height: 700 });
+    try {
+      await expectWholeWords(factCells, "a member's facts on a 320-point phone");
+      await fitsPhone("a member's page on a 320-point phone", facts);
+      await shot("m15c-admin-member-facts-320");
+    } finally {
+      await page.setViewportSize({ width: 390, height: 844 });
+    }
 
     const sent = [];
     const onRequest = (r) => r.method() === "POST" && r.url().includes("/admin/mentors/") && sent.push(r.url());

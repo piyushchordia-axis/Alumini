@@ -10,6 +10,7 @@ import { useMembershipQuery } from "@/hooks/useMembership";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTenant } from "@/hooks/useTenant";
 import { useTenantSlug } from "@/hooks/useTenantSlug";
+import { fitColumns } from "@/lib/layout";
 import { applyTenantTheme } from "@/lib/theme";
 import { useAuthStore, useIsAuthenticated } from "@/stores/authStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -73,11 +74,11 @@ export function LandingPage() {
           </p>
         </div>
         {features.length > 0 && (
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+          <ul className="grid gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600" style={fitColumns(features.map((f) => f.label), { chrome: 1.5, max: 2, gap: 0.75 })}>
             {features.map((f) => (
               <li key={f.label} className="flex items-center gap-2">
-                <f.icon size={16} className="text-primary" />
-                <span>{f.label}</span>
+                <f.icon size={16} className="text-primary-ink" />
+                <span className="min-w-0 break-words">{f.label}</span>
               </li>
             ))}
           </ul>

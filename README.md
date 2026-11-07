@@ -960,7 +960,9 @@ before applying, laid out the same way on both apps; the rules are in `packages/
   place, type, experience, pay, two lines of summary and up to three skills, on one line, with "+N more". The page has
   a header with the logo (or initials), title, company and place; the key facts with SVG icons (`jobFacts`: type, work
   mode, location, pay or stipend, pay note, experience, seniority, openings, education, and "Applications close 12 Dec"
-  while open); skill chips; Apply, email and phone; the sections as rich text; and an "About the company" card.
+  while open), two across on a phone (three on a wide screen) only where their longest word fits, otherwise fewer,
+  down to one, so no word breaks in two (`lib/layout.ts`); skill chips; Apply, email and phone; the sections as rich
+  text; and an "About the company" card.
 - **Closed or expired.** A job is open (`jobIsOpen`) while it's approved, not closed by its poster and not past its
   closing date. Once it isn't, the API leaves out its apply link, email, phone and How to apply for everyone but its
   poster and admins, and both apps show "Applications closed" (with the date, for one that expired) where the buttons
@@ -1337,6 +1339,7 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
                   phone.ts: reading a phone field and writing a number; color.ts: contrast and brand tones;
                   avatar.ts: the colours of initials (avatarTone, brandAvatarTone);
+                  layout.ts: how many columns text laid side by side takes, from its longest word;
                   tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
                   buttons, tones and open state; appearance.ts: a member's background; admin.ts and its siblings:
                   what both admin consoles share)
@@ -1652,6 +1655,11 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     skeleton loaders and purposeful motion.
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
+  - Text laid side by side (job and member facts, the console's tiles, the landing's sections) chooses its columns
+    from an estimate of its longest word (0.6em a character), never a measurement, so it errs towards fewer: a job's
+    facts go to one column on a 320-point screen where two would just fit, and a word wider than the whole row (at
+    the largest text sizes) still breaks, inside the row rather than past it. The charts' label column (the phone's
+    `HBarChart`, 38%) doesn't use it yet.
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
     apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
     SVG set.
