@@ -1,4 +1,5 @@
-import { feedEmpty, LATEST_POSTS_TITLE, PINNED_POSTS_LABEL, type PostDto } from "@illuminize/shared";
+import { feedEmpty, LATEST_POSTS_TITLE, PINNED_POSTS_LABEL, UPCOMING_EVENTS_STRIP, type PostDto } from "@illuminize/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { CelebrationsCard } from "@/components/CelebrationsCard";
@@ -8,6 +9,7 @@ import { IconFeed } from "@/components/icons";
 import { PostCard } from "@/components/PostCard";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
 import { Button, EmptyState, headingRole, ListEmpty, SectionScreen, Spinner } from "@/components/ui";
+import { UpcomingEvents } from "@/components/UpcomingEvents";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -23,6 +25,7 @@ export default function FeedScreen() {
   const slug = tenant.slug;
   const router = useRouter();
   const theme = useTheme();
+  const qc = useQueryClient();
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const pinned = list.first?.pinned ?? [];
   const data: (PostDto | PinnedRow)[] = pinned.length ? [{ id: "pinned", posts: pinned }, ...list.items] : list.items;
@@ -36,7 +39,10 @@ export default function FeedScreen() {
         onEndReached={list.loadMore}
         onEndReachedThreshold={0.4}
         refreshing={list.isRefetching && !list.isFetchingNextPage}
-        onRefresh={() => void list.refetch()}
+        onRefresh={() => {
+          void list.refetch();
+          void qc.invalidateQueries({ queryKey: qk.events(slug, UPCOMING_EVENTS_STRIP) });
+        }}
         ListEmptyComponent={
           <ListEmpty loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()}>
             <EmptyState
@@ -53,6 +59,7 @@ export default function FeedScreen() {
             <ProfileStrengthCard />
             <DigestBanner slug={slug} />
             <CelebrationsCard slug={slug} />
+            <UpcomingEvents slug={slug} />
           </View>
         }
         ListFooterComponent={list.isFetchingNextPage ? <Spinner /> : undefined}

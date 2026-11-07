@@ -12,6 +12,7 @@ import {
   sectionDescription,
   splitSections,
   TENANT_FEATURES,
+  UPCOMING_EVENTS_TITLE,
   type MemberSection,
   type TenantFeature,
   type TenantFeatures,
@@ -37,7 +38,7 @@ describe("SECTION_LABELS", () => {
 describe("SECTION_DESCRIPTIONS", () => {
   // Every name a link in the navigation goes by: the sections, More's own rows and the account's, More itself and the
   // feed's shortcuts to what's behind it.
-  const NAV_NAMES = [...Object.values(SECTION_LABELS), ...Object.values(MORE_HUB_ROWS).map((r) => r.label), "Switch institution", "Sign out", "More", EXPLORE_TITLE, "Upcoming events"];
+  const NAV_NAMES = [...Object.values(SECTION_LABELS), ...Object.values(MORE_HUB_ROWS).map((r) => r.label), "Switch institution", "Sign out", "More", EXPLORE_TITLE, UPCOMING_EVENTS_TITLE];
   // Each line with the name it sits under: a line may say its own row's name (Mentors' way out does), never another's.
   const lines: [string, string][] = [
     ...MEMBER_SECTIONS.map((s): [string, string] => [SECTION_LABELS[s], SECTION_DESCRIPTIONS[s]]),

@@ -173,7 +173,13 @@ Covers:
   rather than a nav, offering what's behind More in priority order (Events, Groups, Mentors, Businesses, Funding) as
   44px chips with SVG icons in the brand's ink under a readable heading, holding no text box or post (the feed's first
   stay the composer's and a post's), with no sideways scrolling and Funding's chip opening its page with More current;
-  and no Explore row at all on a wide screen or with nothing behind More;
+  and no Explore row at all on a wide screen or with nothing behind More; the Upcoming events strip, not there (nor its
+  placeholder) when nothing is coming up or the events can't be fetched, holding its own height while the events load
+  (a placeholder of the same height, both keeping a thin scrollbar's room for a mouse), between the celebrations and
+  the composer, then the seeded two soonest first as 44px links with a readable heading, an SVG icon and See all
+  opening Events, each date tile's day in Demo University's ink on its wash, the Mumbai meetup answered "You: yes" by
+  the RSVP step, and Maybe given on Alumni Day's page (opened from the strip, Back being the feed) showing on its link,
+  then taken back; the strip still there with Events on the bar, and gone on a wide screen and with Events switched off;
 - direct messages between two seeded members (Meera and Sneha): a request, welcomed first by a note named "Say hello to
   Sneha Kulkarni" (its text and tip, the envelope an SVG in Demo University's badge, its words readable, nothing hinting
   at a decline or a block, and the message box described by it: title, text and tip as sentences of their own, as
@@ -186,7 +192,8 @@ Covers:
   block (the blocked member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap
   fill, and the thread on a phone;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on,
-  and the feed's Explore row offering Businesses and Funding;
+  the feed's Explore row offering Businesses and Funding, and Upcoming events listing the Singapore dinner and
+  Founders' Day assembly with Events on the bar, each day in Demo School's ink on its wash;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
   description readable on the wash; an open group found in Discover and joined, live messages both ways, the thread's
   Group details link drawn with an SVG icon rather than a glyph, an invite-only group's invitation (the invitee's box
@@ -359,6 +366,11 @@ Covers:
 - the feed's Explore row offering what's behind More in priority order (Events, Groups, Mentors, Businesses,
   Funding), as chips at least 44 tall with SVG icons under a readable heading and no text box, Funding's chip opening
   its screen with More selected, and the Feed tab going back;
+- the feed's Upcoming events strip: not there (nor its placeholder) when nothing is coming up or the events can't be
+  fetched; a placeholder of its own height while the events load; under Explore and the celebrations and over the
+  posts; then the seeded two soonest first as links at least 44 tall under a readable heading with an SVG icon, each
+  date tile's day in Demo University's ink on its wash; the Mumbai meetup opening on Events' stack, so Back is the
+  Events list with More selected, and See all opening Events;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; the More hub grouped
   under Connect, Community and You headings, its rows at least 44 tall, each with a line exposed as its description
   (Funding's "Members raising and investing", My posts' "Everything you've shared"), and on a 320×568 screen sitting
@@ -375,7 +387,8 @@ Covers:
   this)" after each in the card's name; its page keeping the job's order, the same two checked, and "You have 2 of 4
   skills"; and "You have 0 of 4 skills" with no marks on Associate Product Manager;
 - an RSVP, with the description's bullets, link and mail link as on the web, and the chosen answer as on the web (its
-  tone's fill, ink and edge, a drawn check and no ✓) in a "Your RSVP" group of three 44px buttons;
+  tone's fill, ink and edge, a drawn check and no ✓) in a "Your RSVP" group of three 44px buttons, then "You: yes" on
+  the feed's strip;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
   name, the Investing filter leaving Priya out, Were there in chosen from a list behind Filters and counted with them
   (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
@@ -402,8 +415,9 @@ Covers:
   poster's own card on Jobs unmarked though they have TypeScript, its long skills cut short with an ellipsis to stay on
   one line; a second job at the same company filling the website and industry from Use details from your last job at
   Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
-- a current pupil seeing none of them, Explore offering Businesses and Funding; sections switched off, with no Explore
-  row once nothing is behind More; the guards (the registration form keeping what's typed,
+- a current pupil seeing none of them, Explore offering Businesses and Funding and Upcoming events Demo School's two;
+  sections switched off, with no Explore row once nothing is behind More (Upcoming events staying, with Events on the
+  bar) and no Upcoming events once Events is off; the guards (the registration form keeping what's typed,
   even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
   with the reason on each; joining Demo College from its landing screen's Join DCE (it doesn't send a signed-in
   non-member into the form, and forgets Demo College as the institution to start at, so Choose a different institution
@@ -813,6 +827,16 @@ the console (part 14).
       lines rather than running off the screen, no label is cut off, and a count stays beside its label. VoiceOver and
       TalkBack read "Explore" as a heading and each chip as a link by its name ("Groups, 1 invitation").
 - [ ] Android: Back from a section opened from Explore (Funding, say) returns to the feed, not to More.
+- [ ] The feed's Upcoming events strip, on the narrowest phone you have with the largest text size: each event's card
+      grows wider and taller with the text, its title and its date and place each wrapping onto up to four lines
+      (cut with an ellipsis only past that; the strip's text stops growing at twice its size) and its answer inside
+      the card; the date tile's month and day stay inside the tile; and the strip scrolls sideways to the next event.
+      Close the app and open it again at that size (and at one step above the standard size): the posts under the
+      strip don't move when its events arrive. VoiceOver and TalkBack read "Upcoming events" as a heading, each event
+      as one link by its title, date, place and answer ("Mumbai alumni coffee meetup, …, Mumbai, You: yes"), and See
+      all as "See all events".
+- [ ] Android: Back from an event opened on the strip goes to the Events list, then to the feed. RSVP to it in the
+      browser as the same member, then pull the feed down: the strip shows the answer.
 
 ### 7. Messages
 

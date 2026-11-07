@@ -311,6 +311,21 @@ the way to the rest. A wide screen's feed doesn't have it at all, as its sidebar
 through `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`) rather than hiding it with CSS, and the phone app
 always shows it.
 
+Under today's celebrations, and above the composer, the phone feed shows **Upcoming events**: the next three events
+that haven't begun, soonest first, each a link with its date tile, its title, when and where, and the member's answer
+("You: yes"), then **See all** (named "See all events"), which opens Events. The date tile is the one the Events cards
+use (`EventDateTile`): the day in the institution's ink on its wash, the month in a grey that reads there. The strip
+asks the events list for `UPCOMING_EVENTS_STRIP` (`packages/shared/src/lib/events.ts`: upcoming, three), which already
+leaves out cancelled, held and past events, under the lists' `["events", slug]` key, so an RSVP, a new event or a
+cancellation refreshes it, as does the phone feed's pull to refresh. It shows whenever Events is on, even when Events
+is on the bar (as at a school), and isn't there when nothing is coming or the events can't be fetched. While they load,
+a placeholder of its height stands in, so the composer and the posts under it don't jump. On the phone app that holds
+at any text size: the cards grow wider and taller with the text, their title and date wrapping onto more lines rather
+than being cut short after two, and the placeholder takes the same sizes. With a mouse, which can't swipe the web's
+strip sideways, its list keeps a thin scrollbar, whose room the placeholder holds too. On the phone app an event
+opens on Events' own stack, its list underneath, so Back goes to the Events list and then the feed. Like Explore, only
+the feed has it, and on the web only below `md`.
+
 ### Profiles and onboarding
 
 A profile belongs to a membership, so someone in two institutions has two: the years, the degree and admins' edits

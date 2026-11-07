@@ -37,6 +37,7 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   of an institution colour (`brandTones`); `lib/avatar.ts` initials' colours (`avatarTone`, `brandAvatarTone`);
   `lib/tones.ts` the greys and status tones (`GREYS`, `STATUS_TONES`);
   `lib/rsvp.ts` an event's RSVP buttons, their tones and labels, and whether it takes answers (`rsvpsOpen`);
+  `lib/events.ts` the phone feed's Upcoming events strip (`UPCOMING_EVENTS_STRIP`, its title and links' names);
   `lib/appearance.ts` a member's background (`resolveAppearance`, `pageBackdrop` and the tiles both apps offer);
   `lib/branding.ts` the console's Branding form (`brandingSave`, `BRAND_SWATCHES`, `brandContrastWarnings`) and the
   time zones a picker offers (`timeZoneOptions`);
@@ -271,7 +272,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     app): More's sections as wrapping chips with More's badges, a labelled region and never a nav (e2e finds the bar's
     links inside one), and nothing when nothing is behind More. The web draws phone-only modules through
     `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`), never hidden by CSS, so a wide screen has no second copy of
-    the sidebar's links.
+    the sidebar's links. Under Celebrations and above the composer, the phone feed's Upcoming events strip
+    (`UpcomingEvents`, with the `EventDateTile` the event cards use) is a plain query under `["events", slug]`
+    (`UPCOMING_EVENTS_STRIP`) beside the Events lists' infinite ones, so every event change refreshes it, and nothing
+    may `setQueriesData` that prefix as if every entry had pages; a placeholder holds its height while it loads.
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
     way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row

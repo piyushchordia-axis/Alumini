@@ -1,3 +1,4 @@
+import { UPCOMING_EVENTS_STRIP } from "@illuminize/shared";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { events } from "../../src/db/schema";
@@ -89,6 +90,45 @@ describe.skipIf(!dbAvailable)("events + RSVP", () => {
     const aNotifs = await api().get(`${base}/notifications`).set(a.headers);
     expect(aNotifs.body.data[0]).toMatchObject({ type: "EVENT_CANCELLED", body: "Reason: Venue closed" });
     expect((await api().put(`${base}/events/${id}/rsvp`).set(a.headers).send({ status: "YES" })).status).toBe(409);
+  });
+
+  it("gives the feed's Upcoming events strip the next three it may show, soonest first, with the viewer's own answer", async () => {
+    const { tenant } = await createTenant(ctx);
+    const base = `/api/v1/t/${tenant.slug}/events`;
+    const host = await memberSession(ctx, tenant.id);
+    const viewer = await memberSession(ctx, tenant.id);
+    const other = await memberSession(ctx, tenant.id);
+    const create = async (title: string, days: number) => {
+      const res = await api().post(base).set(host.headers).send({ ...EVENT, title, startAt: future(days), endAt: future(days + 0.1) });
+      expect(res.status, title).toBe(201);
+      return res.body.data.id as string;
+    };
+    // Created out of order, so only the start time can put them in order.
+    const day9 = await create("Day 9", 9);
+    const day1 = await create("Day 1", 1);
+    await create("Day 12", 12);
+    const day3 = await create("Day 3", 3);
+    const cancelled = await create("Day 2, cancelled", 2);
+    expect((await api().post(`${base}/${cancelled}/cancel`).set(host.headers).send({})).status).toBe(200);
+    const held = await create("Day 4, held", 4);
+    await ctx.db.update(events).set({ moderationStatus: "PENDING" }).where(eq(events.id, held));
+    const past = await create("Day 0.5, then over", 0.5);
+    await ctx.db.update(events).set({ startAt: new Date(Date.now() - 86400000), endAt: new Date(Date.now() - 86400000 + 7200000) }).where(eq(events.id, past));
+    expect((await api().put(`${base}/${day3}/rsvp`).set(viewer.headers).send({ status: "YES" })).status).toBe(200);
+
+    // The query string the apps send for UPCOMING_EVENTS_STRIP.
+    const strip = new URLSearchParams(Object.fromEntries(Object.entries(UPCOMING_EVENTS_STRIP).map(([k, v]) => [k, String(v)]))).toString();
+    expect(strip).toBe("scope=upcoming&limit=3");
+    const seen = await api().get(`${base}?${strip}`).set(viewer.headers);
+    expect(seen.status).toBe(200);
+    expect(seen.body.data.map((e: { title: string }) => e.title)).toEqual(["Day 1", "Day 3", "Day 9"]);
+    expect(seen.body.data.map((e: { id: string }) => e.id)).toEqual([day1, day3, day9]);
+    // A fourth is there (Day 12), so the list says it has more; the strip's See all is the way to it.
+    expect(seen.body.nextCursor).toBeTruthy();
+    expect(seen.body.data.map((e: { myRsvp: string | null }) => e.myRsvp)).toEqual([null, "YES", null]);
+    // Answers are each member's own.
+    const theirs = await api().get(`${base}?${strip}`).set(other.headers);
+    expect(theirs.body.data.map((e: { myRsvp: string | null }) => e.myRsvp)).toEqual([null, null, null]);
   });
 
   it("lets the author edit and delete", async () => {

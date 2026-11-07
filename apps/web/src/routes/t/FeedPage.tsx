@@ -6,6 +6,7 @@ import { DigestBanner } from "@/components/feed/DigestBanner";
 import { ExploreRow } from "@/components/feed/ExploreRow";
 import { PostCard } from "@/components/feed/PostCard";
 import { PostComposer } from "@/components/feed/PostComposer";
+import { UpcomingEvents } from "@/components/feed/UpcomingEvents";
 import { IconFeed } from "@/components/icons";
 import { ProfileStrengthCard } from "@/components/profile/ProfileStrengthCard";
 import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/components/ui";
@@ -62,6 +63,7 @@ export function FeedPage() {
       <ProfileStrengthCard />
       <DigestBanner slug={slug} />
       <CelebrationsCard slug={slug} />
+      {phone && <UpcomingEvents slug={slug} />}
       <PostComposer inputRef={composer} />
       {list.isLoading && <Loading />}
       {list.error && <ErrorBox error={list.error} />}

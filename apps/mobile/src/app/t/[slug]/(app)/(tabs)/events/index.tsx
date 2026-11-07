@@ -2,6 +2,7 @@ import { EVENT_KIND_LABELS, eventsEmpty, nameWithYears, rsvpBadge, type EventDto
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
+import { EventDateTile } from "@/components/events/EventDateTile";
 import { IconEvents } from "@/components/icons";
 import { ModerationBadge } from "@/components/ModerationBadge";
 import { Badge, Button, Card, EmptyState, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
@@ -14,16 +15,11 @@ import { colors, spacing, useTheme } from "@/theme";
 
 function EventCard({ slug, event }: { slug: string; event: EventDto }) {
   const router = useRouter();
-  const theme = useTheme();
-  const d = new Date(event.startAt);
   const rsvp = rsvpBadge(event.myRsvp);
   return (
     <Card onPress={() => router.push(`/t/${slug}/events/${event.id}`)}>
       <Row gap={12} style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
-        <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: theme.primary, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>{d.toLocaleString(undefined, { month: "short", timeZone: event.timezone })}</Text>
-          <Text style={{ color: theme.primary, fontSize: 22, fontWeight: "800", lineHeight: 24 }}>{d.toLocaleString(undefined, { day: "numeric", timeZone: event.timezone })}</Text>
-        </View>
+        <EventDateTile startAt={event.startAt} timezone={event.timezone} />
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ fontWeight: "700", color: colors.text }} numberOfLines={1}>
             {event.title}

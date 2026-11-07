@@ -1,18 +1,15 @@
 import { EVENT_KIND_LABELS, nameWithYears, rsvpBadge, type EventDto } from "@illuminize/shared";
+import { EventDateTile } from "@/components/events/EventDateTile";
 import { ContentCard } from "@/components/moderation/ContentCard";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { Badge } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 
 export function EventCard({ slug, event }: { slug: string; event: EventDto }) {
-  const d = new Date(event.startAt);
   const rsvp = rsvpBadge(event.myRsvp);
   return (
     <ContentCard to={`/t/${slug}/app/events/${event.id}`} status={event.moderationStatus} className="flex gap-4 p-4">
-      <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <span className="text-xs font-semibold uppercase">{d.toLocaleString(undefined, { month: "short", timeZone: event.timezone })}</span>
-        <span className="text-2xl font-bold leading-none">{d.toLocaleString(undefined, { day: "numeric", timeZone: event.timezone })}</span>
-      </div>
+      <EventDateTile startAt={event.startAt} timezone={event.timezone} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="truncate font-semibold text-slate-900">{event.title}</h3>

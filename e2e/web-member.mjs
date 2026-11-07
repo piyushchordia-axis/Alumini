@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1398,6 +1398,44 @@ try {
       .getByRole("link")
       .evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")));
   };
+  // The phone feed's Upcoming events strip, a region of plain cards too. Each event is a link named title first ("Mumbai
+  // alumni coffee meetup, Nov 16, 2026, 11:00 AM, Mumbai, You: yes"), then comes See all.
+  const upcoming = (p, options = {}) => p.getByRole("region", { name: "Upcoming events", exact: true, ...options });
+  const upcomingTitles = async (p) => {
+    await upcoming(p).getByRole("link").first().waitFor();
+    const names = await upcoming(p)
+      .getByRole("link")
+      .evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")));
+    return names.filter((name) => name !== "See all events").map((name) => name.split(", ")[0]);
+  };
+  // An event's date tile (hidden from screen readers, as the link's name says the date): a square, not stretched to the
+  // height of its card, with the day in the institution's ink on its wash and the month in a grey that reads there.
+  const expectDateTile = async (event, tones, where) => {
+    const tile = event.locator("span[aria-hidden]").first();
+    const box = await tile.boundingBox();
+    if (box.height > box.width + 1) throw new Error(`${where} is ${box.width}×${box.height}, stretched taller than it is wide`);
+    const day = await paintedColour(tile.locator("span").nth(1));
+    if (day.colour !== tones.ink || day.behind !== tones.wash) throw new Error(`${where}'s day is rgb ${day.colour} on rgb ${day.behind}, not the ink (${tones.ink}) on the wash (${tones.wash})`);
+    await expectReadable(tile.locator("span").first(), `${where}'s month`);
+  };
+  // Every event's tile on a strip.
+  const expectDateTiles = async (strip, tones, where) => {
+    const events = strip.getByRole("listitem");
+    const count = await events.count();
+    if (!count) throw new Error(`${where} lists no events`);
+    for (let i = 0; i < count; i++) {
+      const event = events.nth(i).getByRole("link");
+      await expectDateTile(event, tones, `${where}' ${(await event.getAttribute("aria-label")).split(", ")[0]} date tile`);
+    }
+  };
+  // The scrollbar-width of each element, the one given included, that always draws a sideways scrollbar (overflow-x:
+  // scroll), joined: "thin" for one thin one.
+  const alwaysScrolls = (el) =>
+    [el, ...el.querySelectorAll("*")]
+      .map((node) => getComputedStyle(node))
+      .filter((style) => style.overflowX === "scroll")
+      .map((style) => style.scrollbarWidth)
+      .join();
 
   await step("phone layout: every section opens, with Events and Funding behind More", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1426,6 +1464,91 @@ try {
     if (!(await page.locator("article").first().locator('button[aria-label="Celebrate"]').count())) throw new Error("the phone feed's first article isn't a post");
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (sideways > 0) throw new Error(`the phone feed scrolls sideways by ${sideways}px`);
+
+    // Under the celebrations, Upcoming events: what's next, soonest first (the API leaves out cancelled, held and past
+    // events), each a 44px link with its date tile, then See all. While they load, a placeholder holds the strip's own
+    // height, so the composer under it doesn't jump when they come.
+    const strip = upcoming(page);
+    const placeholder = page.getByTestId("upcoming-events-loading");
+    const stripGet = (url) => url.pathname === "/api/v1/t/demo-university/events" && url.searchParams.get("limit") === "3";
+    // With nothing coming up, or no answer once its tries are spent, there's no strip, and no placeholder left behind.
+    const expectNoStrip = async (when) => {
+      await placeholder.waitFor({ state: "detached", timeout: 15_000 }).catch(() => {
+        throw new Error(`the Upcoming events placeholder stays ${when}`);
+      });
+      if (await upcoming(page, { includeHidden: true }).count()) throw new Error(`the feed shows Upcoming events ${when}`);
+    };
+    const nothing = await scriptEmptyList(page, stripGet);
+    const emptyAnswer = page.waitForResponse((response) => stripGet(new URL(response.url())));
+    await page.reload();
+    await emptyAnswer;
+    await expectNoStrip("with nothing coming up");
+    await nothing.stop();
+    await page.route(stripGet, (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "INTERNAL", message: "e2e INTERNAL" } }) }));
+    await page.reload();
+    await placeholder.waitFor();
+    await expectNoStrip("when its events can't be fetched");
+    await page.unroute(stripGet);
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route(stripGet, async (route) => {
+      await held;
+      await route.fallback();
+    });
+    await page.reload();
+    await placeholder.waitFor();
+    const reserved = (await placeholder.boundingBox()).height;
+    // With a mouse, as here, the list keeps a thin scrollbar to drag (it can't swipe sideways), and the placeholder holds
+    // the same scrollbar's room.
+    if ((await placeholder.evaluate(alwaysScrolls)) !== "thin") throw new Error("the Upcoming events placeholder doesn't hold a thin scrollbar's room for a mouse");
+    release();
+    await strip.waitFor();
+    const drawn = (await strip.boundingBox()).height;
+    await page.unroute(stripGet);
+    if (Math.abs(drawn - reserved) > 1) throw new Error(`Upcoming events is ${drawn}px tall, but held ${reserved}px while it loaded, so the composer jumps`);
+    if ((await strip.evaluate(alwaysScrolls)) !== "thin") throw new Error("Upcoming events' list has no thin scrollbar for a mouse to drag");
+    // In the feed's order: under the celebrations, over the composer.
+    await page.locator('textarea[aria-label="New post"]').waitFor();
+    const celebrations = page.getByRole("heading", { name: "Celebrating today", exact: true }).locator("xpath=ancestor::section[1]");
+    const [above, here, below] = await Promise.all([celebrations.boundingBox(), strip.boundingBox(), page.locator('textarea[aria-label="New post"]').boundingBox()]);
+    if (here.y < above.y + above.height || here.y + here.height > below.y) throw new Error(`Upcoming events (${here.y}–${here.y + here.height}px) isn't between the celebrations (ending at ${above.y + above.height}px) and the composer (from ${below.y}px)`);
+    const titles = await upcomingTitles(page);
+    if (titles.join() !== "Mumbai alumni coffee meetup,DemoU Alumni Day 2026") throw new Error(`Upcoming events lists ${titles.join(", ")}, expected the seeded two, soonest first`);
+    for (const [name, height] of await strip.getByRole("link").evaluateAll((links) => links.map((a) => [a.getAttribute("aria-label"), a.getBoundingClientRect().height]))) {
+      if (height < 44) throw new Error(`Upcoming events' "${name}" link is ${height}px tall, under 44px`);
+    }
+    if ((await strip.getByRole("link", { name: "See all events", exact: true }).getAttribute("href")) !== "/t/demo-university/app/events") throw new Error("Upcoming events' See all doesn't open Events");
+    await expectSvgNoEmoji(strip, "the Upcoming events strip");
+    await expectReadable(strip.getByRole("heading", { name: "Upcoming events", exact: true }), "the Upcoming events heading");
+    if (await strip.locator("textarea, input, article").count()) throw new Error("the Upcoming events strip holds a text box or a post");
+    // The RSVP step answered the Mumbai meetup: its link says so, as its badge does.
+    const mumbai = strip.getByRole("link", { name: /^Mumbai alumni coffee meetup, .+, Mumbai, You: yes$/ });
+    await mumbai.getByText("You: yes", { exact: true }).waitFor();
+    await expectDateTiles(strip, BRAND_TONES.demoUniversity, "Upcoming events");
+    // Clear of the bottom bar, which is fixed over the page.
+    await strip.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await strip.screenshot({ path: `${SHOTS}/08c-phone-feed-upcoming.png` });
+    // An answer given on an event's page shows on its link back on the feed: every change to an event refreshes
+    // ["events", slug], the strip's key included. Back from the event is the feed. Maybe, then taken back, so the run
+    // leaves Alumni Day as it found it.
+    const alumniDay = (answer) => strip.getByRole("link", { name: new RegExp(`^DemoU Alumni Day 2026, .+, Mumbai${answer ? `, You: ${answer}` : ""}$`) });
+    const maybe = page.getByRole("group", { name: "Your RSVP", exact: true }).getByRole("button", { name: "Maybe", exact: true });
+    await alumniDay(null).click();
+    await page.waitForURL(/\/app\/events\/[0-9a-f-]{36}$/);
+    await page.waitForSelector("text=Who's coming");
+    await maybe.click();
+    await page.locator('[role="group"][aria-label="Your RSVP"] button[aria-pressed="true"]', { hasText: "Maybe" }).waitFor();
+    await page.goBack();
+    await page.waitForURL(/\/app\/feed$/);
+    await alumniDay("maybe").waitFor();
+    await alumniDay("maybe").click();
+    await page.waitForURL(/\/app\/events\/[0-9a-f-]{36}$/);
+    await page.locator('[role="group"][aria-label="Your RSVP"] button[aria-pressed="true"]', { hasText: "Maybe" }).waitFor();
+    await maybe.click();
+    await page.locator('[role="group"][aria-label="Your RSVP"] button[aria-pressed="true"]').waitFor({ state: "detached" });
+    await page.goBack();
+    await page.waitForURL(/\/app\/feed$/);
+    await alumniDay(null).waitFor();
     await shot("08-phone-feed-explore");
     // A chip opens its section, for which More then stands in on the bar; the bar's Feed comes back first in the loop.
     await row.getByRole("link", { name: "Funding", exact: true }).click();
@@ -1511,10 +1634,11 @@ try {
     await sidebarCurrent.filter({ hasText: "Mentors" }).waitFor();
     if ((await sidebarCurrent.count()) !== 1) throw new Error("only the Mentors link should show as current in the sidebar");
     await expectCurrentLink(sidebarCurrent, "the sidebar's current link");
-    // The sidebar lists everything, so a wide screen's feed has no Explore row, not even a hidden one.
+    // The sidebar lists everything, so a wide screen's feed has no Explore row, not even a hidden one, nor Upcoming events.
     await page.goto(BASE + "/t/demo-university/app/feed");
     await page.locator('textarea[aria-label="New post"]').waitFor();
     if (await explore(page, { includeHidden: true }).count()) throw new Error("the feed has an Explore row on a wide screen, beside the sidebar");
+    if ((await upcoming(page, { includeHidden: true }).count()) || (await page.getByTestId("upcoming-events-loading").count())) throw new Error("the feed has Upcoming events on a wide screen");
   });
 
   await step("phone layout: More sheet reaches My posts and past events", async () => {
@@ -1588,9 +1712,10 @@ try {
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
     await page.click('a:has-text("Go to the app")');
     await page.waitForURL(/\/app\/feed$/);
-    // With nothing behind More, the feed has no Explore row either.
+    // With nothing behind More, the feed has no Explore row either. Upcoming events stays, with Events on the bar.
     await page.locator('textarea[aria-label="New post"]').waitFor();
     if (await explore(page, { includeHidden: true }).count()) throw new Error("the feed shows an Explore row with nothing behind More");
+    await upcoming(page).waitFor();
     await page.goto(app + "/businesses");
     await page.waitForSelector("text=Businesses is turned off");
     await page.goto(app + "/my-content");
@@ -1600,6 +1725,10 @@ try {
     // The empty inbox offers only the ways to start a chat that are on: Find a group without the Directory, and Find
     // people without groups.
     features.only("feed", "messaging", "groups");
+    // Events off too: the feed has no Upcoming events, nor a placeholder for it.
+    await page.goto(app + "/feed");
+    await page.locator('textarea[aria-label="New post"]').waitFor();
+    if ((await upcoming(page, { includeHidden: true }).count()) || (await page.getByTestId("upcoming-events-loading").count())) throw new Error("the feed shows Upcoming events with Events switched off");
     await page.goto(app + "/messages");
     await expectEmptyState(emptyInbox, "the empty inbox with the Directory off", { actions: ["Find a group"], absent: ["Find people"], tones: BRAND_TONES.demoUniversity });
     features.only("feed", "messaging", "directory");
@@ -2027,6 +2156,10 @@ try {
     // The feed's Explore row offers what's behind their More, which is neither Groups nor Mentors.
     const offered = await exploreNames(pupil);
     if (offered.join() !== "Businesses,Funding") throw new Error(`a pupil's Explore offers ${offered.join(", ")}, expected Businesses, Funding`);
+    // Events is on their bar, and the feed still lists what's next at Demo School, the day in its amber ink on its wash.
+    const schoolEvents = await upcomingTitles(pupil);
+    if (schoolEvents.join() !== "Singapore alumni dinner,Founders' Day assembly") throw new Error(`a pupil's Upcoming events lists ${schoolEvents.join(", ")}`);
+    await expectDateTiles(upcoming(pupil), BRAND_TONES.demoSchool, "a pupil's Upcoming events");
     await pupil.click('nav[aria-label="Main"] >> button:has-text("More")');
     await pupil.waitForSelector('[role="dialog"] >> text=Switch institution');
     for (const section of ["Messages", "Groups", "Mentors"]) if (await pupil.locator(`[role="dialog"] a:has-text("${section}")`).count()) throw new Error(`a pupil's More sheet offers ${section}`);

@@ -227,7 +227,9 @@ shows four sections and **More** holds the rest, grouped, with a line under each
 (Groups, Mentors), **Community** (Events, Businesses, Funding), then **You** (your posts, your profile and, for an
 admin, the admin console), switching institution and signing out. The feed there also starts with **Explore**, a row of
 shortcuts to the same sections behind More, with the same badges: invite someone to a group, and their Groups chip
-counts it.
+counts it. Under today's celebrations, **Upcoming events** shows what's coming next (the Mumbai coffee meetup and
+DemoU Alumni Day), each with its date, and **See all** opens Events: answer **I'm going** on the meetup, and back on the
+feed its card says **You: yes**.
 
 - **Messages, with two browsers.** This walks through a message request, live messages, a report and what an admin
   sees.
