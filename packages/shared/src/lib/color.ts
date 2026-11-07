@@ -161,6 +161,30 @@ export function brandTones(primary: string): BrandTones {
   };
 }
 
+/** heroScrim's veils in twentieths, 5% steps: 30% up to 55%, under which white reads on white (#737373, 4.74:1). */
+const HERO_SCRIM_STEPS = 20;
+const HERO_SCRIM_LIGHTEST = 6;
+const HERO_SCRIM_DARKEST = 11;
+
+/**
+ * How dark a brand cover's veil (the opacity of black laid over it) must be for its white text, the hero name and the
+ * lines under it, to read at 4.5:1 wherever that text falls: over every colour in `brand` (the cover's colour, or the
+ * colours its gradient runs between) or, on a cover photo, over the lightest a photo can be, white. Only as dark as
+ * that: 30% for a brand white already reads on, as covers have always had; 50% for a pale one such as #fde68a; and 55%
+ * for the palest, about as light as #eeeeee or lighter (sky-100 #e0f2fe, white), as on any photo. A colour that can't
+ * be read, or none, counts as the default institution colour, as the themes draw it.
+ */
+export function heroScrim(brand: string | readonly string[], hasPhoto: boolean): number {
+  const colours = (typeof brand === "string" ? [brand] : brand).map((c) => (parseHex(c) ? c : FALLBACK_PRIMARY));
+  const under = hasPhoto ? [WHITE] : colours.length ? colours : [FALLBACK_PRIMARY];
+  // A browser paints the veil with its opacity in 8 bits, so each step is checked as the lightest it can come out.
+  const painted = (step: number) => Math.floor((step / HERO_SCRIM_STEPS) * 255) / 255;
+  const reads = (step: number) => under.every((c) => contrastRatio(WHITE, mixHex(BLACK, c, painted(step))) >= TEXT_CONTRAST);
+  let step = HERO_SCRIM_LIGHTEST;
+  while (step < HERO_SCRIM_DARKEST && !reads(step)) step++;
+  return step / HERO_SCRIM_STEPS;
+}
+
 /**
  * `base` with as much of the brand colour mixed in, up to 8%, as keeps `text` (grey text on the page, the meta grey
  * unless the page darkens it) at least as readable as the meta grey on the plain page (#f1f5f9, about 4.97:1), so a page

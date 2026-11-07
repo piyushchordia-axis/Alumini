@@ -1,4 +1,4 @@
-import { GREYS, brandTones, contrastRatio, inkOn, mixHex, onColor, pageTint, parseHex, relativeLuminance, toHex } from "@illuminize/shared";
+import { GREYS, brandTones, contrastRatio, heroScrim, inkOn, mixHex, onColor, pageTint, parseHex, relativeLuminance, toHex } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 import { sampledColours } from "../helpers/colours";
 
@@ -220,6 +220,66 @@ describe("brandTones", () => {
   it("draws a clear box's edge in the meta grey, which shows (3:1) on white and on the page", () => {
     expect(contrastRatio(GREYS.meta, WHITE)).toBeGreaterThanOrEqual(3);
     expect(contrastRatio(GREYS.meta, PAGE)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("heroScrim", () => {
+  const BLACK = "#000000";
+  /**
+   * White hero text over `under` with `scrim` of black laid over it, as both apps' BrandCover draw it: as a browser
+   * paints it at its lightest, with the opacity in 8 bits.
+   */
+  const heroContrast = (under: string, scrim: number) => contrastRatio(WHITE, mixHex(BLACK, under, Math.floor(scrim * 255) / 255));
+
+  it("keeps the 30% veil covers have always had on a brand white already reads on, the seeded institutions' among them", () => {
+    for (const c of [...SEEDED, NEAR_BLACK, "#0f172a", BLACK]) expect(heroScrim(c, false), c).toBe(0.3);
+  });
+
+  it("darkens the veil until white reads (4.5:1) over the brand, across the colour cube, and no further", () => {
+    for (const c of sampledColours()) {
+      const scrim = heroScrim(c, false);
+      expect(scrim, c).toBeGreaterThanOrEqual(0.3);
+      expect(scrim, c).toBeLessThanOrEqual(0.55);
+      expect(heroContrast(c, scrim), `${c} under ${scrim}`).toBeGreaterThanOrEqual(4.5);
+      // One 5% step lighter wouldn't do, unless it is already at the lightest.
+      const lighter = (Math.round(scrim * 20) - 1) / 20;
+      if (scrim > 0.3) expect(heroContrast(c, lighter), `${c} under ${lighter}`).toBeLessThan(4.5);
+    }
+  });
+
+  it("takes a pale brand to half black, which a 30% veil leaves unreadable", () => {
+    for (const c of ["#fde68a", NEAR_WHITE, "#dbeafe", "#ececec"]) {
+      expect(heroContrast(c, 0.3), c).toBeLessThan(4.5);
+      expect(heroScrim(c, false), c).toBe(0.5);
+    }
+  });
+
+  it("takes the palest brands, about #eeeeee and lighter, to 55%, as dark as a photo's, since half black leaves white under 4.5:1", () => {
+    for (const c of ["#eeeeee", "#e0f2fe", "#fef3c7", "#f8fafc", WHITE]) {
+      expect(heroContrast(c, 0.5), c).toBeLessThan(4.5);
+      expect(heroScrim(c, false), c).toBe(0.55);
+    }
+  });
+
+  it("on a cover photo, assumes the lightest photo there could be, white: 55%, whatever the brand", () => {
+    for (const c of [...ALL, BLACK]) expect(heroScrim(c, true), c).toBe(0.55);
+    expect(heroContrast(WHITE, 0.55)).toBeGreaterThanOrEqual(4.5);
+    expect(heroContrast(WHITE, 0.5)).toBeLessThan(4.5);
+  });
+
+  it("over a gradient, darkens for the lightest of its colours", () => {
+    const sample = sampledColours().filter((_, i) => i % 97 === 0);
+    for (const a of sample) {
+      for (const b of sample) expect(heroScrim([a, b], false), `${a} to ${b}`).toBe(Math.max(heroScrim(a, false), heroScrim(b, false)));
+    }
+    // Demo University's blue to its near-black secondary, as the web's gradient runs.
+    expect(heroScrim(["#1d4ed8", "#0f172a"], false)).toBe(0.3);
+  });
+
+  it("counts a colour it can't read, or none, as the default institution colour", () => {
+    expect(heroScrim("navy", false)).toBe(heroScrim("#1d4ed8", false));
+    expect(heroScrim([], false)).toBe(heroScrim("#1d4ed8", false));
+    expect(heroScrim(["navy", "#fde68a"], false)).toBe(0.5);
   });
 });
 

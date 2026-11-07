@@ -44,7 +44,7 @@ export function OptionPicker<T extends string>({ label, value, options, onChange
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${selected ? selected.label : placeholder}`}
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, minHeight: 46, borderWidth: 1, borderColor: error ? colors.danger : colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12 }}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, minHeight: 46, borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12 }}
       >
         <Text style={{ flexShrink: 1, fontSize: 15, color: selected ? colors.text : colors.faint }} numberOfLines={1}>
           {selected ? selected.label : placeholder}

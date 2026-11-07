@@ -161,10 +161,48 @@ try {
     await page.getByText("DemoU", { exact: true }).waitFor();
     await page.getByText("Once a DemoU, always a DemoU.", { exact: true }).waitFor();
     await shot("02-landing");
+    // The hero is white on a veil only as dark as white needs (heroScrim), and each cover is pinned to the veil it
+    // should get, which also shows the served institution reached it: Demo University's blue keeps the 30% of black its
+    // cover has always had; a pale colour served in its place (in a browser context of its own, which leaves this
+    // page's history as it is) takes half; a cover photo, which may be white where the text falls, 55%. paintedColour
+    // sees no photo, so there the text is read on the veil over the blue, and the veil is what's checked.
+    const heroTexts = (p) => ["DemoU", "Once a DemoU, always a DemoU.", "Mumbai, India"].map((text) => p.getByText(text, { exact: true }));
+    const expectHero = async (p, brand, scrim, where) => {
+      const veiled = brand.map((c) => c * (1 - scrim));
+      for (const text of heroTexts(p)) {
+        const { behind } = await expectReadable(text, `the landing's "${await text.innerText()}" ${where}`);
+        if (behind.split(" ").some((c, i) => Math.abs(Number(c) - veiled[i]) > 2)) throw new Error(`the landing's cover ${where} is veiled to rgb ${behind}, not ${Math.round(scrim * 100)}% of black over rgb ${brand.join(" ")}`);
+      }
+    };
+    await expectHero(page, [29, 78, 216], 0.3, "on Demo University's blue");
+    const scriptedContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const scriptedPage = await scriptedContext.newPage();
+    const scripted = await scriptTenant(scriptedPage, "demo-university");
+    scripted.rewrite((t) => ({ ...t, primaryColor: "#fde68a" }));
+    await scriptedPage.goto(BASE + "/t/demo-university");
+    await scriptedPage.waitForSelector("text=Sign in / Join");
+    await expectHero(scriptedPage, [253, 230, 138], 0.5, "on a pale brand");
+    await scriptedPage.screenshot({ path: `${SHOTS}/02a-landing-pale-brand.png`, fullPage: true });
+    // A white photo, the lightest a cover photo can be, over Demo University's own colours.
+    const whitePhoto = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"><rect width="16" height="9" fill="#fff"/></svg>')}`;
+    scripted.rewrite((t) => ({ ...t, coverImageUrl: whitePhoto }));
+    await scriptedPage.reload();
+    await scriptedPage.waitForSelector("text=Sign in / Join");
+    await expectHero(scriptedPage, [29, 78, 216], 0.55, "over a cover photo");
+    await scriptedPage.screenshot({ path: `${SHOTS}/02b-landing-cover-photo.png`, fullPage: true });
+    await scriptedContext.close();
     await page.click("text=Sign in / Join");
     // Autofill and paste bring the calling code along. A foreign number moves the picker to its country, which a screen
     // reader is told; the box keeps the national part, not "+91 91…", and the code step names the number as it was read.
     if ((await page.getAttribute('input[type="tel"]', "autocomplete")) !== "tel") throw new Error("the number box doesn't ask the browser for the full number");
+    // A field's edge is all that shows it on the white card: 3:1, the faint grey at rest and the ink when focused. The
+    // country code's select is see-through, so the box under it shows its focus.
+    const countryBox = page.locator('select[aria-label^="Country code"]').locator("xpath=preceding-sibling::div");
+    await expectEdge(countryBox, "the country code box");
+    await expectEdge(page.locator('input[type="tel"]'), "the mobile number box");
+    await page.focus('select[aria-label^="Country code"]');
+    const { colour: focusedEdge } = await expectEdge(countryBox, "the focused country code box");
+    if (focusedEdge !== BRAND_TONES.demoUniversity.ink) throw new Error(`the focused country code box's edge is rgb ${focusedEdge}, not Demo University's ink`);
     await page.fill('input[type="tel"]', "+44 7700 900123");
     await expectPhoneField(page, { box: "7700 900123", country: "GB" });
     await page.getByRole("status").filter({ hasText: "Country code set to United Kingdom +44" }).waitFor({ state: "attached" });

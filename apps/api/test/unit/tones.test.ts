@@ -130,6 +130,34 @@ describe("the brand's tones on its tints", () => {
   });
 });
 
+describe("form controls' edges", () => {
+  /** The edges fields had before: the web's slate-300 and the phone's colors.border. */
+  const OLD_EDGES = ["#cbd5e1", "#e2e8f0"];
+
+  it("show a field at rest at 3:1 in the faint grey, on the white field and the page and slate-50 around it, where the old edges didn't", () => {
+    for (const bg of [WHITE, PAGE, SLATE_50]) expect(contrastRatio(GREYS.faint, bg), bg).toBeGreaterThanOrEqual(3);
+    for (const edge of OLD_EDGES) expect(contrastRatio(edge, WHITE), edge).toBeLessThan(3);
+    // On a member's tint or photo the web's slate-400 steps to the meta grey ([data-backdrop]), darker still.
+    expect(contrastRatio(GREYS.meta, WHITE)).toBeGreaterThan(contrastRatio(GREYS.faint, WHITE));
+  });
+
+  it("show a focused field in the ink and an invalid one in the danger edge, each at 3:1 on white, for any brand", () => {
+    expect(contrastRatio(STATUS_TONES.danger.edge, WHITE)).toBeGreaterThanOrEqual(3);
+    for (const c of sampledColours()) expect(contrastRatio(brandTones(c).ink, WHITE), c).toBeGreaterThanOrEqual(3);
+  });
+
+  it("are what both apps' fields draw: the web's controlClass and the phone's Input", () => {
+    const web = readFileSync(resolve(ROOT, "apps/web/src/components/ui/index.tsx"), "utf8");
+    const control = /const controlClass =\s*"([^"]+)"/.exec(web)?.[1]?.split(/\s+/) ?? [];
+    expect(control).toEqual(expect.arrayContaining(["border", "border-slate-400", "focus:border-primary-ink"]));
+    expect(control.filter((c) => /^border-slate-[23]00$/.test(c))).toEqual([]);
+    expect(/const invalidControlClass = "([^"]+)"/.exec(web)?.[1]).toBe("border-tone-danger-edge");
+    const mobile = readFileSync(resolve(ROOT, "apps/mobile/src/components/ui.tsx"), "utf8");
+    expect(/^\s*input: \{([^}]*)\}/m.exec(mobile)?.[1]).toMatch(/\bborderColor: colors\.faint\b/);
+    expect(readFileSync(resolve(ROOT, "apps/mobile/src/theme/index.tsx"), "utf8")).toMatch(/\bfaint: GREYS\.faint\b/);
+  });
+});
+
 describe("apps/web/src/index.css", () => {
   const css = readFileSync(resolve(ROOT, "apps/web/src/index.css"), "utf8");
   /** The custom properties declared in a block's body, by name. */

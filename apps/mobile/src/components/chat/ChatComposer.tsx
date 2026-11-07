@@ -193,7 +193,7 @@ export function ChatComposer({
           onContentSizeChange={Platform.OS === "web" ? (e) => setWebHeight(Math.min(Math.max(e.nativeEvent.contentSize.height, MIN_HEIGHT), MAX_HEIGHT)) : undefined}
           textAlignVertical="top"
           style={[
-            { flex: 1, minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, borderWidth: 1, borderColor: colors.border, borderRadius: 22, backgroundColor: colors.card, paddingHorizontal: spacing.lg, paddingTop: 11, paddingBottom: 11, fontSize: 15, lineHeight: 20, color: colors.text },
+            { flex: 1, minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT, borderWidth: 1, borderColor: colors.faint, borderRadius: 22, backgroundColor: colors.card, paddingHorizontal: spacing.lg, paddingTop: 11, paddingBottom: 11, fontSize: 15, lineHeight: 20, color: colors.text },
             Platform.OS === "web" ? { height: webHeight } : null,
           ]}
         />

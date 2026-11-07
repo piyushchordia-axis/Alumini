@@ -121,8 +121,12 @@ pnpm e2e:web                             # screenshots go to e2e/screenshots (or
 
 Covers:
 
-- tenant picker → landing (the brand cover's short name and tagline) → phone + OTP → registration in three steps →
-  auto-approved → the walk-through → the feed: "Signed in as" with the
+- tenant picker → landing (the brand cover's short name and tagline, white at 4.5:1 with the place under them, each
+  cover pinned to its veil: Demo University's blue under 30%, a pale colour served in its place under 50%
+  (`02a-landing-pale-brand`), and a white cover photo served with Demo University under 55%
+  (`02b-landing-cover-photo`)) → phone + OTP (the country box's and the number box's edges at 3:1, the country box in
+  Demo University's ink when its select has focus) → registration in three steps → auto-approved → the walk-through →
+  the feed: "Signed in as" with the
   number on Basics, and one Back on every step; Back on an untouched Basics leaving for the landing page, which offers
   Join DemoU (not the sign-in button) instead of sending them back into the form; a photo on Basics, Continue refusing a
   missing name and focusing it, both years starting blank and asked for under the institution's labels ("Year you
@@ -424,10 +428,14 @@ add that origin to `CORS_ORIGINS`.
 
 Covers:
 
-- tenant picker → landing (the brand cover's short name and tagline) → login → OTP → registration in three steps →
-  the walk-through → feed, as on the web: each step's button on the
-  screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so nothing holds
-  the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the form; with a
+- tenant picker → landing (the brand cover's short name and tagline, white at 4.5:1, each cover pinned to its veil:
+  Demo University's blue under 30%, a pale colour served in its place under 50% (`m02a-landing-pale-brand`), and a
+  white cover photo served with Demo University under 55% (`m02b-landing-cover-photo`)) → login (the country picker's
+  and the number box's edges at 3:1) → OTP → registration in three steps → the walk-through → feed, as on the web:
+  each step's
+  button on the screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so
+  nothing holds the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the
+  form; with a
   name typed, the page held, Use a different number asking first and Cancel staying signed in, and Back asking "Leave
   registration?", Cancel staying with the name and Leave going to the landing screen; the years filled by their labels
   ("Year you joined *", "Year you left (or will leave) *"), never by position, so a past role's Start year can't be
@@ -773,11 +781,17 @@ install can't find the new modules.
 
 ### 1. Sign-in and phone entry
 
-On each phone, open Demo University (signing out first under More → Sign out, if someone is signed in) and choose "Sign
-in / Join with mobile number": India (+91) is chosen. Write `+91 98765 43210` in Notes first, to copy it from there:
-the paste checks use it on both phones and send nothing. Only the fourth check sends a code, each phone for its own
-new number.
+On each phone, open the list of institutions (signing out first under More → Sign out, if someone is signed in;
+Choose a different institution, under a landing screen's card, opens the list). The first check ends on Demo
+University's sign-in screen, where the rest begin. Write `+91 98765 43210` in Notes first, to copy it from there: the
+paste checks use it on both phones and send nothing. Only the fifth check sends a code, each phone for its own new
+number.
 
+- [ ] Outdoors, or with the screen at its dimmest: open Shri Gujarati Samaj, then Choose a different institution →
+      Demo University. On each landing screen the cover's name and tagline are plain white on the darkened orange or
+      blue, easy to read, and the status bar's clock and icons are white on it too. On Demo University's, choose "Sign
+      in / Join with mobile number": India (+91) is chosen, and the Country code and Mobile number boxes each show a
+      clear grey edge on the white card.
 - [ ] Paste "+91 98765 43210" into Mobile number: the box shows 98765 43210, with no 91 in front, India stays chosen,
       and Send code is enabled. Clear it and paste "+919876543210", then "919876543210": each time the box holds the ten
       digits once. Five digits leave Send code dimmed; the sixth enables it.
@@ -1372,6 +1386,13 @@ As Rahul, under My profile → Appearance. Choose Plain again at the end, so the
       suspended at an institution, or members there had blocked you, that still applies if you join again with this
       number.", then Delete account and Cancel, and focus stays in the sheet until it closes. Cancel (and Android's
       back button) closes it and leaves the account. Don't confirm it as Rahul.
+- [ ] The cover over a photo, on Demo College's walk-through in the next check. Before the first phone gets there, as
+      Demo College's admin (`+91 90000 00002`, web, the sign-in the next check uses), under Admin → Settings → Branding,
+      Upload cover with a bright photo (a sky, or a white wall) and Save branding. When Demo College's walk-through
+      opens on a phone (close and open the app again if it still shows the plain colour), its cover is the photo under
+      an even dark veil: the name and the line under it are plain white and easy to read over the photo's brightest
+      part, and so are the status bar's clock and icons. Once both phones have seen it, Remove cover and Save branding,
+      so the later parts find Demo College as it was seeded.
 - [ ] With the number from parts 1 and 2, signed in on the phone: message Priya (Directory → Priya Nair → Message this
       member), and in the browser, as Priya, open the request and choose Block member. As Demo College's admin
       (`+91 90000 00002`, web), approve the number's request under Admin → Members; as Demo University's admin, suspend

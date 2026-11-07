@@ -729,9 +729,26 @@ looks the same on the web and the phone and stays readable in any institution co
   into the label, in the label's grey, and shows no "Removed" on comments. The reds the ink replaced fell under 4.5:1 on
   the page. Toasts are white on the success or danger solid (or slate-800), the WhatsApp link on a member's profile is
   the success ink, and a poll marks the reader's vote with a drawn check, which screen readers hear as "your vote".
-- **Tests.** `tones.test.ts` pins every pair with `contrastRatio` and checks `index.css` against the shared values, and
-  `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted (`expectReadable` and `expectEdge` in
-  `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill, skill chips and the success toast.
+- **Form fields.** A text field, select, text area, picker or chat box is white on a white card, so its edge is all that
+  shows where it is: the faint grey, 3:1 on white (WCAG 1.4.11), on both apps (web `Input`, `Select`, `Textarea`, the
+  chat composer and the phone number's country box; the phone's `Input`, country, option and date pickers, Skills box
+  and chat composer). On the web a focused field's edge is the brand's ink, which shows in any institution colour (the
+  country box, a see-through select over a drawn box, shows its focus too), and an invalid one's the danger edge, which
+  until now lost to the grey and never showed. Cards, dividers and outline buttons keep their lighter lines.
+- **Brand cover.** The landing, sign-in, registration and walk-through covers (`BrandCover` on both apps) write the
+  institution's name and lines in plain white on an even black veil, as dark as `heroScrim` (`lib/color.ts`) says white
+  needs to read at 4.5:1: 30% for a colour white already reads on, as the seeded institutions are; 50% for a pale one
+  (a colour like `#fde68a`, which white reads on at 1.25:1); and 55% for the palest, about as light as `#eeeeee` or
+  lighter (sky-100 `#e0f2fe`, or white), and on any cover photo, since a photo may be white where the text falls. The
+  web's gradient, from the primary to the secondary colour, is mixed in sRGB, so its lightest point is one of the two,
+  which `heroScrim` checks. Before, a fixed veil and white text at 70–90% left pale brands and bright photos at about
+  2:1. The phone's status bar sits on the same veil and is light.
+- **Tests.** `tones.test.ts` pins every pair with `contrastRatio`, the fields' edges with them (and that both apps'
+  fields draw them), and checks `index.css` against the shared values; `color.test.ts` checks `heroScrim` across the
+  colour cube, a photo and a gradient; `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted
+  (`expectReadable` and `expectEdge` in `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill, skill chips, the
+  success toast, the sign-in page's field edges, and the landing's hero and its veil over Demo University's blue (30%),
+  over a pale colour served in its place (50%) and over a cover photo served with it (55%).
 
 ### Lists and loading
 

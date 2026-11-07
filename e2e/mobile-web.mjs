@@ -175,6 +175,36 @@ try {
     await page.getByText("DemoU", { exact: true }).locator("visible=true").first().waitFor();
     await page.getByText("Once a DemoU, always a DemoU.", { exact: true }).locator("visible=true").first().waitFor();
     await shot("m02-landing");
+    // The hero is white on a veil only as dark as white needs (heroScrim), and each cover is pinned to the veil it
+    // should get, which also shows the served institution reached it: Demo University's blue keeps the 30% of black its
+    // cover has always had; a pale colour served in its place (in a browser context of its own, which leaves this
+    // page's stack as it is) takes half; a cover photo, which may be white where the text falls, 55%. paintedColour
+    // sees no photo, so there the text is read on the veil over the blue, and the veil is what's checked.
+    const heroTexts = (p) => ["DemoU", "Once a DemoU, always a DemoU."].map((text) => p.getByText(text, { exact: true }).locator("visible=true").first());
+    const expectHero = async (p, brand, scrim, where) => {
+      const veiled = brand.map((c) => c * (1 - scrim));
+      for (const text of heroTexts(p)) {
+        const { behind } = await expectReadable(text, `the landing's "${await text.innerText()}" ${where}`);
+        if (behind.split(" ").some((c, i) => Math.abs(Number(c) - veiled[i]) > 2)) throw new Error(`the landing's cover ${where} is veiled to rgb ${behind}, not ${Math.round(scrim * 100)}% of black over rgb ${brand.join(" ")}`);
+      }
+    };
+    await expectHero(page, [29, 78, 216], 0.3, "on Demo University's blue");
+    const scriptedContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const scriptedPage = await scriptedContext.newPage();
+    const scripted = await scriptTenant(scriptedPage, "demo-university");
+    scripted.rewrite((t) => ({ ...t, primaryColor: "#fde68a" }));
+    await scriptedPage.goto(BASE + "/t/demo-university");
+    await scriptedPage.getByText("Sign in / Join with mobile number").waitFor();
+    await expectHero(scriptedPage, [253, 230, 138], 0.5, "on a pale brand");
+    await scriptedPage.screenshot({ path: `${SHOTS}/m02a-landing-pale-brand.png` });
+    // A white photo, the lightest a cover photo can be, over Demo University's own colours.
+    const whitePhoto = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"><rect width="16" height="9" fill="#fff"/></svg>')}`;
+    scripted.rewrite((t) => ({ ...t, coverImageUrl: whitePhoto }));
+    await scriptedPage.reload();
+    await scriptedPage.getByText("Sign in / Join with mobile number").waitFor();
+    await expectHero(scriptedPage, [29, 78, 216], 0.55, "over a cover photo");
+    await scriptedPage.screenshot({ path: `${SHOTS}/m02b-landing-cover-photo.png` });
+    await scriptedContext.close();
     await tap("Sign in / Join with mobile number");
     // The country code picker searches the full list; pick the UK, then switch back to India.
     await page.getByRole("button", { name: /^Country code, India \+91/ }).click();
@@ -185,6 +215,9 @@ try {
     await page.getByPlaceholder(/Search by name or code/).fill("+91");
     await page.getByText("India", { exact: true }).click();
     await page.getByRole("button", { name: /^Country code, India \+91/ }).waitFor();
+    // A field's edge is all that shows it on the white card: the faint grey, 3:1, the picker's as the box's.
+    await expectEdge(page.getByRole("button", { name: /^Country code, India \+91/ }), "the country code picker");
+    await expectEdge(page.getByPlaceholder("98765 43210"), "the mobile number box");
     await signIn(PHONE);
     await page.getByText("Create your profile").waitFor();
     await shot("m03-register");

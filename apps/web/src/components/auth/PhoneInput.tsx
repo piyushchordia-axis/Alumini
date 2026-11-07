@@ -15,8 +15,9 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneEntry; 
   const [note, setNote] = useState("");
   return (
     <div className="flex gap-2">
-      <div className="relative w-28 shrink-0">
-        <div aria-hidden className="pointer-events-none flex h-10 items-center justify-between gap-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900">
+      {/* The select is see-through over the box, so the box shows the focus a field shows (Input), in the ink. */}
+      <div className="group/country relative w-28 shrink-0">
+        <div aria-hidden className="pointer-events-none flex h-10 items-center justify-between gap-1 rounded-lg border border-slate-400 bg-white px-3 text-sm text-slate-900 group-has-[select:focus]/country:border-primary-ink group-has-[select:focus]/country:ring-2 group-has-[select:focus]/country:ring-primary/20">
           <span>
             {flagEmoji(selected.code)} {selected.dial}
           </span>

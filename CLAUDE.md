@@ -267,7 +267,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     fill, a 1px edge and its ink, with a pixel less padding so the edge doesn't change its size; a chosen RSVP is its
     tone's fill, edge and ink. A field's error is the danger ink, as web `FormField` (with its required `*`) and mobile
     `Input`/`FieldError` draw it (the phone's `*` is part of the label), toasts sit on the solids, and the phone's
-    `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders.
+    `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders. A form field's edge is the
+    faint grey, 3:1 on white, because on a white card it is all that shows the field: web `controlClass` (`Input`,
+    `Select`, `Textarea`: `border-slate-400`, `focus:border-primary-ink`, invalid `border-tone-danger-edge`), the chat
+    composer and the phone number's country box; mobile `Input`, `CountryPicker`, `OptionPicker`, `DateTimeField`,
+    `SkillsInput` and the chat composer (`colors.faint`, `colors.danger` when invalid). Cards, dividers and outline
+    buttons keep their light lines (`colors.border`, `slate-200`/`300`), which aren't a control's only edge.
   - **Notices.** A note above a box or a form is `Notice` (both apps): `info` on the info tone with `IconInfo`, for what
     is worth knowing before acting (not live; on the web the box it's about lists it in `aria-describedby`), and
     `warning` on the warning tone with `IconAlert`, for what went wrong, which replaces the info note while it shows
@@ -291,8 +296,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Typography.** Web: Manrope (display) + Source Sans 3 (body) via `index.html` / CSS vars. Keep page titles from
     dwarfing body copy (`PageHeader` uses a locked scale).
   - **Landing / auth.** Brand-first full-bleed cover, drawn by `BrandCover` on both apps (web `AuthShell`, mobile the
-    tenant landing screen; `compact` is a shorter band); institution name is the hero; one CTA; features below the fold
-    with SVG + text.
+    tenant landing screen, and the walk-through on both; `compact` is a shorter band); institution name is the hero; one
+    CTA; features below the fold with SVG + text. The hero text is plain white on an even black veil whose opacity is
+    shared `heroScrim(brand, hasPhoto)` (`lib/color.ts`): only as dark as white needs to read at 4.5:1 over the brand's
+    colours (the web's gradient, from the primary to the secondary, mixes in sRGB so its lightest point is one of the
+    two), 30% for a brand white already reads on, 50% for a pale one such as `#fde68a`, and 55% for the palest (about
+    `#eeeeee` and lighter: sky-100, white) and on any cover photo. Only `BrandCover` applies it; a page doesn't add a
+    veil or fade the text of its own. The veil wraps the hero, so e2e's `paintedColour` sees it, and the phone's status
+    bar, on the same veil, is light while the cover's screen is in front.
   - **Nav.** Sidebar / tabs need ≥40–44px targets, clear active weight (primary wash + stronger text), and SVG icons.
     The member sections, their badges and More's come from one `useMemberSections` hook per app (web `HomeLayout`, the
     phone's tabs and More), never worked out again in place. A current link is chosen: web `bg-primary-wash ring-1
@@ -443,6 +454,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   the install will fail to resolve the package. Prefer `npx expo install <pkg>` inside `apps/mobile`.
 - Do not declare React components inside another component's render body (e.g. a local `NavLabel`): ESLint
   `react-hooks/static-components` rejects it. Hoist helpers to module scope.
+- Tailwind writes two utilities that set the same property in the order of their names, not of the classes on the
+  element, so the one whose name sorts later wins: an invalid field's `border-red-400` never beat `border-slate-300`.
+  Put a state behind a variant (`focus:`, `aria-invalid:`) or use a name that sorts after (`border-tone-danger-edge`).
 - sharp decodes and re-encodes every upload, so upload tests use real images made at test time
   (`test/helpers/images.ts`); a few fake bytes after a PNG header get 415. Its native build is per platform: don't
   share `node_modules` between Windows and a dev container.

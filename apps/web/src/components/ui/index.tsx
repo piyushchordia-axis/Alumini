@@ -57,20 +57,24 @@ export function LinkButton({ to, state, variant = "primary", size = "md", classN
 }
 
 /* ---------- Form controls ---------- */
+// A field is white on a white card, so its edge is all that shows where it is: the faint grey, 3:1 on white (WCAG
+// 1.4.11). Focused, the edge is the ink, which shows in any institution colour. Invalid, it is the danger edge, which
+// Tailwind writes after slate-400 (the two set one property, in name order), so it wins; border-red-400 never did.
 const controlClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-slate-50";
+  "w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-ink focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-slate-50";
+const invalidControlClass = "border-tone-danger-edge";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }>(function Input({ className, invalid, ...rest }, ref) {
-  return <input ref={ref} className={clsx(controlClass, invalid && "border-red-400 focus:ring-red-200", className)} {...rest} />;
+  return <input ref={ref} className={clsx(controlClass, invalid && [invalidControlClass, "focus:ring-red-200"], className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }>(function Textarea({ className, invalid, ...rest }, ref) {
-  return <textarea ref={ref} className={clsx(controlClass, "min-h-24", invalid && "border-red-400", className)} {...rest} />;
+  return <textarea ref={ref} className={clsx(controlClass, "min-h-24", invalid && invalidControlClass, className)} {...rest} />;
 });
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }>(function Select({ className, invalid, children, ...rest }, ref) {
   return (
-    <select ref={ref} className={clsx(controlClass, invalid && "border-red-400", className)} {...rest}>
+    <select ref={ref} className={clsx(controlClass, invalid && invalidControlClass, className)} {...rest}>
       {children}
     </select>
   );

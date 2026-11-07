@@ -89,14 +89,14 @@ export function DateTimeField({ label, value, onChange, mode = "datetime", error
         value: value ?? "",
         "aria-label": label,
         onChange: (e: { target: { value: string } }) => onChange(e.target.value || null),
-        style: { border: `1px solid ${error ? colors.danger : colors.border}`, borderRadius: radius.md, padding: 10, fontSize: 15, background: "#fff", color: colors.text },
+        style: { border: `1px solid ${error ? colors.danger : colors.faint}`, borderRadius: radius.md, padding: 10, fontSize: 15, background: "#fff", color: colors.text },
       })
     ) : (
       <Pressable
         onPress={open}
         accessibilityRole="button"
         accessibilityLabel={`${label}${value ? `, ${display(value, mode)}` : ""}`}
-        style={{ borderWidth: 1, borderColor: error ? colors.danger : colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
+        style={{ borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
       >
         <Text style={{ fontSize: 15, color: value ? colors.text : colors.faint }}>{value ? display(value, mode) : (placeholder ?? (mode === "date" ? "Choose a date" : "Choose date and time"))}</Text>
       </Pressable>

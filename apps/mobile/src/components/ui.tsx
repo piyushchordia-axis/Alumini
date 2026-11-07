@@ -754,7 +754,9 @@ const styles = StyleSheet.create({
   buttonTextCompact: { fontSize: 14 },
   buttonWithIcon: { flexDirection: "row", gap: spacing.sm },
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
-  input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
+  // A field is white on a white card, so its edge is all that shows where it is: the faint grey, 3:1 on white (WCAG
+  // 1.4.11), as the web draws it. The pickers, the Skills box and the chat composer take the same edge.
+  input: { borderWidth: 1, borderColor: colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
   error: { color: STATUS_TONES.danger.ink, fontSize: 12 },
   hint: { color: colors.muted, fontSize: 12 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },

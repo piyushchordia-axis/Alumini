@@ -155,7 +155,7 @@ export function SkillsInput({
 // The same as `Input` in ui.tsx, which can't take the ref this needs to move focus back after a removal.
 const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600", color: "#334155" },
-  input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
+  input: { borderWidth: 1, borderColor: colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
   error: { color: STATUS_TONES.danger.ink, fontSize: 12 },
   hint: { color: colors.muted, fontSize: 12 },
   note: { color: "#92400e", fontSize: 12 },

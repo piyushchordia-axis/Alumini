@@ -42,7 +42,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}${selected ? `, ${selected.name}${variant === "dial" ? ` ${selected.dial}` : ""}` : ""}`}
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: error ? colors.danger : colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
       >
         <Text style={{ fontSize: 15, color: selected ? colors.text : colors.faint }} numberOfLines={1}>
           {fieldText}
@@ -69,7 +69,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
                 autoFocus
                 autoCorrect={false}
                 accessibilityLabel="Search countries"
-                style={{ borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text }}
+                style={{ borderWidth: 1, borderColor: colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text }}
               />
             </View>
             <FlatList
