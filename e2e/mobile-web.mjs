@@ -620,7 +620,49 @@ try {
     if (!(await tabs.evaluate((list) => list.firstElementChild.scrollWidth > list.firstElementChild.clientWidth))) throw new Error("the tabs should scroll sideways on a narrow phone");
     await pastEvents(false).click();
     await pastEvents(true).waitFor();
+    // Each tab says what it holds and offers its own way to add one, in Demo University's ink on its wash: this member has
+    // organised nothing and listed no funding. Past events has nothing to add from there.
+    const tabBox = (title) => page.getByText(title, { exact: true }).locator("visible=true").first().locator("xpath=..");
+    await expectEmptyState(tabBox("No past events"), "My posts' empty Past events", { absent: ["Plan a gathering"], tones: BRAND_TONES.demoUniversity });
+    // The web app's name for it, longer than the "Events" this used to say, and still whole on the narrow phone.
+    const upcoming = page.locator('[role="tab"]').getByText("Upcoming events", { exact: true }).locator("visible=true").first();
+    if (await upcoming.evaluate((label) => label.scrollWidth - label.clientWidth > 1)) throw new Error('"Upcoming events" is truncated on a narrow phone');
+    await upcoming.click();
+    await expectEmptyState(tabBox("You aren't organising anything yet"), "My posts' empty Upcoming events", { actions: ["Plan a gathering"], tones: BRAND_TONES.demoUniversity });
+    // Nor has this member posted a job, listed a business (that comes later) or made a group. The screen's own tabs: the
+    // bar has a Jobs tab too.
+    const myTab = (label) => tabs.locator('[role="tab"]').getByText(label, { exact: true });
+    for (const [label, title, action] of [
+      ["Jobs", "You haven't posted a job yet", "Post a job"],
+      ["Businesses", "You haven't listed a business yet", "Add a business"],
+      ["Groups", "You haven't created a group yet", "Create group"],
+    ]) {
+      await myTab(label).click();
+      await expectEmptyState(tabBox(title), `My posts' empty ${label}`, { actions: [action], tones: BRAND_TONES.demoUniversity });
+    }
+    await myTab("Funding").click();
+    const funding = tabBox("You haven't listed any funding yet");
+    await expectEmptyState(funding, "My posts' empty Funding", { actions: ["I'm raising", "I'm investing"], tones: BRAND_TONES.demoUniversity });
     await page.setViewportSize({ width: 390, height: 844 });
+    // I'm investing opens the form for investing, on Funding's own stack: Back is Funding's list, not My posts.
+    await funding.getByRole("link", { name: "I'm investing", exact: true }).click();
+    await page.waitForURL(/\/t\/demo-university\/funding\/new\?kind=OFFERING$/);
+    await page.getByText("Offer to invest", { exact: true }).locator("visible=true").last().waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last().click();
+    await page.waitForURL("**/t/demo-university/funding");
+    await page.getByText("Seeking funding", { exact: true }).locator("visible=true").first().waitFor();
+    // And Plan a gathering the event form, on Events' stack.
+    await barTab("More").click();
+    await page.waitForURL("**/t/demo-university/more");
+    await hubRow("My posts").click();
+    await page.waitForURL("**/t/demo-university/profile/my-content");
+    await myTab("Upcoming events").click();
+    await tabBox("You aren't organising anything yet").getByRole("link", { name: "Plan a gathering", exact: true }).click();
+    await page.waitForURL("**/t/demo-university/events/new");
+    await page.getByRole("heading", { name: "Plan a gathering", exact: true }).locator("visible=true").last().waitFor();
+    await page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last().click();
+    await page.waitForURL("**/t/demo-university/events");
+    await page.getByText("Mumbai alumni coffee meetup").locator("visible=true").first().waitFor();
   });
 
   await step("jobs tab lists seeded openings", async () => {
@@ -2217,6 +2259,14 @@ try {
     await pupil.goto(`${BASE}/t/demo-school/profile/my-content`);
     await pupil.locator('[role="tab"]').getByText("Posts", { exact: true }).locator("visible=true").first().waitFor();
     if (await pupil.locator('[role="tab"]').getByText("Groups", { exact: true }).locator("visible=true").count()) throw new Error("a pupil's My posts has a Groups tab");
+    // Naina has posted nothing. A pupil may post, so the box offers it, and nothing on the screen offers a group.
+    const noPosts = pupil.getByText("You haven't posted yet", { exact: true }).locator("visible=true").first().locator("xpath=..");
+    await expectEmptyState(noPosts, "a pupil's empty Posts tab", { actions: ["Write a post"], tones: BRAND_TONES.demoSchool });
+    if (await pupil.getByRole("link", { name: "Create group" }).locator("visible=true").count()) throw new Error("a pupil's My posts offers Create group");
+    // Write a post opens the new-post screen, on the feed's stack.
+    await noPosts.getByRole("link", { name: "Write a post", exact: true }).click();
+    await pupil.waitForURL("**/t/demo-school/feed/new");
+    await pupil.getByRole("button", { name: "Post", exact: true }).locator("visible=true").first().waitFor();
 
     // Jobs stay open to a pupil, without referrals: no tab, no filter, nothing to tick on the form, and no way to ask, even
     // with the job served as offering referrals, so only the pupil rule can be what hides it.
@@ -2289,6 +2339,12 @@ try {
     await selectedBarTab("More").waitFor();
     await open("/events");
     await page.waitForURL("**/t/demo-university/profile");
+    // My posts says why it has nothing, with its icon on Demo University's wash, and no tabs.
+    await open("/profile/my-content");
+    await page.waitForURL("**/t/demo-university/profile/my-content");
+    const nothing = page.getByText("Nothing to show", { exact: true }).locator("visible=true").first().locator("xpath=..");
+    await expectEmptyState(nothing, "My posts with every section off", { tones: BRAND_TONES.demoUniversity });
+    if (await page.locator('[role="tablist"]').filter({ hasText: "Posts" }).locator("visible=true").count()) throw new Error("My posts shows tabs with every section off");
     await features.stop();
   });
 

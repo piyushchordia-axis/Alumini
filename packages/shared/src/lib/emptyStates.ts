@@ -1,4 +1,4 @@
-import type { FundingKind, TenantFeatures, TenantType } from "../constants";
+import type { FundingKind, TenantFeature, TenantFeatures, TenantType } from "../constants";
 import type { TenantSummaryDto } from "../types/dto";
 import { CAN_REFER_LABEL } from "./referrals";
 
@@ -163,3 +163,125 @@ export function tenantSearchEmpty(searching: boolean): EmptyCopy {
     live: true,
   };
 }
+
+/* ---------- My posts & listings ---------- */
+
+/** The tabs of My posts & listings, in the order both apps show them. */
+export const MY_CONTENT_TABS = ["posts", "jobs", "funding", "businesses", "groups", "events", "pastEvents"] as const;
+export type MyContentTab = (typeof MY_CONTENT_TABS)[number];
+
+/** The section icon a tab's empty state draws: names both apps' NavIcon knows. */
+export type MyContentIcon = "posts" | "jobs" | "funding" | "businesses" | "groups" | "events";
+
+interface MyContentTabCopy {
+  label: string;
+  icon: MyContentIcon;
+  /** The switch the tab's section follows. */
+  feature: TenantFeature;
+  emptyTitle: string;
+  emptyText: (peers: PeersWord) => string;
+  /** What its empty state offers to add, the first as the primary way on. */
+  create: readonly EmptyCreate[];
+}
+
+export const MY_CONTENT: Readonly<Record<MyContentTab, MyContentTabCopy>> = {
+  posts: {
+    label: "Posts",
+    icon: "posts",
+    feature: "feed",
+    emptyTitle: "You haven't posted yet",
+    emptyText: (peers) => `Share news or ask your ${peers} a question. Posts waiting for approval show here too.`,
+    create: ["post"],
+  },
+  jobs: {
+    label: "Jobs",
+    icon: "jobs",
+    feature: "jobs",
+    emptyTitle: "You haven't posted a job yet",
+    emptyText: (peers) => `Hiring, or know of a role? Post it for your ${peers}.`,
+    create: ["job"],
+  },
+  funding: {
+    label: "Funding",
+    icon: "funding",
+    feature: "funding",
+    emptyTitle: "You haven't listed any funding yet",
+    emptyText: () => "Raising money or looking to invest? List it so members can find you.",
+    create: ["raising", "investing"],
+  },
+  businesses: {
+    label: "Businesses",
+    icon: "businesses",
+    feature: "businesses",
+    emptyTitle: "You haven't listed a business yet",
+    emptyText: (peers) => `Run a business? Add it so your ${peers} can find it.`,
+    create: ["business"],
+  },
+  groups: {
+    label: "Groups",
+    icon: "groups",
+    feature: "groups",
+    emptyTitle: "You haven't created a group yet",
+    emptyText: () => "Start one for your city, your year or an interest. Groups you create show here.",
+    create: ["group"],
+  },
+  events: {
+    // Beside Past events, so it says which.
+    label: "Upcoming events",
+    icon: "events",
+    feature: "events",
+    emptyTitle: "You aren't organising anything yet",
+    emptyText: () => "Heading somewhere? Plan a gathering and see who wants to join.",
+    create: ["event"],
+  },
+  pastEvents: {
+    label: "Past events",
+    icon: "events",
+    feature: "events",
+    emptyTitle: "No past events",
+    emptyText: () => "Gatherings you organised show here once they're over.",
+    create: [],
+  },
+};
+
+/**
+ * The tabs this member sees: each while its section is on, and Groups only for a member who may chat (a group is a kind
+ * of chat, which a current pupil can't use), so they never see a tab they couldn't add to.
+ */
+export function myContentTabs(viewer: EmptyViewer): { value: MyContentTab; label: string }[] {
+  const features = viewer.tenant.settings.features;
+  return MY_CONTENT_TABS.filter((tab) => features[MY_CONTENT[tab].feature] && (tab !== "groups" || viewer.membership.chatEligible)).map((value) => ({ value, label: MY_CONTENT[value].label }));
+}
+
+/** A create action that says what it adds, for a box that may offer more than one (Funding: raising and investing). */
+export interface EmptyCreateAction extends EmptyAction {
+  kind: "create";
+  what: EmptyCreate;
+}
+
+export interface MyContentEmpty {
+  icon: MyContentIcon;
+  title: string;
+  description: string;
+  /** Each only while mayCreate allows it; the first is primary, the rest outline. */
+  actions: EmptyCreateAction[];
+}
+
+export function myContentEmpty(tab: MyContentTab, viewer: EmptyViewer): MyContentEmpty {
+  const copy = MY_CONTENT[tab];
+  return {
+    icon: copy.icon,
+    title: copy.emptyTitle,
+    description: copy.emptyText(peersWord(viewer.tenant.type)),
+    actions: copy.create
+      .filter((what) => mayCreate(what, viewer))
+      .map((what, i): EmptyCreateAction => ({ what, label: EMPTY_CREATE_LABELS[what], kind: "create", variant: i === 0 ? "primary" : "outline" })),
+  };
+}
+
+/** My posts with every one of its sections switched off. */
+export const MY_CONTENT_OFF: Readonly<{ icon: MyContentIcon; title: string; description: string }> = {
+  icon: "posts",
+  title: "Nothing to show",
+  description: "Your institution has switched off posts, jobs, funding, businesses, groups and events.",
+};

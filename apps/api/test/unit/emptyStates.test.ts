@@ -1,5 +1,8 @@
 import {
   EMPTY_CREATE_LABELS,
+  MY_CONTENT,
+  MY_CONTENT_OFF,
+  MY_CONTENT_TABS,
   SEEKERS_EMPTY,
   TENANT_FEATURES,
   businessesEmpty,
@@ -10,6 +13,8 @@ import {
   groupsEmpty,
   jobsEmpty,
   mayCreate,
+  myContentEmpty,
+  myContentTabs,
   notificationsEmpty,
   peersWord,
   referralsReceivedEmpty,
@@ -17,6 +22,7 @@ import {
   type EmptyCopy,
   type EmptyCreate,
   type EmptyViewer,
+  type MyContentTab,
   type TenantFeature,
   type TenantFeatures,
   type TenantType,
@@ -202,5 +208,100 @@ describe("tenantSearchEmpty", () => {
   it("suggests another search only while there is one", () => {
     expect(tenantSearchEmpty(true).description).toBe("Try a different search, or ask your alumni office to join Illuminize.");
     expect(tenantSearchEmpty(false).description).toBe("Ask your alumni office to join Illuminize.");
+  });
+});
+
+describe("My posts & listings", () => {
+  const values = (v: EmptyViewer) => myContentTabs(v).map((t) => t.value);
+  // What each tab's box offers, as label and variant, with everything on.
+  const offers = (tab: MyContentTab, v = viewer()) => myContentEmpty(tab, v).actions.map((a) => [a.label, a.variant]);
+
+  it("lists its tabs in order, with the same labels on both apps", () => {
+    expect(myContentTabs(viewer())).toEqual([
+      { value: "posts", label: "Posts" },
+      { value: "jobs", label: "Jobs" },
+      { value: "funding", label: "Funding" },
+      { value: "businesses", label: "Businesses" },
+      { value: "groups", label: "Groups" },
+      { value: "events", label: "Upcoming events" },
+      { value: "pastEvents", label: "Past events" },
+    ]);
+    expect(MY_CONTENT_TABS).toEqual(myContentTabs(viewer()).map((t) => t.value));
+  });
+
+  it("shows each tab only while its own section is on", () => {
+    // A switch with no tab here (directory, messaging, mentorship, or one added later) shows none of them alone.
+    const tabOf: Partial<Record<TenantFeature, MyContentTab[]>> = { feed: ["posts"], jobs: ["jobs"], funding: ["funding"], businesses: ["businesses"], groups: ["groups"], events: ["events", "pastEvents"] };
+    for (const feature of TENANT_FEATURES) expect(values(viewer({ features: only(feature) })), `only ${feature} on`).toEqual(tabOf[feature] ?? []);
+    expect(values(viewer({ features: only() }))).toEqual([]);
+    expect(values(viewer({ features: only("directory", "messaging", "mentorship") }))).toEqual([]);
+  });
+
+  it("shows Groups only to a member who may chat, as a current pupil may not", () => {
+    expect(values(viewer({ features: only("groups"), chatEligible: false }))).toEqual([]);
+    expect(values(viewer({ type: "SCHOOL", chatEligible: false }))).toEqual(["posts", "jobs", "funding", "businesses", "events", "pastEvents"]);
+  });
+
+  it("gives every tab its own icon, title and description, never the old Nothing here yet", () => {
+    for (const tab of MY_CONTENT_TABS) {
+      const empty = myContentEmpty(tab, viewer());
+      expect(empty.icon, tab).toMatch(/^(posts|jobs|funding|businesses|groups|events)$/);
+      expect(empty.title, tab).not.toBe("Nothing here yet");
+      expect(empty.description, tab).toMatch(/\S.*[.?]$/);
+    }
+    expect(new Set(MY_CONTENT_TABS.map((tab) => myContentEmpty(tab, viewer()).title)).size).toBe(MY_CONTENT_TABS.length);
+    expect(Object.fromEntries(MY_CONTENT_TABS.map((tab) => [tab, MY_CONTENT[tab].icon]))).toEqual({ posts: "posts", jobs: "jobs", funding: "funding", businesses: "businesses", groups: "groups", events: "events", pastEvents: "events" });
+  });
+
+  it("keeps the titles e2e looks for", () => {
+    expect(myContentEmpty("posts", viewer()).title).toBe("You haven't posted yet");
+    expect(myContentEmpty("funding", viewer()).title).toBe("You haven't listed any funding yet");
+    expect(myContentEmpty("events", viewer()).title).toBe("You aren't organising anything yet");
+    expect(myContentEmpty("pastEvents", viewer()).title).toBe("No past events");
+  });
+
+  it("calls the other members fellow members at a community and batchmates elsewhere", () => {
+    expect(myContentEmpty("posts", viewer({ type: "OTHER" })).description).toBe("Share news or ask your fellow members a question. Posts waiting for approval show here too.");
+    expect(myContentEmpty("posts", viewer()).description).toBe("Share news or ask your batchmates a question. Posts waiting for approval show here too.");
+    expect(myContentEmpty("jobs", viewer({ type: "OTHER" })).description).toBe("Hiring, or know of a role? Post it for your fellow members.");
+    expect(myContentEmpty("businesses", viewer({ type: "COLLEGE" })).description).toBe("Run a business? Add it so your batchmates can find it.");
+  });
+
+  it("offers to add one under the screen's own name, Funding both kinds, and Past events nothing", () => {
+    expect(Object.fromEntries(MY_CONTENT_TABS.map((tab) => [tab, offers(tab)]))).toEqual({
+      posts: [["Write a post", "primary"]],
+      jobs: [["Post a job", "primary"]],
+      funding: [
+        ["I'm raising", "primary"],
+        ["I'm investing", "outline"],
+      ],
+      businesses: [["Add a business", "primary"]],
+      groups: [["Create group", "primary"]],
+      events: [["Plan a gathering", "primary"]],
+      pastEvents: [],
+    });
+    for (const tab of MY_CONTENT_TABS) {
+      for (const action of myContentEmpty(tab, viewer()).actions) {
+        expect(action.kind, tab).toBe("create");
+        expect(action.label, tab).toBe(EMPTY_CREATE_LABELS[action.what]);
+      }
+    }
+    expect(myContentEmpty("funding", viewer()).actions.map((a) => a.what)).toEqual(["raising", "investing"]);
+  });
+
+  it("offers each only while mayCreate allows it, the words staying the same", () => {
+    const pupil = viewer({ type: "SCHOOL", chatEligible: false });
+    expect(myContentEmpty("groups", pupil).actions).toEqual([]);
+    expect(offers("posts", pupil)).toEqual([["Write a post", "primary"]]);
+    const off = viewer({ features: only("directory") });
+    for (const tab of MY_CONTENT_TABS) {
+      expect(myContentEmpty(tab, off).actions, tab).toEqual([]);
+      expect({ ...myContentEmpty(tab, off), actions: [] }).toEqual({ ...myContentEmpty(tab, viewer()), actions: [] });
+      for (const what of MY_CONTENT[tab].create) expect(mayCreate(what, viewer({ features: only(MY_CONTENT[tab].feature) })), `${tab}: ${what}`).toBe(true);
+    }
+  });
+
+  it("says why there's nothing when every section is off", () => {
+    expect(MY_CONTENT_OFF).toEqual({ icon: "posts", title: "Nothing to show", description: "Your institution has switched off posts, jobs, funding, businesses, groups and events." });
   });
 });

@@ -251,7 +251,9 @@ nothing. The rules live in `packages/shared/src/lib/features.ts`.
   Directory, Clear search on the institution picker, Clear filters on Mentors), which puts focus back in the search
   box; a Groups search offers Create group instead. A create action shows only while its section is on (`mayCreate` in
   `packages/shared/src/lib/emptyStates.ts`, which holds the lists' copy for both apps), Create group also needs a
-  member who may chat (not a current pupil), and Referrals shown as a way out offers no Post a job.
+  member who may chat (not a current pupil), and Referrals shown as a way out offers no Post a job. Each tab of My posts
+  has its own box (`MY_CONTENT`), shown only while its section is on: Funding offers I'm raising and I'm investing,
+  Past events nothing, and Write a post opens the feed with focus in its composer on the web, New post on the phone.
 
 ### Current pupils
 

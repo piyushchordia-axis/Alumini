@@ -1277,7 +1277,33 @@ try {
     if (await page.locator('[role="dialog"]').count()) throw new Error("More sheet stayed open after navigating");
     await expectMoreActive(true, "My posts");
     await page.click('[role="tab"]:has-text("Past events")');
+    // Each tab says what it holds and offers its own way to add one, in Demo University's ink on its wash. Smoke Tester
+    // has organised nothing and listed no funding. Past events has nothing to add from there. (Their post fills Posts:
+    // the pupil's step below sees that box.)
+    const tabBox = (title) => page.locator(`div:has(> h3:text-is("${title}"))`);
+    await expectEmptyState(tabBox("No past events"), "My posts' empty Past events", { absent: ["Plan a gathering"], tones: BRAND_TONES.demoUniversity });
     await shot("08b-phone-my-content");
+    // Both of Smoke Tester's jobs and the bakery went at their own steps, and the groups step comes later: each of those
+    // tabs is empty too, and each box opens its section's form.
+    for (const [label, title, action, form] of [
+      ["Jobs", "You haven't posted a job yet", "Post a job", "jobs/new"],
+      ["Businesses", "You haven't listed a business yet", "Add a business", "businesses/new"],
+      ["Groups", "You haven't created a group yet", "Create group", "groups/new"],
+      ["Upcoming events", "You aren't organising anything yet", "Plan a gathering", "events/new"],
+    ]) {
+      await page.click(`[role="tab"]:has-text("${label}")`);
+      const box = tabBox(title);
+      await expectEmptyState(box, `My posts' empty ${label}`, { actions: [action], tones: BRAND_TONES.demoUniversity });
+      const href = await box.getByRole("link", { name: action, exact: true }).getAttribute("href");
+      if (href !== `/t/demo-university/app/${form}`) throw new Error(`My posts' ${action} opens ${href}`);
+    }
+    await page.click('[role="tab"]:has-text("Funding")');
+    const funding = tabBox("You haven't listed any funding yet");
+    await expectEmptyState(funding, "My posts' empty Funding", { actions: ["I'm raising", "I'm investing"], tones: BRAND_TONES.demoUniversity });
+    for (const [name, kind] of [["I'm raising", "SEEKING"], ["I'm investing", "OFFERING"]]) {
+      const href = await funding.getByRole("link", { name, exact: true }).getAttribute("href");
+      if (href !== `/t/demo-university/app/funding/new?kind=${kind}`) throw new Error(`My posts' ${name} opens ${href}`);
+    }
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
@@ -1328,8 +1354,19 @@ try {
     await expectMoreActive(true, "the profile, as home");
     await page.goto(app + "/events");
     await page.waitForSelector("text=Events is turned off");
-    await features.stop();
+    // My posts says why it has nothing, with its icon on Demo University's wash, under its own header and as wide as the
+    // page (max-w-2xl, 672px) on a wide screen, not across the whole of it.
     await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(app + "/my-content");
+    const myPosts = page.getByRole("heading", { level: 1, name: "My posts & listings", exact: true });
+    await myPosts.waitFor();
+    const nothing = page.locator('div:has(> h3:text-is("Nothing to show"))');
+    await expectEmptyState(nothing, "My posts with every section off", { tones: BRAND_TONES.demoUniversity });
+    const [header, box] = [await myPosts.boundingBox(), await nothing.boundingBox()];
+    if (box.y < header.y + header.height) throw new Error("My posts' Nothing to show isn't under its header");
+    if (box.width > 672) throw new Error(`My posts' Nothing to show is ${box.width}px wide, wider than the page`);
+    if (await page.locator('[role="tab"]').count()) throw new Error("My posts shows tabs with every section off");
+    await features.stop();
   });
 
   await step("a failed refetch keeps the open screen, and an answer from the API doesn't", async () => {
@@ -1694,6 +1731,21 @@ try {
     await pupil.goto(`${BASE}/t/demo-school/app/my-content`);
     await pupil.locator('[role="tab"]:has-text("Posts")').waitFor();
     if (await pupil.locator('[role="tab"]:has-text("Groups")').count()) throw new Error("a pupil's My posts has a Groups tab");
+    // Naina has posted nothing. A pupil may post, so the box offers it, and nothing anywhere offers a group.
+    const noPosts = pupil.locator(`div:has(> h3:text-is("You haven't posted yet"))`);
+    await expectEmptyState(noPosts, "a pupil's empty Posts tab", { actions: ["Write a post"], tones: BRAND_TONES.demoSchool });
+    if (await pupil.getByRole("link", { name: "Create group" }).count()) throw new Error("a pupil's My posts offers Create group");
+    // The feed's composer is the form for a post: Write a post opens the feed with focus in it.
+    await noPosts.getByRole("link", { name: "Write a post", exact: true }).click();
+    await pupil.waitForURL(/\/t\/demo-school\/app\/feed$/);
+    await pupil.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "New post");
+    // Once: the entry keeps its state through a reload (pull to refresh), which mustn't put focus there again unasked and
+    // bring up a phone's keyboard.
+    await pupil.reload();
+    if (!(await pupil.evaluate(() => window.history.state?.usr?.compose))) throw new Error("the reloaded feed lost Write a post's state, so this checks nothing");
+    await pupil.locator('textarea[aria-label="New post"]').waitFor();
+    await pupil.waitForTimeout(500);
+    if ((await pupil.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "New post") throw new Error("reloading the feed Write a post opened put focus in the composer again");
 
     // Jobs stay open to a pupil, without referrals: no tab, no filter, nothing to tick on the form, and no way to ask, even
     // with the job served as offering referrals, so only the pupil rule can be what hides it.

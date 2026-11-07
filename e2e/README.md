@@ -171,9 +171,14 @@ Covers:
   "match" box with Show all members, which empties the search and Open to, and the businesses' with Show all
   businesses, which empties the search, the category and the city, each putting focus back in the search box, an empty
   Requests tab, a mentor search with Clear filters inside the box
-  (its title matched exactly, as a live box repeats its words in a hidden status line) and a job's empty referral
-  requests at Demo University (blue), and the pupil's three "aren't available" boxes, each with Go to the app, at Demo
-  School (amber).
+  (its title matched exactly, as a live box repeats its words in a hidden status line), a job's empty referral
+  requests, My posts' own box on each of its tabs but Posts, which Smoke Tester's post fills (Past events with nothing
+  to add; Jobs with Post a job, Businesses with Add a business, Groups with Create group and Upcoming events with Plan a
+  gathering, each linking to its section's form; Funding with I'm raising and I'm investing, each to the form for its
+  kind), and with every section off its "Nothing to show" under the page's header and no wider than the page, at Demo
+  University (blue); the pupil's three "aren't available" boxes, each with Go to the app, and her empty Posts tab in My
+  posts, with Write a post (no Create group anywhere there) opening the feed with focus in its composer, once (a reload
+  keeps the state but doesn't focus it again), at Demo School (amber).
 
 ## Web (tenant admin + platform console)
 
@@ -298,7 +303,7 @@ Covers:
   still to add, skills no longer among it, and `?section=about` scrolling About you into view; Delete my account's
   confirm sheet, saying a suspension or blocks come back with the number, cancelled with the account still there;
 - every section opening its own screen, with Events, Groups, Mentors and Funding behind More; My posts from the More
-  hub, its tabs scrolling rather than truncating;
+  hub, its tabs scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px;
 - jobs: seeded cards with place, pay, experience and "+1 more" skills, and Zylo Labs's and Deloitte's initials in a
   tone from each company's name, two tones apart and not the institution's; the Work mode and experience filters behind
   Filters, and Clear filters; the Backend Engineer page, its title the only heading holding it, with its facts, section
@@ -483,9 +488,14 @@ Covers:
   buttons that used to sit beside them inside the box: the empty inbox with Find a group, Received referrals with Post
   a job, Sent referrals with Find jobs that can refer, a mentor search with Clear filters, the directory's "match" box
   with Show all members, the businesses' with Show all businesses (which empties the search, the category and the
-  city and puts focus back in the search box) and an empty Requests tab at Demo University (blue); the pupil's "aren't
-  available" screens at Demo School (amber), each with its way out; and the console's empty chat reports, Pending tab
-  and invitations at the Samaj (orange).
+  city and puts focus back in the search box), an empty Requests tab, My posts' own box on each of its tabs but Posts,
+  which the member's post fills (Past events with nothing to add, Upcoming events with Plan a gathering, Jobs with Post
+  a job, Businesses with Add a business, Groups with Create group, Funding with I'm raising and I'm investing), I'm
+  investing opening the investing form and Plan a gathering the event form, each with Back on its section's list, and
+  with every section off its "Nothing to show", at Demo University (blue); the pupil's "aren't available" screens at
+  Demo School (amber), each with its way out, and her empty Posts tab in My posts, with Write a post (no Create group on
+  the screen) opening the new-post screen; and the console's empty chat reports, Pending tab and invitations at the
+  Samaj (orange).
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -693,9 +703,15 @@ the console (part 14).
       you have and with the largest text size. No label is cut off.
 - [ ] Android: Back from a section behind More (Events, Groups, Mentors, Businesses, Funding) returns to the More
       hub, not out of the app. Back from a chat returns to Messages.
-- [ ] My posts has seven tabs at Demo University (Posts, Jobs, Funding, Businesses, Groups, Events, Past events): they
-      scroll sideways, the selected one scrolls into view, and no label is clipped. Nor are the tab labels on Jobs,
-      Mentors and Groups.
+- [ ] My posts has seven tabs at Demo University (Posts, Jobs, Funding, Businesses, Groups, Upcoming events, Past
+      events): they scroll sideways, the selected one scrolls into view, and no label is clipped. Nor are the tab labels
+      on Jobs, Mentors and Groups.
+- [ ] My posts as a new member, who has added nothing: each tab says what it holds, with its icon in the brand's round
+      tint and its own button (Write a post, Post a job, I'm raising and I'm investing, Add a business, Create group,
+      Plan a gathering; none on Past events). Each opens its form, Funding's on the kind pressed. Back from a section's
+      form lands on that section's list (Jobs, Funding, Businesses, Events), never on a screen with no way back, and
+      Back from Create group returns to My posts; Write a post opens New post, and posting returns to the feed.
+      TalkBack or VoiceOver reads each button as a link.
 - [ ] Bell notifications of each kind open their screen, a chat message's time and day labels look right, and a group
       whose name starts with an emoji (create "🏃 Morning runners") shows the initials "MR". These check `Object.hasOwn`,
       `Intl` and Unicode handling on Hermes.

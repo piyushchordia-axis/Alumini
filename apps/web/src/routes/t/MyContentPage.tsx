@@ -1,3 +1,4 @@
+import { MY_CONTENT_OFF, myContentEmpty, myContentTabs, type MyContentTab } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { useSearchParams } from "react-router-dom";
 import { BusinessCard } from "@/components/businesses/BusinessCard";
@@ -6,34 +7,25 @@ import { EventCard } from "@/components/events/EventCard";
 import { PostCard } from "@/components/feed/PostCard";
 import { FundingCard } from "@/components/funding/FundingCard";
 import { JobCard } from "@/components/jobs/JobCard";
-import { EmptyState, ErrorBox, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
+import { NavIcon } from "@/components/icons";
+import { EmptyState, ErrorBox, LinkButton, LoadMore, Loading, PageHeader, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { myContentHref } from "@/lib/emptyStates";
 import { qk } from "@/lib/queryKeys";
 
-type Tab = "posts" | "jobs" | "funding" | "businesses" | "groups" | "events" | "pastEvents";
+const HEADER = { title: "My posts & listings", subtitle: "Everything you've shared, including items awaiting approval" };
 
 export function MyContentPage() {
-  const { tenant, membership } = useMembership();
-  const slug = tenant.slug;
-  const f = tenant.settings.features;
-  const tabs = (
-    [
-      { value: "posts", label: "Posts", on: f.feed },
-      { value: "jobs", label: "Jobs", on: f.jobs },
-      { value: "funding", label: "Funding", on: f.funding },
-      { value: "businesses", label: "Businesses", on: f.businesses },
-      { value: "groups", label: "Groups", on: f.groups && membership.chatEligible },
-      { value: "events", label: "Upcoming events", on: f.events },
-      { value: "pastEvents", label: "Past events", on: f.events },
-    ] satisfies Array<{ value: Tab; label: string; on: boolean }>
-  ).filter((t) => t.on);
+  const member = useMembership();
+  const slug = member.tenant.slug;
+  const tabs = myContentTabs(member);
   // The tab is in the URL, so a notice about a group's review can open this on Groups, and Back returns to the same tab.
   const [params, setParams] = useSearchParams();
   const picked = tabs.find((t) => t.value === params.get("tab"))?.value;
-  const tab: Tab = picked ?? tabs[0]?.value ?? "posts";
-  const setTab = (next: Tab) => setParams((old) => {
+  const tab: MyContentTab = picked ?? tabs[0]?.value ?? "posts";
+  const setTab = (next: MyContentTab) => setParams((old) => {
     const p = new URLSearchParams(old);
     p.set("tab", next);
     return p;
@@ -47,11 +39,19 @@ export function MyContentPage() {
   const events = useInfiniteList(qk.events(slug, { mine: true, scope: "upcoming" }), (cursor) => api.events.list(slug, { mine: true, scope: "upcoming", cursor, limit: 20 }), tab === "events");
   const pastEvents = useInfiniteList(qk.events(slug, { mine: true, scope: "past" }), (cursor) => api.events.list(slug, { mine: true, scope: "past", cursor, limit: 20 }), tab === "pastEvents");
   const active = { posts, jobs, funding, businesses, groups, events, pastEvents }[tab];
-  if (tabs.length === 0) return <EmptyState title="Nothing to show" description="Your institution has switched off posts, jobs, funding, businesses, groups and events." />;
+  const empty = myContentEmpty(tab, member);
+  if (tabs.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <PageHeader {...HEADER} />
+        <EmptyState icon={<NavIcon name={MY_CONTENT_OFF.icon} />} title={MY_CONTENT_OFF.title} description={MY_CONTENT_OFF.description} />
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="My posts & listings" subtitle="Everything you've shared, including items awaiting approval" />
-      <Tabs value={tab} onChange={setTab} tabs={tabs.map(({ value, label }) => ({ value, label }))} className="max-w-full sm:w-fit" />
+      <PageHeader {...HEADER} />
+      <Tabs value={tab} onChange={setTab} tabs={tabs} className="max-w-full sm:w-fit" />
       {active.isLoading && <Loading />}
       {active.error && <ErrorBox error={active.error} />}
       {/* One column that may shrink, so a long job title truncates on a phone rather than widening the page. */}
@@ -64,7 +64,24 @@ export function MyContentPage() {
         {tab === "events" && events.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
         {tab === "pastEvents" && pastEvents.items.map((e) => <EventCard key={e.id} slug={slug} event={e} />)}
       </div>
-      {!active.isLoading && !active.error && active.items.length === 0 && <EmptyState title="Nothing here yet" />}
+      {!active.isLoading && !active.error && active.items.length === 0 && (
+        <EmptyState
+          icon={<NavIcon name={empty.icon} />}
+          title={empty.title}
+          description={empty.description}
+          action={
+            empty.actions.length > 0 &&
+            empty.actions.map((a) => {
+              const link = myContentHref(slug, a.what);
+              return (
+                <LinkButton key={a.what} to={link.to} state={link.state} variant={a.variant}>
+                  {a.label}
+                </LinkButton>
+              );
+            })
+          }
+        />
+      )}
       <LoadMore hasNextPage={!!active.hasNextPage} isFetchingNextPage={active.isFetchingNextPage} fetchNextPage={() => void active.fetchNextPage()} />
     </div>
   );

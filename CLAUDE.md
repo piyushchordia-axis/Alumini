@@ -41,7 +41,7 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   in chunks (`importInChunks`) and each row's status and actions; `lib/csv.ts` `parseCsv`, `csvLine` and `withBom`;
   `lib/charts.ts` the charts' palette, ticks, layouts and hand-written number and week text; `lib/analytics.ts` the
   Analytics page's figures and chart cards; `lib/emptyStates.ts` what the member lists say when empty and which way on
-  each offers (`mayCreate`).
+  each offers (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 

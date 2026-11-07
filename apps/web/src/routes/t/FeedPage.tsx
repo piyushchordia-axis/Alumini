@@ -1,5 +1,6 @@
 import { feedEmpty } from "@illuminize/shared";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { CelebrationsCard } from "@/components/feed/CelebrationsCard";
 import { DigestBanner } from "@/components/feed/DigestBanner";
 import { PostCard } from "@/components/feed/PostCard";
@@ -10,7 +11,31 @@ import { Button, EmptyState, ErrorBox, LoadMore, Loading, PageHeader } from "@/c
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import type { FeedArrival } from "@/lib/emptyStates";
 import { qk } from "@/lib/queryKeys";
+
+/**
+ * Whether this is the first arrival on a history entry Write a post opened. The entry keeps its `compose` state, so
+ * coming Back to it later (from a post, say) or reloading it (pull to refresh, or Back from another site) would focus the
+ * composer again and bring up a phone's keyboard unasked. The entries are remembered for the browser tab's session, as
+ * its history is, so a reload remembers them too; where the browser refuses storage, for this page load only.
+ */
+const COMPOSED = "illuminize.composed";
+const composedHere = new Set<string>();
+function firstArrival(key: string): boolean {
+  if (composedHere.has(key)) return false;
+  composedHere.add(key);
+  try {
+    const seen: unknown = JSON.parse(sessionStorage.getItem(COMPOSED) ?? "[]");
+    const keys = Array.isArray(seen) ? seen.filter((k): k is string => typeof k === "string") : [];
+    if (keys.includes(key)) return false;
+    // The latest twenty are plenty: an older one is far back in the history.
+    sessionStorage.setItem(COMPOSED, JSON.stringify([...keys, key].slice(-20)));
+  } catch {
+    // Storage refused or unreadable: the set above still covers this page load.
+  }
+  return true;
+}
 
 export function FeedPage() {
   const member = useMembership();
@@ -18,6 +43,12 @@ export function FeedPage() {
   const slug = tenant.slug;
   const composer = useRef<HTMLTextAreaElement>(null);
   const empty = feedEmpty(member);
+  // Write a post elsewhere (My posts) links here with `compose`: the composer is the form, so arriving puts focus in it.
+  const { key, state } = useLocation();
+  const compose = !!(state as FeedArrival | null)?.compose;
+  useEffect(() => {
+    if (compose && firstArrival(key)) composer.current?.focus();
+  }, [compose, key]);
   const list = useInfiniteList(qk.posts(slug), (cursor) => api.posts.list(slug, { cursor, limit: 10 }));
   const pinned = list.first?.pinned ?? [];
   return (
