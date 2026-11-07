@@ -1136,6 +1136,10 @@ try {
     const noAttendees = await scriptEmptyList(page, /\/api\/v1\/t\/demo-university\/events\/[0-9a-f-]+\/attendees\?/);
     await openSection("Events");
     await mumbaiCard().click();
+    // The feed's Upcoming strip opened this event a moment ago, so its lists are still fresh in the cache and wouldn't
+    // be asked for again: a reload asks for them, through the scripted answer.
+    await page.waitForURL(/\/t\/demo-university\/events\/[0-9a-f-]{36}$/);
+    await page.reload();
     await page.getByText("Who's coming").waitFor();
     await expectEmptyState(emptyBox("No one has said yes yet"), "an open event's empty Going list", { tones: BRAND_TONES.demoUniversity });
     await emptyBox("No one has said yes yet").getByText("Choose I'm going to be the first.", { exact: true }).waitFor();
