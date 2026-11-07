@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1002,6 +1002,38 @@ try {
     if (skillRow.height > tsBox.height + 1) throw new Error(`the card's skills take ${skillRow.height}px, more than one line of ${tsBox.height}px`);
     await backend.evaluate((el) => el.scrollIntoView({ block: "center" }));
     await backend.screenshot({ path: `${SHOTS}/m05e-job-card-skills.png` });
+    // A search typed letter by letter asks once typing pauses, not at every letter. While its answer is on its way (held
+    // here), the cards already listed stay, faded under "Updating results…", the internship among them though it won't
+    // match; then the answer replaces them, unfaded.
+    const searches = [];
+    const jobSearch = (u) => u.pathname.endsWith("/t/demo-university/jobs") && u.searchParams.has("q");
+    const recordSearch = (r) => {
+      if (r.method() === "GET" && jobSearch(new URL(r.url()))) searches.push(new URL(r.url()).searchParams.get("q"));
+    };
+    page.on("request", recordSearch);
+    const searchJobs = page.getByLabel("Search jobs", { exact: true }).locator("visible=true").first();
+    const internCard = page.getByRole("button", { name: /^Summer Intern – Strategy/ }).locator("visible=true").first();
+    await internCard.waitFor();
+    const backendHeld = await holdGets(page, (u) => jobSearch(u) && u.searchParams.get("q") === "Backend");
+    let jobsUpdating;
+    try {
+      await searchJobs.pressSequentially("Backend", { delay: 40 });
+      await backendHeld.asked();
+      jobsUpdating = await expectKeptResults(page, backend, "the job cards while a search loads");
+      await internCard.waitFor();
+      await shot("m05h-jobs-updating");
+    } finally {
+      backendHeld.release();
+    }
+    await internCard.waitFor({ state: "hidden" });
+    await jobsUpdating.waitFor({ state: "detached" });
+    await backendHeld.stop();
+    page.off("request", recordSearch);
+    if (searches.length >= "Backend".length || searches.at(-1) !== "Backend") throw new Error(`typing "Backend" searched for ${searches.map((q) => `"${q}"`).join(", ")}, not once typing paused`);
+    if ((await drawnOpacity(backend)) !== 1) throw new Error("the Backend card stays faded once the search's answer is in");
+    // Cleared, so the tabs below come back to every opening.
+    await searchJobs.fill("");
+    await internCard.waitFor();
     // Each tab, and on Referrals each list, is in the URL, as a referral notification links to them.
     await tab("Looking for work", false).click();
     await tab("Looking for work", true).waitFor();
@@ -1035,7 +1067,7 @@ try {
     const workModes = onTop(page.getByRole("group", { name: "Work mode", exact: true }));
     await workModes.getByRole("button", { name: "Remote", exact: true }).click();
     if ((await workModes.getByRole("button", { name: "Remote", exact: true }).getAttribute("aria-selected")) !== "true") throw new Error("the Remote filter doesn't show as chosen");
-    // The cards also go while the list loads, filtered or not, so what's left out is checked once the filtered list is in.
+    // The cards listed stay, faded, while the list loads, so what's left out is checked once the filtered list is in.
     const listed = (name) => page.getByRole("button", { name }).locator("visible=true").count();
     await intern.waitFor({ state: "hidden" });
     await backend.waitFor();
@@ -1178,8 +1210,18 @@ try {
     await page.getByText("Company", { exact: true }).locator("visible=true").first().waitFor();
     await page.getByText("Country", { exact: true }).locator("visible=true").first().waitFor();
     const search = page.getByPlaceholder("Name, company, role or skill", { exact: true }).locator("visible=true").first();
+    // The cards listed stay until a search's answer is on the screen, so a step waits for that before reading them.
+    const answered = (q) => {
+      const answer = page.waitForResponse((r) => r.request().method() === "GET" && new URL(r.url()).pathname.endsWith("/t/demo-university/directory") && new URL(r.url()).searchParams.get("q") === q);
+      return async () => {
+        await answer;
+        await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
+      };
+    };
     // A seeded skill finds the member who lists it, though her name, company, role and headline don't say it.
+    const bySkill = answered("Distributed systems");
     await search.fill("Distributed systems");
+    await bySkill();
     const sneha = page.getByRole("button", { name: /^Sneha Kulkarni, / }).locator("visible=true").first();
     await sneha.waitFor();
     // What she's open to is on her card, short, and in full in the card's name.
@@ -1187,10 +1229,26 @@ try {
     if (!(await sneha.getAttribute("aria-label")).includes("Open to investing")) throw new Error(`Sneha's card is named "${await sneha.getAttribute("aria-label")}", without what she's open to`);
     // The Open to filter keeps her, and leaves out Priya, who is open to hiring.
     await page.getByRole("button", { name: "Investing", exact: true }).locator("visible=true").first().click();
+    const byName = answered("Sneha");
     await search.fill("Sneha");
+    await byName();
     await sneha.waitFor();
-    await search.fill("Priya");
+    // While that search's answer is on its way (held here), Sneha's card stays, faded under "Updating results…", and
+    // nothing says the list is empty: that would name a search whose answer hasn't come.
+    const priyaHeld = await holdGets(page, (u) => u.pathname.endsWith("/t/demo-university/directory") && u.searchParams.get("q") === "Priya");
+    let updating;
+    try {
+      await search.fill("Priya");
+      await priyaHeld.asked();
+      updating = await expectKeptResults(page, sneha, "the directory's cards while a search loads");
+      if (await page.getByText("No members match", { exact: true }).locator("visible=true").count()) throw new Error("the directory says no members match while the search's answer is still on its way");
+      await shot("m07c-directory-updating");
+    } finally {
+      priyaHeld.release();
+    }
     await page.getByText("No members match", { exact: true }).locator("visible=true").first().waitFor();
+    await updating.waitFor({ state: "detached" });
+    await priyaHeld.stop();
     await expectEmptyState(page.getByText("No members match", { exact: true }).locator("visible=true").first().locator("xpath=.."), "the directory's empty state", { actions: ["Show all members"], tones: BRAND_TONES.demoUniversity });
     await page.getByRole("button", { name: "Clear filters", exact: true }).locator("visible=true").first().click();
     const hit = page.getByText("Priya Nair").locator("visible=true").first();
@@ -2518,10 +2576,14 @@ try {
     if (await poster.getByRole("link", { name: "Ask for a referral" }).locator("visible=true").count()) throw new Error("a poster is offered Ask for a referral on their own job");
     await poster.screenshot({ path: `${SHOTS}/m13a-referral-job-posted.png` });
 
-    // The asker finds it under Can refer, which leaves out jobs that take no requests.
+    // The asker finds it under Can refer, which leaves out jobs that take no requests. Read once the filtered answer is on
+    // the screen: the cards listed before it stay, faded, until then, the internship among them.
     await asker.goto(`${app}/jobs`);
     const filter = shown(asker.getByRole("checkbox", { name: "Can refer", exact: true }));
+    const referable = asker.waitForResponse((r) => r.request().method() === "GET" && new URL(r.url()).pathname.endsWith("/t/demo-university/jobs") && new URL(r.url()).searchParams.get("canRefer") === "true");
     await filter.click();
+    await referable;
+    await asker.waitForFunction(() => !document.querySelector('[aria-busy="true"]'));
     if ((await filter.getAttribute("aria-checked")) !== "true") throw new Error("the Can refer filter doesn't show as chosen");
     const card = shown(asker.getByRole("button", { name: new RegExp(`^${engineer}`) }));
     await card.getByText("Can refer", { exact: true }).waitFor();

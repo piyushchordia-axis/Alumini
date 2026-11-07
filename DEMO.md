@@ -109,6 +109,10 @@ phone-sized preview in the browser. Port 4000 must still be public.
   on Sneha Kulkarni's profile: in place of the old warning, a note, **Say hello to Sneha Kulkarni**, says her first
   message arrives as a request and gives a tip for writing it. Once it's sent, **Request sent** has the date she could
   ask again on a line of its own, with a clock.
+- **Results that stay while you search.** In **Directory** or **Jobs**, type a search or change a filter: the cards
+  already listed stay, faded, with a small **Updating results…** above them, until the new ones arrive, rather than the
+  list emptying to an outline each time (on a fast connection it can be over in a blink). The search asks once you
+  pause typing, not at every letter.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 

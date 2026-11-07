@@ -18,6 +18,7 @@ import { tenantSettingsUpdateSchema, type TenantSettingsUpdate } from "../schema
 import type { AdminMemberDto, DashboardDto, TenantPublicSettings, TenantSettingsDto } from "../types/dto";
 import { changedFeatures } from "./features";
 import { MONTHS } from "./jobs";
+import { filterFields, listFilters, sameFilterValue } from "./lists";
 import { memberYearsLabel, memberYearsLine } from "./memberYears";
 import { NOTIFICATION_CATEGORY } from "./notifications";
 import { formatPhone } from "./phone";
@@ -566,23 +567,15 @@ export function dedupeById<T extends { id: string }>(rows: readonly T[]): T[] {
 
 /**
  * Whether a list may go on showing the rows of `previousKey` while those of `key` load: only when the two keys differ in
- * nothing but the search (`searchField` of the filters, the key's last part). Rows carry actions for the tab they were
- * listed under, so a tab's rows must never stand in for another's, even for a moment, with live Approve buttons.
+ * nothing but the search (`searchField` of the filters, the key's last part; the others compared by value, as
+ * onlyFiltersChanged does). Rows carry actions for the tab they were listed under, so a tab's rows must never stand in
+ * for another's, even for a moment, with live Approve buttons.
  */
 export function onlySearchChanged(previousKey: readonly unknown[] | undefined, key: readonly unknown[], searchField = "q"): boolean {
-  if (!previousKey || previousKey.length !== key.length || key.length === 0) return false;
-  const last = key.length - 1;
-  if (previousKey.some((part, i) => i < last && part !== key[i])) return false;
-  const before = previousKey[last];
-  const now = key[last];
-  if (!isFilters(before) || !isFilters(now)) return false;
-  const fields = new Set([...Object.keys(before), ...Object.keys(now)]);
-  fields.delete(searchField);
-  return [...fields].every((field) => before[field] === now[field]);
-}
-
-function isFilters(value: unknown): value is Readonly<Record<string, unknown>> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+  const filters = listFilters(previousKey, key);
+  if (!filters) return false;
+  const [before, now] = filters;
+  return filterFields(before, now).every((field) => field === searchField || sameFilterValue(before[field], now[field]));
 }
 
 /** A whole count with its thousands grouped: "12,345". Written by hand, as Hermes may lack Intl number formatting. */

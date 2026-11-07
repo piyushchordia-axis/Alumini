@@ -10,11 +10,12 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
 - `apps/web`: React 19, Vite, Tailwind v4, TanStack Query. Holds the member app, tenant admin (`routes/t/admin`) and
   platform console (`routes/platform`). Design tokens live in `src/index.css`; SVG icons in `src/components/icons.tsx`;
   shared primitives in `src/components/ui` (skeletons in `ui/Skeleton.tsx`; a list's states in
-  `components/common/ListBody.tsx`, with `ListError`).
+  `components/common/ListBody.tsx`, with `ListError`; kept results in `components/common/UpdatingNote.tsx`,
+  `UpdatingNote` and `KeptResults`).
 - `apps/mobile`: Expo SDK 58 with expo-router: the member app and the institution admin console
   (`src/app/t/[slug]/(app)/admin`, a stack above the tabs). Screens are in `src/app`. Theme tokens in `src/theme`;
   SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx` (skeletons in
-  `components/Skeleton.tsx`, which `ListEmpty` draws). Chrome:
+  `components/Skeleton.tsx`, which `ListEmpty` draws; kept results' note in `components/UpdatingNote.tsx`). Chrome:
   `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen` (pushed screens), `ChatHeader` (chat
   overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
   to the console's home). Do not use native stack headers for member chrome (see Gotchas). Files the console picks or
@@ -53,8 +54,10 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   Analytics page's figures and chart cards; `lib/emptyStates.ts` what the member lists say when empty (a post's
   comments, with whether it takes them, `postTakesComments`, and an event's attendees too) and which way on each offers
   (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`); `lib/lists.ts` how a list reads its query
-  (`listView`, `loadingFirstTime`, `LOADING_LABEL`) and `lib/skeletons.ts` the skeletons' shapes (`SKELETON_LAYOUTS`,
-  My posts' `MY_CONTENT_SKELETONS`).
+  (`listView`, `loadingFirstTime`, `LOADING_LABEL`) and keeps its rows while a new search loads (`keepPrevious`,
+  `onlyFiltersChanged`, `listUpdating`, `UPDATING_RESULTS`; the hooks' `listPlaceholder`, `listHasMore`,
+  `listMayLoadMore` and `listRefreshing`), and `lib/skeletons.ts` the skeletons' shapes
+  (`SKELETON_LAYOUTS`, My posts' `MY_CONTENT_SKELETONS`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -343,6 +346,19 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame. `data-testid` / `testID="skeleton"` is there for
     e2e alone. Spinners stay on the guards, sign-in and landing, registration, Load more and buttons, and for now on
     detail and form pages and the web console's and platform's lists (README → Known gaps).
+    A list that keeps its rows while a new search or filter loads opts in with `keepPreviousWhile` (`useInfiniteList`;
+    the phone console's `usePagedList`): `onlyFiltersChanged` for rows that only open a page, as Directory and Jobs do,
+    `onlySearchChanged` for console rows whose actions belong to their tab; both compare filters by value, as pages
+    rebuild them each render. `useInfiniteList` keeps nothing while a retry from the error is on its way
+    (`listPlaceholder`) and returns `updating` (kept rows: faded, busy, under `UPDATING_RESULTS` "Updating results…";
+    web `KeptResults`, busy on the grid; mobile `UpdatingNote` last in the box above the rows, raised over them, with
+    `KEPT_ROW` on each row and `busy` on each card, as a scroll view's busy isn't read, and an iOS announcement),
+    `hasMore` (web Load more) and `refreshing` (mobile pull-to-refresh), from `listHasMore`, `listMayLoadMore` and
+    `listRefreshing`, never `hasNextPage` or `isRefetching`, which kept rows would fool. The note floats on the first
+    row's top edge, below the filters, taking no room or clicks (on mobile Jobs, at the foot of the list's header with
+    `gap`), and the search box stays mounted; kept rows that are none show the skeleton (`listView`), so no empty state
+    names a search whose answer hasn't come. A member search box that hits the API waits 300 ms after typing stops
+    (`useDebounced`).
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.
@@ -442,6 +458,10 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   `route.fallback()` hands the request to the one set up before it, so set the hold up after any scripted answer to
   the same GET (`scriptNotification`, `scriptEmptyList`), or the answer comes first and nothing is held. The web
   skeleton's words stay "Loading…", naming no section, because `text=` and `hasText` match screen-reader-only text.
+- TanStack reports rows kept by `placeholderData` as `status: "success"`, so `isRefetching` is true while they show (a
+  FlatList's `refreshing` would spin for a search): read the hooks' `updating`, `hasMore` and `refreshing`. An e2e step
+  that reads a search's results waits for its answer first, as the directory steps' `answered` does: kept results may
+  already hold what it looks for.
 - Navigate once. React Router draws each navigation as a transition, so two in quick succession can be drawn as the last
   alone: registration navigating to `/app` itself while its own `<Navigate>` (on the membership put in the cache) did
   the same left `AppHomeRedirect`'s `<Navigate>`, whose effect had already run, on `/app` with nothing to show. When a

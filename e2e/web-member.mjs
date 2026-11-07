@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -672,7 +672,7 @@ try {
     await backend.waitFor({ state: "detached" });
     await page.locator("a", { hasText: "Associate Product Manager" }).waitFor();
     await intern.waitFor();
-    // Checked again now the filtered list is on the page: the cards also go while it loads, filtered or not.
+    // Checked again now the filtered list is on the page: the cards listed before stay, faded, while it loads.
     if (await backend.count()) throw new Error("one year of experience still lists the 3–6 year Backend job");
     await page.getByRole("button", { name: "Clear filters" }).click();
     await backend.waitFor();
@@ -913,8 +913,18 @@ try {
   await step("directory search and profile", async () => {
     await page.click('nav >> text=Directory');
     const search = page.locator('input[placeholder="Name, company, role or skill"]');
+    // The cards listed stay until a search's answer is on the page, so a step waits for that before reading them.
+    const answered = (q) => {
+      const answer = page.waitForResponse((r) => r.request().method() === "GET" && new URL(r.url()).pathname.endsWith("/t/demo-university/directory") && new URL(r.url()).searchParams.get("q") === q);
+      return async () => {
+        await answer;
+        await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'));
+      };
+    };
     // A seeded skill finds the member who lists it, though her name, company, role and headline don't say it.
+    const bySkill = answered("Distributed systems");
     await search.fill("Distributed systems");
+    await bySkill();
     const sneha = page.locator("a", { hasText: "Sneha Kulkarni" });
     await sneha.waitFor();
     // What she's open to shows on her card, and filters the directory from behind More filters.
@@ -922,12 +932,33 @@ try {
     await page.click('button:has-text("More filters")');
     const openTo = page.getByLabel("Open to", { exact: true });
     await openTo.selectOption("INVESTING");
+    const byName = answered("Sneha");
     await search.fill("Sneha");
+    await byName();
     await sneha.waitFor();
     // It leaves out Priya, who is open to hiring: the list comes back empty (not merely loading), and without the filter
-    // the same search finds her.
-    await search.fill("Priya");
+    // the same search finds her. While that answer is on its way (held here), Sneha's card stays, faded under "Updating
+    // results…", in the same place, the search box keeping focus, and nothing says the list is empty: that would name a
+    // search whose answer hasn't come.
+    const top = () => sneha.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+    const before = await top();
+    const priyaHeld = await holdGets(page, (u) => u.pathname.endsWith("/t/demo-university/directory") && u.searchParams.get("q") === "Priya");
+    let updating;
+    try {
+      await search.fill("Priya");
+      await priyaHeld.asked();
+      updating = await expectKeptResults(page, sneha, "the directory's cards while a search loads");
+      const during = await top();
+      if (Math.abs(during - before) > 1) throw new Error(`"Updating results…" moved the cards (Sneha's from ${before}px down the page to ${during}px)`);
+      if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("the search box lost focus while its results updated");
+      if (await page.getByText("No members match", { exact: true }).count()) throw new Error("the directory says no members match while the search's answer is still on its way");
+      await shot("07c-directory-updating");
+    } finally {
+      priyaHeld.release();
+    }
     await page.getByText("No members match", { exact: true }).waitFor();
+    await updating.waitFor({ state: "detached" });
+    await priyaHeld.stop();
     // Its icon in Demo University's blue ink on the wash, not a grey glyph on white, and a way back to everyone.
     await expectEmptyState(page.locator('div:has(> h3:text-is("No members match"))'), "the directory's empty state", { actions: ["Show all members"], tones: BRAND_TONES.demoUniversity });
     if (await page.locator("a", { hasText: "Priya Nair" }).count()) throw new Error("the Open to filter kept Priya, who isn't open to investing");
@@ -1241,7 +1272,11 @@ try {
 
     // Found by the new headline, which the card shows in place of the role.
     await page.goto(BASE + "/t/demo-university/app/directory");
+    // Once the search's answer is on the page: the cards listed before it stay until then, this member's perhaps among them.
+    const found = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith("/t/demo-university/directory") && new URL(r.url()).searchParams.get("q") === `smoke run ${unique}`);
     await page.fill('input[placeholder="Name, company, role or skill"]', `smoke run ${unique}`);
+    await found;
+    await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'));
     const card = page.locator("a", { hasText: "Smoke Tester" });
     await card.getByText(headline, { exact: true }).waitFor();
     // The years they gave when registering, under the name on the card and the profile, and when they registered.
@@ -1301,6 +1336,38 @@ try {
     // Clear of the bottom bar, which would cover its skills in the picture.
     await card.evaluate((el) => el.scrollIntoView({ block: "center" }));
     await card.screenshot({ path: `${SHOTS}/06d-job-card-skills-phone.png` });
+
+    // A search typed letter by letter asks once typing pauses, not at every letter. While its answer is on its way (held
+    // here), the cards already listed stay, faded under "Updating results…", the internship among them though it won't
+    // match; then the answer replaces them, unfaded.
+    const searches = [];
+    const jobSearch = (u) => u.pathname.endsWith("/t/demo-university/jobs") && u.searchParams.has("q");
+    const recordSearch = (r) => {
+      if (r.method() === "GET" && jobSearch(new URL(r.url()))) searches.push(new URL(r.url()).searchParams.get("q"));
+    };
+    page.on("request", recordSearch);
+    const intern = page.getByRole("link", { name: /^Summer Intern – Strategy/ });
+    await intern.waitFor();
+    const backendHeld = await holdGets(page, (u) => jobSearch(u) && u.searchParams.get("q") === "Backend");
+    let jobsUpdating;
+    try {
+      await page.getByLabel("Search jobs", { exact: true }).pressSequentially("Backend", { delay: 40 });
+      await backendHeld.asked();
+      jobsUpdating = await expectKeptResults(page, card, "the job cards while a search loads");
+      await intern.waitFor();
+      await page.screenshot({ path: `${SHOTS}/06i-jobs-updating-phone.png` });
+    } finally {
+      backendHeld.release();
+    }
+    await intern.waitFor({ state: "detached" });
+    await jobsUpdating.waitFor({ state: "detached" });
+    await backendHeld.stop();
+    page.off("request", recordSearch);
+    if (searches.length >= "Backend".length || searches.at(-1) !== "Backend") throw new Error(`typing "Backend" searched for ${searches.map((q) => `"${q}"`).join(", ")}, not once typing paused`);
+    // The fade eases out where motion is welcome.
+    let opacity = 0;
+    for (let i = 0; i < 20 && (opacity = await drawnOpacity(card)) < 1; i++) await page.waitForTimeout(50);
+    if (opacity < 1) throw new Error(`the Backend card stays faded (opacity ${opacity}) once the search's answer is in`);
 
     // The job's page keeps its own order, marks the same two, and says how many of its skills this member has.
     await card.click();
@@ -2859,9 +2926,13 @@ try {
     await poster.getByText("No referral requests yet").waitFor();
     await expectEmptyState(poster.locator('div:has(> h3:text-is("No referral requests yet"))'), "a job's empty referral requests", { tones: BRAND_TONES.demoUniversity });
 
-    // Meera finds it under Can refer, which leaves out jobs that take no requests.
+    // Meera finds it under Can refer, which leaves out jobs that take no requests. Read once the filtered answer is on the
+    // page: the cards listed before it stay, faded, until then, the internship among them.
     await meera.goto(`${app}/jobs`);
+    const referable = meera.waitForResponse((r) => r.request().method() === "GET" && new URL(r.url()).pathname.endsWith("/t/demo-university/jobs") && new URL(r.url()).searchParams.get("canRefer") === "true");
     await meera.getByLabel("Can refer", { exact: true }).check();
+    await referable;
+    await meera.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'));
     const card = meera.locator("a", { hasText: engineer });
     await card.getByText("Can refer", { exact: true }).waitFor();
     await meera.locator("a", { hasText: "Backend Engineer (Node.js)" }).waitFor();
@@ -3124,6 +3195,57 @@ try {
       await said.waitFor({ state: "detached" });
     } finally {
       await page.unroute("**/api/v1/**", nextPage);
+    }
+
+    // A search refused while the cards before it are kept. While its answer is on its way (held), Load more doesn't offer
+    // the kept cards' next page, which is their own search's. Then the cards go for the error, and its Retry loading
+    // keeps that error and focus, busy, while the retry is held, rather than bringing the kept cards back over it.
+    let refuseSearch = true;
+    const searchFails = async (route) => {
+      const u = new URL(route.request().url());
+      if (route.request().method() !== "GET" || !directory(u)) return route.fallback();
+      if (u.searchParams.get("q") === "Priya") return refuseSearch ? route.fulfill(refusal("e2e search refused")) : route.fallback();
+      if (u.searchParams.has("cursor")) return route.fallback();
+      // A next page for the cards that will be kept, so Load more would be there for them.
+      const response = await route.fetch();
+      const json = await response.json();
+      return route.fulfill({ response, json: { ...json, nextCursor: json.nextCursor ?? "e2e-next" } });
+    };
+    await page.route("**/api/v1/**", searchFails);
+    const isPriya = (u) => directory(u) && u.searchParams.get("q") === "Priya";
+    let searchHeld = null;
+    try {
+      await page.goto(BASE + "/t/demo-university/app/directory");
+      const more = page.getByRole("button", { name: "Load more", exact: true });
+      await more.waitFor();
+      const cards = page.locator("main a[href*='/app/directory/']");
+      // Set up after the refusal, so it holds the search and then hands it on to it.
+      searchHeld = await holdGets(page, isPriya);
+      await page.fill('input[placeholder="Name, company, role or skill"]', "Priya");
+      await searchHeld.asked();
+      const updating = await expectKeptResults(page, cards.first(), "the directory's cards while a refused search loads");
+      if (await more.count()) throw new Error("Load more offers the next page of the cards kept from the search before");
+      searchHeld.release();
+      const retry = page.getByRole("button", { name: "Retry loading", exact: true });
+      await retry.waitFor();
+      await updating.waitFor({ state: "detached" });
+      if (await cards.count()) throw new Error("the directory's kept cards stay beside a refused search's error");
+      await searchHeld.stop();
+      searchHeld = await holdGets(page, isPriya);
+      await retry.focus();
+      await page.keyboard.press("Enter");
+      await searchHeld.asked();
+      const during = await page.evaluate(() => ({ text: document.activeElement?.textContent?.trim(), busy: document.activeElement?.getAttribute("aria-busy") }));
+      if (during.text !== "Retry loading" || during.busy !== "true") throw new Error(`while the refused search's Retry loading retries, focus is on ${JSON.stringify(during)}, not the busy button`);
+      if (await cards.count()) throw new Error("the cards kept from the search before came back over the error while it retried");
+      if (await page.getByRole("status").filter({ hasText: "Updating results…" }).locator("visible=true").count()) throw new Error("the directory says it's updating kept cards while a retry from its error is on its way");
+      refuseSearch = false;
+      searchHeld.release();
+      await page.locator("a", { hasText: "Priya Nair" }).waitFor();
+      await retry.waitFor({ state: "detached" });
+    } finally {
+      if (searchHeld) await searchHeld.stop();
+      await page.unroute("**/api/v1/**", searchFails);
     }
   });
 

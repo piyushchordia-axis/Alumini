@@ -241,6 +241,34 @@ export async function holdGets(page, test) {
   };
 }
 
+/** How faded `locator` is drawn: its opacity times each of its ancestors' (1 when nothing fades it). */
+export const drawnOpacity = (locator) =>
+  locator.evaluate((el) => {
+    let opacity = 1;
+    for (let node = el; node; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+    return opacity;
+  });
+
+/**
+ * Checks a list keeps its results while a new search's answer is held back (holdGets): `card`, one of them, stays,
+ * faded to about 0.6, under an "Updating results…" status that is shown (not to screen readers alone) and takes no
+ * clicks, with no skeleton standing in. Returns the note, which goes once the answer is in.
+ */
+export async function expectKeptResults(page, card, where) {
+  const note = page.getByRole("status").filter({ hasText: "Updating results…" }).locator("visible=true").first();
+  await note.waitFor();
+  await card.waitFor();
+  const box = await note.boundingBox();
+  if (!box || box.width < 60) throw new Error(`${where}: "Updating results…" is said to screen readers alone, not shown over the results`);
+  if ((await note.evaluate((el) => getComputedStyle(el).pointerEvents)) !== "none") throw new Error(`${where}: "Updating results…" takes clicks meant for the results under it`);
+  // The fade eases in where motion is welcome.
+  let opacity = 1;
+  for (let i = 0; i < 20 && (opacity = await drawnOpacity(card)) > 0.65; i++) await page.waitForTimeout(50);
+  if (opacity > 0.65 || opacity < 0.5) throw new Error(`${where}: a kept result is drawn at opacity ${opacity}, not faded to about 0.6`);
+  if (await page.getByTestId("skeleton").locator("visible=true").count()) throw new Error(`${where}: a skeleton shows beside the kept results`);
+  return note;
+}
+
 /**
  * Puts the page's live connection through a proxy that loses any server frame containing `text`, as a flaky network would.
  * Set it up before the page connects (a reload does). `opened()` waits until the connection is up and has had a moment to

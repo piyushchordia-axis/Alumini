@@ -1,7 +1,8 @@
-import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type Industry, type OpenTo, type ProfessionType, countryName, directoryEmpty } from "@illuminize/shared";
+import { INDUSTRY_LABELS, OPEN_TO, OPEN_TO_LABELS, PROFESSION_TYPES, PROFESSION_TYPE_LABELS, type Industry, type OpenTo, type ProfessionType, countryName, directoryEmpty, onlyFiltersChanged } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { ListError } from "@/components/common/ListBody";
+import { KeptResults } from "@/components/common/UpdatingNote";
 import { MemberCard } from "@/components/directory/MemberCard";
 import { IconDirectory, IconSearch } from "@/components/icons";
 import { Button, EmptyState, Input, ListSkeleton, LoadMore, PageHeader, Select } from "@/components/ui";
@@ -45,7 +46,9 @@ export function DirectoryPage() {
     field: field.length ? field : undefined,
   };
   const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
-  const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
+  const key = qk.directory(slug, filters);
+  // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a profile.
+  const list = useInfiniteList(key, (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
   const reset = () => {
     setQ("");
     setYear("");
@@ -187,11 +190,11 @@ export function DirectoryPage() {
       </div>
       {list.view === "loading" && <ListSkeleton shape="member" />}
       {list.view === "error" && <ListError error={list.error} onRetry={list.retry} retrying={list.retrying} />}
-      <div className="grid gap-3 md:grid-cols-2">
+      <KeptResults updating={list.updating} className="grid gap-3 md:grid-cols-2">
         {list.items.map((m) => (
           <MemberCard key={m.id} slug={slug} member={m} />
         ))}
-      </div>
+      </KeptResults>
       {list.view === "empty" && (
         <EmptyState
           icon={empty.live ? <IconSearch /> : <IconDirectory />}
@@ -201,7 +204,7 @@ export function DirectoryPage() {
           action={empty.action && <Button variant={empty.action.variant} onClick={showAll}>{empty.action.label}</Button>}
         />
       )}
-      <LoadMore hasNextPage={!!list.hasNextPage} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
+      <LoadMore hasNextPage={list.hasMore} isFetchingNextPage={list.isFetchingNextPage} fetchNextPage={() => void list.fetchNextPage()} error={list.nextPageError} />
     </div>
   );
 }

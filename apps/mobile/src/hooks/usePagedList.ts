@@ -1,4 +1,4 @@
-import { dedupeById, pagedNext, type Page } from "@illuminize/shared";
+import { dedupeById, keepPrevious, pagedNext, type Page } from "@illuminize/shared";
 import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -23,7 +23,7 @@ export function usePagedList<T extends { id: string }>(
     queryFn: ({ pageParam }) => fetchPage(pageParam),
     initialPageParam: 1,
     getNextPageParam: (last) => pagedNext(last.page, last.pageSize, last.total),
-    placeholderData: (previous, previousQuery) => (previous && previousQuery && keepPreviousWhile?.(previousQuery.queryKey) ? previous : undefined),
+    placeholderData: keepPreviousWhile ? keepPrevious(keepPreviousWhile) : undefined,
     enabled,
     refetchOnMount,
   });

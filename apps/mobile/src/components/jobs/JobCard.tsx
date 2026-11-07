@@ -27,9 +27,10 @@ function Meta({ Icon, text }: { Icon: (p: IconProps) => ReactElement; text: stri
 /**
  * A job in a list (the Jobs tab and My posts), as on the web app. The title comes first, so it starts the card's name; the
  * logo (hidden from screen readers) comes after it and is drawn on the left. A removed job's page 404s even for its poster,
- * so that card opens nothing.
+ * so that card opens nothing. `kept`: the card is kept from the search before while this one's answer comes (Jobs), so
+ * it's said to be busy.
  */
-export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
+export function JobCard({ slug, job, kept = false }: { slug: string; job: JobCardDto; kept?: boolean }) {
   const router = useRouter();
   const theme = useTheme();
   const { membership } = useMembership();
@@ -52,7 +53,7 @@ export function JobCard({ slug, job }: { slug: string; job: JobCardDto }) {
     .filter(Boolean)
     .join(", ");
   return (
-    <Card onPress={job.moderationStatus === "REMOVED" ? undefined : () => router.push(jobHref(slug, job.id))} accessibilityLabel={name}>
+    <Card onPress={job.moderationStatus === "REMOVED" ? undefined : () => router.push(jobHref(slug, job.id))} accessibilityLabel={name} busy={kept}>
       <View style={{ flexDirection: "row-reverse", alignItems: "flex-start", gap: spacing.md }}>
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }} numberOfLines={2}>

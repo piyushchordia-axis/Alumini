@@ -13,6 +13,7 @@ import {
   jobsEmpty,
   jobsQuery,
   jobsTabFrom,
+  onlyFiltersChanged,
   referralBoxFrom,
   type JobSeniority,
   type JobsTab,
@@ -23,6 +24,7 @@ import {
 import { useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ListError } from "@/components/common/ListBody";
+import { KeptResults } from "@/components/common/UpdatingNote";
 import { IconJobs, IconProfile, IconSearch } from "@/components/icons";
 import { JobCard } from "@/components/jobs/JobCard";
 import { useReferralList } from "@/components/jobs/ReferralList";
@@ -95,7 +97,9 @@ export function JobsPage() {
     setExperience("");
     searchBox.current?.focus();
   };
-  const jobs = useInfiniteList(qk.jobs(slug, filters), (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), tab === "openings");
+  const jobsKey = qk.jobs(slug, filters);
+  // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a job.
+  const jobs = useInfiniteList(jobsKey, (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), { enabled: tab === "openings", keepPreviousWhile: (previous) => onlyFiltersChanged(previous, jobsKey) });
   const seekers = useInfiniteList(qk.seekers(slug), (cursor) => api.jobs.seekers.list(slug, { cursor, limit: 20 }), tab === "seekers");
 
   return (
@@ -181,11 +185,11 @@ export function JobsPage() {
             {jobs.view === "loading" && <ListSkeleton shape="listing" />}
             {jobs.view === "error" && <ListError error={jobs.error} onRetry={jobs.retry} retrying={jobs.retrying} />}
             {/* One column that may shrink, so a long title truncates on a phone rather than widening the page. */}
-            <div className="grid grid-cols-1 gap-3">
+            <KeptResults updating={jobs.updating} className="grid grid-cols-1 gap-3">
               {jobs.items.map((j) => (
                 <JobCard key={j.id} slug={slug} job={j} />
               ))}
-            </div>
+            </KeptResults>
             {jobs.view === "empty" && (
               <EmptyState
                 icon={empty.live ? <IconSearch /> : <IconJobs />}
@@ -202,7 +206,7 @@ export function JobsPage() {
                 }
               />
             )}
-            <LoadMore hasNextPage={!!jobs.hasNextPage} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} error={jobs.nextPageError} />
+            <LoadMore hasNextPage={jobs.hasMore} isFetchingNextPage={jobs.isFetchingNextPage} fetchNextPage={() => void jobs.fetchNextPage()} error={jobs.nextPageError} />
           </>
         ) : tab === "seekers" ? (
           <>

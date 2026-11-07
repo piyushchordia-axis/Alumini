@@ -12,6 +12,7 @@ import {
   WORK_MODE_LABELS,
   jobsEmpty,
   jobsTabFrom,
+  onlyFiltersChanged,
   referralBoxFrom,
   type JobSeekerDto,
   type JobSeniority,
@@ -30,6 +31,7 @@ import { ReferralRequests, ReferralsWayOut } from "@/components/jobs/ReferralReq
 import { useReferralList } from "@/components/jobs/ReferralRows";
 import { MemberRow } from "@/components/MemberRow";
 import { Button, Card, ChipSelect, Choice, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen, Tabs } from "@/components/ui";
+import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -120,7 +122,9 @@ export default function JobsScreen() {
     // The button goes with the filters it cleared, so focus moves to the toggle beside it.
     moveFocus(filtersToggle.current);
   };
-  const jobs = useInfiniteList(qk.jobs(slug, filters), (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), tab === "openings");
+  const jobsKey = qk.jobs(slug, filters);
+  // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a job.
+  const jobs = useInfiniteList(jobsKey, (cursor) => api.jobs.list(slug, { ...filters, cursor, limit: 20 }), { enabled: tab === "openings", keepPreviousWhile: (previous) => onlyFiltersChanged(previous, jobsKey) });
   const seekers = useInfiniteList(qk.seekers(slug), (cursor) => api.jobs.seekers.list(slug, { cursor, limit: 20 }), tab === "seekers");
   const [status, setStatus] = useStatus();
   // Such as "Request sent", from the request form, which has gone.
@@ -146,12 +150,15 @@ export default function JobsScreen() {
             </View>
             <FlatList
               data={jobs.items}
+              extraData={jobs.updating}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 96 }}
               keyboardShouldPersistTaps="handled"
               onEndReached={jobs.loadMore}
-              refreshing={jobs.isRefetching && !jobs.isFetchingNextPage}
+              refreshing={jobs.refreshing}
               onRefresh={() => void jobs.refetch()}
+              // Raised over the rows, so the note at its foot can float on the first one's top edge, below the filters.
+              ListHeaderComponentStyle={{ zIndex: 1 }}
               // With the list, so the filters scroll out of the way of the jobs they found.
               // Search, type and Can refer stay in view; the rest waits behind Filters, as on the directory.
               ListHeaderComponent={
@@ -192,6 +199,8 @@ export default function JobsScreen() {
                       />
                     </View>
                   )}
+                  {/* On the first card's top edge, below every filter, as on the web: the content's gap further down. */}
+                  <UpdatingNote updating={jobs.updating} gap={spacing.md} />
                 </View>
               }
               ListEmptyComponent={
@@ -212,7 +221,12 @@ export default function JobsScreen() {
                   />
                 </ListEmpty>
               }
-              renderItem={({ item }) => <JobCard slug={slug} job={item} />}
+              // Kept rows are faded and busy, each of them, not the list, whose header holds the filters just used.
+              renderItem={({ item }) => (
+                <View style={jobs.updating ? KEPT_ROW : undefined}>
+                  <JobCard slug={slug} job={item} kept={jobs.updating} />
+                </View>
+              )}
             />
             <Pressable
               onPress={() => router.push(`/t/${slug}/jobs/new`)}
@@ -233,7 +247,7 @@ export default function JobsScreen() {
               keyExtractor={(item) => item.member.id}
               contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 96 }}
               onEndReached={seekers.loadMore}
-              refreshing={seekers.isRefetching && !seekers.isFetchingNextPage}
+              refreshing={seekers.refreshing}
               onRefresh={() => void seekers.refetch()}
               ListEmptyComponent={
                 <ListEmpty view={seekers.view} skeleton="member" error={seekers.error} onRetry={seekers.retry} retrying={seekers.retrying}>

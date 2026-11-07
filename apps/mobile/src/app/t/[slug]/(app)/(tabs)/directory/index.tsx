@@ -3,6 +3,7 @@ import {
   directoryEmpty,
   memberYearsLabel,
   memberYearsLine,
+  onlyFiltersChanged,
   INDUSTRY_LABELS,
   OPEN_TO,
   OPEN_TO_LABELS,
@@ -21,6 +22,7 @@ import { IconDirectory, IconSearch } from "@/components/icons";
 import { OptionPicker } from "@/components/OptionPicker";
 import { ProfileBadges, profileBadgeWords, profileTagline } from "@/components/profile/ProfileDetails";
 import { Avatar, Badge, Button, Card, ChipSelect, EmptyState, Input, ListEmpty, Muted, Row, SectionScreen } from "@/components/ui";
+import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
@@ -29,14 +31,15 @@ import { moveFocus } from "@/lib/focus";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
-function MemberCard({ slug, member }: { slug: string; member: DirectoryCardDto }) {
+// `kept`: the card is kept from the search before while this one's answer comes, so it's said to be busy.
+function MemberCard({ slug, member, kept = false }: { slug: string; member: DirectoryCardDto; kept?: boolean }) {
   const router = useRouter();
   const tagline = profileTagline(member);
   // The card's name stands in for what's inside it, so it says the badges in full too.
   const badges = [...(member.role === "TENANT_ADMIN" ? ["Admin"] : []), ...profileBadgeWords(member)];
   const place = [member.city, member.country && member.country !== "IN" ? countryName(member.country) : null].filter(Boolean).join(", ");
   return (
-    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, tagline, memberYearsLabel(member)].join(", ")}>
+    <Card onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityLabel={[member.fullName, ...badges, tagline, memberYearsLabel(member)].join(", ")} busy={kept}>
       <Row gap={12} style={{ flexWrap: "nowrap" }}>
         <Avatar name={member.fullName} src={member.avatarUrl} size={48} toneKey={member.id} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -115,7 +118,9 @@ export default function DirectoryScreen() {
   // The years run only as far as approved members' do, so a chosen year keeps its row too, in its place (newest first).
   const chosenYear = year ? Number(year) : undefined;
   const years = chosenYear !== undefined && !facets.data?.years.includes(chosenYear) ? [...(facets.data?.years ?? []), chosenYear].sort((a, b) => b - a) : (facets.data?.years ?? []);
-  const list = useInfiniteList(qk.directory(slug, filters), (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }));
+  const key = qk.directory(slug, filters);
+  // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a profile.
+  const list = useInfiniteList(key, (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
   const empty = directoryEmpty(!!search || active > 0);
   const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
   const showAll = () => {
@@ -125,7 +130,8 @@ export default function DirectoryScreen() {
   };
   return (
     <SectionScreen>
-      <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+      {/* Raised over the list below, so the note at its foot can float on the list's top edge. */}
+      <View style={{ padding: spacing.lg, gap: spacing.sm, zIndex: 1 }}>
         <Input ref={searchBox} accessibilityLabel="Search members" placeholder="Name, company, role or skill" value={q} onChangeText={setQ} autoCorrect={false} />
         <Row style={{ justifyContent: "space-between" }}>
           <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" aria-expanded={showFilters} hitSlop={8}>
@@ -158,15 +164,17 @@ export default function DirectoryScreen() {
             ))}
           </ScrollView>
         )}
+        <UpdatingNote updating={list.updating} />
       </View>
       <FlatList
         data={list.items}
+        extraData={list.updating}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: 48 }}
         // The keyboard is often still up after a search: one tap reaches Show all members, or a member.
         keyboardShouldPersistTaps="handled"
         onEndReached={list.loadMore}
-        refreshing={list.isRefetching && !list.isFetchingNextPage}
+        refreshing={list.refreshing}
         onRefresh={() => void list.refetch()}
         ListEmptyComponent={
           <ListEmpty view={list.view} skeleton="member" error={list.error} onRetry={list.retry} retrying={list.retrying}>
@@ -179,7 +187,12 @@ export default function DirectoryScreen() {
             />
           </ListEmpty>
         }
-        renderItem={({ item }) => <MemberCard slug={slug} member={item} />}
+        // Kept rows are faded and busy, each of them: the list itself isn't something a screen reader reads.
+        renderItem={({ item }) => (
+          <View style={list.updating ? KEPT_ROW : undefined}>
+            <MemberCard slug={slug} member={item} kept={list.updating} />
+          </View>
+        )}
       />
     </SectionScreen>
   );

@@ -100,6 +100,12 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   background is slate-200 (`rgb(226, 232, 240)`); no other div in the skeleton has an opacity under 1.
 - Reduced motion: the web's pulse follows `page.emulateMedia({ reducedMotion: "reduce" })` at once, to "none". The
   phone's reads the setting as the app starts, so emulate it first, then reload.
+- Kept results: hold a new search's GET, then `expectKeptResults(page, card, where)` checks `card` stays, faded to
+  about 0.6 (`drawnOpacity`, its opacity times its ancestors'), under a `role="status"` saying "Updating results…"
+  that is shown, not to screen readers alone, and takes no clicks, with no skeleton beside it. It returns the note,
+  which goes once the answer is in. A step that reads a search's or a filter's results waits for its answer first, and
+  for nothing on the page to be `aria-busy` (the directory steps' `answered`, the Can refer steps), as kept results
+  may already hold what it looks for.
 
 ## Web (member journey)
 
@@ -172,7 +178,8 @@ Covers:
   saying "Choose I'm going to be the first." and "No maybes yet" who it would list, each its own box with the icon
   in the institution's ink on a round wash; and London pub night, which is over, saying only that nobody has, inviting
   no one; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
-  More filters leaving Priya out, Were there in beside the search ("Were there in 2012" and so on) leaving Priya
+  More filters leaving Priya out (while that search's answer is held back, Sneha's card staying where it was, faded
+  under "Updating results…", the search box keeping focus and no "No members match"), Were there in beside the search ("Were there in 2012" and so on) leaving Priya
   (2008–2012) out in 2013, finding her in 2012, and Any year taking it off, and Priya's card with her headline, then
   her profile: headline, skills, her current role before her past one, studies here and elsewhere, and a LinkedIn link
   with the right target and rel;
@@ -190,7 +197,10 @@ Covers:
   or blocks come back with the number, cancelled with the account still there;
 - matching skills at a phone's width, with "typescript, aws" among the skills just saved: the Backend Engineer card
   showing TypeScript and AWS first, each with a check, then Node.js and "+1 more" on one line, each chip's text readable
-  and its edge at 3:1, its link's name saying "(you have this)" after each; its page keeping the job's order, the same
+  and its edge at 3:1, its link's name saying "(you have this)" after each; "Backend" typed letter by letter into
+  Search jobs asking fewer times than its letters (the last for "Backend"), and while that answer is held back the
+  cards listed staying, faded under "Updating results…", the internship among them, until the answer replaces them
+  unfaded; its page keeping the job's order, the same
   two checked (filled in the brand, readable, with an edge, as the others have), and "You have 2 of 4 skills";
   "You have 0 of 4 skills" and no marks on Associate Product Manager; and the member's own job, asking for TypeScript
   among skills too long for one line, unmarked on its page and on its My posts card, whose chips shorten to fit;
@@ -255,7 +265,9 @@ Covers:
   link, button or spinner, its blocks pulsing and not its card, and still with less motion asked for; the list refused
   (by the script), its Retry loading keeping the error and focus, busy, while the retry is held, and again when that
   fails; the directory's next page refused, said above Load more with the cards kept, then loaded by pressing it
-  again; notification settings, through a Settings link named by its word alone (its icon is silent); sign out;
+  again; a directory search refused while the cards before it are kept: no Load more for them while its answer is
+  held, then the error, whose Retry loading keeps it and focus, busy, while the retry is held, with no kept cards back
+  over it; notification settings, through a Settings link named by its word alone (its icon is silent); sign out;
 - an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
   pending screen; and a forced sign-out leaving nothing cached;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
@@ -439,7 +451,9 @@ Covers:
   in an area that scrolls, which the mouse wheel scrolls to an uncovered Sign out; My posts from the More hub, its tabs
   scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px;
 - jobs: seeded cards with place, pay, experience and "+1 more" skills, and Zylo Labs's and Deloitte's initials in a
-  tone from each company's name, two tones apart and not the institution's; the Work mode and experience filters behind
+  tone from each company's name, two tones apart and not the institution's; "Backend" typed letter by letter into
+  Search jobs asking fewer times than its letters, the cards listed staying, faded under "Updating results…", while
+  that answer is held back, then cleared; the Work mode and experience filters behind
   Filters, and Clear filters; the Backend Engineer page, its title the only heading holding it, with its facts, section
   headings, About the company, a How to apply link opening in a new tab with noopener, and Apply;
 - matching skills: before the member has any, the Backend Engineer card marking none and its page offering "Add your
@@ -454,7 +468,8 @@ Covers:
   web: the meetup's answered empty (scripted) inviting the member to be first and saying who Maybe would list, and
   London pub night's, which is over, saying only that nobody has;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
-  name, the Investing filter leaving Priya out, Were there in chosen from a list behind Filters and counted with them
+  name, the Investing filter leaving Priya out (while that search's answer is held back, Sneha's card staying, faded
+  under "Updating results…", with no "No members match"), Were there in chosen from a list behind Filters and counted with them
   (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
   ("2008–2012 · London, United Kingdom"), "Registered", her roles in order and a LinkedIn link with the right target
   and rel;
@@ -1045,6 +1060,11 @@ second copy of a screen, or back to the page the button was on.
       VoiceOver reads it once as "Loading". Then turn on iOS Reduce Motion (Settings → Accessibility → Motion) or
       Android's Remove animations, close the app fully and open it again (the setting is read as it starts): the
       outline stands still.
+- [ ] On a slow connection, search Directory for "Sneha", then change it to "Priya", and in Jobs type "Backend", then
+      tap Full-time: the cards already listed stay, faded, with "Updating results…" drawn whole on the first card's top
+      edge (below the filters and Job type chips on Jobs; not cut off on Android), and still open when tapped.
+      TalkBack or VoiceOver says "Updating results…" once and "busy" after the name of a card reached meanwhile, the
+      keyboard stays up, and the pull-to-refresh spinner doesn't appear for the search.
 
 ### 13. Notices with Approve and Reject
 

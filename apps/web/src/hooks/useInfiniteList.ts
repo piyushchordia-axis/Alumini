@@ -1,37 +1,57 @@
-import { listView, nextPageError, type CursorPage } from "@illuminize/shared";
+import { listHasMore, listPlaceholder, listUpdating, listView, nextPageError, type CursorPage } from "@illuminize/shared";
 import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
 import { useState } from "react";
+
+export interface InfiniteListOptions {
+  /** Off while the list isn't asked for, such as a tab that isn't open. */
+  enabled?: boolean;
+  /**
+   * Keeps the rows on screen while a new key loads, when this accepts the key they were listed under: one with other
+   * filters (onlyFiltersChanged) for rows that only open a page. They stay, `isPlaceholderData`, until the new rows
+   * come. Off unless given: the feed reads its first page (`first.pinned`), which another key's rows would get wrong.
+   */
+  keepPreviousWhile?: (previousKey: QueryKey) => boolean;
+}
 
 /**
  * Cursor-paginated list wrapper around useInfiniteQuery; `items` is the flattened page data, and `view` what its results
  * area draws (listView): the skeleton, the error, the empty state or the rows, and nothing while it's switched off.
  * `retry` is the error's Retry loading: the error (`error`) stays up, `retrying`, until its answer comes, so the button
- * pressed keeps focus. `nextPageError` is what went wrong with a page Load more asked for, said beside it.
+ * pressed keeps focus (no rows are kept meanwhile: listPlaceholder). `nextPageError` is what went wrong with a page Load
+ * more asked for, said beside it.
+ *
+ * With `keepPreviousWhile`, `updating` says the rows are kept from the search before (faded, with UpdatingNote), and
+ * `hasMore` is Load more's: never from kept rows, whose next page belongs to their own search (listHasMore).
  */
-export function useInfiniteList<P extends CursorPage<unknown>>(queryKey: QueryKey, fetchPage: (cursor: string | undefined) => Promise<P>, enabled = true) {
+export function useInfiniteList<P extends CursorPage<unknown>>(queryKey: QueryKey, fetchPage: (cursor: string | undefined) => Promise<P>, options: boolean | InfiniteListOptions = true) {
+  const { enabled = true, keepPreviousWhile } = typeof options === "boolean" ? { enabled: options } : options;
+  // The error a retry is answering, kept on screen while TanStack clears it for the retry.
+  const [retried, setRetried] = useState<Error | null>(null);
+  const retrying = retried !== null;
   const query = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam }) => fetchPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+    placeholderData: listPlaceholder(keepPreviousWhile, retrying),
     enabled,
   });
-  // The error a retry is answering, kept on screen while TanStack clears it for the retry.
-  const [retried, setRetried] = useState<Error | null>(null);
   const items = (query.data?.pages.flatMap((p) => p.data) ?? []) as P["data"];
   const first = query.data?.pages[0] as P | undefined;
-  const retrying = retried !== null;
   const retry = () => {
     if (retrying) return;
     if (query.error) setRetried(query.error);
     void query.refetch().finally(() => setRetried(null));
   };
+  const state = { status: query.status, fetchStatus: query.fetchStatus, isPlaceholderData: query.isPlaceholderData, retrying };
   return {
     ...query,
     items,
     first,
     error: query.error ?? retried,
-    view: listView({ status: query.status, fetchStatus: query.fetchStatus, isPlaceholderData: query.isPlaceholderData, retrying }, items.length),
+    view: listView(state, items.length),
+    updating: listUpdating(state, items.length),
+    hasMore: listHasMore(query),
     retry,
     retrying,
     nextPageError: nextPageError(query),

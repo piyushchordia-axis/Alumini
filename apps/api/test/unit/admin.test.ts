@@ -444,6 +444,12 @@ describe("onlySearchChanged", () => {
     expect(onlySearchChanged(members({ status: "PENDING" }), members({}))).toBe(false);
   });
 
+  it("compares the other filters by value, so a list of them built afresh at each render still keeps the rows", () => {
+    expect(onlySearchChanged(members({ status: "APPROVED", roles: ["MEMBER"], q: "Ni" }), members({ status: "APPROVED", roles: ["MEMBER"], q: "Nisha" }))).toBe(true);
+    expect(onlySearchChanged(members({ status: "APPROVED", roles: ["MEMBER"], q: "Ni" }), members({ status: "APPROVED", roles: ["TENANT_ADMIN"], q: "Ni" }))).toBe(false);
+    expect(onlySearchChanged(members({ status: "APPROVED", roles: ["MEMBER"] }), members({ status: "APPROVED", roles: ["MEMBER", "TENANT_ADMIN"] }))).toBe(false);
+  });
+
   it("starts over for another list, another institution, or no list before", () => {
     expect(onlySearchChanged(undefined, members({ status: "PENDING" }))).toBe(false);
     expect(onlySearchChanged(adminKeys.members("other", { status: "PENDING" }), members({ status: "PENDING" }))).toBe(false);
