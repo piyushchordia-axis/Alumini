@@ -1,4 +1,4 @@
-import { chatAvailable } from "@illuminize/shared";
+import { chatAvailable, welcomeDue } from "@illuminize/shared";
 import { fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
@@ -27,7 +27,8 @@ export default function AppLayout() {
   const membershipError = fatalQueryError(membership);
   const approved = membership.data?.status === "APPROVED";
   const answeredNotApproved = authed && !approved && (!!membership.data || (!!membership.error && !isTransientError(membership.error)));
-  usePushRegistration(authed && approved);
+  // The phone's notification prompt waits until the walk-through is over, so it never covers its first screen.
+  usePushRegistration(authed && approved && !!membership.data && !welcomeDue(membership.data));
   useChatScope(slug, authed && approved && !!tenant.data && chatAvailable(tenant.data.settings.features, !!membership.data?.chatEligible));
 
   // Remember only institutions the member can open, so the start screen never bounces them back into a waiting or
@@ -63,7 +64,11 @@ export default function AppLayout() {
     <MembershipContext.Provider value={{ tenant: tenant.data, membership: membership.data, isTenantAdmin }}>
       {/* The member's own background here, for every page they see as a member; the console puts the plain one back (PlainPage). */}
       <ThemeProvider tenant={tenant.data} appearance={membership.data.appearance}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* Its ways out end it, and iOS's swipe back would leave it unended (Android's back button it handles itself).
+              Alone in this stack, it turns the swipe off on the screens holding it too (welcome.tsx). */}
+          <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
+        </Stack>
       </ThemeProvider>
     </MembershipContext.Provider>
   );

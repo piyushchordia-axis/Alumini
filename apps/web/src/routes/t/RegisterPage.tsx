@@ -111,12 +111,12 @@ export function RegisterPage() {
           onSubmit={async (values) => {
             const m = await api.membership.register(slug, values);
             await qc.invalidateQueries({ queryKey: qk.me });
-            // A suspension held from a deleted account comes back SUSPENDED: no toast, the pending page says so (as on mobile).
-            if (m.status === "APPROVED") toast.success(`Welcome to ${t.name}!`);
-            else if (m.status === "PENDING") toast.success("Submitted for approval");
-            // The membership moves them on, through this page's own redirect above (to the app, or the waiting page), and
-            // nothing else may: a second visit to the app, landing while its redirect to the first section was still being
-            // drawn, left them on an empty page.
+            // Someone let straight in gets no toast: the walk-through greets them. A suspension held from a deleted account
+            // comes back SUSPENDED: no toast either, the pending page says so (as on mobile).
+            if (m.status === "PENDING") toast.success("Submitted for approval");
+            // The membership moves them on, through this page's own redirect above (to the app, whose front door opens the
+            // walk-through, or the waiting page), and nothing else may: a second visit to the app, landing while its redirect
+            // to the first section was still being drawn, left them on an empty page.
             qc.setQueryData(qk.membership(slug), m);
           }}
         />

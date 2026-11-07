@@ -641,7 +641,29 @@ try {
       if ((await guest.inputValue('select[name="startYear"]')) !== "2011") throw new Error("the invitation didn't fill in the year they joined");
       if ((await guest.inputValue('select[name="batchYear"]')) !== "2015") throw new Error("the invitation didn't fill in the year they left");
       await finishRegistration(guest, "Join the network");
-      await guest.waitForURL(/\/app\/feed$/); // approved straight away: invitations skip the approval queue
+      // Approved straight away (invitations skip the approval queue), so the walk-through welcomes her first, fitting
+      // the phone's width. A link on it opens that part of My profile and ends it.
+      await guest.waitForURL(/\/t\/demo-college\/welcome$/);
+      const fits = async (where) => {
+        if (await guest.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) throw new Error(`${where} scrolls sideways on a phone`);
+      };
+      await guest.getByRole("heading", { level: 1, name: "Welcome, Kavita", exact: true }).waitFor();
+      await fits("the walk-through's first screen");
+      await guest.getByRole("button", { name: "Next", exact: true }).click();
+      await guest.getByRole("heading", { level: 1, name: "Make your profile stand out", exact: true }).waitFor();
+      await fits("the walk-through's profile screen");
+      const toAdd = guest.getByRole("main").getByRole("link");
+      const named = (await toAdd.allInnerTexts()).join(" | ");
+      if (named !== "Add a profile photo | Write a headline") throw new Error(`the walk-through suggests ${named}`);
+      const [done] = await Promise.all([
+        guest.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/memberships/me/welcome/done")),
+        toAdd.first().click(),
+      ]);
+      if (!done.ok()) throw new Error(`a link on the walk-through answered ${done.status()}`);
+      await guest.waitForURL(/\/t\/demo-college\/app\/profile#basics$/);
+      // Ended: the front door opens the feed now.
+      await guest.goto(`${BASE}/t/demo-college/app`);
+      await guest.waitForURL(/\/app\/feed$/);
     } finally {
       await guest.close();
     }

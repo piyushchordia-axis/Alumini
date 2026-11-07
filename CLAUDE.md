@@ -24,6 +24,7 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections, their
   names (`SECTION_LABELS`) and lines (`SECTION_DESCRIPTIONS`, `sectionDescription`) and More's groups
   (`moreHubGroups`, `MORE_HUB_ROWS`);
+  `src/lib/welcome.ts` the first-entry walk-through (`welcomeDue`, its screens and sections, `WELCOME_COPY`);
   `src/data/countries.ts` (generated) includes `maxNationalDigits`; `src/lib/phone.ts` reads a phone field
   (`readPhoneEntry`, `nationalDigits`, `phoneEntryToE164`; `clampNationalNumber` is its last step) and formats stored
   numbers (`formatPhone`).
@@ -133,6 +134,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   a year input offers `memberStartYearOptions` / `memberEndYearOptions`, and every year rule goes through
   `memberYearsIssues` (`lib/memberYears.ts`), which the forms, the invitation import and the API
   (`assertMemberYears`) share. An edit is checked only when it sends a year, together with the stored other one.
+- **First entry.** The walk-through is owed while `memberships.welcome_done_at` is null (`welcomeDue`). The column
+  defaults to now(), so a row anyone else creates (seed, staff, factories) counts as done: only `registerMembership`
+  writes null, and a new way of creating members who should see it must too. The key is on the member's own
+  membership DTO only, never an admin's, card, profile or summary DTO, and a DTO without it counts as not owed. Only
+  the front door opens it (web `WelcomeGate` at `/t/:slug/app`; phone `entryHref` in the landing, sign-in,
+  registration and waiting screens), never a link or a push. Every way out ends it, the cache first, then
+  `finishWelcome`, failing silently, and moves on once: the page decides at mount whether it's owed, so ending it
+  never redirects a second time.
 - **Rich text.** Long member-written text renders through `RichText` (web `components/common/RichText.tsx`, mobile
   `components/RichText.tsx`), never `dangerouslySetInnerHTML`; cards use `plainExcerpt`, forms show `RICH_TEXT_HINT`.
   Posts, comments and chat stay plain text.
@@ -309,9 +318,15 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   a second institution over the one the start screen redirects to; a tap in the Notifications list opens it without
   `withAnchor` (so Back returns to the list), and leaving it
   for a member screen uses `router.dismissTo`, as groups and mentors do (also its guard: `Redirect` would replace the
-  console with a second set of tabs). Typed routes (`apps/mobile/.expo/types`, gitignored) are written by the dev server
-  (`pnpm mobile`) or an export (`pnpm e2e:mobile:export`): regenerate them before `pnpm typecheck` after adding a route,
-  or it checks pushes against the old list. CI has none and doesn't lint mobile, so run the root `pnpm lint` locally.
+  console with a second set of tabs). The first-entry walk-through, `(app)/welcome`, is a stack screen above the tabs
+  too: opened by a `Redirect` or `replace` from the front door it's the stack's only screen, and opened cold from a
+  link the tabs anchor mounts under it. Either way it leaves only through `router.dismissTo` (`DismissTo` when it isn't
+  owed), and a push tapped over it uses `dismissTo` (`isWelcomePath`), so there's never a second set of tabs. A screen
+  alone in its stack can't stop iOS's swipe with its own `gestureEnabled: false`: the swipe pops the screen holding that
+  stack, so the walk-through turns it off on its holders while it's in front (`useNoSwipeOut`). Typed routes
+  (`apps/mobile/.expo/types`, gitignored) are written by the dev server (`pnpm mobile`) or an export
+  (`pnpm e2e:mobile:export`): regenerate them before `pnpm typecheck` after adding a route, or it checks pushes against
+  the old list. CI has none and doesn't lint mobile, so run the root `pnpm lint` locally.
 - Mobile native stack headers (`headerShown: true` / old `detailHeader`) float over the scene on device — search bars
   and titles draw under the status bar and the header. Always use the in-tree bars (`MemberAppBar`, `StackHeader`,
   `ChatHeader`) and keep tab/detail stacks at `headerShown: false`. On web, inactive tab scenes stay mounted: the tabs

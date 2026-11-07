@@ -24,9 +24,10 @@ export function SheetGroup({ title, children }: { title: string; children: React
  * under it, which is the link's description rather than part of its name: the name is set, as the link's text would
  * take the line in too. `name` replaces the label when the link has a count to say ("Groups, 1 invitation"), and
  * `badge` draws that count. The current link is chosen as the sidebar's is: the wash, a thin ring and the page's ink,
- * with hover only on the others.
+ * with hover only on the others. The walk-through's last screen lists sections with it too, and its `onClick` ends the
+ * walk-through on the way.
  */
-export function SheetTile({ to, icon, label, description, name, badge }: { to: string; icon: NavIconName; label: string; description: string; name?: string; badge?: ReactNode }) {
+export function SheetTile({ to, icon, label, description, name, badge, onClick }: { to: string; icon: NavIconName; label: string; description: string; name?: string; badge?: ReactNode; onClick?: () => void }) {
   const descriptionId = useId();
   return (
     <li>
@@ -34,6 +35,7 @@ export function SheetTile({ to, icon, label, description, name, badge }: { to: s
         to={to}
         aria-label={name ?? label}
         aria-describedby={descriptionId}
+        onClick={onClick}
         className={({ isActive }) =>
           clsx(
             "group/tile flex min-h-14 items-center gap-3 rounded-xl px-3 py-2 transition-colors duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-ink",

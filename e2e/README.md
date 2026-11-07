@@ -83,7 +83,7 @@ pnpm e2e:web                             # screenshots go to e2e/screenshots (or
 Covers:
 
 - tenant picker → landing (the brand cover's short name and tagline) → phone + OTP → registration in three steps →
-  auto-approved feed: "Signed in as" with the
+  auto-approved → the walk-through → the feed: "Signed in as" with the
   number on Basics, and one Back on every step; Back on an untouched Basics leaving for the landing page, which offers
   Join DemoU (not the sign-in button) instead of sending them back into the form; a photo on Basics, Continue refusing a
   missing name and focusing it, both years starting blank and asked for under the institution's labels ("Year you
@@ -92,6 +92,18 @@ Covers:
   Back on a Basics with something typed asking "Leave registration?" and Cancel staying, Skip for now putting Work back
   as it was last accepted, the profile question on About you, a server error sending the member back to Work with the
   headline focused, and the photo arriving with the profile;
+- the first-entry walk-through, which the front door opens on a page of its own with no app navigation and no Back on
+  its first screen: "Welcome, Smoke" focused and described by "1 of 3", the brand cover's short name, Demo
+  University's welcome message and one Skip, with SVG icons and no emoji; "Make your profile stand out" scoring 55,
+  "Your photo and headline are in…", and its two links (Add at least 3 skills, Write a short bio) opening `#work` and
+  `#about` on My profile, described by "Each opens My profile and ends this welcome."; Back focusing the first title
+  again; "Find your people" listing Directory, Mentors, Groups, Messages, Events, Jobs, Businesses and Funding as links
+  in a list (never a nav) named by the section alone, each at least 44px with an SVG icon, Directory's described "Find
+  people by name or year"; Get started sending `POST …/memberships/me/welcome/done` and opening the feed; and, after a
+  reload, the front door and the walk-through's own address both opening the feed. The second member the run
+  registers shows it opens only at the front door: a link to the directory opens the directory with the app's
+  navigation while it's owed; Skip with the POST refused still opens the feed, and the next entry at the front door
+  brings it back; then the Directory row ends it (the POST answered) on the way to the directory;
 - the feed's "Complete your profile" card: a section, not a post, scoring 55, its three heaviest missing items linking
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
@@ -236,9 +248,11 @@ Covers:
   new place while the script holds the move, with the arrows waiting until it's saved), and archiving it after the
   confirm dialog (Cancel first); importing an invitation CSV (once the profile questions are in) whose "Year Joined" and
   "Batch" columns are read as the start and end years ("Using phone, name, start year, end year.", 2011–2015 in the
-  preview's Years and on the row once imported), and joining through its link in a second browser, the invitation
-  page's logo initials in Demo College's ink on its tint though no theme colours the page, with the name and both
-  years filled in and the three steps; another invitation revoked through its confirm dialog (Cancel first sends
+  preview's Years and on the row once imported), and joining through its link in a second browser at a phone's width,
+  the invitation page's logo initials in Demo College's ink on its tint though no theme colours the page, with the
+  name and both years filled in and the three steps, then the walk-through ("Welcome, Kavita") with no sideways
+  scrolling, its Add a profile photo link ending it (the POST answered) on My profile's Basics, and the front door
+  then opening the feed; another invitation revoked through its confirm dialog (Cancel first sends
   nothing); an announcement that also goes by email, asked first in the app's dialog with the email box's count and
   the billing line, Cancel posting nothing, then Post and send; Demo University's Send pending asking first in a dialog
   that says it's billed (Cancel sends nothing), a refusal (answered by the script, as for a plan that stopped sending)
@@ -298,7 +312,7 @@ add that origin to `CORS_ORIGINS`.
 Covers:
 
 - tenant picker → landing (the brand cover's short name and tagline) → login → OTP → registration in three steps →
-  feed, as on the web: each step's button on the
+  the walk-through → feed, as on the web: each step's button on the
   screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so nothing holds
   the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the form; with a
   name typed, the page held, Use a different number asking first and Cancel staying signed in, and Back asking "Leave
@@ -307,7 +321,15 @@ Covers:
   taken for them, and Continue with no start year staying on Basics with "Enter the year you joined"; the step bar going
   back with Work kept, Skip for now putting Work back as it was last accepted, Back from About you and from Work, a
   server error sending the member back to Work with the page still held, and Join the network leaving the screen (it
-  isn't held) with nothing holding the feed;
+  isn't held) for the walk-through, with nothing holding it;
+- the first-entry walk-through, above the tabs with no tab bar showing: "Welcome, Mobile" focused and described by "1
+  of 3", the cover's short name, Demo University's welcome message, one Skip and no Back, with SVG icons and no emoji;
+  "Make your profile stand out" scoring 0, "A photo and a headline help…", and Add a profile photo and Write a
+  headline, described by "Each opens My profile and ends this welcome."; Back focusing the first heading again; "Find
+  your people" with Directory, Mentors, Groups, Messages, Events, Jobs, Businesses and Funding named by the section
+  alone, each at least 44 tall, Funding's described "Members raising and investing"; Get started sending `POST
+  …/memberships/me/welcome/done` and opening the feed with one tab bar; and its own address, opened cold once it's
+  ended, going to the feed;
 - the "Complete your profile" card: 0 for a name and years, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
   and the card gone after a reload;
@@ -375,7 +397,11 @@ Covers:
   non-member into the form, and forgets Demo College as the institution to start at, so Choose a different institution
   opens the list), with Use details from Demo University and Undo keeping a headline changed after it, then Submit for
   approval with its note, landing on the pending screen; switching institution and signing out from the More hub; a
-  forced sign-out leaving nothing cached;
+  second new member's walk-through, waiting while a link to the directory opens the directory with the tab bar and
+  opening again at the front door, then its Write a headline link ending it (the POST answered) and opening Edit
+  profile at Work, with Back going to My profile and then the feed with one tab bar, and the front door then opening
+  the feed (Skip and the section rows aren't pressed here: they leave through the same `leave()` as Get started and
+  the links, and the web journey presses its own); a forced sign-out leaving nothing cached;
 - the admin console, as the Samaj admin: More's row named "Admin console, 2 waiting", described "Members, moderation and
   settings", and My profile's link; the
   console's home with no tab bar and no sideways scrolling, its "Pending members, 2" tile in amber and "Content to
@@ -635,7 +661,18 @@ Still the new number, joining Demo University. Leave Work empty with Skip for no
       number", not a fresh form. On Basics with a name typed, "Leave registration?" asks first: Cancel (and Android's
       back button on the sheet) stays with the name kept, and Leave goes to the landing screen. While Join the network
       is spinning (turn on airplane mode first, so it fails), they do nothing; the failure leaves them on About you with
-      everything kept, and back works again. When the profile is sent, Join the network goes straight to the feed.
+      everything kept, and back works again. When the profile is sent, Join the network goes straight to the
+      walk-through (the next check), then the feed.
+- [ ] The walk-through, which opens once Join the network has sent the profile. Before choosing it, set the largest
+      text size in the phone's settings, and put it back after this check. The status bar's clock and icons are white
+      over the brand cover. TalkBack or VoiceOver reads "Welcome" and the first name, then "1 of 3", as it opens, and
+      each screen's title and count on Next and Back. At the largest text size the cover leaves room for the card,
+      which scrolls, and Skip, Back and Next stay in reach above the bottom edge (the home indicator on the iPhone),
+      nothing cut off. A quick double tap on Next moves one screen. On the iPhone, the swipe from the left edge does
+      nothing on any screen, though the landing screen is under it here (Sign in / Join opened the sign-in screen over
+      it): finish with Get started, which opens the feed. On Android, the back button on the second screen goes to the
+      first, and on the first it ends the walk-through as Skip does, opening the feed. Either way it doesn't come back:
+      force-quit the app and open it again, and the feed opens.
 - [ ] Signed in at an institution they aren't a member of, whose landing screen is the one the app opened (as after
       being removed): Choose a different institution opens the list of institutions, not the same landing screen again.
 - [ ] With the profile sent (Work skipped, so it lists no skills): on My profile choose Edit profile and type a headline
@@ -1126,10 +1163,12 @@ As Rahul, under My profile → Appearance. Choose Plain again at the end, so the
       member), and in the browser, as Priya, open the request and choose Block member. As Demo College's admin
       (`+91 90000 00002`, web), approve the number's request under Admin → Members; as Demo University's admin, suspend
       it there with a reason. The phone shows "Membership suspended" at Demo University (reopen the app if it hasn't
-      yet). Choose another institution → Demo College → More → My profile → Delete my account → Delete account: the app
-      opens the list of institutions. Sign in with the same number at Demo University and register again: after Join the
-      network the screen says "Membership suspended" and "Reason given: Suspended before this account was deleted".
-      As the admin, find the member under Suspended and Reinstate them: within half a minute the phone opens the feed.
+      yet). Choose another institution → Demo College: its walk-through opens, as this is the first visit since the
+      approval; Skip it, then More → My profile → Delete my account → Delete account: the app opens the list of
+      institutions. Sign in with the same number at Demo University and register again: after Join the network the
+      screen says "Membership suspended" and "Reason given: Suspended before this account was deleted". As the admin,
+      find the member under Suspended and Reinstate them: within half a minute the phone opens Demo University's
+      walk-through (the membership is a new one, so it's owed); Skip it for the feed.
       Message Priya again: it says the request was sent, as before, but Priya's Messages show nothing new, and her
       Blocked members list the new account.
 
@@ -1172,7 +1211,10 @@ made after the five native modules above were added.
      `eas build --profile development --platform ios` and install what it gives you.
 
    `expo run` starts the Expo server when it's done. Another day, start it with `pnpm mobile`.
-2. Allow notifications when the app asks, and sign Rahul in again on each phone.
+2. Allow notifications when the app asks, and sign Rahul in again on each phone. On one phone, first check that a
+   member who has just joined isn't asked until their walk-through is over: before signing Rahul in, sign in with a
+   number that isn't in the demo data (`+91 98765 43212`) and join Demo University. The walk-through opens with no
+   notification prompt over it, and the phone asks once Get started opens the feed. Allow it, then sign out under More.
 3. A push about a chat comes 5 to 10 seconds after the message, and one about a group 30 to 60 seconds after. After a
    push, that chat sends you no other for 2 minutes (a group for 10) unless you open it or write in it, so wait between
    checks that need one.
@@ -1230,6 +1272,15 @@ made after the five native modules above were added.
       her offer to mentor under Be a mentor and Rahul ask her from the phone): tapping that push opens the chat.
 - [ ] Have Priya ask for a referral on Rahul's "Backend Engineer (Node.js)" from the browser, with the app closed:
       tapping the push opens Jobs → Referrals. With the app open, referral pushes show a banner.
+
+**The walk-through**
+
+- [ ] A push tapped over the walk-through. As Rahul, join Demo College under More → Switch institution and submit for
+      approval, and leave the waiting screen open. Have the Demo College admin (`+91 90000 00002`) approve him in the
+      web console: within half a minute the waiting screen opens Demo College's walk-through. Leave the approval's push
+      in the phone's notifications until then, and tap it there with the walk-through on screen: its screen opens with
+      one tab bar, and nothing goes back to the walk-through. It isn't ended: force-quit the app and open it again,
+      and the walk-through opens; Skip it.
 
 **Admin console**
 

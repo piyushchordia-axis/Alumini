@@ -6,7 +6,7 @@ import { IconAlert, IconClock, IconLock } from "@/components/icons";
 import { Button, LoadError, Screen, Spinner, Title } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
-import { homeHref } from "@/lib/sections";
+import { entryHref } from "@/lib/sections";
 import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, useTheme } from "@/theme";
@@ -36,7 +36,7 @@ export default function PendingScreen() {
   }
   const m = membership.data;
   if (!m) return <Spinner />;
-  if (m.status === "APPROVED") return <Redirect href={homeHref(slug, tenant.data.settings.features)} />;
+  if (m.status === "APPROVED") return <Redirect href={entryHref(slug, tenant.data.settings.features, m)} />;
   const copy = {
     PENDING: { title: "Awaiting approval", Icon: IconClock, body: `Thanks ${m.fullName.split(" ")[0]}! The ${tenant.data.shortName ?? tenant.data.name} alumni office reviews every request. You'll be notified when it's approved.` },
     REJECTED: { title: "Request not approved", Icon: IconAlert, body: m.statusReason ? `Reason given: ${m.statusReason}` : "Your request was not approved. You can update your details and re-apply." },

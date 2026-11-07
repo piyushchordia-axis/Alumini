@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { RequireAuth } from "@/components/guards/RequireAuth";
 import { AppHomeRedirect, RequireChat, RequireFeature, RequireGroups, RequireMentors } from "@/components/guards/RequireFeature";
 import { RequireMembership } from "@/components/guards/RequireMembership";
+import { WelcomeGate } from "@/components/guards/WelcomeGate";
 import { HomeLayout } from "@/components/layout/HomeLayout";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 import { RouteErrorPage } from "@/routes/RouteErrorPage";
@@ -45,6 +46,7 @@ import { NotificationsPage } from "@/routes/t/NotificationsPage";
 import { PendingApprovalPage } from "@/routes/t/PendingApprovalPage";
 import { PostDetailPage } from "@/routes/t/PostDetailPage";
 import { RegisterPage } from "@/routes/t/RegisterPage";
+import { WelcomePage } from "@/routes/t/WelcomePage";
 import { adminRoutes, platformRoutes } from "@/router.admin";
 import type { AppRouteHandle } from "@/lib/routeHandle";
 
@@ -67,9 +69,15 @@ export const router = createBrowserRouter([
           {
             element: <RequireMembership />,
             children: [
+              { path: "welcome", element: <WelcomePage /> },
               {
                 path: "app",
-                element: <HomeLayout />,
+                // The front door opens the walk-through for a member who is owed it, before the app's chrome draws.
+                element: (
+                  <WelcomeGate>
+                    <HomeLayout />
+                  </WelcomeGate>
+                ),
                 children: [
                   { index: true, element: <AppHomeRedirect /> },
                   {

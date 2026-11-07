@@ -9,7 +9,7 @@ import { SignedInAs } from "@/components/SignedInAs";
 import { Button, Spinner } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
-import { homeHref } from "@/lib/sections";
+import { entryHref } from "@/lib/sections";
 import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
@@ -45,7 +45,7 @@ export default function TenantLandingScreen() {
   if (!tenant.data || !hydrated) return <Spinner />;
   if (authed) {
     if (membership.isLoading) return <Spinner label="Checking your membership…" />;
-    if (membership.data) return <Redirect href={membership.data.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
+    if (membership.data) return <Redirect href={membership.data.status === "APPROVED" ? entryHref(slug!, tenant.data.settings.features, membership.data) : `/t/${slug}/pending`} />;
   }
   const t = tenant.data;
   const f = t.settings.features;

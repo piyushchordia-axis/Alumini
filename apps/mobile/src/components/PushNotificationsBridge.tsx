@@ -11,6 +11,7 @@ import { MENTORSHIP_TYPES } from "@/lib/mentors";
 import { notificationHref } from "@/lib/notificationLinks";
 import { qk } from "@/lib/queryKeys";
 import { REFERRAL_TYPES, refreshReferrals } from "@/lib/referrals";
+import { isWelcomePath } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 
@@ -93,8 +94,13 @@ export function PushNotificationsBridge() {
       // nothing mounted yet) has a real way back: a thread lands above the tabs, a job above the job list, a console
       // screen above the console's home.
       const fallback = `/t/${slug}/profile/notifications` as const;
+      // Over this institution's walk-through, which sits above the tabs or in their place, dismissed rather than pushed:
+      // a push would stack a second set of tabs on it. It isn't ended, and waits for the next entry at the front door.
+      const overWelcome = () => isWelcomePath(shown.current, slug);
       if (!isAdminNotification(data.type ?? "")) {
-        router.push(notificationHref(slug, data.type ?? "", data, { isAdmin: false }) ?? fallback, { withAnchor: true });
+        const href = notificationHref(slug, data.type ?? "", data, { isAdmin: false }) ?? fallback;
+        if (overWelcome()) router.dismissTo(href, { withAnchor: true });
+        else router.push(href, { withAnchor: true });
         return;
       }
       // The console may already be open on what the push is about.
@@ -102,7 +108,8 @@ export function PushNotificationsBridge() {
       // Whether this is an admin: the loaded membership, or on a cold start, before it has loaded, the stored session.
       void storedSession().then((session) => {
         const href = notificationHref(slug, data.type ?? "", data, { isAdmin: isPushAdminOf(session, qc.getQueryData<MembershipDto>(qk.membership(slug)), slug) });
-        if (!href) router.push(fallback, { withAnchor: true });
+        if (overWelcome()) router.dismissTo(href ?? fallback, { withAnchor: true });
+        else if (!href) router.push(fallback, { withAnchor: true });
         // Navigate, so a console home already in front isn't stacked again, and on a cold start the institution the
         // start screen has just redirected to is reused rather than a second one added.
         else if (opensInPlace(shown.current, slug)) router.navigate(href, { withAnchor: true });

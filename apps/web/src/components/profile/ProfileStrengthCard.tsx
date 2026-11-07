@@ -33,9 +33,9 @@ export function ProfileStrengthMeter({ score, className }: { score: number; clas
   );
 }
 
-/** Missing items as rows that open the part of the profile where each is added. */
-function ItemLinks({ items, link }: { items: ProfileStrengthItem[]; link: (item: ProfileStrengthItem, className: string, children: ReactNode) => ReactNode }) {
-  const row = "group flex min-h-11 items-center gap-3 py-2 text-sm font-medium text-slate-800 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md";
+/** Missing items as rows that open the part of the profile where each is added (the feed's card, My profile and the walk-through). */
+export function ProfileItemLinks({ items, link }: { items: ProfileStrengthItem[]; link: (item: ProfileStrengthItem, className: string, children: ReactNode) => ReactNode }) {
+  const row = "group flex min-h-11 items-center gap-3 rounded-md py-2 text-sm font-medium text-slate-800 transition hover:text-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink";
   return (
     <ul className="divide-y divide-slate-100">
       {items.map((item) => (
@@ -45,7 +45,7 @@ function ItemLinks({ items, link }: { items: ProfileStrengthItem[]; link: (item:
             row,
             <>
               <span className="min-w-0 flex-1">{item.label}</span>
-              <IconChevronDown size={16} className="-rotate-90 text-slate-400 group-hover:text-primary" />
+              <IconChevronDown size={16} className="-rotate-90 text-slate-400 group-hover:text-primary-ink" />
             </>,
           )}
         </li>
@@ -117,7 +117,7 @@ export function ProfileStrengthCard() {
         </div>
         <ProfileStrengthMeter score={strength.score} className="mt-4" />
         <div className="mt-3 border-t border-slate-100 pt-1">
-          <ItemLinks
+          <ProfileItemLinks
             items={missingProfileItems(strength)}
             link={(item, className, children) => (
               <Link to={`${profile}#${item.section}`} className={className}>
@@ -146,7 +146,7 @@ export function ProfileStrengthPanel({ strength }: { strength: ProfileStrength }
           <>
             <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Still to add</p>
             <div className="mt-1">
-              <ItemLinks
+              <ProfileItemLinks
                 items={missing}
                 link={(item, className, children) => (
                   <a href={`#${item.section}`} className={className}>

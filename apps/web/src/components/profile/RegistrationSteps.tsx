@@ -45,9 +45,10 @@ const onlyWork = (values: Values): Values => Object.fromEntries(Object.entries(v
 
 /**
  * The second click of a double-click lands on whichever button has just taken the first one's place ("Continue" becomes
- * "Join the network"): it's dropped, so a double-click moves one step. Keyboard presses and single clicks pass.
+ * "Join the network"): it's dropped, so a double-click moves one step. Keyboard presses and single clicks pass. The
+ * walk-through's steps drop it the same way.
  */
-const isRepeatClick = (e: MouseEvent) => e.detail > 1;
+export const isRepeatClick = (e: MouseEvent) => e.detail > 1;
 
 /** Where the browser's history is, as the router counts it (its own `idx` in each entry's state). */
 export const historyIndex = (): number | undefined => {

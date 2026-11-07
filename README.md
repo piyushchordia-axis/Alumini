@@ -178,7 +178,8 @@ before showing the demo.
   profile outside schools, as **Admin → Profile fields** says, so they need no question.
 - Per-tenant **member approval mode**: `AUTO_APPROVE` or `ADMIN_APPROVAL`. Pending members see a waiting screen and
   are notified when approved or rejected (with the reason). Rejected members can update their details and re-apply;
-  admins can suspend and reinstate.
+  admins can suspend and reinstate. Once a member is in, their first entry opens a short walk-through (see **First
+  entry** under Profiles and onboarding).
 - Per-tenant **content moderation mode**: `AUTO_APPROVE` or `ADMIN_APPROVAL` for posts, jobs, funding listings,
   events, business listings and groups (like a moderated Facebook group). Comments are never held but can be removed,
   and neither are chat messages, which never reach moderation at all. Tenant admins' own content is always published.
@@ -459,6 +460,46 @@ institution (never one waiting, rejected or suspended, nor at a suspended or arc
 - **Undo** puts back only what still holds what the copy put there, and says which later changes it kept.
 - It isn't offered when re-applying, or when it would add nothing.
 
+**First entry.** A member who is let in (straight away, through an invitation, or once an admin approves them) is
+welcomed on their first entry by a walk-through of three screens, the same on both apps, its words in
+`packages/shared/src/lib/welcome.ts` (`WELCOME_COPY`):
+
+1. "Welcome, {first name}", under the institution's brand cover at full height, with its welcome message as the
+   landing page shows it (line breaks kept), then "Here's a quick look around before you start."
+2. "Make your profile stand out": the profile strength meter (below), a line chosen by what's missing, and the two
+   heaviest missing items, each a link into its part of the profile (web `/app/profile#work`, phone Edit profile at
+   `?section=work`), with "Each opens My profile and ends this welcome." under them.
+3. "Find your people": the sections this member can open (`welcomeSections`, after the feature switches and the pupil
+   rule), people first: Directory, Mentors, Groups, Messages, Events, Jobs, Businesses, Funding, never the feed, as
+   More's described rows. With none to list it's left out, and the count reads "1 of 2".
+
+- **The page.** Plain, as the landing page is, with none of the app's chrome, and the cover compact after the first
+  screen. Skip is on every screen, Back on the second and third, then Next or, last, Get started. Under each title,
+  "1 of 3" and dots in the brand's ink. Each screen's title takes focus, described by the count. On the phone it's a
+  screen of the `(app)` stack above the tabs, like the admin console: Android's back button steps back, and on the
+  first screen skips; iOS's swipe back is off; a screen ignores taps for 350 ms after it opens, so a double tap moves
+  one screen; the buttons stay fixed above the bottom edge at any text size; and the status bar is light over the
+  cover.
+- **Who is owed it.** `memberships.welcome_done_at` is null while it's owed. The column defaults to now(), so seeded
+  members, the admins Illuminize staff create and test members count as done: only registration
+  (`registerMembership`) writes null, and migration 0036 nulled it for memberships never yet approved, which see it
+  once they are. `welcomeDue` is APPROVED with `welcomeDoneAt` null. Only the member's own membership carries the key,
+  never an admin's view of them or a card, so an answer without it never opens the walk-through.
+- **Only at the front door.** On the web, `WelcomeGate` sends `/t/:slug/app`, where sign-in, registration, the
+  waiting page, the landing page and the institution picker all lead, to `/t/:slug/welcome` while it's owed, before
+  the app's chrome draws. On the phone, `entryHref` does the same for the landing screen, sign-in, registration and the
+  waiting screen. A link, a notification, a push or a sign-in's `?next=` opens its own screen, and the walk-through
+  waits for the next entry at the front door. Its own address, opened when it isn't owed, goes home.
+- **Every way out ends it:** Skip, Get started, a link on it and, on the phone, Android's back on the first screen.
+  Each marks it done in the app's cache, then sends `POST /t/:slug/memberships/me/welcome/done`, which keeps the first
+  time and leaves `updated_at` alone. If that fails nothing is said, and it's owed again only at the next entry at the
+  front door, so nobody is held there offline. Skip and Get started open the home section (the feed, or the first
+  section on when it's off, or My profile when nothing is), and a link its own page; on the phone they leave through
+  `router.dismissTo`, so there's one set of tabs whether the tabs were under it (opened cold from a link) or not.
+- **Pushes.** The phone asks for permission to send notifications only once the walk-through is over, so the prompt
+  never covers its first screen. A push tapped while it's open opens its screen in the walk-through's place
+  (`dismissTo`) without ending it.
+
 **Profile strength** (`profileStrength`) weighs what's filled in:
 
 | Item | Weight | Left out for |
@@ -475,11 +516,13 @@ institution (never one waiting, rejected or suspended, nor at a suspended or arc
 | Degree or field of study here | 5 | schools |
 | A past role or studies elsewhere | 5 | |
 
-The score is the weight done out of the weight that applies to the member. The feed opens with a "Complete your
-profile" card (a section, not a post) showing the score and the three heaviest missing items, each linking to its
-section of the edit form; it hides at 90% or above. **Not now** (`POST /memberships/me/profile-nudge/dismiss`) stamps
-`profile_nudge_dismissed_at`, so the card stays away for 14 days on every device, and leaves "Hidden for 14 days. My
-profile always shows what's left to add." in its place. My profile always shows the meter and everything still to add.
+The score is the weight done out of the weight that applies to the member. The walk-through's second screen suggests
+the two heaviest missing items (`welcomeProfile`), and after it the feed opens with a "Complete your profile" card (a
+section, not a post), which may repeat them: it shows the score and the three heaviest missing items, each linking to
+its section of the edit form, and hides at 90% or above. **Not now** (`POST /memberships/me/profile-nudge/dismiss`)
+stamps `profile_nudge_dismissed_at`, so the card stays away for 14 days on every device, and leaves "Hidden for 14
+days. My profile always shows what's left to add." in its place. My profile always shows the meter and everything
+still to add.
 
 **Directory.** `q` also matches the headline and any skill. New filters for industry, skill (one, matched whole and
 regardless of case), field of study (matched whole, like city) and Open to sit behind **More filters** (web) and
@@ -1381,8 +1424,9 @@ export.
 1. Create an Expo project (`npx eas init` in `apps/mobile`, or expo.dev) and put its id in `apps/mobile/.env` as
    `EAS_PROJECT_ID`; `app.config.ts` passes it to the app. Without it the app skips push registration.
 2. Optionally set `EXPO_ACCESS_TOKEN` on the API if you enabled enhanced push security in Expo.
-3. Install a development build on a real device and sign in; the device token is registered with the API and removed
-   again on sign-out.
+3. Install a development build on a real device and sign in; the device token is registered with the API (for a
+   member who has just joined, once their walk-through is over, which is when the phone asks for permission) and
+   removed again on sign-out.
 
 Every push carries the institution slug, the notification type and its ids, so tapping one opens the right screen in
 the right institution (also when the tap launches the app). The API reads Expo's send tickets and, about 15 minutes
@@ -1527,6 +1571,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     auto-approve off: no seeded institution is set up that way.
   - Once a request to join is approved or rejected, only current admins' notices of it are marked read: a demoted or
     suspended admin's copy stays unread, still saying the request waits, until they read it.
+  - The first-entry walk-through shows once and can't be opened again, and admins can't preview it. There's no setup
+    tour of the console for a new institution's first admin. On the phone, its Android back, the swipe being off, the
+    light status bar over the cover, the large-text layout and the push prompt's wait are checked by hand only
+    (`e2e/README.md`).
 - Member years:
   - Retyping an institution away from a community (type OTHER) leaves its members' blank end years blank until each
     gives one, which their next profile save asks for. Until then they read "–present" ("1996–present"), count as there

@@ -1,4 +1,6 @@
 import type { TenantPublicDto } from "@illuminize/shared";
+import { useIsFocused } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/ui";
@@ -7,6 +9,8 @@ import { spacing, useTheme } from "@/theme";
 /** How far the card after a cover rides up over its foot. The cover keeps its hero clear of it. */
 export const BRAND_COVER_OVERLAP = 56;
 
+const HERO_MAX_SCALE = 1.5;
+
 /**
  * An institution's brand cover, as the web's BrandCover draws it: its cover photo or its colour, its logo, its short name
  * as the hero, and under that a line (its tagline, unless `title` says otherwise). Full height on the landing screen, from
@@ -14,16 +18,19 @@ export const BRAND_COVER_OVERLAP = 56;
  * status bar. Put it in a view that leaves the top edge to it (a SafeAreaView without "top").
  *
  * The text stays white over a fixed veil, as the landing has always drawn it. How dark the veil must go for a pale brand
- * or a bright photo is the contrast work's heroScrim, which belongs here; it keeps this text white. The status bar over
- * the cover is not part of heroScrim: it still has the root layout's dark style, and a light one to match the white
- * hero, set with expo-status-bar while a cover is on screen, is the walk-through's to add with its screens.
+ * or a bright photo is the contrast work's heroScrim, which belongs here; it keeps this text white. So does the status
+ * bar over the cover: light while the screen holding it is in front, and the root layout's dark one again once a screen
+ * is opened over it or it goes. Only while in front, because a stack keeps the screens under the top one mounted.
  */
 export function BrandCover({ tenant, title, compact = false }: { tenant: TenantPublicDto; title?: string; compact?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const name = tenant.shortName ?? tenant.name;
   return (
     <View style={[{ backgroundColor: theme.primary }, compact ? null : styles.full]}>
+      {/* The last StatusBar mounted wins, and the root's dark one is back when this one unmounts. */}
+      {focused && <StatusBar style="light" />}
       {tenant.coverImageUrl ? <Image source={{ uri: tenant.coverImageUrl }} style={StyleSheet.absoluteFill} /> : null}
       <View style={[StyleSheet.absoluteFill, styles.veil]} />
       {/* In the flow rather than pinned to the foot, so the compact band grows with large text instead of running under
@@ -32,9 +39,15 @@ export function BrandCover({ tenant, title, compact = false }: { tenant: TenantP
       <View style={[styles.hero, compact ? { paddingTop: insets.top + spacing.xl, paddingBottom: BRAND_COVER_OVERLAP + spacing.lg } : styles.heroFull]}>
         <View style={styles.row}>
           <Avatar name={name} src={tenant.logoUrl} size={56} />
+          {/* Already large, so it grows only half again with the phone's text size: at the largest, a cover that grew
+              with it would leave a small phone's card (the walk-through's steps) only a sliver of the screen. */}
           <View style={styles.text}>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.line}>{title ?? tenant.tagline ?? `${name} alumni network`}</Text>
+            <Text maxFontSizeMultiplier={HERO_MAX_SCALE} style={styles.name}>
+              {name}
+            </Text>
+            <Text maxFontSizeMultiplier={HERO_MAX_SCALE} style={styles.line}>
+              {title ?? tenant.tagline ?? `${name} alumni network`}
+            </Text>
           </View>
         </View>
       </View>

@@ -46,7 +46,8 @@ The phone field has a country picker. Choose **IN +91**, then type the 10 digits
 1. On the first screen, pick **Demo University** and sign in with any new number. The landing is brand-first (cover +
    institution name); chrome uses SVG icons, not emoji.
 2. Create your profile in three steps: **Basics** (a photo, your name, and the years you joined and left), **Work** (or
-   **Skip for now**) and **About you**, then **Join the network**. "What's new" below walks through it.
+   **Skip for now**) and **About you**, then **Join the network**: a short welcome opens first, and **Skip** or **Get
+   started** goes to the feed. "What's new" below walks through it.
 3. Post in the community feed (composer tray with Add image / Poll / Post), react and comment on others' posts.
 4. Open **Jobs** and post an opening, or switch to **Looking for work** and mark yourself as open to work.
 5. Open **Events** and RSVP to the Mumbai coffee meetup (your answer shows in its colour, green for I'm going, with a
@@ -153,8 +154,15 @@ apps match.
   "Step 1 of 3 · Basics": choose **Add photo**, fill in your name and your years, and press **Continue**. On "Step 2 of
   3 · Work", type a headline, then press **Skip for now**: you move on to "Step 3 of 3 · About you" without what you
   typed on Work. The step bar at the top goes back to any step you've opened, and the browser's Back to the step
-  before. Press **Join the network** and the feed opens. At Demo College the last button is **Submit for approval**,
-  with "An admin at DCE will review your profile before you can join." under it.
+  before. Press **Join the network** and the welcome opens, then the feed. At Demo College the last button is **Submit
+  for approval**, with "An admin at DCE will review your profile before you can join." under it.
+- **A welcome on the first visit.** Joining opens three short screens before the feed, under Demo University's cover:
+  "Welcome" and your first name, with the institution's welcome message; **Make your profile stand out**, with your
+  profile strength and the two things to add first, each opening that part of your profile; and **Find your people**,
+  the sections you can open, each with a line saying what's there. **Skip** is on every screen and **Back** after the
+  first, and **Get started** opens the feed. It shows once, on any device: sign in again and the feed opens. Kiran
+  Joshi (below) gets it too if he joins, and so does someone an admin approves at Demo College, on their first visit
+  after.
 - **Use details from another institution.** Sign in to **Demo University** as Kiran Joshi (`+91 91000 00011`), who is a
   member of Demo College only. The first step says "You have a profile at Demo College of Engineering". Fill in the
   years and type a city, then choose **Use details from Demo College of Engineering**: it fills in his headline,
@@ -202,7 +210,8 @@ apps match.
   meetup in **Events**, or Zylo Labs in **Businesses**. A line starting with "- " is a bullet, "1. " starts a numbered
   list, and web and email addresses become links. Posts, comments and chat stay plain text.
 - **On the phone app** all of this works the same. While registering, Android's back button and an iPhone's swipe back
-  go to the step before, keeping what was typed.
+  go to the step before, keeping what was typed. On the welcome, Android's back button goes to the screen before, and
+  on the first one skips it.
 
 **Wave 2: connect one to one** (run `pnpm db:reset` first, so the demo data for these is fresh)
 

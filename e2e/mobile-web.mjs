@@ -132,7 +132,7 @@ try {
     await tap("Demo University");
   });
 
-  await step("landing → login → OTP → register → feed", async () => {
+  await step("landing → login → OTP → register → walk-through", async () => {
     await page.getByText("Sign in / Join with mobile number").waitFor();
     // The brand cover: the short name as the hero, and the institution's tagline under it when the screen names no title.
     await page.getByText("DemoU", { exact: true }).locator("visible=true").first().waitFor();
@@ -252,20 +252,89 @@ try {
     await stepHeading(3, "About you").waitFor();
     await pressStepButton("Join the network");
     // Sending lets the screen go: Back's hold on it, kept while the profile is sent, mustn't keep the member there, nor
-    // outlive it.
-    const welcome = page.getByText("Welcome to the official Demo University alumni network", { exact: false });
-    await welcome.waitFor();
-    await page.waitForURL("**/t/demo-university/feed");
+    // outlive it. Let straight in, they're welcomed first (the next step).
+    await page.waitForURL("**/t/demo-university/welcome");
     await page
       .getByText("Create your profile")
       .waitFor({ state: "detached", timeout: 5000 })
       .catch(() => {
         throw new Error("the registration screen stayed after Join the network");
       });
-    if (await holdsBack()) throw new Error("the feed holds going back: registration's hold outlived it");
+    if (await holdsBack()) throw new Error("the walk-through holds going back: registration's hold outlived it");
     for (let i = 0; i < 50 && liveSockets.length === 0; i++) await page.waitForTimeout(100);
     if (liveSockets.length === 0) throw new Error("the app did not open a live-updates connection after signing in");
+  });
+
+  await step("the first-entry walk-through: three screens, Skip and Back, once", async () => {
+    // Above the tabs, plain as the landing screen is, under the brand cover. Each screen's heading takes focus, described
+    // by where they are ("1 of 3"). Its buttons ignore taps for a moment after each screen opens, which clicks wait out.
+    const main = page.locator("main");
+    const heading = (name) => page.getByRole("heading", { name, exact: true }).locator("visible=true");
+    const button = (name) => page.getByRole("button", { name, exact: true }).locator("visible=true");
+    const onScreen = async (name, count) => {
+      await heading(name).waitFor();
+      await page.waitForFunction((text) => document.activeElement?.getAttribute("role") === "heading" && document.activeElement.textContent === text, name, { timeout: 5000 }).catch(async () => {
+        throw new Error(`the walk-through's "${name}" opened with focus on "${await page.evaluate(() => document.activeElement?.textContent)}"`);
+      });
+      await expectDescription(heading(name), count, `the walk-through's "${name}"`);
+    };
+    await onScreen("Welcome, Mobile", "1 of 3");
+    if (await page.locator('a[role="tab"]').locator("visible=true").count()) throw new Error("the walk-through shows the tab bar");
+    await page.getByText("DemoU", { exact: true }).locator("visible=true").first().waitFor();
+    // The institution's own welcome message, as its landing screen shows it, then the walk-through's line.
+    await main.getByText(/^Welcome to the Demo University alumni network\. Reconnect/).locator("visible=true").waitFor();
+    await main.getByText("Here's a quick look around before you start.", { exact: true }).locator("visible=true").waitFor();
+    if ((await button("Skip").count()) !== 1) throw new Error(`the walk-through shows ${await button("Skip").count()} Skip buttons`);
+    if (await button("Back").count()) throw new Error("the walk-through's first screen offers Back");
+    await expectSvgNoEmoji(main, "the walk-through");
+    await shot("m04-welcome");
+    // What to add first: the two heaviest things missing, each a link into its part of Edit profile, which ends the
+    // walk-through on the way (the line under them says so). A name and years alone: 0.
+    await button("Next").click();
+    await onScreen("Make your profile stand out", "2 of 3");
+    const strength = await main.getByRole("progressbar", { name: "Profile strength", exact: true }).locator("visible=true").getAttribute("aria-valuenow");
+    if (strength !== "0") throw new Error(`the walk-through scores a new profile ${strength}, not 0`);
+    await main.getByText("A photo and a headline help people recognise you and see what you do.", { exact: true }).locator("visible=true").waitFor();
+    const toAdd = main.getByRole("link").locator("visible=true");
+    const named = await toAdd.allInnerTexts();
+    if (named.join() !== "Add a profile photo,Write a headline") throw new Error(`the walk-through suggests ${named.join(", ")}`);
+    await expectDescription(toAdd.first(), "Each opens My profile and ends this welcome.", "the walk-through's first profile link");
+    await shot("m04a-welcome-profile");
+    // Back goes to the screen before, its heading taking focus again.
+    await button("Back").click();
+    await onScreen("Welcome, Mobile", "1 of 3");
+    await button("Next").click();
+    await onScreen("Make your profile stand out", "2 of 3");
+    // Every section this member can open, people first, as More's described rows, each named by its section alone
+    // with its line as the description, at least 44 tall.
+    await button("Next").click();
+    await onScreen("Find your people", "3 of 3");
+    await main.getByText("Here's what DemoU has for you. It's all in the menu too, any time.", { exact: true }).locator("visible=true").waitFor();
+    const rows = main.getByRole("link").locator("visible=true");
+    const sections = await rows.evaluateAll((links) => links.map((a) => a.getAttribute("aria-label")));
+    if (sections.join() !== "Directory,Mentors,Groups,Messages,Events,Jobs,Businesses,Funding") throw new Error(`the walk-through lists ${sections.join(", ")}`);
+    await expectDescription(main.getByRole("link", { name: "Funding", exact: true }).locator("visible=true"), "Members raising and investing", "the walk-through's Funding row");
+    const short = await rows.evaluateAll((links) => links.filter((a) => a.getBoundingClientRect().height < 44).map((a) => a.getAttribute("aria-label")));
+    if (short.length) throw new Error(`the walk-through's ${short.join(", ")} rows are under 44 tall`);
+    await expectSvgNoEmoji(main, "the walk-through's sections");
+    if (await button("Next").count()) throw new Error("the walk-through's last screen offers Next");
+    await shot("m04a2-welcome-explore");
+    // Get started ends it on the server and opens the feed in its place, with one tab bar.
+    const [finished] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/memberships/me/welcome/done")),
+      button("Get started").click(),
+    ]);
+    if (!finished.ok()) throw new Error(`Get started answered ${finished.status()}`);
+    await page.waitForURL("**/t/demo-university/feed");
+    const pinned = page.getByText("Welcome to the official Demo University alumni network", { exact: false }).locator("visible=true").first();
+    await pinned.waitFor();
+    if ((await barTab("More").locator("visible=true").count()) !== 1) throw new Error("the feed after the walk-through doesn't show one tab bar");
     await shot("m04-feed");
+    // Ended once, on every device: opened cold, the walk-through's own address goes home.
+    await page.goto(BASE + "/t/demo-university/welcome");
+    await page.waitForURL("**/t/demo-university/feed");
+    await pinned.waitFor();
+    if ((await barTab("More").locator("visible=true").count()) !== 1) throw new Error("the walk-through's address, once it's ended, doesn't open the feed with one tab bar");
   });
 
   await step("the profile card on the feed lists what to add, opens its section, and Not now puts it away", async () => {
@@ -2697,8 +2766,8 @@ try {
     await page.waitForURL("**/t/demo-university");
   });
 
-  await step("a forced sign-out leaves nothing cached for whoever signs in next", async () => {
-    // Signed out by the last step. A new member joins, so there is a membership cached.
+  await step("the walk-through waits while a link opens its own screen, and a link on it opens that part of the profile and ends it", async () => {
+    // Signed out by the last step. A new member joins, which the next step needs too: a membership cached.
     await tap("Sign in / Join with mobile number");
     await signIn(PHONE_2);
     await page.getByText("Create your profile").waitFor();
@@ -2707,6 +2776,40 @@ try {
     await page.getByLabel("Year you joined *", { exact: true }).locator("visible=true").fill("2011");
     await page.getByLabel("Year you left (or will leave) *", { exact: true }).locator("visible=true").fill("2015");
     await finishRegistration("Join the network");
+    await page.waitForURL("**/t/demo-university/welcome");
+    // Only the front door opens it: a link into the app, as from a push or an email, opens its own screen while the
+    // walk-through is owed, and the next entry at the front door brings it back.
+    await page.goto(BASE + "/t/demo-university/directory");
+    await page.getByPlaceholder("Name, company, role or skill").locator("visible=true").first().waitFor().catch(() => {
+      throw new Error(`a link to the directory, while the walk-through is owed, opened ${page.url()}`);
+    });
+    if (!page.url().endsWith("/t/demo-university/directory")) throw new Error(`a link to the directory, while the walk-through is owed, opened ${page.url()}`);
+    await barTab("More").locator("visible=true").first().waitFor();
+    await page.goto(BASE + "/t/demo-university");
+    await page.waitForURL("**/t/demo-university/welcome");
+    await page.getByRole("heading", { name: "Welcome, Forced", exact: true }).locator("visible=true").waitFor();
+    await page.getByRole("button", { name: "Next", exact: true }).locator("visible=true").click();
+    const headline = page.locator("main").getByRole("link", { name: "Write a headline", exact: true }).locator("visible=true");
+    const [done] = await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/memberships/me/welcome/done")), headline.click()]);
+    if (!done.ok()) throw new Error(`a link on the walk-through answered ${done.status()}`);
+    await page.waitForURL("**/t/demo-university/profile/edit?section=work");
+    await page.getByRole("heading", { name: "Work", exact: true }).locator("visible=true").last().waitFor();
+    // With the tabs under it, as the feed's card opens it: Back goes to My profile, then the feed, with one tab bar.
+    const back = page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
+    await back.click();
+    await page.waitForURL("**/t/demo-university/profile");
+    await page.getByRole("button", { name: "Edit profile" }).locator("visible=true").first().waitFor();
+    await back.click();
+    await page.waitForURL("**/t/demo-university/feed");
+    await barTab("More").locator("visible=true").first().waitFor();
+    if ((await barTab("More").locator("visible=true").count()) !== 1) throw new Error("the feed after a link on the walk-through doesn't show one tab bar");
+    // Ended on the server: the front door opens the feed.
+    await page.goto(BASE + "/t/demo-university");
+    await page.waitForURL("**/t/demo-university/feed");
+  });
+
+  await step("a forced sign-out leaves nothing cached for whoever signs in next", async () => {
+    // The member who just joined (the step before) has their membership cached.
     await barTab("More").waitFor();
     const membership = await scriptMembership(page, "demo-university");
     membership.answer(401, "SESSION_REVOKED");
@@ -3302,10 +3405,17 @@ try {
     await page.getByLabel("Pending members, 2", { exact: true }).waitFor();
     // The API's own answer with the role taken away, found by a refetch, as when another admin demotes them.
     const url = "**/api/v1/t/shri-gujarati-samaj/memberships/me";
+    // The console refetches the membership as it opens, so one can still be on its way through this answer when the step
+    // ends: unrouted, Playwright has passed it on by the time it's answered here, which mustn't end the script.
+    let unrouted = false;
     await page.route(url, async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
       const response = await route.fetch();
-      return route.fulfill({ response, json: { data: { ...(await response.json()).data, role: "MEMBER" } } });
+      try {
+        await route.fulfill({ response, json: { data: { ...(await response.json()).data, role: "MEMBER" } } });
+      } catch (error) {
+        if (!unrouted) throw error;
+      }
     });
     // Routed after, so it runs first: it counts the requests and passes each on to the answer above.
     const membership = await scriptMembership(page, "shri-gujarati-samaj");
@@ -3322,6 +3432,7 @@ try {
       await page.waitForURL("**/t/shri-gujarati-samaj/feed");
       await barTab("More").waitFor();
     } finally {
+      unrouted = true;
       await membership.stop();
       await page.unroute(url);
     }

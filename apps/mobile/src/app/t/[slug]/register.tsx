@@ -12,7 +12,7 @@ import { useProfileFields } from "@/hooks/useProfileFields";
 import { useTenant } from "@/hooks/useTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
-import { homeHref } from "@/lib/sections";
+import { entryHref } from "@/lib/sections";
 import { useSignOut } from "@/lib/session";
 import { useAuthStore } from "@/stores/authStore";
 import { useTenantStore } from "@/stores/tenantStore";
@@ -61,7 +61,7 @@ export default function RegisterScreen() {
   const membershipError = fatalQueryError(membership);
   const notMember = isApiClientError(membershipError) && membershipError.status === 404;
   const existing = membership.data;
-  if (existing && existing.status !== "REJECTED") return <Redirect href={existing.status === "APPROVED" ? homeHref(slug!, tenant.data.settings.features) : `/t/${slug}/pending`} />;
+  if (existing && existing.status !== "REJECTED") return <Redirect href={existing.status === "APPROVED" ? entryHref(slug!, tenant.data.settings.features, existing) : `/t/${slug}/pending`} />;
   if (membershipError && !notMember)
     return (
       <LoadError
@@ -132,8 +132,9 @@ export default function RegisterScreen() {
             qc.setQueryData(qk.membership(slug!), m);
             // Refresh the membership list (profile screen, institution switcher).
             void qc.invalidateQueries({ queryKey: qk.me });
-            // The feed (with its profile card) or the waiting screen says what happened.
-            router.replace(m.status === "APPROVED" ? homeHref(slug!, t.settings.features) : `/t/${slug}/pending`);
+            // The walk-through (someone let straight in is owed it) or the waiting screen says what happened. The same place
+            // as this screen's own redirect on the membership just cached.
+            router.replace(m.status === "APPROVED" ? entryHref(slug!, t.settings.features, m) : `/t/${slug}/pending`);
           }}
         />
       )}

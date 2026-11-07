@@ -1,4 +1,5 @@
 import type { MembershipStatus, TenantFeatures } from "../constants";
+import { missingProfileItems, type ProfileStrength, type ProfileStrengthItem } from "./profile";
 import { splitSections, type MemberSection } from "./sections";
 
 /**
@@ -37,3 +38,56 @@ export function welcomeSteps(sections: readonly MemberSection[]): WelcomeStep[] 
 
 /** How many missing profile items its profile screen suggests (missingProfileItems), the heaviest first. */
 export const WELCOME_PROFILE_ITEMS = 2;
+
+/**
+ * Every word the walk-through says, the same on both apps. The first screen's title (welcomeTitle) and the second's line
+ * (welcomeProfile) depend on the member, and the institution's own welcome message sits between the first screen's
+ * title and its lead.
+ */
+export const WELCOME_COPY = {
+  hello: {
+    lead: "Here's a quick look around before you start.",
+  },
+  profile: {
+    title: "Make your profile stand out",
+    /** Photo or headline still missing: the two things people see first on every card. */
+    start: "A photo and a headline help people recognise you and see what you do.",
+    /** Both in, other things missing. */
+    more: "Your photo and headline are in. A little more helps people find you.",
+    /** Nothing missing. */
+    complete: "Your profile has what people look for first.",
+    /** Under the rows: following one leaves the walk-through, which counts as done. */
+    linksHint: (count: number) => (count === 1 ? "It opens My profile and ends this welcome." : "Each opens My profile and ends this welcome."),
+    later: "You can change it any time from My profile.",
+  },
+  explore: {
+    title: "Find your people",
+    body: (shortName: string) => `Here's what ${shortName} has for you. It's all in the menu too, any time.`,
+  },
+  skip: "Skip",
+  back: "Back",
+  next: "Next",
+  done: "Get started",
+} as const;
+
+/** The first screen's title: "Welcome, Asha" from "Asha Rao", or just "Welcome" with no name to go by. */
+export function welcomeTitle(fullName: string | null | undefined): string {
+  const first = fullName?.trim().split(/\s+/)[0];
+  return first ? `Welcome, ${first}` : "Welcome";
+}
+
+/** The line under each title: "1 of 3". `index` counts from 0, as welcomeSteps' list does. */
+export function welcomeStepCount(index: number, count: number): string {
+  return `${index + 1} of ${count}`;
+}
+
+/**
+ * What the profile screen suggests (the WELCOME_PROFILE_ITEMS heaviest items missing, each a link into the part of My
+ * profile it's added in) and the line above them, which says what's in when the photo and headline are.
+ */
+export function welcomeProfile(strength: ProfileStrength): { items: ProfileStrengthItem[]; body: string } {
+  const missing = strength.items.filter((i) => !i.done);
+  const items = missingProfileItems(strength, WELCOME_PROFILE_ITEMS);
+  const body = missing.length === 0 ? WELCOME_COPY.profile.complete : missing.some((i) => i.key === "photo" || i.key === "headline") ? WELCOME_COPY.profile.start : WELCOME_COPY.profile.more;
+  return { items, body };
+}

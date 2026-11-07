@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { IconChevronDown, IconProfile } from "@/components/icons";
-import { Button, Card, ErrorText, focusOn, headingRole, type Focusable } from "@/components/ui";
+import { Button, Card, ErrorText, describedBy, focusOn, headingRole, type Focusable } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
@@ -36,19 +36,26 @@ export function ProfileStrengthMeter({ score }: { score: number }) {
   );
 }
 
+/** The edit screen, open at the section where `item` is added. */
+export const profileItemHref = (slug: string, item: ProfileStrengthItem) => `/t/${slug}/profile/edit?section=${item.section}` as const;
+
 /**
- * Missing items as rows that open the part of the edit screen where each is added. With `withAnchor`: from the feed, the
- * profile stack may not be mounted yet, and would otherwise hold only the edit screen, which Back and Save leave behind.
+ * Missing items as rows that open the part of the edit screen where each is added (the feed's card, My profile and the
+ * walk-through). With `withAnchor`: from the feed, the profile stack may not be mounted yet, and would otherwise hold only
+ * the edit screen, which Back and Save leave behind. `onOpen` opens it some other way (the walk-through ends itself on
+ * the way), and `hint` describes every row, by the line under them whose `nativeID` is its id.
  */
-function ItemLinks({ items, slug }: { items: ProfileStrengthItem[]; slug: string }) {
+export function ProfileItemLinks({ items, slug, onOpen, hint }: { items: ProfileStrengthItem[]; slug: string; onOpen?: (item: ProfileStrengthItem) => void; hint?: { id: string; text: string } }) {
   const router = useRouter();
   return (
     <View role="list">
       {items.map((item, i) => (
         <View key={item.key} role="listitem" style={i ? styles.divider : null}>
           <Pressable
-            onPress={() => router.push(`/t/${slug}/profile/edit?section=${item.section}`, { withAnchor: true })}
+            onPress={() => (onOpen ? onOpen(item) : router.push(profileItemHref(slug, item), { withAnchor: true }))}
             role="link"
+            accessibilityHint={hint?.text}
+            {...(hint ? describedBy(hint.id) : {})}
             style={({ pressed }) => [styles.item, pressed ? { backgroundColor: colors.bg } : null]}
           >
             <Text style={styles.itemText}>{item.label}</Text>
@@ -121,7 +128,7 @@ export function ProfileStrengthCard() {
         <ProfileStrengthMeter score={strength.score} />
         <ErrorText error={dismiss.isError ? `Couldn't hide this: ${errorMessage(dismiss.error)}` : null} />
         <View style={styles.items}>
-          <ItemLinks items={missingProfileItems(strength)} slug={tenant.slug} />
+          <ProfileItemLinks items={missingProfileItems(strength)} slug={tenant.slug} />
         </View>
       </Card>
     </View>
@@ -140,7 +147,7 @@ export function ProfileStrengthPanel({ strength, slug }: { strength: ProfileStre
       {missing.length > 0 ? (
         <View style={{ gap: spacing.xs }}>
           <Text style={styles.overline}>Still to add</Text>
-          <ItemLinks items={missing} slug={slug} />
+          <ProfileItemLinks items={missing} slug={slug} />
         </View>
       ) : (
         <Text style={styles.sub}>Your profile is complete. Members see everything they need to know you.</Text>

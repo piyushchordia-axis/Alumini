@@ -1,5 +1,6 @@
 import { countryByCode, defaultFeaturesFor, formatPhone, nationalDigits, phoneCountryNote, phoneEntryToE164, readPhoneEntry, type PhoneEntry } from "@illuminize/shared";
-import { errorMessage, isApiClientError } from "@illuminize/shared/client";
+import { errorMessage, GUARD_QUERY_META, isApiClientError } from "@illuminize/shared/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, Platform, Pressable, Text, View } from "react-native";
@@ -7,13 +8,15 @@ import { CountryPicker } from "@/components/CountryPicker";
 import { Button, ErrorText, Input, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useTenant } from "@/hooks/useTenant";
-import { homeHref } from "@/lib/sections";
+import { qk } from "@/lib/queryKeys";
+import { entryHref, homeHref } from "@/lib/sections";
 import { useAuthStore } from "@/stores/authStore";
 import { colors, useTheme } from "@/theme";
 
 export default function LoginScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const qc = useQueryClient();
   const theme = useTheme();
   const setSession = useAuthStore((s) => s.setSession);
   const tenant = useTenant(slug);
@@ -68,8 +71,13 @@ export default function LoginScreen() {
       const session = await api.auth.verifyOtp(phone, code);
       setSession(session);
       const m = session.memberships.find((x) => x.tenant.slug === slug);
+      if (!m || m.status !== "APPROVED") return router.replace(!m ? `/t/${slug}/register` : `/t/${slug}/pending`);
       // The tenant layout has loaded the institution, so its feature switches are in the query cache.
-      router.replace(!m ? `/t/${slug}/register` : m.status === "APPROVED" ? homeHref(slug!, tenant.data?.settings.features ?? defaultFeaturesFor(tenant.data?.type ?? "OTHER")) : `/t/${slug}/pending`);
+      const features = tenant.data?.settings.features ?? defaultFeaturesFor(tenant.data?.type ?? "OTHER");
+      // The session's summary doesn't say whether the walk-through is owed: the membership does, which the app's guard
+      // would fetch next anyway. Without it they go home, and the walk-through waits for the next time they come in.
+      const full = await qc.fetchQuery({ queryKey: qk.membership(slug!), queryFn: () => api.membership.me(slug!), staleTime: 0, meta: GUARD_QUERY_META }).catch(() => null);
+      router.replace(full ? entryHref(slug!, features, full) : homeHref(slug!, features));
     } catch (err) {
       setError(err);
     } finally {
