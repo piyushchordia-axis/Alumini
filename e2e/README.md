@@ -52,10 +52,12 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   and left edges: colour, width and contrast with the card) are built on them, and a new colour check should be too.
   They don't see a photo under the page's veil, and they refuse a faded (disabled) element.
 - `expectEmptyState(box, where, { actions, absent, tones })` checks an empty state or a chat notice, found from its
-  title (the web's `h3` directly inside it, the phone's title as a direct child): an SVG icon and no emoji, on a badge
-  that isn't white, at 3:1 on it, and the links or buttons it should and shouldn't offer. `tones` pins the badge and the
-  icon to the institution's own wash and ink (`BRAND_TONES`, the seeded institutions' as `brandTones` gives them), which
-  a grey badge would otherwise pass for; every check in the scripts gives them.
+  title (the web's `h3` directly inside it, the phone's title as a direct child), or the note before a first message
+  (the web's `role="note"` named by its title; on the phone the card two levels above the title, which sits in a column
+  beside the icon, so the title's parent holds no icon): an SVG icon and no emoji, on a badge that isn't white, at 3:1
+  on it, and the links or buttons it should and shouldn't offer. `tones` pins the badge and the icon to the
+  institution's own wash and ink (`BRAND_TONES`, the seeded institutions' as `brandTones` gives them), which a grey
+  badge would otherwise pass for; every check in the scripts gives them.
 - `expectChoiceLook(choice, boxSelector, where, { checked, tile, tones, label })` checks a checkbox or radio as both
   apps draw them (`choice` the web's `<label>` or the phone's element with the role; the box the web's `input`, the
   phone's `:scope > div`): a clear box's edge the meta grey (`GREY_TEXT`) at 3:1; a chosen one in the ink at 3:1 on
@@ -172,14 +174,17 @@ Covers:
   44px chips with SVG icons in the brand's ink under a readable heading, holding no text box or post (the feed's first
   stay the composer's and a post's), with no sideways scrolling and Funding's chip opening its page with More current;
   and no Explore row at all on a wide screen or with nothing behind More;
-- direct messages between two seeded members (Meera and Sneha): a request (refused once for going too fast, keeping
-  its words in the box), its Request sent panel giving the date to ask again on a line of its own (a clock, thirty
-  days on in a `<time>`, nothing hinting at a decline or a block), the thread left open past that date (answered by
-  the script a few seconds on) offering the box with its note on the info tone and saying so, accepted live, replies
-  both ways with exactly one bubble each, a thread in a background tab not marking anything read, Try again reusing
-  the client key, a refusal for sending too fast (a warning on the warning tone), a draft surviving a failed refetch, a
-  report (and a second one), a block (the blocked member's messages never arrive, even after the unblock), a lost
-  socket frame recovered by the gap fill, and the thread on a phone;
+- direct messages between two seeded members (Meera and Sneha): a request, welcomed first by a note named "Say hello to
+  Sneha Kulkarni" (its text and tip, the envelope an SVG in Demo University's badge, its words readable, nothing hinting
+  at a decline or a block, and the message box described by it: title, text and tip as sentences of their own, as
+  Chromium works the description out over CDP), refused once for going too fast (keeping its words in the box), its
+  Request sent panel giving the date to ask again on a line of its own (a clock, thirty days on in a `<time>`, nothing
+  hinting at a decline or a block), the thread left open past that date (answered by the script a few seconds on)
+  offering the box with its note on the info tone and saying so, accepted live, replies both ways with exactly one
+  bubble each, a thread in a background tab not marking anything read, Try again reusing the client key, a refusal for
+  sending too fast (a warning on the warning tone), a draft surviving a failed refetch, a report (and a second one), a
+  block (the blocked member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap
+  fill, and the thread on a phone;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on,
   and the feed's Explore row offering Businesses and Funding;
 - groups: each chosen visibility card in Demo University's wash and ring around an ink ring and dot, with its
@@ -382,10 +387,11 @@ Covers:
   edit, My posts and delete through the confirm sheet;
 - notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
   and a notification tap landing on its target;
-- direct messages between two seeded members (Arjun and Vikram), as on the web, including the request refused once for
-  going too fast (on the warning tone), the date to ask again on a line of its own, the thread left open past it
-  offering the box with its note on the info tone, a report from tapping a message, a block, a cold start on a thread,
-  and a lost socket frame recovered by the gap fill;
+- direct messages between two seeded members (Arjun and Vikram), as on the web, including the note welcoming the first
+  message ("Say hello to Vikram Desai", its text and tip, its envelope in Demo University's badge, its words readable,
+  nothing hinting at a decline), the request refused once for going too fast (on the warning tone), the date to ask
+  again on a line of its own, the thread left open past it offering the box with its note on the info tone, a report
+  from tapping a message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
   (the invitation's badge arriving live on More and on the feed's Explore chip, named "Groups, 1 invitation"; Mentors,
   kept as a way out, on the feed's Explore row and as More's row saying "Your requests and mentorships");
@@ -838,6 +844,10 @@ the console (part 14).
       Messages → Blocked members.
 - [ ] The web app in iPhone Safari and Android Chrome: open a chat, tap the message box, and the box stays in view
       above the keyboard.
+- [ ] Open Message this member on a member you haven't messaged, and tap the message box. The note "Say hello to …"
+      stays whole above the keyboard, or scrolls, with nothing cut off; its envelope is in the institution's colour on
+      a pale disc; and TalkBack or VoiceOver read its title, its text and its tip, in that order, before the box, and
+      skip the envelope.
 - [ ] Send a first message to a member you haven't messaged. Under Request sent, the line with the clock reads like
       "You can ask again from Mon, 7 Dec if they haven't accepted by then." (no "Invalid Date", and the day and date as
       the web shows them: Hermes writes it with the same `Intl` options as the chat times), and TalkBack or VoiceOver

@@ -1,12 +1,13 @@
 import { memberYearsLine } from "@illuminize/shared";
-import { chatKeys, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
+import { chatKeys, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatHeader, ChatNotice, ChatOff, ChatScreen, useLeaveChatScreen } from "@/components/chat/ChatFrame";
+import { FirstMessageNote } from "@/components/chat/RequestNotes";
 import { IconMessages } from "@/components/icons";
 import { Button, Spinner } from "@/components/ui";
 import { useChatEnabled } from "@/hooks/useChat";
@@ -14,7 +15,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { draftKey, useChatStore } from "@/stores/chatStore";
-import { colors, radius, spacing } from "@/theme";
+import { spacing } from "@/theme";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -96,7 +97,6 @@ function NewConversation({ to }: { to: string }) {
     }
   };
 
-  const name = profile.data?.fullName ?? "this member";
   const waiting = existing.isLoading || profile.isLoading;
   return (
     <ChatScreen>
@@ -106,11 +106,8 @@ function NewConversation({ to }: { to: string }) {
           <Spinner />
         </View>
       ) : (
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: spacing.xl }}>
-          <View style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: 4 }}>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text, textAlign: "center" }}>Your first message is a request</Text>
-            <Text style={{ fontSize: 14, color: colors.muted, textAlign: "center" }}>{`${name} can accept or decline it. You can't send more until they accept.`}</Text>
-          </View>
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl }}>
+          <FirstMessageNote notice={firstMessageNotice(profile.data?.fullName)} />
         </ScrollView>
       )}
       {!waiting && <ChatComposer draftKey={dk} onSend={(text) => void send(text)} sending={sending} notice={notice} />}

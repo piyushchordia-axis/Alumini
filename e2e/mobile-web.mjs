@@ -1347,7 +1347,17 @@ try {
     const profileUrl = pageA.url();
     await shown(pageA.getByRole("link", { name: "Message this member" })).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
-    await shown(pageA.getByText("Your first message is a request")).waitFor();
+    // Before it goes, a note welcomes it rather than warns, as on the web: its text and tip, the envelope drawn in Demo
+    // University's badge, its words readable on the card and nothing hinting at a decline. The title's parent is the
+    // note's words, and theirs the card.
+    const firstTitle = shown(pageA.getByText("Say hello to Vikram Desai", { exact: true }));
+    await firstTitle.waitFor();
+    const firstNote = firstTitle.locator("xpath=../..");
+    const firstLines = firstTitle.locator("xpath=../*");
+    for (const words of ["Your first message arrives as a request, and you can send more once they accept.", "A line about who you are and why you're getting in touch helps them say hello back."]) await firstNote.getByText(words, { exact: true }).waitFor();
+    await expectEmptyState(firstNote, "the note before a first message", { tones: BRAND_TONES.demoUniversity });
+    for (const line of await firstLines.all()) await expectReadable(line, `the note before a first message's "${await line.innerText()}"`);
+    if (HINTS_AT_A_DECLINE.test(await firstNote.innerText())) throw new Error(`the note before a first message hints at a decline or a block: "${await firstNote.innerText()}"`);
     await shown(pageA.getByText("2016–2020 · New conversation", { exact: true })).waitFor();
     const asked = `Hello Vikram, could I ask about IIM? ${unique}`;
     // A first message refused for going too fast says so as a thread does, and keeps its words in the box to send again.

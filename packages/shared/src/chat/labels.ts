@@ -203,3 +203,23 @@ export function rerequestOpenedText(c: Pick<ChatConversationDto, "state" | "peer
   if (c.state === "CLOSED") return `You can send ${peerName(c.peer)} a new request now.`;
   return null;
 }
+
+/** The note on the screen writing a first message: a title, what happens to the message, and a tip for writing it. */
+export interface FirstMessageNotice {
+  title: string;
+  text: string;
+  tip: string;
+}
+
+/**
+ * What the screen writing a first message says above the box, on both apps: that it goes as a request, said as a welcome
+ * rather than a warning, with nothing about a decline or the limits on asking again, which only matter once there's a
+ * problem. `name` is the other member's full name; until it's known (or with the directory off), "this member".
+ */
+export function firstMessageNotice(name: string | null | undefined): FirstMessageNotice {
+  return {
+    title: `Say hello to ${name || "this member"}`,
+    text: "Your first message arrives as a request, and you can send more once they accept.",
+    tip: "A line about who you are and why you're getting in touch helps them say hello back.",
+  };
+}

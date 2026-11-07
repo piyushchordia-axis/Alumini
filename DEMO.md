@@ -102,6 +102,11 @@ phone-sized preview in the browser. Port 4000 must still be public.
   **I'm raising** and **I'm investing**, **Plan a gathering**. Search the Directory for "zzzz": **No members match**
   offers **Show all members**, which clears the search and the filters and puts you back in the search box, as Jobs and
   Businesses do.
+- **A first message, welcomed** (on fresh demo data: run `pnpm db:reset` first, because once Priya has written to Sneha,
+  as Wave 2's Messages walk-through does, the page opens their thread instead). As Priya, choose **Message this member**
+  on Sneha Kulkarni's profile: in place of the old warning, a note, **Say hello to Sneha Kulkarni**, says her first
+  message arrives as a request and gives a tip for writing it. Once it's sent, **Request sent** has the date she could
+  ask again on a line of its own, with a clock.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 
@@ -228,9 +233,10 @@ counts it.
   sees.
   1. In your normal browser window, sign in to Demo University as Priya (`+91 91000 00002`). In a private window, sign
      in as Sneha (`+91 91000 00006`), open **Messages** and then the **Requests** tab.
-  2. As Priya, open **Directory**, search for "Sneha", open **Sneha Kulkarni** and choose **Message this member**. Write
-     something and send it. A first message is a request: Priya's screen says **Request sent**, and she can't write
-     more until Sneha accepts.
+  2. As Priya, open **Directory**, search for "Sneha", open **Sneha Kulkarni** and choose **Message this member**. A
+     note, **Say hello to Sneha Kulkarni**, says her first message goes as a request. Write something and send it:
+     Priya's screen says **Request sent**, and she can't write more until Sneha accepts. The date she could ask again,
+     thirty days on, has a line of its own.
   3. As Sneha, watch the request appear under Requests, and a number appear on Messages, without reloading. Open it:
      Sneha can **Accept request**, **Decline request** (Priya is never told) or **Block member**. Choose **Accept
      request**.

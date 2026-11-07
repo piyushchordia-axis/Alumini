@@ -105,9 +105,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   (`withheld`, `suppressed`, `invite_suppressed`); nobody is told. Tests deep-equal the blocked and unblocked views.
   What a thread says under it (the box and its intro, or a panel and its date to ask again) is shared `threadFooter`
   (`chat/labels.ts`), a function of the thread's DTO and the clock only, on both apps, so those tests compare it too
-  (`comparableFooter`); requester-side copy goes there, and `chatRequestNotices.test.ts` keeps it from hinting at a
-  decline or a block. The timer that brings the box back at the date (`watchRerequest`, `chat/rerequest.ts`) reads
-  the same DTO alone.
+  (`comparableFooter`); requester-side copy goes there (before a first message, `firstMessageNotice`), and
+  `chatRequestNotices.test.ts` keeps it from hinting at a decline or a block. The timer that brings the box back at
+  the date (`watchRerequest`, `chat/rerequest.ts`) reads the same DTO alone.
 - **Ways out.** A gated connection (mentorship, referrals) keeps its ways out (own lists, withdraw, end, report, stop)
   outside the feature gate and the pupil check, and the apps keep the section reachable while something is left there.
   An empty list's create action follows the switches and the pupil check too (`mayCreate`), and a list shown as a way

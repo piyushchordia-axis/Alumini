@@ -1755,7 +1755,23 @@ try {
     await pageA.click("text=Sneha Kulkarni");
     await pageA.getByRole("link", { name: "Message this member" }).click();
     await pageA.waitForURL(/\/messages\/new\?to=[0-9a-f-]+$/);
-    await pageA.waitForSelector("text=Your first message is a request");
+    // Before it goes, a note welcomes it rather than warns: named by its title, its text and tip, the envelope drawn in
+    // Demo University's badge, its words readable on the card, nothing hinting at a decline, and the box described by it.
+    const firstNote = pageA.getByRole("note", { name: "Say hello to Sneha Kulkarni", exact: true });
+    await firstNote.waitFor();
+    const firstWords = ["Your first message arrives as a request, and you can send more once they accept.", "A line about who you are and why you're getting in touch helps them say hello back."];
+    for (const words of firstWords) await firstNote.getByText(words, { exact: true }).waitFor();
+    await expectEmptyState(firstNote, "the note before a first message", { tones: BRAND_TONES.demoUniversity });
+    for (const line of await firstNote.locator("p").all()) await expectReadable(line, `the note before a first message's "${await line.innerText()}"`);
+    if (HINTS_AT_A_DECLINE.test(await firstNote.innerText())) throw new Error(`the note before a first message hints at a decline or a block: "${await firstNote.innerText()}"`);
+    if (!(await pageA.getByLabel("Write a message").getAttribute("aria-describedby"))?.split(" ").includes(await firstNote.getAttribute("id"))) throw new Error("the box isn't described by the note before a first message");
+    // What a screen reader says with the box, as Chromium works it out: the title a sentence of its own (a hidden full
+    // stop ends it, which Chromium spaces off, unvoiced), then the text and the tip.
+    const cdp = await pageA.context().newCDPSession(pageA);
+    const { result: firstBox } = await cdp.send("Runtime.evaluate", { expression: `document.querySelector('textarea[aria-label="Write a message"]')` });
+    const heard = (await cdp.send("Accessibility.getPartialAXTree", { objectId: firstBox.objectId, fetchRelatives: false })).nodes[0]?.description?.value;
+    await cdp.detach();
+    if (heard?.replace(/\s+/g, " ").replace(/ ([.!?])/g, "$1").trim() !== ["Say hello to Sneha Kulkarni.", ...firstWords].join(" ")) throw new Error(`the box is described as "${heard}", not the note's title, text and tip in sentences`);
     await pageA.locator("header h2").getByText("2004–2008 · New conversation", { exact: true }).waitFor();
     const asked = `Hello Sneha, could I ask about Seattle? ${unique}`;
     // A first message refused for going too fast says so as a thread does, and keeps its words in the box to send again.

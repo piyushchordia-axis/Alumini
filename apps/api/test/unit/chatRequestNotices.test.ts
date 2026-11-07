@@ -1,6 +1,6 @@
 import type { ChatConversationDto, ChatGroupReviewDto } from "@illuminize/shared";
 import { ERROR_CODES } from "@illuminize/shared";
-import { formatRerequestAt, REREQUEST_RECHECK_MS, rerequestDrawAt, rerequestOpenedText, rerequestRefetchIn, sendLimitNotice, threadFooter, watchRerequest, type ThreadFooter } from "@illuminize/shared/chat";
+import { firstMessageNotice, formatRerequestAt, REREQUEST_RECHECK_MS, rerequestDrawAt, rerequestOpenedText, rerequestRefetchIn, sendLimitNotice, threadFooter, watchRerequest, type ThreadFooter } from "@illuminize/shared/chat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("sendLimitNotice", () => {
@@ -111,7 +111,27 @@ describe("threadFooter", () => {
       }
       said.push(rerequestOpenedText(direct({ state })));
     }
+    said.push(firstMessageNotice("Priya Sharma"), firstMessageNotice(null));
     expect(JSON.stringify(said)).not.toMatch(/declin|block|reject|ignor|refus|turned down|unavailable/i);
+  });
+});
+
+describe("firstMessageNotice", () => {
+  it("welcomes a first message by the other member's name, and says it goes as a request", () => {
+    // The web and phone e2e journeys look for the title, the text and the tip whole on the screen writing a first message.
+    expect(firstMessageNotice("Priya Sharma")).toEqual({
+      title: "Say hello to Priya Sharma",
+      text: "Your first message arrives as a request, and you can send more once they accept.",
+      tip: "A line about who you are and why you're getting in touch helps them say hello back.",
+    });
+  });
+
+  it("says this member while the name isn't known", () => {
+    for (const name of [null, undefined, ""]) expect(firstMessageNotice(name).title, String(name)).toBe("Say hello to this member");
+  });
+
+  it("says nothing of the limits on asking again before there's a problem", () => {
+    expect(JSON.stringify(firstMessageNotice("Priya Sharma"))).not.toMatch(/\d|limit|again|\bdays?\b/i);
   });
 });
 

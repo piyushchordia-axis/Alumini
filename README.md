@@ -996,8 +996,10 @@ only: uploads can be read by anyone with their link, so an attachment wouldn't b
 so. The tables are `chat_*` (`apps/api/src/db/schema/chat.ts`) and the client is `api.chat`, because "messages"
 already means outbound WhatsApp, SMS and email.
 
-- **Message requests.** A first message to someone is a request. It waits in their **Requests** tab, where they can
-  read it and accept, decline or block. The sender sees "Request sent" and can't write more until it's accepted.
+- **Message requests.** A first message to someone is a request. Before it goes, a note above the box welcomes it
+  ("Say hello to Priya Nair") and says it arrives as a request, with a tip for writing it and nothing about a decline
+  or the limits below (shared `firstMessageNotice`). It waits in their **Requests** tab, where they can read it and
+  accept, decline or block. The sender sees "Request sent" and can't write more until it's accepted.
   Replying accepts a request. A decline is silent: the sender may ask again 30 days after their last request, three
   times in all, and can start 20 new requests a day.
 - **Asking again.** Under "Request sent", the date the sender may ask again has a line of its own, with a clock: "You

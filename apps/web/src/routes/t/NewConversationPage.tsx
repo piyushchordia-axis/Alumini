@@ -1,11 +1,12 @@
 import { memberYearsLine } from "@illuminize/shared";
-import { chatKeys, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
+import { chatKeys, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
+import { FirstMessageNote } from "@/components/chat/RequestNotes";
 import { IconLock, IconMessages } from "@/components/icons";
 import { Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
@@ -38,6 +39,7 @@ export function NewConversationPage() {
   const clientKey = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const noteId = useId();
   // A send can answer after the member has gone elsewhere, and must not drag them back.
   const mounted = useRef(true);
   useEffect(() => {
@@ -50,7 +52,6 @@ export function NewConversationPage() {
   const existingId = existing.data?.conversationId;
   if (existingId) return <Navigate to={`${inbox}/${existingId}`} replace />;
 
-  const name = profile.data?.fullName ?? "this member";
   // Messages can be open for groups alone, with direct messages off: then there's nobody to write to here.
   const directOff = !tenant.settings.features.messaging;
   const unavailable = directOff || !valid || profile.data?.canMessage === false || (profile.error && isApiClientError(profile.error) && profile.error.status === 404);
@@ -108,14 +109,12 @@ export function NewConversationPage() {
               <Loading />
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-6 text-center">
-              <div className="max-w-sm rounded-xl bg-slate-50 px-5 py-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-800">Your first message is a request</p>
-                <p className="mt-1">{name} can accept or decline it. You can't send more until they accept.</p>
-              </div>
+            // Centred by its own auto margins, not justify-center, so a phone's keyboard shrinking the pane scrolls it rather than cutting its top off.
+            <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto p-6">
+              <FirstMessageNote id={noteId} notice={firstMessageNotice(profile.data?.fullName)} className="my-auto" />
             </div>
           )}
-          {!waiting && <ChatComposer draftKey={dk} onSend={(text) => void send(text)} sending={sending} notice={notice} keyboardOpen={keyboardOpen} autoFocus />}
+          {!waiting && <ChatComposer draftKey={dk} onSend={(text) => void send(text)} sending={sending} notice={notice} describedBy={noteId} keyboardOpen={keyboardOpen} autoFocus />}
         </>
       )}
     </ChatPane>
