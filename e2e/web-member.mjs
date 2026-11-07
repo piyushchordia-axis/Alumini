@@ -102,6 +102,9 @@ try {
   await step("landing → login with OTP (new user) → register in three steps, with a photo → auto-approved feed", async () => {
     await page.click("text=Demo University");
     await page.waitForSelector("text=Sign in / Join");
+    // The brand cover: the short name as the hero, and the institution's tagline under it when the page names no title.
+    await page.getByText("DemoU", { exact: true }).waitFor();
+    await page.getByText("Once a DemoU, always a DemoU.", { exact: true }).waitFor();
     await shot("02-landing");
     await page.click("text=Sign in / Join");
     // Autofill and paste bring the calling code along. A foreign number moves the picker to its country, which a screen

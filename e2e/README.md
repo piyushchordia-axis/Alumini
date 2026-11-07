@@ -82,7 +82,8 @@ pnpm e2e:web                             # screenshots go to e2e/screenshots (or
 
 Covers:
 
-- tenant picker → landing → phone + OTP → registration in three steps → auto-approved feed: "Signed in as" with the
+- tenant picker → landing (the brand cover's short name and tagline) → phone + OTP → registration in three steps →
+  auto-approved feed: "Signed in as" with the
   number on Basics, and one Back on every step; Back on an untouched Basics leaving for the landing page, which offers
   Join DemoU (not the sign-in button) instead of sending them back into the form; a photo on Basics, Continue refusing a
   missing name and focusing it, both years starting blank and asked for under the institution's labels ("Year you
@@ -296,7 +297,8 @@ add that origin to `CORS_ORIGINS`.
 
 Covers:
 
-- tenant picker → landing → login → OTP → registration in three steps → feed, as on the web: each step's button on the
+- tenant picker → landing (the brand cover's short name and tagline) → login → OTP → registration in three steps →
+  feed, as on the web: each step's button on the
   screen once, Back included; "Signed in as" with the number on Basics, and Back there (untouched, so nothing holds
   the page) leaving for the landing screen, which offers Join DemoU instead of sending them back into the form; with a
   name typed, the page held, Use a different number asking first and Cancel staying signed in, and Back asking "Leave

@@ -1,11 +1,12 @@
 import { isApiClientError } from "@illuminize/shared/client";
 import { Redirect, useGlobalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BRAND_COVER_OVERLAP, BrandCover } from "@/components/BrandCover";
 import { IconBusinesses, IconDirectory, IconEvents, IconFeed, IconFunding, IconJobs } from "@/components/icons";
 import { SignedInAs } from "@/components/SignedInAs";
-import { Avatar, Button, Spinner } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
 import { useMembershipQuery } from "@/hooks/useMembership";
 import { useTenant } from "@/hooks/useTenant";
 import { homeHref } from "@/lib/sections";
@@ -59,18 +60,8 @@ export default function TenantLandingScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["bottom", "left", "right"]}>
-      <View style={{ height: 280, backgroundColor: theme.primary }}>
-        {t.coverImageUrl ? <Image source={{ uri: t.coverImageUrl }} style={{ width: "100%", height: "100%" }} /> : null}
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 0, backgroundColor: "rgba(0,0,0,0.28)" }} />
-        <View style={{ position: "absolute", left: spacing.lg, right: spacing.lg, bottom: 88, flexDirection: "row", alignItems: "flex-end", gap: 12 }}>
-          <Avatar name={t.shortName ?? t.name} src={t.logoUrl} size={56} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>{t.shortName ?? t.name}</Text>
-            <Text style={{ marginTop: 4, fontSize: 14, color: "rgba(255,255,255,0.9)" }}>{t.tagline ?? `${t.shortName ?? t.name} alumni network`}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={{ marginHorizontal: spacing.lg, marginTop: -56, backgroundColor: "#fff", borderRadius: 20, padding: spacing.xl, gap: spacing.md, ...elevation[2] }}>
+      <BrandCover tenant={t} />
+      <View style={{ marginHorizontal: spacing.lg, marginTop: -BRAND_COVER_OVERLAP, backgroundColor: "#fff", borderRadius: 20, padding: spacing.xl, gap: spacing.md, ...elevation[2] }}>
         {t.welcomeMessage ? <Text style={{ color: "#475569", lineHeight: 20 }}>{t.welcomeMessage}</Text> : null}
         {notMember ? (
           <>

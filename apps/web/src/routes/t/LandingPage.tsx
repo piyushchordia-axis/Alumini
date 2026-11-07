@@ -52,7 +52,7 @@ export function LandingPage() {
   ].filter(Boolean) as { icon: typeof IconFeed; label: string }[];
 
   return (
-    <AuthShell tenant={t} title={t.tagline ?? `${t.shortName ?? t.name} alumni network`} subtitle={place}>
+    <AuthShell tenant={t} subtitle={place}>
       <div className="space-y-5">
         {t.welcomeMessage && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">{t.welcomeMessage}</p>}
         <div className="space-y-2">

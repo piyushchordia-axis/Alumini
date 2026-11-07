@@ -1,0 +1,54 @@
+import type { TenantPublicDto } from "@illuminize/shared";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Avatar } from "@/components/ui";
+import { spacing, useTheme } from "@/theme";
+
+/** How far the card after a cover rides up over its foot. The cover keeps its hero clear of it. */
+export const BRAND_COVER_OVERLAP = 56;
+
+/**
+ * An institution's brand cover, as the web's BrandCover draws it: its cover photo or its colour, its logo, its short name
+ * as the hero, and under that a line (its tagline, unless `title` says otherwise). Full height on the landing screen, from
+ * the top of the screen; `compact` is a shorter band for a screen that leads with its card, its hero padded below the
+ * status bar. Put it in a view that leaves the top edge to it (a SafeAreaView without "top").
+ *
+ * The text stays white over a fixed veil, as the landing has always drawn it. How dark the veil must go for a pale brand
+ * or a bright photo is the contrast work's heroScrim, which belongs here; it keeps this text white. The status bar over
+ * the cover is not part of heroScrim: it still has the root layout's dark style, and a light one to match the white
+ * hero, set with expo-status-bar while a cover is on screen, is the walk-through's to add with its screens.
+ */
+export function BrandCover({ tenant, title, compact = false }: { tenant: TenantPublicDto; title?: string; compact?: boolean }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const name = tenant.shortName ?? tenant.name;
+  return (
+    <View style={[{ backgroundColor: theme.primary }, compact ? null : styles.full]}>
+      {tenant.coverImageUrl ? <Image source={{ uri: tenant.coverImageUrl }} style={StyleSheet.absoluteFill} /> : null}
+      <View style={[StyleSheet.absoluteFill, styles.veil]} />
+      {/* In the flow rather than pinned to the foot, so the compact band grows with large text instead of running under
+          the status bar. The hero clears the card by 32 points under the full cover and 16 under the compact one, as on
+          the web. */}
+      <View style={[styles.hero, compact ? { paddingTop: insets.top + spacing.xl, paddingBottom: BRAND_COVER_OVERLAP + spacing.lg } : styles.heroFull]}>
+        <View style={styles.row}>
+          <Avatar name={name} src={tenant.logoUrl} size={56} />
+          <View style={styles.text}>
+            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.line}>{title ?? tenant.tagline ?? `${name} alumni network`}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  full: { height: 280 },
+  veil: { backgroundColor: "rgba(0,0,0,0.28)" },
+  hero: { paddingHorizontal: spacing.lg },
+  heroFull: { flex: 1, justifyContent: "flex-end", paddingBottom: BRAND_COVER_OVERLAP + 32 },
+  row: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
+  text: { flex: 1 },
+  name: { fontSize: 26, fontWeight: "800", color: "#fff" },
+  line: { marginTop: 4, fontSize: 14, color: "rgba(255,255,255,0.9)" },
+});

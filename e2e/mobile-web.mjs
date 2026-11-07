@@ -134,6 +134,9 @@ try {
 
   await step("landing → login → OTP → register → feed", async () => {
     await page.getByText("Sign in / Join with mobile number").waitFor();
+    // The brand cover: the short name as the hero, and the institution's tagline under it when the screen names no title.
+    await page.getByText("DemoU", { exact: true }).locator("visible=true").first().waitFor();
+    await page.getByText("Once a DemoU, always a DemoU.", { exact: true }).locator("visible=true").first().waitFor();
     await shot("m02-landing");
     await tap("Sign in / Join with mobile number");
     // The country code picker searches the full list; pick the UK, then switch back to India.

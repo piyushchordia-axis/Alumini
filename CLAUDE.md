@@ -232,8 +232,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     wrap in `PlainPage`.
   - **Typography.** Web: Manrope (display) + Source Sans 3 (body) via `index.html` / CSS vars. Keep page titles from
     dwarfing body copy (`PageHeader` uses a locked scale).
-  - **Landing / auth.** Brand-first full-bleed cover in `AuthShell` (web) and the tenant landing screen (mobile);
-    institution name is the hero; one CTA; features below the fold with SVG + text.
+  - **Landing / auth.** Brand-first full-bleed cover, drawn by `BrandCover` on both apps (web `AuthShell`, mobile the
+    tenant landing screen; `compact` is a shorter band); institution name is the hero; one CTA; features below the fold
+    with SVG + text.
   - **Nav.** Sidebar / tabs need ≥40–44px targets, clear active weight (primary wash + stronger text), and SVG icons.
     The member sections, their badges and More's come from one `useMemberSections` hook per app (web `HomeLayout`, the
     phone's tabs and More), never worked out again in place. A current link is chosen: web `bg-primary-wash ring-1

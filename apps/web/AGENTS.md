@@ -15,6 +15,6 @@ Follow root `CLAUDE.md` → **UI / UX**:
 ## Layout map
 
 - Member chrome: `src/components/layout/HomeLayout.tsx`
-- Auth / landing: `src/components/layout/AuthShell.tsx`, `src/routes/t/LandingPage.tsx`
+- Auth / landing: `src/components/layout/AuthShell.tsx` (the cover is `BrandCover.tsx`), `src/routes/t/LandingPage.tsx`
 - Feed: `src/components/feed/` (`PostComposer`, `PostCard`, `CelebrationsCard`)
 - Primitives: `src/components/ui/index.tsx`
