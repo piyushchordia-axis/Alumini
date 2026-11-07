@@ -8,14 +8,14 @@ import { colors, spacing } from "@/theme";
 
 /**
  * One invitation in the console's list: who it's for, its status and how its latest message went, then what can be done
- * with it, each button named for the invitation. `notice` is what just happened to it. `disabled` holds the actions while
- * the rows on screen are a previous search's.
+ * with it, each button named for the invitation. `notice` is what just happened to it. `kept`: the row is kept from the
+ * search before while this one's answer comes, so its actions wait and its name is said to be busy (the list fades it).
  */
 export function InvitationRow({
   inv,
   channels,
   sending,
-  disabled = false,
+  kept = false,
   notice,
   onCopy,
   onWhatsApp,
@@ -25,7 +25,7 @@ export function InvitationRow({
   inv: InvitationDto;
   channels: readonly MessageChannel[];
   sending: boolean;
-  disabled?: boolean;
+  kept?: boolean;
   notice?: ReactNode;
   onCopy: () => void;
   onWhatsApp: () => void;
@@ -41,7 +41,7 @@ export function InvitationRow({
   return (
     <View role="article" style={styles.row}>
       <View style={styles.nameLine}>
-        <Text numberOfLines={1} style={styles.name}>
+        <Text numberOfLines={1} aria-busy={kept || undefined} style={styles.name}>
           {invitationName(inv)}
         </Text>
         <Badge label={status.label} tone={status.tone} />
@@ -50,10 +50,10 @@ export function InvitationRow({
       {facts ? <Text style={styles.facts}>{facts}</Text> : null}
       {(can.copy || can.whatsapp || can.send || can.revoke) && (
         <View style={styles.actions}>
-          {can.copy && <Button {...label("copy")} size="compact" variant="outline" disabled={disabled} icon={(c) => <IconCopy size={16} color={c} />} onPress={onCopy} />}
-          {can.whatsapp && <Button {...label("whatsapp")} size="compact" variant="outline" disabled={disabled} icon={(c) => <IconExternalLink size={16} color={c} />} onPress={onWhatsApp} />}
-          {can.send && <Button {...label("send")} size="compact" variant="outline" disabled={disabled} loading={sending} onPress={onSend} />}
-          {can.revoke && <Button {...label("revoke")} size="compact" variant="ghost" disabled={disabled || sending} onPress={onRevoke} />}
+          {can.copy && <Button {...label("copy")} size="compact" variant="outline" disabled={kept} icon={(c) => <IconCopy size={16} color={c} />} onPress={onCopy} />}
+          {can.whatsapp && <Button {...label("whatsapp")} size="compact" variant="outline" disabled={kept} icon={(c) => <IconExternalLink size={16} color={c} />} onPress={onWhatsApp} />}
+          {can.send && <Button {...label("send")} size="compact" variant="outline" disabled={kept} loading={sending} onPress={onSend} />}
+          {can.revoke && <Button {...label("revoke")} size="compact" variant="ghost" disabled={kept || sending} onPress={onRevoke} />}
         </View>
       )}
       {notice}

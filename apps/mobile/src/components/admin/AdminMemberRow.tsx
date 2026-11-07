@@ -12,10 +12,11 @@ import { colors, spacing } from "@/theme";
 
 /**
  * One member of the console's list: who they are, a link to their page, then what can be done, as a row of its own
- * beneath, never inside the link. The admin's own row has no actions, as the API refuses them. `disabled` holds the
- * actions while the rows on screen are a previous search's.
+ * beneath, never inside the link. The admin's own row has no actions, as the API refuses them. `kept`: the row is kept
+ * from the search before while this one's answer comes, so its actions wait and its link, which still opens the page, is
+ * said to be busy (the list fades it).
  */
-export function AdminMemberRow({ slug, member, actions, you, disabled = false }: { slug: string; member: AdminMemberDto; actions: MemberActions; you: boolean; disabled?: boolean }) {
+export function AdminMemberRow({ slug, member, actions, you, kept = false }: { slug: string; member: AdminMemberDto; actions: MemberActions; you: boolean; kept?: boolean }) {
   const router = useRouter();
   const meta = memberListMeta(member, formatDate);
   const name = [member.fullName, member.role === "TENANT_ADMIN" ? "Admin" : null, MEMBERSHIP_STATUS_LABELS[member.status], meta, member.statusReason ? `Reason: ${member.statusReason}` : null].filter(Boolean).join(", ");
@@ -25,6 +26,7 @@ export function AdminMemberRow({ slug, member, actions, you, disabled = false }:
         onPress={() => router.push(adminMemberHref(slug, member.id))}
         accessibilityRole="link"
         accessibilityLabel={name}
+        aria-busy={kept || undefined}
         style={({ pressed }) => [styles.who, pressed ? { opacity: 0.6 } : null]}
       >
         <Avatar name={member.fullName} src={member.avatarUrl} size={AVATAR} toneKey={member.id} />
@@ -49,7 +51,7 @@ export function AdminMemberRow({ slug, member, actions, you, disabled = false }:
           <IconChevronRight size={16} color={colors.faint} />
         </View>
       </Pressable>
-      <View style={styles.actions}>{you ? <Text style={styles.you}>You</Text> : <MemberActionButtons member={member} actions={actions} disabled={disabled} />}</View>
+      <View style={styles.actions}>{you ? <Text style={styles.you}>You</Text> : <MemberActionButtons member={member} actions={actions} disabled={kept} />}</View>
     </View>
   );
 }

@@ -116,7 +116,7 @@ export default function AdminProfileFieldsScreen() {
           </View>
         }
         ListEmptyComponent={
-          <ListEmpty loading={list.isLoading && !list.isFetched} error={list.error} onRetry={() => void list.refetch()}>
+          <ListEmpty loading={list.isLoading && !list.isFetched} skeleton="adminRow" frame="cards" error={list.error} onRetry={() => void list.refetch()}>
             <EmptyState icon={<IconFields />} title="No profile fields yet" description="Add questions members answer when they join and on their profile." action={<Button title="Add field" onPress={addField} />} />
           </ListEmpty>
         }

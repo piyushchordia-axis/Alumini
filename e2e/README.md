@@ -105,7 +105,12 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   that is shown, not to screen readers alone, and takes no clicks, with no skeleton beside it. It returns the note,
   which goes once the answer is in. A step that reads a search's or a filter's results waits for its answer first, and
   for nothing on the page to be `aria-busy` (the directory steps' `answered`, the Can refer steps), as kept results
-  may already hold what it looks for.
+  may already hold what it looks for. A console's kept rows hold their buttons (`isDisabled()`), so pass `card` a row
+  or its name, not a held button, which a disabled look fades further; and wait for the answer's rows (the count of
+  `main ul li`) before acting on one. On the phone build each kept console row is busy on its name or link
+  (`aria-busy="true"`), as a list's busy isn't read on a phone. A debounced search typed letter by letter
+  (`pressSequentially` with a short delay) holds every search GET, not only the last, so an early answer can't replace
+  the kept rows, and counts the searches asked for: fewer than half the letters, the last the whole word.
 
 ## Web (member journey)
 
@@ -300,7 +305,10 @@ Covers:
   Approve and Reject 44px tall beside the link to her page, never inside it; an open Reject closing with a toast that
   says where she stands once the API's live notice of a change refetches the list showing her decided elsewhere, and
   not opening again by itself when she waits again; Approve sending the status the notice showed, and the notice then
-  showing Approved); a member's page showing Kiran Joshi's whole profile (headline, skills, past role, studies
+  showing Approved); the members search with no Search button, searching as typing pauses: Kiran Joshi's name typed
+  letter by letter asking fewer times than half its letters, and while the script holds the search (`holdGets`), the
+  search already in the address and the rows listed staying, faded under "Updating results…" (`expectKeptResults`),
+  their names still links and their Suspend held, until his row alone replaces them; a member's page showing Kiran Joshi's whole profile (headline, skills, past role, studies
   elsewhere, Open to), his initials in the same tone of his own in the list and on his page, and Make admin and Remove admin role each asking first (Cancel sending nothing), each toast
   naming Kiran, and both changes in the recent activity by the admin's name; his answers' Clubs and societies chips
   each 44px tall, the chosen ones on Demo College's wash, in its ink, with a drawn tick, and the others white with none
@@ -331,8 +339,9 @@ Covers:
   the invitation page's logo initials in Demo College's ink on its tint though no theme colours the page, with the
   name and both years filled in and the three steps, then the walk-through ("Welcome, Kavita") with no sideways
   scrolling, its Add a profile photo link ending it (the POST answered) on My profile's Basics, and the front door
-  then opening the feed; another invitation revoked through its confirm dialog (Cancel first sends
-  nothing); an announcement that also goes by email, asked first in the app's dialog with the email box's count and
+  then opening the feed; another invitation, while the script holds a search for it, kept faded under "Updating
+  results…" with Copy link, Send and Revoke held and its WhatsApp link going nowhere (no address, `aria-disabled`),
+  then revoked through its confirm dialog (Cancel first sends nothing); an announcement that also goes by email, asked first in the app's dialog with the email box's count and
   the billing line, Cancel posting nothing, then Post and send; Demo University's Send pending asking first in a dialog
   that says it's billed (Cancel sends nothing), a refusal (answered by the script, as for a plan that stopped sending)
   closing the dialog and saying why, then a send (answered by the script, so nothing is billed);
@@ -364,7 +373,9 @@ Covers:
   University's blue, Demo College's green), onboarding an institution (the welcome message's hint saying new members
   see it too) with its first admin, whose years are asked under a college's labels, an end before the start refused on
   its box with nothing created, and the admin then listed with 2010–2014 on the Admins tab; a billing plan and usage,
-  stats and user search, the institution comparison and its CSV,
+  stats and user search (Suresh Patil's number typed digit by digit asking fewer times than its digits, the users
+  listed staying, faded under "Updating results…", with Make or Revoke platform admin held while the script holds the
+  answer, until his row alone replaces them), the institution comparison and its CSV,
   the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
   staff's, "About an admin" or "No other admin", and reports another member of staff must handle, or that no member of
   staff may take yet, or that are closed, each with its note and no link), opening an institution's admin console
@@ -375,12 +386,17 @@ Covers:
   what its list holds: Demo College's empty reports (green), Kiran Joshi's empty recent activity (a small box on his
   page), its empty Pending tab with Invite members (to Invitations), and a member search and an invitation search that
   find nobody, each offering Clear search in its place (the web's own: the phone's search box clears itself), which
-  empties the box and puts focus back in it; Demo University's empty chat reports (blue) and an audit filter that finds
-  nothing, whose Show all activity shows the whole log again, All chosen and focus back in the box; and in the platform
-  console, in the default blue, the empty escalated reports (Open and Resolved), an institution search with Show all
-  institutions, a user search with Clear search and an audit filter with Show all activity (each emptying its box and
-  putting focus back in it), a new institution's empty plan history and snapshots, small boxes inside their cards, and
-  its console's empty Profile fields, whose Add field opens the editor (Cancel adds nothing).
+  empties the box and puts focus back in it (the invitation search's rows staying, faded under "Updating results…",
+  while the script holds its answer), and the member search, typed again and kept in the address, dropped by the
+  console's own Members link, which starts the list again with an empty box; Demo University's empty chat reports
+  (blue) and an audit filter that finds nothing, whose Show all activity shows the whole log again, All chosen and
+  focus back in the box; and in the platform console, in the default blue, the empty escalated reports (Open and
+  Resolved), an institution search with Show all institutions (typed letter by letter, asking fewer times than half
+  its letters, and the institutions listed staying, faded under "Updating results…", while the script holds its
+  answer), a user search with Clear search and an audit filter with Show all
+  activity (each emptying its box and putting focus back in it), a new institution's empty plan history and
+  snapshots, small boxes inside their cards, and its console's empty Profile fields, whose Add field opens the editor
+  (Cancel adds nothing).
 
 ## Mobile (Expo app exported for the web)
 
@@ -560,8 +576,9 @@ Covers:
   rejected closing it, saying so and refreshing the list; then listed under Rejected with her reason, where a refusal
   (answered by the script) says she has already been approved, the Approve sent the status her row showed, and the list
   refreshes; the Approved tab, its answer held back by the script (`holdGets`), showing its skeleton (one progressbar
-  named "Loading", its blocks gently pulsing and not its card) and none of Rejected's rows or buttons until its own arrive; searching for Nisha,
-  and for Jignesh, whose own row says "You" with no actions; the app started again with less motion asked for, the same
+  named "Loading", its blocks gently pulsing and not its card) and none of Rejected's rows or buttons until its own arrive; searching for Nisha
+  (the rows listed staying, faded under "Updating results…", with Parth Joshi's link marked busy and his Suspend held,
+  while the script holds the answer), and for Jignesh, whose own row says "You" with no actions; the app started again with less motion asked for, the same
   skeleton standing still while Approved's answer is held again; and a second page (answered by the script) loading on
   scroll, a row repeated across the pages shown once;
 - a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
@@ -579,7 +596,8 @@ Covers:
   away again, each through its confirmation (Cancel first sends nothing), the Admin badge following, and his recent
   activity naming Jignesh Patel with the changes made; the audit log from the console's home, opening on All, its
   Members chip showing Diya's rejection with its reason, a prefix typed by hand that is no chip's ("membership.app")
-  leaving none chosen, and one that is ("chat_report.") choosing that chip and finding nothing, Clear choosing All
+  leaving none chosen (the rows listed staying, faded under "Updating results…", with Diya's link marked busy, while
+  the script holds its answer), and one that is ("chat_report.") choosing that chip and finding nothing, Clear choosing All
   again, a membership row opening Diya's page with Back keeping the filter, and a row carrying a phone hash (answered by
   the script) showing its other details and never the hash;
 - the console's moderation and reports queues, as the Samaj admin: Moderation from the console's sections, opening on
@@ -646,7 +664,9 @@ Covers:
   disabled, imported ("2 new, 0 updated, 0 skipped.") after the script has held the request long enough to see
   "Importing 0 of 2…" and "Keep this screen open…" and the bar's Back leave the screen where it is, and Done saying "2
   invited, 0 updated" on the list, each row with its years; Copy link read back from the clipboard; WhatsApp opening a
-  new tab at wa.me with the number and the Samaj's message (answered by the script); a search kept in the address;
+  new tab at wa.me with the number and the Samaj's message (answered by the script); a search kept in the address,
+  the rows listed staying, faded under "Updating results…", each marked busy and its Copy link, WhatsApp and Revoke
+  held, while the script holds its answer;
   Revoke through its sheet (Cancel first), the row then Revoked, listed under the Revoked tab, which a reload keeps;
   and, with the plan said to send by WhatsApp (answered by the script, so nothing is billed), Send 1 pending asking
   first and saying it's billed (Cancel sends nothing), a refusal (as for a plan that stopped sending) closing the sheet

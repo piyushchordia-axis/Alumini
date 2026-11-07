@@ -729,7 +729,8 @@ Both apps read a list's state the same way, from `listView` in `packages/shared/
 
 - **First load:** the list's skeleton, an outline in the shape of what is coming: a post's author, text and reaction
   pills; a member's photo and three lines; a job's or a listing's logo tile; an event's date block; a notification's
-  two lines and its time; or a row. The shapes are `SKELETON_LAYOUTS` in `lib/skeletons.ts`, so both apps draw the same
+  two lines and its time; a row; in the consoles, a console row (two lines, with its action on a wide web screen) or a
+  table's header and cells. The shapes are `SKELETON_LAYOUTS` in `lib/skeletons.ts`, so both apps draw the same
   counts and widths (My posts takes each tab's from `MY_CONTENT_SKELETONS`). The page's title, search box and filters
   stay above it, so typing carries on, and on the feed it sits under the composer.
 - **Offline:** a first load waiting for the network still shows the skeleton, never a false "nothing here".
@@ -748,6 +749,17 @@ Both apps read a list's state the same way, from `listView` in `packages/shared/
   (a status; on iOS, which has no live regions, an announcement), and the faded cards are marked busy (on the web their
   grid; on the phone each card, which VoiceOver and TalkBack say is busy after its name). Searches typed into Directory
   and Jobs wait 300 ms after typing stops before asking.
+- **A new search in a console** (Members and Invitations on both consoles, and the platform's Institutions and
+  Users): the rows stay the same way, faded under **Updating results…** and marked busy (on the web their table or
+  list; on the phone each row's name, or an audit row's target), but only for a new search on the same tab (and, on
+  the web, the same page), and their buttons (Approve, Suspend, Send, Revoke, Copy link, WhatsApp, Make platform admin)
+  are held until the answer comes, as they'd act on someone the search before found; names still open their page. The
+  web hides Previous and Next meanwhile, and otherwise keeps them on a page emptied past the last, so Previous leads
+  back. The institution's audit log, whose rows have nothing to press, keeps its rows for any filter or page, under the
+  same note. These searches wait 300 ms too, so the web console's
+  Members has no Search button: it searches as typing pauses, as the phone's and both Invitations pages do, and keeps
+  the search in the address (`?q=`). The console's own Members link, with a search typed, starts the list again
+  rather than writing the search back, as the audit log's link does (`useAddressRestarts` on the web).
 
 Skeletons are neutral slate blocks on white cards or a white group of rows, never the institution's colour and never
 straight on a member's background, so they read on any brand, tint or photo. Only the grey blocks pulse; the cards
@@ -756,29 +768,36 @@ same way, edge to edge, so nothing moves when the rows come. Screen readers hear
 on the web, with the outline hidden from them, and one progressbar named "Loading" on the phone (or the screen's own
 words, such as "Finding members…"). The web's pulses only when the device allows motion (`motion-safe`); the phone's
 stands still under iOS Reduce Motion or Android's Remove animations, read as the app starts (reanimated's
-`useReducedMotion`). On the phone, `ListEmpty` draws the skeleton for every list, the console's included, which take
-the plain row shape for now.
+`useReducedMotion`). On the phone, `ListEmpty` draws the skeleton for every list, the console's included: a console
+row in one white card of rows for Members, Invitations and the audit log, and as cards for Moderation, Reports, Chat
+reports and Profile fields, as their rows are. The web console and the platform console draw theirs the same way,
+with a table's outline for Invitations, the audit logs, Institutions and Compare.
 
 Spinners stay where there is no page yet or the wait is a button's: the route guards, the sign-in and landing pages,
-registration, Load more and buttons. Detail and form pages on both apps, and the lists in the web console and the
-platform console, still show one too (Known gaps).
+registration, Load more and buttons. Detail and form pages on both apps still show one too (Known gaps).
 
 A list opts in to keeping its rows with `keepPreviousWhile` (`useInfiniteList`, or the phone console's
-`usePagedList`): Directory and Jobs with `onlyFiltersChanged`, as their cards only open a page, and the phone
-console's Members and Invitations with `onlySearchChanged`, only for a new search, as their buttons act on the tab
-they were listed under (the audit log keeps its rows for any filter, on both apps). Both compare the filters by value,
-as a page builds them afresh at every render. The feed doesn't opt in: it reads its first page for the pinned posts.
-The hooks read the shared rules for the rest: `listPlaceholder` (nothing kept while a retry from the error is on its
-way), `listHasMore` and `listMayLoadMore` (no next page from kept rows) and `listRefreshing` (no pull-to-refresh
-spinner for a new search).
+`usePagedList`, which also returns `view` and `updating`): Directory and Jobs with `onlyFiltersChanged`, as their
+cards only open a page, and the consoles' Members and Invitations with `onlySearchChanged`, only for a new search, as
+their buttons act on the tab they were listed under (the audit log keeps its rows for any filter, on both apps). The
+web console and the platform console pass `keepPrevious(onlySearchChanged)` as their `useQuery`'s `placeholderData`
+(the platform's Users with `phone` as its search), and the page in their keys means Previous and Next never keep
+rows. Both compare the filters by value, as a page builds them afresh at every render. The feed doesn't opt in: it
+reads its first page for the pinned posts. The hooks read the shared rules for the rest: `listPlaceholder` (nothing
+kept while a retry from the error is on its way), `listHasMore` and `listMayLoadMore` (no next page from kept rows)
+and `listRefreshing` (no pull-to-refresh spinner for a new search).
 
-`lists.test.ts` and `skeletons.test.ts` cover the rules and the shapes. The e2e journeys hold a list's request
-(`holdGets` in `e2e/lib.mjs`) to check the web notifications skeleton (a status saying "Loading…", pulsing, and still
-under reduced motion) and the phone console's Approved members skeleton (a progressbar named Loading, pulsing, and
-still when the app starts with reduced motion), and, on both apps, the directory's and the jobs' cards kept, faded,
-under "Updating results…" while a search's answer is held (`expectKeptResults`), with Jobs asking once for a word
-typed letter by letter, and on the web a refused directory search: no Load more for the kept cards, then its Retry
-loading keeping the error and focus with no kept cards back over it.
+`lists.test.ts` and `skeletons.test.ts` cover the rules and the shapes, and `admin.test.ts` `onlySearchChanged` with
+the consoles' pages and the platform's keys. The e2e journeys hold a list's request (`holdGets` in `e2e/lib.mjs`) to
+check the web notifications skeleton (a status saying "Loading…", pulsing, and still under reduced motion) and the
+phone console's Approved members skeleton (a progressbar named Loading, pulsing, and still when the app starts with
+reduced motion), and, on both apps, the directory's and the jobs' cards kept, faded, under "Updating results…" while
+a search's answer is held (`expectKeptResults`), with Jobs asking once for a word typed letter by letter, and on the
+web a refused directory search: no Load more for the kept cards, then its Retry loading keeping the error and focus
+with no kept cards back over it. In the consoles they hold a Members search on both apps (the rows kept with Suspend
+held; on the web no Search button, the search in the address, and the console's Members link starting the list
+again), the web Invitations' and the platform's Institutions searches, and the platform's Users search typed digit by
+digit, asked for once, with Make platform admin held meanwhile.
 
 ### Rich text
 
@@ -1770,11 +1789,10 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
   - UI follow-ups: deeper tenant theming (Branding previews a gradient card, not the landing page or the app), and
     purposeful motion.
-  - Member lists draw a skeleton while they first load (see Lists and loading), but detail and form pages on both apps
-    (a job, an event, a post, the edit forms) still show a spinner in place of the page, and so do the lists in the web
-    console and the platform console; the phone console's lists draw the plain row skeleton whatever their rows look
-    like. The web console's Members and Invitations keep no rows for a new search (the phone's do), and the
-    platform's Institutions and Users searches ask at every keystroke.
+  - Lists draw a skeleton while they first load, the consoles' and the platform's included (see Lists and loading),
+    but detail and form pages on both apps (a job, an event, a post, the edit forms, the consoles' dashboards and
+    settings, a moderation item's full content) still show a spinner in place of the page. The platform's audit log
+    filter still asks at every keystroke and keeps no rows.
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
   - Text laid side by side (job and member facts, the console's tiles, the landing's sections) chooses its columns

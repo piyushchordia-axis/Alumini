@@ -29,7 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { IconCheck } from "@/components/icons";
-import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { formatDateTime, timeAgo } from "@/lib/format";
@@ -193,14 +193,16 @@ export function AdminChatReportsPage() {
     <div className="space-y-4">
       <PageHeader title="Chat reports" subtitle={CHAT_REPORTS_SUBTITLE} />
       <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={chatReportTabs(dashboard.data)} className="w-fit max-w-full" />
-      {list.isLoading && <Loading />}
+      {list.isLoading && <ListSkeleton shape="adminRow" />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={chatReportEmptyTitle(status)} description={chatReportEmptyText(status)} />}
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {list.data?.data.map((r) => (
-          <ChatReportRow key={r.id} slug={slug} report={r} />
-        ))}
-      </ul>
+      {!!list.data?.data.length && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {list.data.data.map((r) => (
+            <ChatReportRow key={r.id} slug={slug} report={r} />
+          ))}
+        </ul>
+      )}
       {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={(p) => setParam("page", String(p))} />}
     </div>
   );

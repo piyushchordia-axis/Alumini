@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChipLook, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChipLook, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, holdGets, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -101,11 +101,41 @@ try {
 
   await step("a member's page shows the admin their whole profile", async () => {
     await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED`);
-    const searched = page.waitForResponse((r) => r.url().includes("/admin/members?") && new URL(r.url()).searchParams.get("q") === "Kiran Joshi");
-    await page.getByLabel("Search members").fill("Kiran Joshi");
+    const rows = page.locator("main ul li");
+    await rows.nth(1).waitFor();
+    // The search runs once typing pauses, as the phone's does, so there's no Search button, and a name typed letter by
+    // letter asks once, not at every letter. While its answer is on its way (held here, with any search asked for before
+    // it), the rows already listed stay, faded under "Updating results…", with their names still links but their buttons
+    // held, as they'd act on someone the search before found; the search is in the address already.
+    if (await page.getByRole("button", { name: "Search", exact: true }).count()) throw new Error("the members list still has a Search button");
+    const typed = "Kiran Joshi";
+    const asked = [];
+    const recordSearch = (r) => {
+      const u = new URL(r.url());
+      if (r.method() === "GET" && u.pathname.endsWith("/admin/members") && u.searchParams.has("q")) asked.push(u.searchParams.get("q"));
+    };
+    page.on("request", recordSearch);
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/admin/members") && u.searchParams.has("q"));
+    try {
+      await page.getByRole("search").getByLabel("Search members", { exact: true }).pressSequentially(typed, { delay: 30 });
+      await held.asked();
+      await page.waitForURL(/[?&]q=Kiran(\+|%20)Joshi/);
+      await expectKeptResults(page, rows.first(), "the members list while a search loads");
+      if ((await rows.count()) < 2) throw new Error(`the members list keeps ${await rows.count()} row while the search loads, not the rows it had`);
+      const suspend = rows.getByRole("button", { name: /^Suspend / }).first();
+      if (!(await suspend.isDisabled())) throw new Error("a kept row's Suspend can be pressed while the search's answer is on its way");
+      if (!(await rows.first().getByRole("link").first().isEnabled())) throw new Error("a kept row's name isn't a link while the search loads");
+      await shot("a02a-members-updating");
+    } finally {
+      held.release();
+    }
+    await page.waitForFunction(() => document.querySelectorAll("main ul li").length === 1);
+    await held.stop();
+    page.off("request", recordSearch);
+    // At every letter it would ask ten times (a trailing space trims away); a pause on a busy machine may add one.
+    if (asked.length * 2 >= typed.length || asked.at(-1) !== typed) throw new Error(`typing "${typed}" asked for ${asked.map((q) => `"${q}"`).join(", ")}, not once typing paused`);
     // His initials have a tone of his own, not the institution's colours, and keep it on his page. Read once the search
     // has answered, so the row read is the one that stays.
-    await searched;
     const inList = await expectInitials(page.locator("main li", { hasText: "Kiran Joshi" }).first().getByText("KJ", { exact: true }), "Kiran Joshi's initials in the members list");
     if (inList.colour === INSTITUTION_INITIALS.demoCollege.colour) throw new Error("Kiran Joshi's initials are in the institution's ink, not a tone of his own");
     await page.locator("a", { hasText: "Kiran Joshi" }).first().click();
@@ -330,6 +360,16 @@ try {
     if ((await search.inputValue()) !== "") throw new Error("Clear search left the search box filled");
     if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Clear search didn't put focus back in the search box");
     await none.waitFor();
+    await page.waitForURL((url) => !url.searchParams.has("q"));
+    // The search is kept in the address, and the console's own Members link, with the page still open, starts the list
+    // again rather than writing the search back over the address.
+    await search.fill("Zzyzx");
+    await page.waitForURL(/[?&]q=Zzyzx/);
+    await nobody.waitFor();
+    await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: /^Members/ }).click();
+    await none.waitFor();
+    if ((await search.inputValue()) !== "") throw new Error(`the console's Members link left "${await search.inputValue()}" in the search box`);
+    if (new URL(page.url()).searchParams.has("q")) throw new Error(`the console's Members link kept the search: ${page.url()}`);
   });
 
   await step("approve a pending job from the moderation queue", async () => {
@@ -717,7 +757,15 @@ try {
     // A search that finds nobody says what it looks at, and Clear search (the web's own: the phone's box clears itself)
     // brings the list back with focus in the box.
     const search = page.getByLabel("Search invitations");
-    await search.fill("Zzyzx");
+    // While the search's answer is on its way (held here), the rows already listed stay, faded under "Updating results…".
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/admin/invitations") && u.searchParams.get("q") === "Zzyzx");
+    try {
+      await search.fill("Zzyzx");
+      await held.asked();
+      await expectKeptResults(page, page.locator("main tbody tr", { hasText: "Kavita Invitee" }).first(), "the invitations while a search loads");
+    } finally {
+      held.release();
+    }
     const nobody = page.locator('div:has(> h3:text-is("No invitations match “Zzyzx”"))');
     await nobody.getByText("Search looks at names, phone numbers and email addresses.", { exact: true }).waitFor();
     await expectEmptyState(nobody, "the invitations' empty search", { actions: ["Clear search"], tones: BRAND_TONES.demoCollege });
@@ -726,6 +774,7 @@ try {
     if (!(await search.evaluate((el) => el === document.activeElement))) throw new Error("Clear search didn't put focus back in the invitations' search box");
     await page.locator("tr", { hasText: "Kavita Invitee" }).first().waitFor();
     await nobody.waitFor({ state: "detached" });
+    await held.stop();
   });
 
   await step("revoking an invitation asks first in a dialog, and Cancel keeps it", async () => {
@@ -737,6 +786,25 @@ try {
     await page.waitForSelector("text=1 new");
     const row = page.locator("tr", { hasText: "Ravi Revoked" }).first();
     const revoke = row.getByRole("button", { name: "Revoke the invitation for Ravi Revoked", exact: true });
+    await revoke.waitFor();
+    // While a search's answer is on its way (held here), a kept row's buttons wait, as they'd act on an invitation the
+    // search before listed, and its WhatsApp link, which can't be disabled, goes nowhere and says so.
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/admin/invitations") && u.searchParams.has("q"));
+    try {
+      await page.getByLabel("Search invitations").fill("Ravi Revoked");
+      await held.asked();
+      const note = await expectKeptResults(page, row, "the invitations while a search loads");
+      const buttons = row.getByRole("button");
+      const names = await buttons.evaluateAll((all) => all.map((b) => b.getAttribute("aria-label") ?? b.textContent));
+      if (!names.includes("Revoke the invitation for Ravi Revoked") || !names.includes("Copy link for Ravi Revoked")) throw new Error(`a kept invitation offers ${names.join(", ")}`);
+      for (let i = 0; i < names.length; i++) if (!(await buttons.nth(i).isDisabled())) throw new Error(`a kept invitation's "${names[i]}" can be pressed while the search's answer is on its way`);
+      const whatsapp = row.getByRole("link", { name: "Share on WhatsApp with Ravi Revoked", exact: true });
+      if ((await whatsapp.getAttribute("href")) !== null || (await whatsapp.getAttribute("aria-disabled")) !== "true") throw new Error("a kept invitation's WhatsApp link still goes somewhere while the search's answer is on its way");
+      held.release();
+      await note.waitFor({ state: "detached" });
+    } finally {
+      await held.stop();
+    }
     const dialog = page.getByRole("dialog", { name: "Revoke the invitation for Ravi Revoked?" });
     const sent = [];
     const onRequest = (r) => r.method() === "POST" && /\/admin\/invitations\/[^/]+\/revoke$/.test(r.url()) && sent.push(r.url());
@@ -1239,11 +1307,29 @@ try {
 
     // A search that finds none says so, and Show all institutions brings the list back with focus in the search box.
     const search = page.getByLabel("Search institutions");
-    await search.fill("Zzyzx");
+    // Typed letter by letter, it asks once typing pauses, not at every letter, and while the answer is on its way (held
+    // here, with any search asked for before it) the rows already listed stay, faded under "Updating results…".
+    const asked = [];
+    const recordSearch = (r) => {
+      const u = new URL(r.url());
+      if (r.method() === "GET" && u.pathname.endsWith("/platform/tenants") && u.searchParams.has("q")) asked.push(u.searchParams.get("q"));
+    };
+    page.on("request", recordSearch);
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/platform/tenants") && u.searchParams.has("q"));
+    try {
+      await search.pressSequentially("Zzyzx", { delay: 30 });
+      await held.asked();
+      await expectKeptResults(page, page.locator("main tbody tr", { hasText: "Demo University" }).first(), "the platform's institutions while a search loads");
+    } finally {
+      held.release();
+    }
     const none = page.locator('div:has(> h3:text-is("No institutions match"))');
     await none.getByText("Try another name, slug or city, or another status.", { exact: true }).waitFor();
     // The platform console has no institution's colour, so this is the default blue.
     await expectEmptyState(none, "the platform's empty institution search", { actions: ["Show all institutions"], absent: ["Onboard the first one"], tones: BRAND_TONES.demoUniversity });
+    await held.stop();
+    page.off("request", recordSearch);
+    if (asked.length * 2 >= "Zzyzx".length || asked.at(-1) !== "Zzyzx") throw new Error(`typing "Zzyzx" asked for ${asked.map((q) => `"${q}"`).join(", ")}, not once typing paused`);
     await none.getByRole("button", { name: "Show all institutions", exact: true }).click();
     await page.locator("main tr", { hasText: "Demo University" }).first().waitFor();
     if ((await search.inputValue()) !== "") throw new Error("Show all institutions left the search box filled");
@@ -1308,7 +1394,31 @@ try {
     await page.waitForSelector("text=Institutions");
     await page.waitForSelector(`text=Smoke Institute ${unique}`);
     await page.goto(`${BASE}/platform/users`);
-    await page.fill('input[placeholder="Search by phone digits"]', "9000000002");
+    const rows = page.locator("main ul li");
+    await rows.nth(1).waitFor();
+    // Typed digit by digit, the search asks once typing pauses, not at every digit. While its answer is on its way (held
+    // here, with any search asked for before it), the rows already listed stay, faded under "Updating results…", and
+    // their buttons wait: they'd change someone the search before found.
+    const asked = [];
+    const recordSearch = (r) => {
+      const u = new URL(r.url());
+      if (r.method() === "GET" && u.pathname.endsWith("/platform/users") && u.searchParams.has("phone")) asked.push(u.searchParams.get("phone"));
+    };
+    page.on("request", recordSearch);
+    const held = await holdGets(page, (u) => u.pathname.endsWith("/platform/users") && u.searchParams.has("phone"));
+    try {
+      await page.getByLabel("Search by phone", { exact: true }).pressSequentially("9000000002", { delay: 30 });
+      await held.asked();
+      await expectKeptResults(page, rows.first(), "the platform's users while a search loads");
+      const toggle = rows.getByRole("button", { name: /platform admin$/ }).first();
+      if (!(await toggle.isDisabled())) throw new Error(`a kept row's "${await toggle.textContent()}" can be pressed while the search's answer is on its way`);
+    } finally {
+      held.release();
+    }
+    await page.waitForFunction(() => document.querySelectorAll("main ul li").length === 1);
+    await held.stop();
+    page.off("request", recordSearch);
+    if (asked.length * 2 >= "9000000002".length || asked.at(-1) !== "9000000002") throw new Error(`typing the number asked for ${asked.map((q) => `"${q}"`).join(", ")}, not once typing paused`);
     await page.waitForSelector("text=Suresh Patil");
     await shot("p04-users");
     // Longer than any number, so it finds nobody; Clear search empties the box and puts focus back in it.

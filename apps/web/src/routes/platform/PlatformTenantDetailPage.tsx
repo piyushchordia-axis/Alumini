@@ -20,7 +20,7 @@ import { Link, useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { IconAdmin, IconAudit, IconExternalLink, IconWallet } from "@/components/icons";
-import { Avatar, Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, ListSkeleton, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -419,7 +419,7 @@ function BillingTab({ tenantId }: { tenantId: string }) {
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  if (billing.isLoading) return <Loading />;
+  if (billing.isLoading) return <ListSkeleton shape="adminRow" />;
   if (billing.error || !billing.data) return <ErrorBox error={billing.error ?? "Failed"} />;
   const b = billing.data;
   return (

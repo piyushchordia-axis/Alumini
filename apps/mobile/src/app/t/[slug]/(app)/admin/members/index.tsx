@@ -22,6 +22,7 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconDirectory, IconSearch } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
 import { Button, EmptyState, ListEmpty, Spinner, Tabs } from "@/components/ui";
+import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useMemberActions, type MemberActionOutcome } from "@/hooks/useMemberActions";
@@ -104,14 +105,17 @@ export default function AdminMembersScreen() {
           </View>
         )}
       </View>
-      <StatusLine text={said?.text ?? null} tone={said?.tone} />
+      {/* Raised over the list below, so the note at its foot floats on the list's top edge. */}
+      <View style={styles.aboveList}>
+        <StatusLine text={said?.text ?? null} tone={said?.tone} />
+        <UpdatingNote updating={list.updating} />
+      </View>
       <View role="tabpanel" aria-label={MEMBER_STATUS_TAB_LABELS[status]} style={styles.panel}>
         <FlatList
           // A new tab starts at its top.
           key={status}
           data={list.items}
           keyExtractor={(m) => m.id}
-          style={list.isPlaceholderData ? styles.stale : undefined}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -120,11 +124,16 @@ export default function AdminMembersScreen() {
           refreshing={refreshing}
           onRefresh={() => void refresh()}
           ItemSeparatorComponent={Divider}
-          renderItem={({ item }) => <AdminMemberRow slug={slug} member={item} actions={actions} you={item.id === membership.id} disabled={list.isPlaceholderData} />}
+          // Kept rows are faded and busy, each of them, not the list, whose busy a screen reader doesn't read.
+          renderItem={({ item }) => (
+            <View style={list.isPlaceholderData ? KEPT_ROW : undefined}>
+              <AdminMemberRow slug={slug} member={item} actions={actions} you={item.id === membership.id} kept={list.isPlaceholderData} />
+            </View>
+          )}
           ListEmptyComponent={
             <View style={styles.empty}>
               {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
-              <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
+              <ListEmpty view={list.view} skeleton="adminRow" error={list.error} onRetry={() => void list.refetch()}>
                 {/* No Clear search here: the search box above has its own. */}
                 <EmptyState
                   icon={search ? <IconSearch /> : <IconDirectory />}
@@ -165,9 +174,9 @@ const styles = StyleSheet.create({
   toolbar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
   approveAll: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   waiting: { flex: 1, fontSize: 13, color: colors.muted },
+  aboveList: { zIndex: 1 },
   panel: { flex: 1 },
   list: { paddingBottom: 48 },
-  stale: { opacity: 0.6 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   empty: { padding: spacing.lg },
   showing: { textAlign: "center", fontSize: 12, color: colors.muted, padding: spacing.lg },

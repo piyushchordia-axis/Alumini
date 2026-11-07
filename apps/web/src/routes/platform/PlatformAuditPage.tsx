@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { IconAudit, IconSearch } from "@/components/icons";
-import { Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination } from "@/components/ui";
+import { Button, EmptyState, ErrorBox, Input, ListSkeleton, PageHeader, Pagination } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -23,7 +23,7 @@ export function PlatformAuditPage() {
     <div className="space-y-4">
       <PageHeader title="Audit log" subtitle="Platform-wide, newest first" />
       <Input ref={filterBox} aria-label="Filter by action" placeholder="Filter by action prefix, e.g. platform." value={action} onChange={(e) => { setAction(e.target.value); setPage(1); }} className="max-w-sm" />
-      {q.isLoading && <Loading />}
+      {q.isLoading && <ListSkeleton shape="table" />}
       {q.error && <ErrorBox error={q.error} />}
       {q.data &&
         (q.data.data.length === 0 ? (

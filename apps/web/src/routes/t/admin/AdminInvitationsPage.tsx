@@ -25,6 +25,10 @@ import {
   invitationTemplateCsv,
   invitationsEmpty,
   inviteShareText,
+  keepPrevious,
+  listUpdating,
+  listView,
+  onlySearchChanged,
   partialImportText,
   readInvitationCsv,
   revokeInvitationCopy,
@@ -46,10 +50,12 @@ import {
 } from "@illuminize/shared";
 import { errorMessage, isApiClientError, isOutOfDate } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import clsx from "clsx";
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { KeptResults } from "@/components/common/UpdatingNote";
 import { IconCopy, IconDownload, IconExternalLink, IconMail, IconSearch } from "@/components/icons";
-import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination, Stat, Tabs } from "@/components/ui";
+import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, Input, ListSkeleton, PageHeader, Pagination, Stat, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
@@ -225,15 +231,26 @@ export function AdminInvitationsPage() {
   const search = useDebounced(q.trim());
   const searchBox = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
+  // A new search starts at its first page.
+  const [pagedSearch, setPagedSearch] = useState(search);
+  if (pagedSearch !== search) {
+    setPagedSearch(search);
+    setPage(1);
+  }
   const filters = { status: invitationStatusFilter(status), q: search || undefined, page, pageSize: 25 };
   const empty = invitationsEmpty(search);
   const clearSearch = () => {
     setQ("");
-    setPage(1);
     searchBox.current?.focus();
   };
   const summary = useQuery({ queryKey: qk.admin.invitationSummary(slug), queryFn: () => api.admin.invitations.summary(slug) });
-  const list = useQuery({ queryKey: qk.admin.invitations(slug, filters), queryFn: () => api.admin.invitations.list(slug, filters) });
+  const key = qk.admin.invitations(slug, filters);
+  // The rows stay, faded, while a search is refined, never across tabs or pages, and their buttons wait meanwhile: a Not
+  // sent row's Send mustn't act from under another search.
+  const list = useQuery({ queryKey: key, queryFn: () => api.admin.invitations.list(slug, filters), placeholderData: keepPrevious((previous) => onlySearchChanged(previous, key)) });
+  const rows = list.data?.data ?? [];
+  const view = listView(list, rows.length);
+  const kept = list.isPlaceholderData;
   const fields = useQuery({ queryKey: qk.admin.profileFields(slug), queryFn: () => api.admin.profileFields.list(slug) });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin", slug, "invitations"] });
 
@@ -351,18 +368,15 @@ export function AdminInvitationsPage() {
           placeholder="Name, phone or email"
           value={q}
           maxLength={80}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => setQ(e.target.value)}
           className="max-w-xs"
         />
       </div>
-      {list.isLoading ? (
-        <Loading />
-      ) : list.error || !list.data ? (
-        <ErrorBox error={list.error ?? "Failed"} />
-      ) : list.data.data.length === 0 ? (
+      {view === "loading" ? (
+        <ListSkeleton shape="table" />
+      ) : view === "error" ? (
+        <ErrorBox error={list.error} />
+      ) : view === "empty" ? (
         <EmptyState
           icon={empty.live ? <IconSearch /> : <IconMail />}
           title={empty.title}
@@ -378,98 +392,102 @@ export function AdminInvitationsPage() {
           }
         />
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-2">Alumnus</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Delivery</th>
-                  <th className="px-4 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {list.data.data.map((inv) => {
-                  const can = invitationActions(inv, channels);
-                  const view = invitationStatusView(inv);
-                  const times = sendCountText(inv);
-                  return (
-                    <tr key={inv.id}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{invitationName(inv)}</div>
-                        <div className="font-mono text-xs text-slate-500">{invitationMeta(inv)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={view.tone}>{view.label}</Badge>
-                        {inv.acceptedAt && <div className="mt-1 text-xs text-slate-500">{formatDateTime(inv.acceptedAt)}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {deliveryText(inv, timeAgo)}
-                        {times && <div className="text-slate-400">{times}</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap justify-end gap-1">
-                          {can.copy && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="gap-1.5"
-                              aria-label={invitationActionLabel("copy", inv)}
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(inv.link!);
-                                  toast.success("Link copied");
-                                } catch {
-                                  toast.error("Couldn't copy the link");
-                                }
-                              }}
-                            >
-                              <IconCopy size={16} />
-                              {invitationActionText("copy", inv)}
-                            </Button>
-                          )}
-                          {can.whatsapp && (
-                            <a
-                              className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm text-emerald-700 hover:bg-emerald-50"
-                              href={whatsappUrl(inv.phone, inviteShareText(tenant.name, inv.link!))}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={invitationActionLabel("whatsapp", inv)}
-                            >
-                              <IconExternalLink size={16} />
-                              {invitationActionText("whatsapp", inv)}
-                            </a>
-                          )}
-                          {can.send && (
-                            <Button size="sm" variant="outline" aria-label={invitationActionLabel("send", inv)} loading={resend.isPending && resend.variables?.id === inv.id} onClick={() => resend.mutate(inv)}>
-                              {invitationActionText("send", inv)}
-                            </Button>
-                          )}
-                          {can.revoke && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              aria-label={invitationActionLabel("revoke", inv)}
-                              onClick={() => {
-                                revoke.reset();
-                                setRevoking(inv);
-                              }}
-                            >
-                              {invitationActionText("revoke", inv)}
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={setPage} />
-        </>
+        <KeptResults updating={listUpdating(list, rows.length)} className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2">Alumnus</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Delivery</th>
+                <th className="px-4 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((inv) => {
+                const can = invitationActions(inv, channels);
+                const statusView = invitationStatusView(inv);
+                const times = sendCountText(inv);
+                return (
+                  <tr key={inv.id}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900">{invitationName(inv)}</div>
+                      <div className="font-mono text-xs text-slate-500">{invitationMeta(inv)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={statusView.tone}>{statusView.label}</Badge>
+                      {inv.acceptedAt && <div className="mt-1 text-xs text-slate-500">{formatDateTime(inv.acceptedAt)}</div>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-600">
+                      {deliveryText(inv, timeAgo)}
+                      {times && <div className="text-slate-400">{times}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {can.copy && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5"
+                            aria-label={invitationActionLabel("copy", inv)}
+                            disabled={kept}
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(inv.link!);
+                                toast.success("Link copied");
+                              } catch {
+                                toast.error("Couldn't copy the link");
+                              }
+                            }}
+                          >
+                            <IconCopy size={16} />
+                            {invitationActionText("copy", inv)}
+                          </Button>
+                        )}
+                        {can.whatsapp && (
+                          <a
+                            className={clsx("inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm text-emerald-700", kept ? "cursor-not-allowed opacity-60" : "hover:bg-emerald-50")}
+                            // A link can't be disabled, so while the rows are kept it goes nowhere, and says so.
+                            href={kept ? undefined : whatsappUrl(inv.phone, inviteShareText(tenant.name, inv.link!))}
+                            role={kept ? "link" : undefined}
+                            aria-disabled={kept || undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={invitationActionLabel("whatsapp", inv)}
+                          >
+                            <IconExternalLink size={16} />
+                            {invitationActionText("whatsapp", inv)}
+                          </a>
+                        )}
+                        {can.send && (
+                          <Button size="sm" variant="outline" aria-label={invitationActionLabel("send", inv)} loading={resend.isPending && resend.variables?.id === inv.id} disabled={kept} onClick={() => resend.mutate(inv)}>
+                            {invitationActionText("send", inv)}
+                          </Button>
+                        )}
+                        {can.revoke && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={invitationActionLabel("revoke", inv)}
+                            disabled={kept}
+                            onClick={() => {
+                              revoke.reset();
+                              setRevoking(inv);
+                            }}
+                          >
+                            {invitationActionText("revoke", inv)}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </KeptResults>
       )}
+      {/* Hidden while the rows are kept, but kept on a page emptied past the last (its rows revoked), to offer Previous. */}
+      {list.data && !kept && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={setPage} />}
     </div>
   );
 }

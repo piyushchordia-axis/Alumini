@@ -1,11 +1,13 @@
-import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, AUDIT_SHOW_ALL, auditEmptyText, auditEmptyTitle, parseAuditAction } from "@illuminize/shared";
+import { AUDIT_ACTION_FILTERS, AUDIT_ACTION_MAX, AUDIT_LOG_INTRO, AUDIT_SHOW_ALL, auditEmptyText, auditEmptyTitle, listUpdating, listView, parseAuditAction } from "@illuminize/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
-import { Button, EmptyState, ErrorBox, Input, Loading, PageHeader, Pagination } from "@/components/ui";
+import { KeptResults } from "@/components/common/UpdatingNote";
+import { Button, EmptyState, ErrorBox, Input, ListSkeleton, PageHeader, Pagination } from "@/components/ui";
 import { IconAudit, IconSearch } from "@/components/icons";
+import { useAddressRestarts } from "@/hooks/useAddressRestarts";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { useDebounced } from "@/hooks/useDebounced";
 import { api } from "@/lib/api";
@@ -21,21 +23,14 @@ import { qk } from "@/lib/queryKeys";
 export function AdminAuditPage() {
   const [params] = useSearchParams();
   const inAddress = parseAuditAction(params.get("action"));
-  // What the log itself last wrote to the address (or started from), and the address as last seen, with a count of the
-  // times it changed from elsewhere, which starts the log again.
-  const [written, setWritten] = useState(inAddress);
-  const [seen, setSeen] = useState({ action: inAddress, restarts: 0 });
-  if (seen.action !== inAddress) {
-    const fromElsewhere = inAddress !== written;
-    setSeen({ action: inAddress, restarts: fromElsewhere ? seen.restarts + 1 : seen.restarts });
-    if (fromElsewhere) setWritten(inAddress);
-  }
-  return <AuditLog key={seen.restarts} initialAction={inAddress} onWrite={setWritten} />;
+  const { restarts, onWrite } = useAddressRestarts(inAddress);
+  return <AuditLog key={restarts} initialAction={inAddress} onWrite={onWrite} />;
 }
 
 /**
- * The log itself. Typing waits until it stops before asking the API, and the rows on screen stay while the next filter
- * loads: they have no actions to go stale. `onWrite` hears each filter just before it goes into the address.
+ * The log itself. Typing waits until it stops before asking the API, and the rows on screen stay, faded under "Updating
+ * results…", while the next filter or page loads: they have no actions to go stale. `onWrite` hears each filter just
+ * before it goes into the address.
  */
 function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: (action: string) => void }) {
   const { tenant } = useAdminTenant();
@@ -80,8 +75,9 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
       {label}
     </button>
   );
-  // An empty answer kept while the next filter's loads would name the wrong filter, as on the phone app.
-  const emptyNow = !!q.data && q.data.data.length === 0;
+  // An empty answer kept while the next filter's loads would name the wrong filter, so the outline shows (listView).
+  const rows = q.data?.data ?? [];
+  const view = listView(q, rows.length);
   return (
     <div className="space-y-4">
       <PageHeader title="Audit log" subtitle={AUDIT_LOG_INTRO} />
@@ -99,27 +95,27 @@ function AuditLog({ initialAction, onWrite }: { initialAction: string; onWrite: 
         onChange={(e) => setAction(e.target.value)}
         className="max-w-sm"
       />
-      {(q.isLoading || (emptyNow && q.isPlaceholderData)) && <Loading />}
-      {q.error && !q.data && <ErrorBox error={q.error} />}
-      {emptyNow ? (
-        !q.isPlaceholderData && (
-          <EmptyState
-            icon={filter ? <IconSearch /> : <IconAudit />}
-            title={auditEmptyTitle(filter)}
-            description={auditEmptyText(filter)}
-            live={!!filter}
-            action={
-              // The phone's filter box has its own Clear search, so only the web offers this here.
-              filter && <Button onClick={showAll}>{AUDIT_SHOW_ALL}</Button>
-            }
-          />
-        )
-      ) : q.data ? (
-        <div className={clsx(q.isPlaceholderData && "opacity-60")}>
-          <AuditTable rows={q.data.data} memberHref={(id) => `/t/${slug}/admin/members/${id}`} />
-        </div>
-      ) : null}
-      {q.data && !(emptyNow && q.isPlaceholderData) && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onChange={setPage} />}
+      {view === "loading" && <ListSkeleton shape="table" />}
+      {view === "error" && <ErrorBox error={q.error} />}
+      {view === "empty" && (
+        <EmptyState
+          icon={filter ? <IconSearch /> : <IconAudit />}
+          title={auditEmptyTitle(filter)}
+          description={auditEmptyText(filter)}
+          live={!!filter}
+          action={
+            // The phone's filter box has its own Clear search, so only the web offers this here.
+            filter && <Button onClick={showAll}>{AUDIT_SHOW_ALL}</Button>
+          }
+        />
+      )}
+      {view === "rows" && (
+        <KeptResults updating={listUpdating(q, rows.length)}>
+          <AuditTable rows={rows} memberHref={(id) => `/t/${slug}/admin/members/${id}`} />
+        </KeptResults>
+      )}
+      {/* Not under the outline of a kept empty answer, but still on an empty page past the last, to offer Previous. */}
+      {q.data && view !== "loading" && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onChange={setPage} />}
     </div>
   );
 }

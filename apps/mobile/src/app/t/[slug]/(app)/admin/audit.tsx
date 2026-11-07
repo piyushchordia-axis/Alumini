@@ -7,6 +7,7 @@ import { AuditRow } from "@/components/admin/AuditRow";
 import { SearchField } from "@/components/admin/SearchField";
 import { IconAudit, IconSearch } from "@/components/icons";
 import { ChipSelect, EmptyState, ListEmpty, Muted, Spinner } from "@/components/ui";
+import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useMembership } from "@/hooks/useMembership";
 import { usePagedList } from "@/hooks/usePagedList";
@@ -60,11 +61,11 @@ export default function AdminAuditScreen() {
         <Muted size={13}>{AUDIT_LOG_INTRO}</Muted>
         <ChipSelect options={CHIPS} value={action.trim()} onChange={setAction} allowEmpty emptyLabel="All" tall />
         <SearchField value={action} onChangeText={setAction} label="Filter by action" placeholder="Action starts with…" maxLength={AUDIT_ACTION_MAX} />
+        <UpdatingNote updating={list.updating} />
       </View>
       <FlatList
         data={list.items}
         keyExtractor={(a) => a.id}
-        style={list.isPlaceholderData ? styles.stale : undefined}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -73,11 +74,16 @@ export default function AdminAuditScreen() {
         refreshing={refreshing}
         onRefresh={() => void refresh()}
         ItemSeparatorComponent={Divider}
-        renderItem={({ item }) => <AuditRow entry={item} onOpenMember={(id) => router.push(adminMemberHref(slug, id))} />}
+        // Kept rows are faded and busy, each of them, not the list, whose busy a screen reader doesn't read.
+        renderItem={({ item }) => (
+          <View style={list.isPlaceholderData ? KEPT_ROW : undefined}>
+            <AuditRow entry={item} kept={list.isPlaceholderData} onOpenMember={(id) => router.push(adminMemberHref(slug, id))} />
+          </View>
+        )}
         ListEmptyComponent={
           <View style={styles.empty}>
             {/* An empty filter's answer, kept while the next one loads, would name the wrong filter. */}
-            <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
+            <ListEmpty view={list.view} skeleton="adminRow" error={list.error} onRetry={() => void list.refetch()}>
               {/* No Show all activity here: the filter box above has its own Clear search, and All is a chip. */}
               <EmptyState icon={filter ? <IconSearch /> : <IconAudit />} title={auditEmptyTitle(filter)} description={auditEmptyText(filter)} live={!!filter} />
             </ListEmpty>
@@ -98,9 +104,9 @@ export default function AdminAuditScreen() {
 }
 
 const styles = StyleSheet.create({
-  toolbar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm },
+  // Raised over the list below, so the note at its foot floats on the list's top edge.
+  toolbar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, gap: spacing.sm, zIndex: 1 },
   list: { paddingBottom: 48 },
-  stale: { opacity: 0.6 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   empty: { padding: spacing.lg },
   showing: { textAlign: "center", fontSize: 12, color: colors.muted, padding: spacing.lg },

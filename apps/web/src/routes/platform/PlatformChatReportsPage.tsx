@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { IconCheck } from "@/components/icons";
-import { Badge, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Badge, EmptyState, ErrorBox, ListSkeleton, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -43,14 +43,16 @@ export function PlatformChatReportsPage() {
         tabs={REPORT_STATUSES.map((s) => ({ value: s, label: REPORT_STATUS_LABELS[s] }))}
         className="w-fit max-w-full"
       />
-      {q.isLoading && <Loading />}
+      {q.isLoading && <ListSkeleton shape="adminRow" />}
       {q.error && <ErrorBox error={q.error} />}
       {q.data && q.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={`No ${REPORT_STATUS_LABELS[status].toLowerCase()} escalated reports`} description={EMPTY_TEXT[status]} />}
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {q.data?.data.map((r) => (
-          <ReportRow key={r.id} report={r} />
-        ))}
-      </ul>
+      {!!q.data?.data.length && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {q.data.data.map((r) => (
+            <ReportRow key={r.id} report={r} />
+          ))}
+        </ul>
+      )}
       {q.data && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onChange={setPage} />}
     </div>
   );

@@ -12,8 +12,10 @@ const DETAIL_LINES = 4;
  * One row of the audit log, on its page and on a member's: the action as recorded, when, who did it, what it was done
  * to, and its details as readable lines (auditDetailLines, which never shows a private key such as a phone hash). A
  * membership target opens that member's page through `onOpenMember`, unless it is `selfId`, the page already open.
+ * `kept`: the row is kept from the filter before while this one's answer comes, so its target (the link, when it has
+ * one) is said to be busy (the list fades it).
  */
-export function AuditRow({ entry, onOpenMember, selfId }: { entry: AuditDto; onOpenMember?: (membershipId: string) => void; selfId?: string }) {
+export function AuditRow({ entry, onOpenMember, selfId, kept = false }: { entry: AuditDto; onOpenMember?: (membershipId: string) => void; selfId?: string; kept?: boolean }) {
   const theme = useTheme();
   const target = auditTargetLabel(entry);
   const lines = auditDetailLines(entry.metadata).slice(0, DETAIL_LINES);
@@ -32,13 +34,16 @@ export function AuditRow({ entry, onOpenMember, selfId }: { entry: AuditDto; onO
           onPress={() => onOpenMember(memberId)}
           accessibilityRole="link"
           accessibilityHint="Opens this member's page in the console"
+          aria-busy={kept || undefined}
           style={({ pressed }) => [styles.link, pressed ? { opacity: 0.6 } : null]}
         >
           <Text style={[styles.target, { color: theme.primaryInk }]}>{target.text}</Text>
           <IconChevronRight size={14} color={theme.primaryInk} />
         </Pressable>
       ) : (
-        <Text style={[styles.target, { color: colors.muted }]}>{target.text}</Text>
+        <Text aria-busy={kept || undefined} style={[styles.target, { color: colors.muted }]}>
+          {target.text}
+        </Text>
       )}
       {lines.map((line, i) => (
         <Text key={i} numberOfLines={2} style={styles.detail}>

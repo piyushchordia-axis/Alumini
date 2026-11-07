@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChartCard, HBarChart, plural, type Unit } from "@/components/charts";
 import { IconDownload } from "@/components/icons";
-import { Avatar, Button, ErrorBox, FormField, Input, Loading, PageHeader } from "@/components/ui";
+import { Avatar, Button, ErrorBox, FormField, Input, ListSkeleton, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
@@ -101,7 +101,7 @@ export function PlatformComparePage() {
       </div>
 
       {q.isLoading ? (
-        <Loading />
+        <ListSkeleton shape="table" />
       ) : q.error || !d ? (
         <ErrorBox error={q.error ?? "Failed"} />
       ) : (

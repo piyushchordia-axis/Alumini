@@ -112,7 +112,9 @@ phone-sized preview in the browser. Port 4000 must still be public.
 - **Results that stay while you search.** In **Directory** or **Jobs**, type a search or change a filter: the cards
   already listed stay, faded, with a small **Updating results…** above them, until the new ones arrive, rather than the
   list emptying to an outline each time (on a fast connection it can be over in a blink). The search asks once you
-  pause typing, not at every letter.
+  pause typing, not at every letter. The admin console's **Members** works the same way on the web now, with no
+  **Search** button: the rows stay faded while a search loads, their names still links but **Approve** and
+  **Suspend** held until the new rows arrive, and the search stays in the address.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 

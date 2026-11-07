@@ -23,7 +23,7 @@ import { useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
 import { IconCheck } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
-import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -126,14 +126,16 @@ export function AdminReportsPage() {
     <div className="space-y-4">
       <PageHeader title="Reports" subtitle={REPORTS_SUBTITLE} />
       <Tabs value={status} onChange={(v) => setParam("status", v)} tabs={statusTabs(REPORT_STATUSES, REPORT_STATUS_LABELS, queueTabCounts(dashboard.data)?.reports)} className="w-fit" />
-      {list.isLoading && <Loading />}
+      {list.isLoading && <ListSkeleton shape="adminRow" />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={reportEmptyTitle(status)} description={reportEmptyText(status)} />}
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {list.data?.data.map((r) => (
-          <ReportRow key={r.id} slug={slug} report={r} />
-        ))}
-      </ul>
+      {!!list.data?.data.length && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {list.data.data.map((r) => (
+            <ReportRow key={r.id} slug={slug} report={r} />
+          ))}
+        </ul>
+      )}
       {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={(p) => setParam("page", String(p))} />}
     </div>
   );

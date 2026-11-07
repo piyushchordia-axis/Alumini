@@ -27,7 +27,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useId, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconChevronDown, IconChevronUp, IconClose, IconFields, IconPlus } from "@/components/icons";
-import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, Loading, Modal, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, ListSkeleton, Modal, PageHeader, Select } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -256,7 +256,13 @@ export function AdminProfileFieldsPage() {
       toast.error(errorMessage(e));
     },
   });
-  if (list.isLoading) return <Loading />;
+  if (list.isLoading)
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Profile fields" />
+        <ListSkeleton shape="adminRow" />
+      </div>
+    );
   if (list.error || !list.data) return <ErrorBox error={list.error ?? "Failed"} />;
   const fields = list.data;
   const active = fields.filter((f) => !f.archivedAt);

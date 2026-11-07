@@ -457,6 +457,25 @@ describe("onlySearchChanged", () => {
     expect(onlySearchChanged(adminKeys.dashboard("demo"), members({ status: "PENDING" }))).toBe(false);
     expect(onlySearchChanged([], [])).toBe(false);
   });
+
+  it("keeps a numbered page's rows only for a new search on the same page, as the web consoles ask by page", () => {
+    expect(onlySearchChanged(members({ status: "APPROVED", q: "Ki", page: 1, pageSize: 25 }), members({ status: "APPROVED", q: "Kiran", page: 1, pageSize: 25 }))).toBe(true);
+    // Previous and Next aren't a search: the next page's rows load in place of these.
+    expect(onlySearchChanged(members({ status: "APPROVED", q: undefined, page: 1, pageSize: 25 }), members({ status: "APPROVED", q: undefined, page: 2, pageSize: 25 }))).toBe(false);
+    expect(onlySearchChanged(members({ status: "APPROVED", q: "Ki", page: 3, pageSize: 25 }), members({ status: "APPROVED", q: "Kiran", page: 1, pageSize: 25 }))).toBe(false);
+  });
+
+  it("takes the platform's lists, each searched by its own field", () => {
+    // As the platform console keys them (apps/web lib/queryKeys.ts).
+    const users = (filters: Record<string, unknown>) => ["platform", "users", filters] as const;
+    const tenants = (filters: Record<string, unknown>) => ["platform", "tenants", filters] as const;
+    expect(onlySearchChanged(users({ phone: "900", page: 1, pageSize: 25 }), users({ phone: "9000000002", page: 1, pageSize: 25 }), "phone")).toBe(true);
+    // Searched by q, a change of phone is a change of filter.
+    expect(onlySearchChanged(users({ phone: "900", page: 1, pageSize: 25 }), users({ phone: "9000000002", page: 1, pageSize: 25 }))).toBe(false);
+    expect(onlySearchChanged(tenants({ q: "Demo", status: undefined, page: 1, pageSize: 25 }), tenants({ q: "Demo U", status: undefined, page: 1, pageSize: 25 }))).toBe(true);
+    expect(onlySearchChanged(tenants({ q: "Demo", status: undefined, page: 1, pageSize: 25 }), tenants({ q: "Demo", status: "ACTIVE", page: 1, pageSize: 25 }))).toBe(false);
+    expect(onlySearchChanged(tenants({ q: "Demo", page: 1, pageSize: 25 }), users({ q: "Demo", page: 1, pageSize: 25 }))).toBe(false);
+  });
 });
 
 describe("formatCount", () => {

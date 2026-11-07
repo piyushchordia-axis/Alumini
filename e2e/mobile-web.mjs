@@ -4104,11 +4104,24 @@ try {
     await memberButton("Suspend Parth Joshi").waitFor();
     await held.stop();
     const search = shown(page.getByLabel("Search members", { exact: true }));
-    await search.fill("Nisha");
+    // While a search's answer is on its way (held here), the rows already listed stay, faded under "Updating results…",
+    // and their buttons wait, as they'd act on someone the search before found.
+    held = await holdGets(page, (u) => u.pathname.endsWith("/admin/members") && u.searchParams.get("q") === "Nisha");
+    try {
+      await search.fill("Nisha");
+      await held.asked();
+      await expectKeptResults(page, shown(page.getByText("Parth Joshi", { exact: true })), "the console's members while a search loads");
+      if (!(await memberButton("Suspend Parth Joshi").isDisabled())) throw new Error("a kept row's Suspend can be pressed while the search's answer is on its way");
+      // Busy on the row's link, which still opens the page: a list's busy isn't read on a phone.
+      if ((await shown(page.getByRole("link", { name: /^Parth Joshi, / })).getAttribute("aria-busy")) !== "true") throw new Error("a kept row's link isn't marked busy while the search loads");
+    } finally {
+      held.release();
+    }
     await page.waitForURL(/q=Nisha/);
     await memberButton("Suspend Nisha Modi").waitFor();
     // Once the search's answer is in, it's the only row.
     await page.waitForFunction(() => [...document.querySelectorAll('[role="button"][aria-label^="Suspend "]')].filter((b) => b.getBoundingClientRect().height > 0).length === 1);
+    await held.stop();
     await search.fill("Jignesh");
     await page.waitForURL(/q=Jignesh/);
     await shown(page.getByText("Jignesh Patel", { exact: true })).waitFor();
@@ -4438,7 +4451,17 @@ try {
     // A prefix typed that is no chip's leaves none chosen; one that is a chip's chooses it. Finding nothing says what it
     // looked for.
     const field = shown(page.getByLabel("Filter by action", { exact: true }));
-    await field.fill("membership.app");
+    // While its answer is on its way (held here), the rows already listed stay, faded under "Updating results…", with
+    // a kept row's link to its member marked busy.
+    const filterHeld = await holdGets(page, (u) => u.pathname.endsWith("/admin/audit") && u.searchParams.get("action") === "membership.app");
+    try {
+      await field.fill("membership.app");
+      await filterHeld.asked();
+      await expectKeptResults(page, shown(page.getByText("membership.reject", { exact: true })), "the audit log while a filter loads");
+      if ((await shown(page.getByRole("link", { name: `membership ${diyaId.slice(0, 8)}`, exact: true })).getAttribute("aria-busy")) !== "true") throw new Error("a kept audit row's link isn't marked busy while the filter loads");
+    } finally {
+      await filterHeld.stop();
+    }
     await page.waitForURL(/[?&]action=membership\.app/);
     await shown(page.getByText("membership.approve", { exact: true })).waitFor();
     for (const chip of AUDIT_CHIPS) if (await pressed(memberButton(chip))) throw new Error(`the ${chip} chip is chosen for a prefix typed by hand`);
@@ -5628,7 +5651,20 @@ try {
 
     // The search, kept in the address.
     const search = shown(page.getByLabel("Search invitations", { exact: true }));
-    await search.fill("Mitesh");
+    // While its answer is on its way (held here), the rows already listed stay, faded under "Updating results…", each
+    // marked busy, and their buttons wait, as they'd act on an invitation the search before listed.
+    const searchHeld = await holdGets(page, (u) => u.pathname.endsWith("/admin/invitations") && u.searchParams.has("q"));
+    try {
+      await search.fill("Mitesh");
+      await searchHeld.asked();
+      await expectKeptResults(page, invitationRow("Komal Desai"), "the console's invitations while a search loads");
+      for (const name of ["Copy link for Komal Desai", "Share on WhatsApp with Komal Desai", "Revoke the invitation for Komal Desai"]) {
+        if (!(await memberButton(name).isDisabled())) throw new Error(`a kept invitation's "${name}" can be pressed while the search's answer is on its way`);
+      }
+      if (!(await invitationRow("Komal Desai").locator('[aria-busy="true"]').count())) throw new Error("a kept invitation isn't marked busy while the search loads");
+    } finally {
+      await searchHeld.stop();
+    }
     await page.waitForURL(/[?&]q=Mitesh/);
     await page.waitForFunction(() => [...document.querySelectorAll('[role="button"][aria-label^="Revoke the invitation for "]')].filter((b) => b.getBoundingClientRect().height > 0).length === 1);
     await memberButton("Revoke the invitation for Mitesh Shah").waitFor();

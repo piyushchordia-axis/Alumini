@@ -98,7 +98,8 @@ function ReasonFor({ action, member, actions, open, onClose }: { action: "reject
   );
 }
 
-export function MemberActionButtons({ member, actions, compact }: { member: MemberRef; actions: MemberActions; compact?: boolean }) {
+/** `disabled` holds them all, as while the members list's rows are a previous search's. */
+export function MemberActionButtons({ member, actions, compact, disabled = false }: { member: MemberRef; actions: MemberActions; compact?: boolean; disabled?: boolean }) {
   const [asking, setAsking] = useState<"reject" | "suspend" | null>(null);
   const busy = actions.busyAction(member.id);
   const press = (action: MemberAdminAction) => {
@@ -118,7 +119,7 @@ export function MemberActionButtons({ member, actions, compact }: { member: Memb
             aria-label={memberActionLabel(action, member.fullName)}
             onClick={() => press(action)}
             loading={busy === action}
-            disabled={!!busy && busy !== action}
+            disabled={disabled || (!!busy && busy !== action)}
           >
             {copy.label}
           </Button>

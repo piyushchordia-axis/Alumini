@@ -27,7 +27,10 @@ export function UpdatingNote({ updating, gap = 0 }: { updating: boolean; gap?: n
   );
 }
 
-/** A row kept from the search before, faded while the new answer comes. It stays tappable: it only opens a page. */
+/**
+ * A row kept from the search before, faded while the new answer comes. It stays tappable: it only opens a page (a console
+ * row holds its actions meanwhile).
+ */
 export const KEPT_ROW: ViewStyle = { opacity: 0.6 };
 
 const styles = StyleSheet.create({

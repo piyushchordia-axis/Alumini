@@ -345,20 +345,24 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     progressbar named `LOADING_LABEL` ("Loading", or the screen's own words, such as "Finding members…"), still under
     reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame. `data-testid` / `testID="skeleton"` is there for
     e2e alone. Spinners stay on the guards, sign-in and landing, registration, Load more and buttons, and for now on
-    detail and form pages and the web console's and platform's lists (README → Known gaps).
+    detail and form pages (README → Known gaps). Console lists draw `adminRow` or `table`.
     A list that keeps its rows while a new search or filter loads opts in with `keepPreviousWhile` (`useInfiniteList`;
     the phone console's `usePagedList`): `onlyFiltersChanged` for rows that only open a page, as Directory and Jobs do,
-    `onlySearchChanged` for console rows whose actions belong to their tab; both compare filters by value, as pages
-    rebuild them each render. `useInfiniteList` keeps nothing while a retry from the error is on its way
+    `onlySearchChanged` for console rows whose actions belong to their tab (the web console's and platform's `useQuery`
+    lists pass `keepPrevious(onlySearchChanged)` as `placeholderData`), holding those rows' buttons while
+    `isPlaceholderData`; both compare filters by value, as pages rebuild them each render. `useInfiniteList` keeps nothing while a retry from the error is on its way
     (`listPlaceholder`) and returns `updating` (kept rows: faded, busy, under `UPDATING_RESULTS` "Updating results…";
     web `KeptResults`, busy on the grid; mobile `UpdatingNote` last in the box above the rows, raised over them, with
-    `KEPT_ROW` on each row and `busy` on each card, as a scroll view's busy isn't read, and an iOS announcement),
+    `KEPT_ROW` on each row and `busy` on each card, or on a console row's name, as a scroll view's busy isn't read, and
+    an iOS announcement),
     `hasMore` (web Load more) and `refreshing` (mobile pull-to-refresh), from `listHasMore`, `listMayLoadMore` and
     `listRefreshing`, never `hasNextPage` or `isRefetching`, which kept rows would fool. The note floats on the first
     row's top edge, below the filters, taking no room or clicks (on mobile Jobs, at the foot of the list's header with
     `gap`), and the search box stays mounted; kept rows that are none show the skeleton (`listView`), so no empty state
-    names a search whose answer hasn't come. A member search box that hits the API waits 300 ms after typing stops
-    (`useDebounced`).
+    names a search whose answer hasn't come. A member's or an institution console's search box that hits the API, and
+    the platform's Institutions and Users searches, wait 300 ms after typing stops (`useDebounced`), with no Search
+    button (the platform's audit filter doesn't yet: README → Known gaps); a web console page that writes it into the
+    address (`?q=`, `?action=`) starts again when the address changes from elsewhere (`useAddressRestarts`).
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.

@@ -29,6 +29,7 @@ import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconChevronRight, IconMail, IconSearch, IconUpload } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
 import { Button, EmptyState, ErrorText, ListEmpty, Muted, Spinner, Tabs } from "@/components/ui";
+import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { refreshInvitations, useInvitationSummary } from "@/hooks/useAdminInvitations";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useMembership } from "@/hooks/useMembership";
@@ -210,6 +211,7 @@ export default function AdminInvitationsScreen() {
       <StatusLine flush text={topLine?.text ?? null} tone={topLine?.tone} />
       <Tabs tall value={tab} onChange={(next) => navigation.setParams({ status: next === "ALL" ? undefined : next })} tabs={[...INVITATION_TABS]} />
       <SearchField value={q} onChangeText={setQ} label="Search invitations" placeholder="Name, phone or email" maxLength={SEARCH_MAX} />
+      <UpdatingNote updating={list.updating} />
     </View>
   );
 
@@ -220,7 +222,6 @@ export default function AdminInvitationsScreen() {
         keyExtractor={(inv) => inv.id}
         // The rows' Send and line follow these as well as the rows.
         extraData={[rowSaid, send.isPending, send.variables?.id, channels.length, list.isPlaceholderData]}
-        style={list.isPlaceholderData ? styles.stale : undefined}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -229,27 +230,32 @@ export default function AdminInvitationsScreen() {
         refreshing={refreshing}
         onRefresh={() => void refresh()}
         ListHeaderComponent={header}
+        // Over the first row, so the note at the header's foot floats on its top edge.
+        ListHeaderComponentStyle={styles.headerAbove}
         ItemSeparatorComponent={Divider}
+        // Each row is faded and busy while kept, not the list, whose header holds the search box and the note.
         renderItem={({ item }) => (
-          <InvitationRow
-            inv={item}
-            channels={channels}
-            sending={send.isPending && send.variables?.id === item.id}
-            disabled={list.isPlaceholderData}
-            notice={inRow && rowSaid.id === item.id ? <StatusLine flush text={rowSaid.text} tone={rowSaid.tone} /> : undefined}
-            onCopy={() => void copy(item)}
-            onWhatsApp={() => shareOnWhatsApp(item)}
-            onSend={() => {
-              sayInRow(null);
-              send.mutate(item);
-            }}
-            onRevoke={() => askRevoke(item)}
-          />
+          <View style={list.isPlaceholderData ? KEPT_ROW : undefined}>
+            <InvitationRow
+              inv={item}
+              channels={channels}
+              sending={send.isPending && send.variables?.id === item.id}
+              kept={list.isPlaceholderData}
+              notice={inRow && rowSaid.id === item.id ? <StatusLine flush text={rowSaid.text} tone={rowSaid.tone} /> : undefined}
+              onCopy={() => void copy(item)}
+              onWhatsApp={() => shareOnWhatsApp(item)}
+              onSend={() => {
+                sayInRow(null);
+                send.mutate(item);
+              }}
+              onRevoke={() => askRevoke(item)}
+            />
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
             {/* An empty search's answer, kept while the next search loads, would name the wrong search. */}
-            <ListEmpty loading={list.isLoading || list.isPlaceholderData} error={list.error} onRetry={() => void list.refetch()}>
+            <ListEmpty view={list.view} skeleton="adminRow" error={list.error} onRetry={() => void list.refetch()}>
               {/* No Clear search here: the search box above has its own. */}
               <EmptyState icon={empty.live ? <IconSearch /> : <IconMail />} title={empty.title} description={empty.description} live={empty.live} />
             </ListEmpty>
@@ -301,7 +307,7 @@ const styles = StyleSheet.create({
   importLabel: { fontSize: 14, fontWeight: "600", color: colors.text },
   importHint: { fontSize: 12, color: colors.muted },
   list: { paddingBottom: 48 },
-  stale: { opacity: 0.6 },
+  headerAbove: { zIndex: 1 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   empty: { padding: spacing.lg },
   showing: { textAlign: "center", fontSize: 12, color: colors.muted, padding: spacing.lg },

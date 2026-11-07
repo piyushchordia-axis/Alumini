@@ -47,7 +47,7 @@ import { ReasonModal } from "@/components/admin/ReasonModal";
 import { IconAnnounce, IconCheck, IconExternalLink, IconFlag, IconPin } from "@/components/icons";
 import { JobApplyArea } from "@/components/jobs/JobApplyArea";
 import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
-import { Badge, Button, EmptyState, ErrorBox, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -321,14 +321,16 @@ export function AdminModerationPage() {
           ))}
         </Select>
       </div>
-      {list.isLoading && <Loading />}
+      {list.isLoading && <ListSkeleton shape="adminRow" />}
       {list.error && <ErrorBox error={list.error} />}
       {list.data && list.data.data.length === 0 && <EmptyState icon={<IconCheck />} title={MODERATION_EMPTY_TITLE} description={moderationEmptyText(status)} />}
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {list.data?.data.map((item) => (
-          <ModerationRow key={moderationItemKey(item)} slug={slug} item={item} features={tenant.settings.features} />
-        ))}
-      </ul>
+      {!!list.data?.data.length && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {list.data.data.map((item) => (
+            <ModerationRow key={moderationItemKey(item)} slug={slug} item={item} features={tenant.settings.features} />
+          ))}
+        </ul>
+      )}
       {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onChange={(p) => setParam("page", String(p))} />}
     </div>
   );
