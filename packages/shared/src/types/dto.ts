@@ -3,6 +3,7 @@ import type {
   BillingCycle,
   BillingModel,
   CelebrationKind,
+  ChatAttachmentKind,
   ChatConversationKind,
   ChatGroupVisibility,
   ChatMessageKind,
@@ -572,6 +573,55 @@ export interface ChatMemberDto {
   batchYear: number | null;
 }
 
+/**
+ * A photo or PDF in a chat message, described and never addressed: no DTO, socket event or cache holds a link. A member
+ * gets short-lived links from the conversation's attachment links (ChatAttachmentLinksDto), which check again who may
+ * see each message.
+ */
+export interface ChatAttachmentDto {
+  id: string;
+  kind: ChatAttachmentKind;
+  /** A file's name as its sender gave it, cleaned (chatFileName); null for a photo, which has none. */
+  name: string | null;
+  /** Decided by the bytes: image/jpeg, image/png or image/webp for a photo, application/pdf for a file. */
+  contentType: string;
+  /** In bytes, as stored: a photo after the server re-encoded it. */
+  size: number;
+  /** A photo's size in pixels, so its box is drawn before it loads; null for a file. */
+  width: number | null;
+  height: number | null;
+}
+
+/** What an inbox preview says about a last message's photos and files ("Photo", "File: notes.pdf"). */
+export interface ChatAttachmentSummaryDto {
+  photos: number;
+  files: number;
+  /** The first file's name, for "File: {name}"; null when there's no file. */
+  fileName: string | null;
+}
+
+/** One attachment's signed links. Each is a bearer link until it expires: never store, log or share it. */
+export interface ChatAttachmentLinkDto {
+  id: string;
+  messageId: string;
+  /** The photo or file itself: a photo opens in place, a file always downloads. */
+  url: string;
+  /** A photo's thumbnail, which a message shows until the photo is opened; null for a file. */
+  thumbUrl: string | null;
+  /** Saves it as a file: a photo under a generic name, a file under its own. */
+  downloadUrl: string;
+}
+
+/**
+ * Signed links to the photos and files of some of a conversation's messages, for those this member may still see: a
+ * message they may not see is left out, never refused on its own, so the answer says nothing about it.
+ */
+export interface ChatAttachmentLinksDto {
+  /** When every link here stops working. Fetch again before then to keep showing them. */
+  expiresAt: string;
+  links: ChatAttachmentLinkDto[];
+}
+
 export interface ChatMessageDto {
   id: string;
   conversationId: string;
@@ -590,6 +640,11 @@ export interface ChatMessageDto {
   redacted: boolean;
   /** A SYSTEM line's `event` (ChatGroupEvent), which is about its sender. */
   meta: Record<string, unknown> | null;
+  /**
+   * Its photos and files, in the order sent. Empty on a removed or redacted message, whose files no member sees. A message
+   * with attachments may have an empty body, which is no caption.
+   */
+  attachments: ChatAttachmentDto[];
   /** The client's own key for the send, on the sender's copy only, so it can settle its optimistic row. */
   clientKey: string | null;
   createdAt: string;
@@ -614,6 +669,8 @@ export interface ChatLastMessageDto {
   sender: ChatMemberDto | null;
   /** From someone this member blocked, in a group: see ChatMessageDto.redacted. */
   redacted: boolean;
+  /** Its photos and files, counted for the preview; null when it has none, or is removed or redacted for this member. */
+  attachments: ChatAttachmentSummaryDto | null;
   createdAt: string;
 }
 
@@ -638,6 +695,12 @@ export interface ChatConversationDto {
   group: ChatConversationGroupDto | null;
   state: ChatThreadState;
   canSend: boolean;
+  /**
+   * Whether a send here may carry photos and files: it can send, the institution has Chat attachments on, and it's an
+   * accepted chat (or an answer to a request) or a group, never a request. Worked out as the member sees the thread, so a
+   * request waiting, declined or met by a block reads the same.
+   */
+  canAttach: boolean;
   /** When this member may next ask, for a thread they can't send in until then. Null if they can't. */
   canRerequestAt: string | null;
   blockedByMe: boolean;
@@ -787,15 +850,21 @@ export interface PlatformChatReportDto extends AdminChatReportDto {
   noStaffCanTake: boolean;
 }
 
+/** A photo or file in a chat report's audited view, with links that last CHAT_REPORT_LINK_TTL_SEC from the view. */
+export type AdminChatAttachmentDto = ChatAttachmentDto & Omit<ChatAttachmentLinkDto, "id" | "messageId">;
+
 export interface AdminChatReportMessageDto {
   id: string;
   kind: ChatMessageKind;
   /** Null if they deleted their account, and on a system message. */
   sender: ChatMemberDto | null;
+  /** Empty for a message of photos or files alone. */
   body: string;
   removed: boolean;
   /** The message that was reported, which the rest are shown around. */
   isTarget: boolean;
+  /** Its photos and files, a removed message's included, with links signed for this view only. */
+  attachments: AdminChatAttachmentDto[];
   createdAt: string;
 }
 
@@ -807,6 +876,8 @@ export interface AdminChatReportViewDto extends AdminChatReportDto {
   resolutionNote: string | null;
   /** Oldest first. */
   messages: AdminChatReportMessageDto[];
+  /** When the links to the messages' photos and files stop working, or null when there are none. Another view signs new ones. */
+  filesExpireAt: string | null;
 }
 
 /** Who a new-member notice is about, as things stand now. Name and status are null once the membership is gone (the applicant deleted their account). */

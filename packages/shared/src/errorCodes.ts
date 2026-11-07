@@ -34,6 +34,10 @@ export const ERROR_CODES = [
   "CHAT_REQUEST_PENDING",
   /** A group's own send limit, shared by everyone in it, as opposed to RATE_LIMITED, which is the member's own. */
   "CHAT_GROUP_BUSY",
+  /** A send named an upload that is no longer there to claim: sent already, swept, or never this member's in this thread. */
+  "CHAT_ATTACHMENT_GONE",
+  /** Photos and files wait until a direct thread is accepted: never in a request, asking again included. */
+  "CHAT_ATTACHMENTS_NOT_YET",
   "NEEDS_ANOTHER_ADMIN",
   /** A member of staff changed an institution's admins after a chat report there was filed, so another one must handle it. */
   "NEEDS_OTHER_STAFF",

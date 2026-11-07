@@ -130,6 +130,7 @@ export function featureBlockedText(features: TenantFeatures, key: TenantFeature)
 /** What the settings form says under the switches, at every institution. */
 export const FEATURE_HELP: readonly string[] = [
   "Invite-only groups also need Messaging, because a private group can be a private chat. Open groups need only Groups.",
+  "Chat attachments lets members send photos and PDF files in messages and groups. It does nothing while Messaging and Groups are both off. Turning it off stops new ones; photos and files already sent stay.",
   "Mentorship needs Messaging, because accepting a mentee opens a private chat. Turning Messaging off turns Mentorship off too.",
   "Referral requests in Jobs need Messaging too, because accepting one opens a private chat. They have no switch of their own: members can ask for and give referrals while Jobs and Messaging are both on.",
 ];

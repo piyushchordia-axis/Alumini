@@ -1,4 +1,4 @@
-import { NEEDS_OTHER_STAFF_TEXT, type AdminChatReportDto, type AdminChatReportViewDto, type AdminChatReportsQuery, type ChatReportResolveInput, type PlatformChatReportDto } from "@illuminize/shared";
+import { CHAT_REPORT_LINK_TTL_SEC, NEEDS_OTHER_STAFF_TEXT, type AdminChatReportDto, type AdminChatReportViewDto, type AdminChatReportsQuery, type ChatReportResolveInput, type PlatformChatReportDto } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient, Tx } from "../../db/client";
 import { toAdminChatReportDto, toAdminChatReportViewDto, toPlatformChatReportDto } from "../../dto/chat.dto";
@@ -10,6 +10,7 @@ import { chatReportContext, closeChatReport, closeOpenReportsOnMessage, findChat
 import type { AuthContext, MembershipRow, TenantContext } from "../../types/request";
 import { recordAuditStrict, type AuditEntry } from "../audit.service";
 import { notify } from "../notifications/notification.service";
+import { attachmentsByMessage, linksExpireAt, signChatAttachmentLinks } from "./attachments.service";
 import { publishRemoved } from "./fanout";
 
 export interface ChatReportViewer extends AuthContext {
@@ -62,15 +63,23 @@ export async function listPlatformChatReports(ctx: AppContext, viewerUserId: str
 /**
  * Reads a report's messages and records that it happened in one transaction, so a view that can't be audited returns an
  * error and no text. Each call writes its own row. A POST, because a GET could be refetched by a client cache and write
- * audit rows nobody caused.
+ * audit rows nobody caused. The messages' photos and files (the reported one's, removed or not) come with links signed in
+ * the same transaction, for CHAT_REPORT_LINK_TTL_SEC; the audit row counts them and names none.
  */
 export async function viewChatReport(ctx: AppContext, tenantCtx: TenantContext, viewer: ChatReportViewer, id: string): Promise<AdminChatReportViewDto> {
   const tenantId = tenantCtx.tenant.id;
   return runInTransaction(ctx, async (tx) => {
     const found = await reachableReport(tx, tenantId, id, viewer);
     const messages = await chatReportContext(tx, found.report);
-    await recordAuditStrict(tx, auditEntry(tenantId, viewer, "chat_report.view", id, { access: accessBasis(viewer, found), targetKind: found.report.targetKind, conversationId: found.report.conversationId, messageIds: messages.map((m) => m.message.id), messageCount: messages.length }));
-    return toAdminChatReportViewDto(found, messages);
+    const byMessage = await attachmentsByMessage(tx, messages.map((m) => m.message.id));
+    const attachments = [...byMessage.values()].flat();
+    await recordAuditStrict(
+      tx,
+      auditEntry(tenantId, viewer, "chat_report.view", id, { access: accessBasis(viewer, found), targetKind: found.report.targetKind, conversationId: found.report.conversationId, messageIds: messages.map((m) => m.message.id), messageCount: messages.length, attachmentCount: attachments.length }),
+    );
+    const expiresAt = attachments.length > 0 ? linksExpireAt(CHAT_REPORT_LINK_TTL_SEC).toISOString() : null;
+    const links = await signChatAttachmentLinks(ctx.privateStorage, attachments, CHAT_REPORT_LINK_TTL_SEC);
+    return toAdminChatReportViewDto(found, messages, { byMessage, links, expiresAt });
   });
 }
 

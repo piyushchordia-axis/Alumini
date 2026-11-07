@@ -1,4 +1,4 @@
-import type { ChatConversationDto, ChatMessageDto, CursorPage } from "../types/dto";
+import type { ChatAttachmentDto, ChatConversationDto, ChatMessageDto, CursorPage } from "../types/dto";
 
 /** A thread's loaded pages, the shape of an infinite query: pages[0] is the newest, and rows run newest first within a page. */
 export interface ChatMessagePages {
@@ -6,11 +6,22 @@ export interface ChatMessagePages {
   pageParams: unknown[];
 }
 
+/** An uploaded photo or file a pending send carries, with what its bubble shows until the message is confirmed. */
+export type OutboxAttachment = ChatAttachmentDto & {
+  /** A photo's prepared copy on the device; null for a file, or once nothing local is left of it. */
+  previewUri: string | null;
+};
+
 /** A message the server hasn't confirmed. These live apart from the pages, because any refetch replaces the pages. */
 export interface OutboxEntry {
   clientKey: string;
   conversationId: string;
   body: string;
+  /**
+   * Uploads it names, sent again with it on a retry. Left out for words alone. Their previews stay the app's until the entry
+   * leaves the outbox (ChatSyncOptions.onOutboxRelease).
+   */
+  attachments?: OutboxAttachment[];
   status: "sending" | "failed";
   /** Why it failed, when it did. */
   error?: string;
@@ -62,19 +73,19 @@ export function upsertLiveMessage<T extends ChatMessagePages>(data: T | undefine
   return withPage(data, last, [...data.pages[last]!.data, message]);
 }
 
-/** Turns a loaded message into the tombstone every member sees. A message that isn't loaded will arrive that way. */
+/** Turns a loaded message into the tombstone every member sees, with no photos or files. A message that isn't loaded will arrive that way. */
 export function markMessageRemoved<T extends ChatMessagePages>(data: T | undefined, messageId: string): T | undefined {
   if (!data) return data;
   for (let i = 0; i < data.pages.length; i++) {
     const rows = data.pages[i]!.data;
-    if (rows.some((m) => m.id === messageId)) return withPage(data, i, rows.map((m) => (m.id === messageId ? { ...m, body: null, removed: true } : m)));
+    if (rows.some((m) => m.id === messageId)) return withPage(data, i, rows.map((m) => (m.id === messageId ? { ...m, body: null, removed: true, attachments: [] } : m)));
   }
   return data;
 }
 
-/** Takes the removed message's words out of a thread's preview, if that's what the preview is of. */
+/** Takes the removed message's words, photos and files out of a thread's preview, if that's what the preview is of. */
 export function markLastMessageRemoved(conversation: ChatConversationDto | undefined, seq: number): ChatConversationDto | undefined {
-  return conversation?.lastMessage?.seq === seq ? { ...conversation, lastMessage: { ...conversation.lastMessage, body: null } } : conversation;
+  return conversation?.lastMessage?.seq === seq ? { ...conversation, lastMessage: { ...conversation.lastMessage, body: null, attachments: null } } : conversation;
 }
 
 /** Keeps only the newest page, so a refetch after being away asks for one page rather than everything scrolled through. */

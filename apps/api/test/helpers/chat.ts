@@ -39,6 +39,16 @@ export function chatApi(ctx: TestContext, slug: string, member: Pick<Session, "h
     block: (membershipId: string) => api().post(url("/blocks")).set(member.headers).send({ membershipId }),
     unblock: (membershipId: string) => api().delete(url(`/blocks/${membershipId}`)).set(member.headers),
     report: (messageId: string, body: Record<string, unknown> = { reason: "HARASSMENT" }) => api().post(url(`/messages/${messageId}/report`)).set(member.headers).send(body),
+    /** Uploads a photo or PDF to a conversation, with its name as a field of its own when `name` is given, as the apps send it. */
+    attach: (id: string, file: Buffer, opts: { filename?: string; contentType?: string; name?: string } = {}) => {
+      const req = api().post(url(`/conversations/${id}/attachments`)).set(member.headers);
+      if (opts.name !== undefined) void req.field("name", opts.name);
+      return req.attach("file", file, { filename: opts.filename ?? "photo.png", contentType: opts.contentType ?? "image/png" });
+    },
+    /** A send carrying uploads: `body` left out sends photos and files alone. */
+    sendWith: (id: string, input: { body?: string; attachmentIds?: string[]; clientKey?: string }) => api().post(url(`/conversations/${id}/messages`)).set(member.headers).send({ clientKey: newKey(), ...input }),
+    /** Signed links to these messages' photos and files (`?messageId=` once each). */
+    links: (id: string, messageIds: string[]) => api().get(url(`/conversations/${id}/attachments?${messageIds.map((m) => `messageId=${encodeURIComponent(m)}`).join("&")}`)).set(member.headers),
   };
 }
 
@@ -137,5 +147,14 @@ export function comparableFooter(dto: ChatConversationDto, now = FOOTER_NOW) {
 }
 
 export function comparableMessage(dto: ChatMessageDto) {
-  return { ...dto, id: "<id>", conversationId: "<id>", sender: dto.sender && { ...dto.sender, id: "<id>", fullName: "<name>" }, clientKey: dto.clientKey && "<key>", createdAt: "<at>" };
+  return {
+    ...dto,
+    id: "<id>",
+    conversationId: "<id>",
+    sender: dto.sender && { ...dto.sender, id: "<id>", fullName: "<name>" },
+    // Each upload has its own id; what a member could tell apart is everything else about it.
+    attachments: dto.attachments.map((a) => ({ ...a, id: "<id>" })),
+    clientKey: dto.clientKey && "<key>",
+    createdAt: "<at>",
+  };
 }

@@ -186,7 +186,7 @@ describe.skipIf(!dbAvailable)("message requests", () => {
       };
       const expected = await read(normal.to, normal.id);
       expect(expected.thread).toMatchObject({ state: "ACCEPTED", canSend: true });
-      expect(expected.footer).toEqual({ kind: "composer", intro: null });
+      expect(expected.footer).toEqual({ kind: "composer", intro: null, attachCaption: null });
       expect(expected.decline.status).toBe(409);
       expect(await read(blocked.to, blocked.id)).toEqual(expected);
       expect((await chat(blocked.to).send(blocked.id, "Another")).status).toBe((await chat(normal.to).send(normal.id, "Another")).status);

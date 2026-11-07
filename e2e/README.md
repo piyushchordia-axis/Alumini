@@ -259,7 +259,8 @@ Covers:
   owner's new name, a press sending nothing and asking to check it again, and the next sending the new name; resolving
   the spam report by removing content;
 - settings, saving only the switches that changed: every checkbox row 44px tall, a ticked switch's box in Demo
-  College's ink with a drawn tick and a cleared one's grey edge at 3:1 (`expectChoiceLook`), and unchecking Messaging
+  College's ink with a drawn tick and a cleared one's grey edge at 3:1 (`expectChoiceLook`), Chat attachments on with
+  its line under the switches, and unchecking Messaging
   unchecking Mentorship and holding it (its label in the meta grey, unfaded), both coming back on;
   Branding with the welcome message's hint saying new members see it too, Demo College's green chosen among the
   suggested colours (a drawn tick) and the preview's initials in its ink on its tint, a near-white colour typed showing
@@ -311,7 +312,8 @@ Covers:
   the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
   staff's, "About an admin" or "No other admin", and reports another member of staff must handle, or that no member of
   staff may take yet, or that are closed, each with its note and no link), opening an institution's admin console
-  without being a member, a school's settings starting with Messaging, Groups and Mentorship off and saying why, and
+  without being a member, a school's settings starting with Messaging, Groups and Mentorship off and saying why (and
+  Chat attachments on, waiting for nothing), and
   the admin console stacking on a phone;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): Demo College's
   empty reports (green), Demo University's empty chat reports (blue), and the platform console's empty escalated
@@ -450,9 +452,9 @@ Covers:
   than in a card, readable on the plain page and on the tint), and the feed after a reload with its post cards painting
   their own white, the console's home staying on the plain page, and Plain putting the page and its grey text back; the
   console's Settings, reached from the approval
-  sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, the Funding
-  switch and the chosen approval mode drawn in the Samaj's ink on its wash (a drawn tick, a ring), and an approval mode
-  not chosen with a grey edge at 3:1 (`expectChoiceLook`), a blank batch year
+  sentence's 44px Settings link (and later from the section's row), saying the plan has no messaging, Chat attachments
+  on, the Funding switch and the chosen approval mode drawn in the Samaj's ink on its wash (a drawn tick, a ring), and
+  an approval mode not chosen with a grey edge at 3:1 (`expectChoiceLook`), a blank batch year
   refused under its box with nothing sent, a save refused while another admin's change comes back (both answered by the
   script) starting the form again from the stored settings and still saying "Couldn't save: …", Messaging off clearing
   Mentorship and holding it with "Needs Messaging" (its label in the meta grey), and Funding saved off (sending only

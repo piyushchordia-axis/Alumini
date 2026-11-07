@@ -255,6 +255,22 @@ export const CHAT_ATTACHMENT_KINDS = ["PHOTO", "FILE"] as const;
 export type ChatAttachmentKind = (typeof CHAT_ATTACHMENT_KINDS)[number];
 /** Longest side of a chat photo's thumbnail, which a message shows until the photo is opened. */
 export const CHAT_PHOTO_THUMB_SIDE = 480;
+/** Photos and files one message may carry. A photo is at most MAX_UPLOAD_BYTES once prepared, as any other upload. */
+export const CHAT_ATTACHMENTS_PER_MESSAGE = 4;
+/** The largest PDF a chat message takes. */
+export const CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024;
+/** What a chat message's files may be, besides photos: PDF only, decided by the bytes. */
+export const CHAT_FILE_TYPES = ["application/pdf"] as const;
+/** A file's name, as kept and shown, in characters (UTF-16 units), its extension included. */
+export const CHAT_FILE_NAME_MAX_LENGTH = 120;
+/** How long a member's signed link to a chat photo or file lasts. */
+export const CHAT_ATTACHMENT_LINK_TTL_SEC = 600;
+/** How long the links in a chat report's audited view last, for the admin or member of staff who chose to view it. */
+export const CHAT_REPORT_LINK_TTL_SEC = 900;
+/** An upload no message claimed by then is swept away, with its files. */
+export const CHAT_ATTACHMENT_UNSENT_HOURS = 24;
+/** Messages one request for signed links may name, all in one conversation. */
+export const CHAT_ATTACHMENT_LINKS_PER_CALL = 50;
 
 /** What a mentor can help with. A fixed list, because free text would make the filter useless. */
 export const MENTOR_AREAS = [
@@ -452,7 +468,7 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const MAX_INVITE_IMPORT_ROWS = 500;
 export const INVITE_TTL_DAYS = 90;
 
-export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging", "groups", "mentorship"] as const;
+export const TENANT_FEATURES = ["feed", "jobs", "funding", "events", "directory", "businesses", "messaging", "groups", "chatAttachments", "mentorship"] as const;
 export type TenantFeature = (typeof TENANT_FEATURES)[number];
 export type TenantFeatures = Record<TenantFeature, boolean>;
 /** What an admin's settings and the API's refusals call each switch. */
@@ -465,6 +481,7 @@ export const TENANT_FEATURE_LABELS: Record<TenantFeature, string> = {
   businesses: "Business directory",
   messaging: "Messaging",
   groups: "Groups",
+  chatAttachments: "Chat attachments",
   mentorship: "Mentorship",
 };
 

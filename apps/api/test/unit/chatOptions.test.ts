@@ -113,7 +113,7 @@ describe("thread labels shared by both apps", () => {
   });
 
   it("keeps a request's words out of the inbox until it's opened", () => {
-    const lastMessage: ChatLastMessageDto = { seq: 1, kind: "TEXT", body: "Hello there", mine: false, sender: null, redacted: false, createdAt: NOW.toISOString() };
+    const lastMessage: ChatLastMessageDto = { seq: 1, kind: "TEXT", body: "Hello there", mine: false, sender: null, redacted: false, attachments: null, createdAt: NOW.toISOString() };
     const direct = { group: null };
     expect(conversationPreview({ ...direct, state: "REQUEST_RECEIVED", lastMessage })).toBe("Wants to send you a message");
     expect(conversationPreview({ ...direct, state: "REQUEST_SENT", lastMessage: { ...lastMessage, mine: true } })).toBe("Request sent");
@@ -123,10 +123,27 @@ describe("thread labels shared by both apps", () => {
     expect(conversationPreview({ ...direct, state: "CLOSED", lastMessage: null })).toBe("Conversation closed");
   });
 
+  it("names photos and files in place of an address, before any words with them", () => {
+    const at = (attachments: ChatLastMessageDto["attachments"], body = "", mine = false): ChatLastMessageDto => ({ seq: 2, kind: "TEXT", body, mine, sender: null, redacted: false, attachments, createdAt: NOW.toISOString() });
+    const preview = (last: ChatLastMessageDto) => conversationPreview({ group: null, state: "ACCEPTED", lastMessage: last });
+    expect(preview(at({ photos: 1, files: 0, fileName: null }))).toBe("Photo");
+    expect(preview(at({ photos: 3, files: 0, fileName: null }))).toBe("3 photos");
+    expect(preview(at({ photos: 0, files: 1, fileName: "Minutes.pdf" }))).toBe("File: Minutes.pdf");
+    expect(preview(at({ photos: 0, files: 2, fileName: "Minutes.pdf" }))).toBe("2 files");
+    expect(preview(at({ photos: 2, files: 1, fileName: "Minutes.pdf" }))).toBe("3 attachments");
+    expect(preview(at({ photos: 1, files: 0, fileName: null }, "From the reunion"))).toBe("Photo · From the reunion");
+    expect(preview(at({ photos: 1, files: 0, fileName: null }, "", true))).toBe("You: Photo");
+    expect(preview(at({ photos: 0, files: 1, fileName: "Minutes.pdf" }, "For Friday", true))).toBe("You: File: Minutes.pdf · For Friday");
+    // Removed: the words and the files go together, and a request still shows nothing of either.
+    expect(preview({ ...at(null), body: null })).toBe("This message was removed");
+    expect(preview({ ...at({ photos: 1, files: 0, fileName: null }), body: null })).toBe("This message was removed");
+    expect(conversationPreview({ group: null, state: "REQUEST_RECEIVED", lastMessage: at({ photos: 1, files: 0, fileName: null }) })).toBe("Wants to send you a message");
+  });
+
   describe("in a group", () => {
     const group: ChatConversationGroupDto = { name: "Weekend runners", visibility: "OPEN", memberCount: 3, archived: false, isOwner: false };
     const priya = { id: "m-priya", fullName: "Priya Sharma", avatarUrl: null, startYear: 2010, batchYear: 2014 };
-    const last = (overrides: Partial<ChatLastMessageDto>): ChatLastMessageDto => ({ seq: 4, kind: "TEXT", body: "See you at seven", mine: false, sender: priya, redacted: false, createdAt: NOW.toISOString(), ...overrides });
+    const last = (overrides: Partial<ChatLastMessageDto>): ChatLastMessageDto => ({ seq: 4, kind: "TEXT", body: "See you at seven", mine: false, sender: priya, redacted: false, attachments: null, createdAt: NOW.toISOString(), ...overrides });
     const preview = (overrides: Partial<ChatLastMessageDto>) => conversationPreview({ state: "ACCEPTED", group, lastMessage: last(overrides) });
 
     it("says who wrote it, and You for the member's own", () => {
@@ -151,6 +168,16 @@ describe("thread labels shared by both apps", () => {
       expect(line("is now the group's owner", false)).toBe("Priya Sharma is now the group's owner");
       expect(line("was removed from the group", false, null)).toBe(`${DELETED_MEMBER_NAME} was removed from the group`);
       expect(line("joined the group", false, null, true)).toBe(`${BLOCKED_MEMBER_NAME} joined the group`);
+    });
+
+    it("says who sent photos and files, with their words after", () => {
+      const photo = { photos: 1, files: 0, fileName: null };
+      expect(preview({ attachments: photo, body: "" })).toBe("Priya Sharma: Photo");
+      expect(preview({ attachments: photo, body: "Sunday's run", mine: true })).toBe("You: Photo · Sunday's run");
+      expect(preview({ attachments: { photos: 0, files: 1, fileName: "Route.pdf" }, body: "" })).toBe("Priya Sharma: File: Route.pdf");
+      expect(preview({ attachments: null, body: null })).toBe("This message was removed");
+      // A blocked member's photos read as nothing at all: the API sends no summary, and the preview never looks for one.
+      expect(preview({ sender: null, body: null, redacted: true, attachments: photo })).toBe("Message from a blocked member");
     });
 
     it("never shows a blocked member's words or name", () => {
@@ -190,6 +217,19 @@ describe("thread labels shared by both apps", () => {
 describe("chatKeys.direct", () => {
   it("sits under the tenant's keys, so a tenant-wide invalidation reaches it", () => {
     expect(chatKeys.direct("demo", "m1").slice(0, 2)).toEqual(chatKeys.all("demo"));
+  });
+});
+
+describe("chatKeys.attachmentLinks", () => {
+  it("is one key for one set of messages, in any order, under the conversation's links", () => {
+    expect(chatKeys.attachmentLinks("demo", "c1", ["m2", "m1"])).toEqual(chatKeys.attachmentLinks("demo", "c1", ["m1", "m2"]));
+    expect(chatKeys.attachmentLinks("demo", "c1", ["m1"]).slice(0, 4)).toEqual(chatKeys.attachments("demo", "c1"));
+    // Signing out drops everything under "chat"; reading a thread's messages again leaves the links alone.
+    expect(chatKeys.attachments("demo", "c1").slice(0, 2)).toEqual(chatKeys.all("demo"));
+    expect(chatKeys.attachments("demo", "c1").slice(0, 3)).not.toEqual(chatKeys.threads("demo"));
+    const ids = ["m2", "m1"];
+    chatKeys.attachmentLinks("demo", "c1", ids);
+    expect(ids).toEqual(["m2", "m1"]);
   });
 });
 

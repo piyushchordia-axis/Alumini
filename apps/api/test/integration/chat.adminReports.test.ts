@@ -14,6 +14,7 @@ import { refusingAuditWhere as refuseAuditWhere, untilSomeoneSleeps, untilSomeon
 import { auth, createMembership, createTenant, createUser, loginAs, memberSession } from "../helpers/factories";
 import { askMentor, mentorshipApi, offerToMentor } from "../helpers/mentorship";
 import { askForReferral, postReferralJob, referralsApi } from "../helpers/referrals";
+import { testPng } from "../helpers/images";
 import { CapturingRealtime } from "../helpers/realtimeHarness";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
@@ -22,6 +23,9 @@ const dbAvailable = await isDatabaseAvailable();
 const SECRET = "A sentence that only an audited view may show 7Q4X";
 const DETAILS = "The reporter's words, which may quote the sentence";
 const NOTE = "Please keep it civil";
+const EVIDENCE = "Evidence of it 3KQ.pdf";
+const PDF = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n", "latin1");
+const PNG = await testPng(32, 24);
 
 type Headers = Pick<Session, "headers">;
 type MemberOptions = Parameters<typeof memberSession>[2];
@@ -183,14 +187,51 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
       ]);
       expect(view.messages.map((m) => m.sender?.fullName)).toEqual(["Reporter Rao", "Reported Roy"]);
       // Nothing about the row beyond what's shown. A seq would give away the thread's length, and its gaps what was withheld.
-      expect(Object.keys(view.messages[0]!).sort()).toEqual(["body", "createdAt", "id", "isTarget", "kind", "removed", "sender"]);
+      expect(Object.keys(view.messages[0]!).sort()).toEqual(["attachments", "body", "createdAt", "id", "isTarget", "kind", "removed", "sender"]);
 
       await s.as(s.neutral).view(s.reportId);
       const rows = await auditRows(s.tenant.id, "chat_report.view");
       expect(rows).toHaveLength(2);
       expect(rows[0]).toMatchObject({ actorUserId: s.neutral.user.id, actorMembershipId: s.neutral.membership.id, targetType: "chat_report", targetId: s.reportId });
-      expect(rows[0]!.metadata).toEqual({ access: "tenant_admin", targetKind: "MESSAGE", conversationId: s.conversationId, messageIds: view.messages.map((m) => m.id), messageCount: 2 });
+      expect(rows[0]!.metadata).toEqual({ access: "tenant_admin", targetKind: "MESSAGE", conversationId: s.conversationId, messageIds: view.messages.map((m) => m.id), messageCount: 2, attachmentCount: 0 });
       expectNoWords(rows, SECRET, DETAILS);
+      expect(view.filesExpireAt).toBeNull();
+      expect(view.messages.map((m) => m.attachments)).toEqual([[], []]);
+    });
+
+    it("shows the photos and files with links for fifteen minutes, keeps a removed message's, and counts them in the audit row by number alone", async () => {
+      const s = await scenario();
+      const chat = (m: Session) => chatApi(ctx, s.tenant.slug, m);
+      const photo = await chat(s.reported).attach(s.conversationId, PNG);
+      const pdf = await chat(s.reported).attach(s.conversationId, PDF, { filename: "upload.pdf", contentType: "application/pdf", name: EVIDENCE });
+      const sent = await chat(s.reported).sendWith(s.conversationId, { body: "See these", attachmentIds: [photo.body.data.id, pdf.body.data.id] });
+      expect(sent.status).toBe(201);
+      const filed = await chat(s.reporter).report(sent.body.data.id, { reason: "HARASSMENT" });
+      expect(filed.status).toBe(201);
+
+      const before = Date.now();
+      const view = (await s.as(s.neutral).view(filed.body.data.id)).body.data as AdminChatReportViewDto;
+      const after = Date.now();
+      const target = view.messages.find((m) => m.isTarget)!;
+      expect(target.attachments.map((a) => [a.id, a.kind, a.name, a.thumbUrl === null])).toEqual([
+        [photo.body.data.id, "PHOTO", null, false],
+        [pdf.body.data.id, "FILE", EVIDENCE, true],
+      ]);
+      expect(view.messages.filter((m) => !m.isTarget).map((m) => m.attachments)).toEqual([[], []]);
+      expect(Date.parse(view.filesExpireAt!)).toBeGreaterThan(before + 898_000);
+      expect(Date.parse(view.filesExpireAt!)).toBeLessThanOrEqual(after + 900_000);
+      for (const a of target.attachments) for (const url of [a.url, a.downloadUrl]) expect((await api().get(new URL(url).pathname).buffer(true)).status).toBe(200);
+
+      const rows = await auditRows(s.tenant.id, "chat_report.view");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.metadata).toMatchObject({ messageCount: 3, attachmentCount: 2 });
+      expectNoWords(rows, EVIDENCE, "/files/");
+
+      // Removed: members have nothing left to open, and the audited view still shows what was reported.
+      expect((await s.as(s.neutral).resolve(filed.body.data.id, { action: "REMOVE_MESSAGE" })).status).toBe(200);
+      expect((await chat(s.reporter).links(s.conversationId, [sent.body.data.id])).body.data.links).toEqual([]);
+      const again = (await s.as(s.neutral).view(filed.body.data.id)).body.data as AdminChatReportViewDto;
+      expect(again.messages.find((m) => m.isTarget)).toMatchObject({ removed: true, attachments: [expect.objectContaining({ kind: "PHOTO" }), expect.objectContaining({ name: EVIDENCE })] });
     });
 
     it("fails closed: if the audit row can't be written, the answer is an error with no text, and nothing is logged of it", async () => {
@@ -1004,7 +1045,7 @@ describe.skipIf(!dbAvailable)("admin chat reports", () => {
         expect(view).toMatchObject({ targetKind, noteSnapshot: "The request's own words", messages: [] });
         expectNoWords(view, SECRET);
         const [row] = (await auditRows(s.tenant.id, "chat_report.view")).filter((r) => r.targetId === s.noteId);
-        expect(row!.metadata).toEqual({ access: "tenant_admin", targetKind, conversationId: null, messageIds: [], messageCount: 0 });
+        expect(row!.metadata).toEqual({ access: "tenant_admin", targetKind, conversationId: null, messageIds: [], messageCount: 0, attachmentCount: 0 });
         expectNoWords(row, "The request's own words");
       });
 

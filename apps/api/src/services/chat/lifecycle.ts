@@ -1,8 +1,11 @@
 import type { AppContext } from "../../context";
 import type { Tx } from "../../db/client";
+import { afterCommit } from "../../lib/transaction";
 import { deleteWithheldMessagesOf, limitLockWait, lockConversationsOfMembers, updateConversation } from "../../repositories/chat.repo";
+import { deleteUnsentChatAttachmentsOf, withheldChatAttachmentKeysOf } from "../../repositories/chatAttachments.repo";
 import { suppressInvitesBy } from "../../repositories/chatGroups.repo";
 import { listMembershipsForUser } from "../../repositories/memberships.repo";
+import { removeChatFiles } from "./attachments.service";
 import { emitBadges } from "./chat.service";
 import { chatTenantById } from "./common";
 import { publishChangedTo } from "./fanout";
@@ -14,7 +17,8 @@ import { departForDeletion } from "./groups.service";
  * invitations to them go with their participant rows, and reports survive with null parties. This handles what those can't:
  * pending requests involving them are declined; they leave each group they're in, which passes on any they owned or archives
  * one nobody is left in, and keeps its member count right; invitations they sent stop showing; and their withheld messages,
- * which nobody ever received and nobody can review, are deleted outright.
+ * which nobody ever received and nobody can review, are deleted outright, with their photos and files, as are uploads they
+ * never sent. Those files go once this commits; what they sent stays with its message.
  */
 export async function prepareChatForAccountDeletion(ctx: AppContext, tx: Tx, userId: string): Promise<void> {
   await limitLockWait(tx);
@@ -35,5 +39,9 @@ export async function prepareChatForAccountDeletion(ctx: AppContext, tx: Tx, use
     for (const d of here) await publishChangedTo(ctx, tx, tenant.slug, d.conversationId, [d.membershipId]);
     await emitBadges(ctx, tx, tenant, here.map((d) => d.membershipId));
   }
+  // With every conversation of theirs locked, no send can claim an upload of theirs or withhold another message from under
+  // this. An upload can still be saved meanwhile, so the unsent ones' keys come from the rows the delete took.
+  const fileKeys = [...(await withheldChatAttachmentKeysOf(tx, membershipIds)), ...(await deleteUnsentChatAttachmentsOf(tx, membershipIds))];
   await deleteWithheldMessagesOf(tx, membershipIds);
+  if (fileKeys.length > 0) await afterCommit(ctx, tx, () => removeChatFiles(ctx, fileKeys));
 }

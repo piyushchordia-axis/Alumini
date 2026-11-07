@@ -17,6 +17,7 @@ import {
   upsertLiveMessage,
   type ChatMessagePages,
   type ChatSyncApi,
+  type OutboxAttachment,
   type OutboxEntry,
 } from "@illuminize/shared/chat";
 import { ApiClientError } from "@illuminize/shared/client";
@@ -27,6 +28,10 @@ const CONVERSATION = "c1";
 const SLUG = "demo";
 const ME = "m-me";
 const THEM = "m-them";
+
+function photo(id: string): ChatMessageDto["attachments"][number] {
+  return { id, kind: "PHOTO", name: null, contentType: "image/jpeg", size: 120_000, width: 1200, height: 900 };
+}
 
 function message(seq: number, overrides: Partial<ChatMessageDto> = {}): ChatMessageDto {
   return {
@@ -39,6 +44,7 @@ function message(seq: number, overrides: Partial<ChatMessageDto> = {}): ChatMess
     removed: false,
     redacted: false,
     meta: null,
+    attachments: [],
     clientKey: null,
     createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, seq)).toISOString(),
     ...overrides,
@@ -125,8 +131,10 @@ describe("upsertLiveMessage", () => {
 describe("markLastMessageRemoved", () => {
   const conversation = { id: CONVERSATION, lastMessage: { seq: 5, body: "The words", mine: false, createdAt: "2026-01-01T00:00:00.000Z" } } as ChatConversationDto;
 
-  it("clears the preview when it's of the removed message", () => {
-    expect(markLastMessageRemoved(conversation, 5)!.lastMessage).toEqual({ ...conversation.lastMessage, body: null });
+  it("clears the preview when it's of the removed message, its photos and files with its words", () => {
+    expect(markLastMessageRemoved(conversation, 5)!.lastMessage).toEqual({ ...conversation.lastMessage, body: null, attachments: null });
+    const withPhoto = { ...conversation, lastMessage: { ...conversation.lastMessage!, attachments: { photos: 1, files: 0, fileName: null } } };
+    expect(markLastMessageRemoved(withPhoto, 5)!.lastMessage).toMatchObject({ body: null, attachments: null });
   });
 
   it("leaves a preview of any other message, and what isn't there", () => {
@@ -142,6 +150,14 @@ describe("markMessageRemoved", () => {
     const out = markMessageRemoved(pages([[3, 2]]), "id-2")!;
     expect(out.pages[0]!.data[1]).toMatchObject({ id: "id-2", body: null, removed: true });
     expect(out.pages[0]!.data[0]!.body).toBe("Message 3");
+  });
+
+  it("takes a removed message's photos and files with its words, and leaves the rest's", () => {
+    const data = pages([[3, 2]]);
+    data.pages[0]!.data = data.pages[0]!.data.map((m) => ({ ...m, attachments: [photo(`a-${m.seq}`)] }));
+    const out = markMessageRemoved(data, "id-2")!;
+    expect(out.pages[0]!.data[1]!.attachments).toEqual([]);
+    expect(out.pages[0]!.data[0]!.attachments).toEqual([photo("a-3")]);
   });
 
   it("does nothing for what isn't loaded", () => {
@@ -175,6 +191,7 @@ describe("highestSeq", () => {
 });
 
 const entry = (clientKey: string, overrides: Partial<OutboxEntry> = {}): OutboxEntry => ({ clientKey, conversationId: CONVERSATION, body: `Pending ${clientKey}`, status: "sending", createdAt: "2026-01-02T00:00:00.000Z", ...overrides });
+const outboxPhoto = (id: string): OutboxAttachment => ({ ...photo(id), previewUri: `blob:preview-${id}` });
 
 describe("the outbox", () => {
   it("adds, replaces by key and removes", () => {
@@ -193,9 +210,23 @@ describe("the outbox", () => {
     expect(markOutboxFailed([entry("k1"), entry("k2")], "k1", "Offline", true)[0]).toMatchObject({ status: "failed", error: "Offline", retryable: true });
     expect(markOutboxFailed([entry("k1")], "k1", "Slow down", true, "RATE_LIMITED")[0]).toMatchObject({ code: "RATE_LIMITED" });
   });
+
+  it("keeps an entry's attachments through a failure", () => {
+    const attachments = [outboxPhoto("a1"), outboxPhoto("a2")];
+    expect(markOutboxFailed([entry("k1", { attachments })], "k1", "Offline", true)[0]!.attachments).toEqual(attachments);
+  });
 });
 
 describe("threadItems", () => {
+  it("shows a pending send with photos like any other, until its message arrives", () => {
+    const pending = entry("k1", { body: "", attachments: [outboxPhoto("a1")] });
+    expect(threadItems(pages([[1]]), [pending]).map((i) => i.key)).toEqual(["id-1", "k1"]);
+    expect(threadItems(pages([[1]]), [pending]).at(-1)!.pending!.attachments).toEqual([outboxPhoto("a1")]);
+    const arrived = { pages: [{ data: [message(2, { body: "", clientKey: "k1", attachments: [photo("a1")] }), message(1)], nextCursor: null }], pageParams: [undefined] };
+    expect(threadItems(arrived, [pending]).map((i) => i.key)).toEqual(["id-1", "k1"]);
+    expect(threadItems(arrived, [pending]).at(-1)!.pending).toBeNull();
+  });
+
   it("runs oldest first, with what's unconfirmed last", () => {
     const items = threadItems(pages([[5, 4], [3]]), [entry("k1")]);
     expect(items.map((i) => i.message?.seq ?? i.pending?.clientKey)).toEqual([3, 4, 5, "k1"]);
@@ -287,7 +318,7 @@ describe("createChatSync", () => {
     };
   }
 
-  function setup(opts: { active?: { slug: string; conversationId: string | null } | null; api?: Partial<ChatSyncApi> } = {}) {
+  function setup(opts: { active?: { slug: string; conversationId: string | null } | null; api?: Partial<ChatSyncApi>; onOutboxRelease?: (entry: OutboxEntry) => void } = {}) {
     const qc = new QueryClient();
     const realtime = fakeRealtime();
     const api = {
@@ -297,7 +328,7 @@ describe("createChatSync", () => {
     } as { messages: ReturnType<typeof vi.fn<ChatSyncApi["messages"]>>; send: ReturnType<typeof vi.fn<ChatSyncApi["send"]>> };
     const active = "active" in opts ? opts.active : { slug: SLUG, conversationId: CONVERSATION };
     const state = { active };
-    const sync = createChatSync({ realtime: realtime as never, api, queryClient: qc, getActive: () => state.active ?? null });
+    const sync = createChatSync({ realtime: realtime as never, api, queryClient: qc, getActive: () => state.active ?? null, onOutboxRelease: opts.onOutboxRelease });
     const stop = sync.attach();
     const key = chatKeys.messages(SLUG, CONVERSATION);
     return {
@@ -998,6 +1029,101 @@ describe("createChatSync", () => {
       s.qc.setQueryData(s.key, undefined);
       await s.sync.send(SLUG, CONVERSATION, "Hello", "client-key-1");
       expect(s.data()).toBeUndefined();
+    });
+  });
+
+  describe("sending photos and files", () => {
+    const attachments = [outboxPhoto("a1"), outboxPhoto("a2")];
+
+    it("names the uploads in the send, in order, and shows them in the outbox until it's confirmed", async () => {
+      let answer!: (m: ChatMessageDto) => void;
+      const send = vi.fn<ChatSyncApi["send"]>(() => new Promise<ChatMessageDto>((resolve) => (answer = resolve)));
+      const s = setup({ api: { send } });
+      s.load(pages([[1]]));
+      const sending = s.sync.send(SLUG, CONVERSATION, "", "client-key-1", attachments);
+      expect(send).toHaveBeenCalledWith(SLUG, CONVERSATION, { body: "", clientKey: "client-key-1", attachmentIds: ["a1", "a2"] }, { signal: expect.any(AbortSignal) });
+      expect(s.outbox()).toEqual([expect.objectContaining({ clientKey: "client-key-1", attachments, status: "sending" })]);
+      answer(message(2, { body: "", clientKey: "client-key-1", attachments: [photo("a1"), photo("a2")] }));
+      await sending;
+      expect(s.outbox()).toEqual([]);
+      expect(s.data()!.pages[0]!.data[0]!.attachments.map((a) => a.id)).toEqual(["a1", "a2"]);
+    });
+
+    it("sends words alone without naming any uploads, as before there were any", async () => {
+      const s = setup();
+      s.load(pages([[1]]));
+      await s.sync.send(SLUG, CONVERSATION, "Hello", "client-key-1", []);
+      expect(s.api.send.mock.calls[0]![2]).toEqual({ body: "Hello", clientKey: "client-key-1" });
+      expect(s.api.send.mock.calls[0]![2]).not.toHaveProperty("attachmentIds");
+      expect(s.outbox()).toEqual([]);
+    });
+
+    it("tries a failed send again with the same uploads, under its own key", async () => {
+      const send = vi.fn<ChatSyncApi["send"]>().mockRejectedValueOnce(new ApiClientError(0, "NETWORK_ERROR", "Offline")).mockImplementation(async (_s, _i, input) => message(2, { body: input.body, clientKey: input.clientKey }));
+      const s = setup({ api: { send } });
+      s.load(pages([[1]]));
+      expect(await s.sync.send(SLUG, CONVERSATION, "Here you go", "client-key-1", attachments)).toBeNull();
+      expect(s.outbox()).toEqual([expect.objectContaining({ status: "failed", attachments })]);
+      await s.sync.retry(SLUG, CONVERSATION, "client-key-1");
+      expect(send.mock.calls.map((c) => c[2])).toEqual([
+        { body: "Here you go", clientKey: "client-key-1", attachmentIds: ["a1", "a2"] },
+        { body: "Here you go", clientKey: "client-key-1", attachmentIds: ["a1", "a2"] },
+      ]);
+    });
+
+    it("lets go of an entry once, when its message arrives, whichever of the response and the echo comes first", async () => {
+      const released: OutboxEntry[] = [];
+      let answer!: (m: ChatMessageDto) => void;
+      const s = setup({ api: { send: vi.fn(() => new Promise<ChatMessageDto>((resolve) => (answer = resolve))) }, onOutboxRelease: (e) => released.push(e) });
+      s.load(pages([[1]]));
+      const delivered = message(2, { body: "", clientKey: "client-key-1", attachments: [photo("a1")] });
+      const sending = s.sync.send(SLUG, CONVERSATION, "", "client-key-1", [outboxPhoto("a1")]);
+      expect(released).toEqual([]);
+      s.live(delivered);
+      expect(released).toEqual([expect.objectContaining({ clientKey: "client-key-1", attachments: [outboxPhoto("a1")] })]);
+      answer(delivered);
+      await sending;
+      s.live(delivered);
+      expect(released).toHaveLength(1);
+    });
+
+    it("holds on to a failed entry's uploads, and lets go when it's discarded, unless the screen takes them back", async () => {
+      const released: string[] = [];
+      const send = vi.fn<ChatSyncApi["send"]>().mockRejectedValue(new ApiClientError(429, "RATE_LIMITED", "Too many requests"));
+      const s = setup({ api: { send }, onOutboxRelease: (e) => released.push(e.clientKey) });
+      s.load(pages([[1]]));
+      await s.sync.send(SLUG, CONVERSATION, "", "client-key-1", attachments);
+      await s.sync.send(SLUG, CONVERSATION, "", "client-key-2", attachments);
+      expect(released).toEqual([]);
+      s.sync.discard(SLUG, CONVERSATION, "client-key-1");
+      expect(released).toEqual(["client-key-1"]);
+      // Put back in the composer: the uploads are the screen's again, not to be let go.
+      s.sync.discard(SLUG, CONVERSATION, "client-key-2", { release: false });
+      expect(released).toEqual(["client-key-1"]);
+      expect(s.outbox()).toEqual([]);
+      // Nothing left to let go of.
+      s.sync.discard(SLUG, CONVERSATION, "client-key-1");
+      expect(released).toEqual(["client-key-1"]);
+    });
+
+    it("settles a message even when letting go of its entry fails", async () => {
+      const s = setup({
+        onOutboxRelease: () => {
+          throw new Error("The preview was already gone");
+        },
+      });
+      s.load(pages([[1]]));
+      expect(await s.sync.send(SLUG, CONVERSATION, "", "client-key-1", attachments)).toMatchObject({ clientKey: "client-key-1" });
+      expect(s.outbox()).toEqual([]);
+      expect(seqs(s.data())).toEqual([[100, 1]]);
+    });
+
+    it("never brings back a removed message's photos, from a copy read before the removal", () => {
+      const s = setup();
+      s.load(pages([[2]]));
+      s.realtime.fire("chat:removed", { tenantSlug: SLUG, conversationId: CONVERSATION, messageId: "id-3", seq: 3 });
+      s.live(message(3, { attachments: [photo("a1")] }));
+      expect(s.data()!.pages[0]!.data[0]).toMatchObject({ id: "id-3", body: null, removed: true, attachments: [] });
     });
   });
 });

@@ -445,6 +445,9 @@ try {
     await expectChoiceLook(row("Business directory"), "input", "the ticked Business directory switch", { checked: true, tile: false, tones: BRAND_TONES.demoCollege });
     if (!(await page.locator('label:has-text("Messaging") input').isChecked())) throw new Error("the Messaging switch should start on outside schools");
     if (!(await page.locator('label:has-text("Groups") input').isChecked())) throw new Error("the Groups switch should start on outside schools");
+    // Chat attachments is a switch like the rest, on by default, with its line under them.
+    if (!(await row("Chat attachments").locator("input").isChecked())) throw new Error("the Chat attachments switch should start on");
+    await page.getByText("Chat attachments lets members send photos and PDF files in messages and groups. It does nothing while Messaging and Groups are both off. Turning it off stops new ones; photos and files already sent stay.", { exact: true }).waitFor();
     sentFeatures(await save(), undefined);
     await page.waitForSelector("text=Settings saved");
 
@@ -1303,6 +1306,9 @@ try {
     const mentorship = page.locator('label:has-text("Mentorship") input');
     if ((await mentorship.isChecked()) || !(await mentorship.isDisabled())) throw new Error("the Mentorship switch should start off at a school, and wait for Messaging");
     await page.getByText("Needs Messaging", { exact: true }).waitFor();
+    // Chat attachments starts on at a school too: it does nothing until Messaging or Groups is on.
+    const attachments = page.getByRole("checkbox", { name: "Chat attachments", exact: true });
+    if (!(await attachments.isChecked()) || (await attachments.isDisabled())) throw new Error("the Chat attachments switch should start on at a school, and wait for nothing");
     await page.waitForSelector("text=Messaging, Groups and Mentorship start off for schools");
     await page.waitForSelector("text=current pupils still can't use them");
     await shot("p05b-school-settings");

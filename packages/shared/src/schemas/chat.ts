@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  CHAT_ATTACHMENT_LINKS_PER_CALL,
+  CHAT_ATTACHMENTS_PER_MESSAGE,
+  CHAT_FILE_MAX_BYTES,
   CHAT_GROUP_DESCRIPTION_MAX_LENGTH,
   CHAT_GROUP_INVITES_PER_CALL,
   CHAT_GROUP_NAME_MAX_LENGTH,
@@ -34,11 +37,64 @@ export const chatMessageBodySchema = z
   .transform(stripControlCharacters)
   .pipe(z.string().min(1, "Write a message").max(CHAT_MESSAGE_MAX_LENGTH).regex(VISIBLE_CHARACTER, "Write a message"));
 
-export const chatMessageCreateSchema = z.object({ body: chatMessageBodySchema, clientKey: chatClientKeySchema });
+/** What the apps say about a file that is neither a photo the server takes nor a PDF. */
+export const CHAT_ATTACHMENT_TYPE_PROBLEM = "Choose a photo (JPEG, PNG or WebP) or a PDF.";
+/** What the apps, and the server for a file over the limit, say about a PDF that is too big. */
+export const CHAT_FILE_SIZE_PROBLEM = `Choose a PDF under ${Math.round(CHAT_FILE_MAX_BYTES / (1024 * 1024))} MB.`;
+/** Said when a message already holds as many photos and files as it may, and by the API for a send naming more. */
+export const CHAT_ATTACHMENT_LIMIT_TEXT = `You can add up to ${CHAT_ATTACHMENTS_PER_MESSAGE} photos or files to a message.`;
+/** The API's refusal of an upload or a send with attachments while the institution's Chat attachments switch is off. */
+export const CHAT_ATTACHMENTS_OFF_TEXT = "Photos and files in chat are turned off for this institution.";
+/**
+ * The API's refusal of photos and files in a direct thread that isn't accepted (CHAT_ATTACHMENTS_NOT_YET). The same words
+ * whether the request is waiting, declined or met by a block, which a requester can't tell apart.
+ */
+export const CHAT_ATTACHMENTS_NOT_YET_TEXT = "Photos and files can be sent once your request is accepted.";
+/** The API's refusal of a send naming an upload that is no longer there to claim (CHAT_ATTACHMENT_GONE), with the way out. */
+export const CHAT_ATTACHMENT_GONE_TEXT = "A photo or file in this message is no longer available. Remove it and add it again.";
+
+/**
+ * A message's words beside its photos and files, cleaned as a body is: empty is allowed here, and invisible characters
+ * alone count as empty, so the send's own check decides whether there's anything to send.
+ */
+export const chatMessageCaptionSchema = z
+  .string()
+  .transform(stripControlCharacters)
+  .pipe(z.string().max(CHAT_MESSAGE_MAX_LENGTH))
+  .transform((v) => (VISIBLE_CHARACTER.test(v) ? v : ""));
+
+/** Uploads to this conversation (POST …/attachments) that the message carries, in the order it shows them. */
+export const chatAttachmentIdsSchema = z
+  .array(uuidSchema)
+  .max(CHAT_ATTACHMENTS_PER_MESSAGE, CHAT_ATTACHMENT_LIMIT_TEXT)
+  .refine((ids) => new Set(ids).size === ids.length, "Add each photo or file only once");
+
+/** Words, photos and files, or both: a message needs one or the other. */
+export const chatMessageCreateSchema = z
+  .object({ body: chatMessageCaptionSchema.default(""), clientKey: chatClientKeySchema, attachmentIds: chatAttachmentIdsSchema.default([]) })
+  .refine((v) => v.body !== "" || v.attachmentIds.length > 0, { message: "Write a message", path: ["body"] });
 export type ChatMessageCreateInput = z.input<typeof chatMessageCreateSchema>;
 
-export const chatDirectCreateSchema = chatMessageCreateSchema.extend({ membershipId: uuidSchema });
+/**
+ * A first message to a member, which goes as a request: words only, because photos and files wait until it's accepted.
+ * Its own object, as a refined one can't be extended, and one naming uploads is refused rather than sent without them.
+ */
+export const chatDirectCreateSchema = z.object({
+  body: chatMessageBodySchema,
+  clientKey: chatClientKeySchema,
+  membershipId: uuidSchema,
+  attachmentIds: z.undefined({ error: CHAT_ATTACHMENTS_NOT_YET_TEXT }).optional(),
+});
 export type ChatDirectCreateInput = z.input<typeof chatDirectCreateSchema>;
+
+/** Which messages of a conversation to sign links for (`?messageId=` repeated), up to CHAT_ATTACHMENT_LINKS_PER_CALL. */
+export const chatAttachmentLinksQuerySchema = z.object({
+  messageId: z
+    .union([uuidSchema, z.array(uuidSchema)])
+    .transform((v) => [...new Set(Array.isArray(v) ? v : [v])])
+    .pipe(z.array(uuidSchema).min(1, "Name a message").max(CHAT_ATTACHMENT_LINKS_PER_CALL, `Ask for up to ${CHAT_ATTACHMENT_LINKS_PER_CALL} messages at a time`)),
+});
+export type ChatAttachmentLinksQuery = z.infer<typeof chatAttachmentLinksQuerySchema>;
 
 export const chatConversationsQuerySchema = cursorQuerySchema.extend({ inbox: z.enum(CHAT_INBOXES).default("MAIN") });
 export type ChatConversationsQuery = z.infer<typeof chatConversationsQuerySchema>;

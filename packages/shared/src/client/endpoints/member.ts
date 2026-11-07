@@ -7,6 +7,8 @@ import type {
   EventDto,
   BusinessCardDto,
   BusinessDto,
+  ChatAttachmentDto,
+  ChatAttachmentLinksDto,
   ChatBadgeDto,
   ChatBlockDto,
   ChatConversationDto,
@@ -138,6 +140,9 @@ export function businessEndpoints(core: ApiCore) {
   };
 }
 
+/** A file on the phone, which may read its own bytes: Expo's fetch sends a part that does, and refuses one with only a uri. */
+type ChatNativeFile = NativeFile & { bytes?: () => Uint8Array | Promise<Uint8Array> };
+
 export function chatEndpoints(core: ApiCore) {
   return {
     /** Sends to a member, opening the thread if there isn't one: the first message goes as a request. */
@@ -158,6 +163,29 @@ export function chatEndpoints(core: ApiCore) {
     block: (slug: string, membershipId: string) => core.data<ChatBlockDto>({ method: "POST", path: "/chat/blocks", tenantSlug: slug, body: { membershipId } }),
     unblock: (slug: string, membershipId: string) => core.request<void>({ method: "DELETE", path: `/chat/blocks/${membershipId}`, tenantSlug: slug }),
     report: (slug: string, messageId: string, input: ChatReportCreateInput) => core.data<ChatReportDto>({ method: "POST", path: `/chat/messages/${messageId}/report`, tenantSlug: slug, body: input }),
+    /**
+     * Uploads a prepared photo or a PDF to a conversation, for the message being written to name in `attachmentIds`; one
+     * that no send claims is swept away a day later. `name` is the file's name, sent as a field of its own and before the
+     * file, since the server reads a part's own file name as Latin-1. `signal` cancels it (see startUpload).
+     */
+    attach: (slug: string, id: string, file: Blob | ChatNativeFile, opts: { name?: string; signal?: AbortSignal } = {}) => {
+      const formData = new FormData();
+      const name = opts.name ?? ((typeof Blob !== "undefined" && file instanceof Blob ? (file as File).name : (file as NativeFile).name) || "");
+      if (name) formData.append("name", name);
+      if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, name || "upload");
+      else {
+        const native = file as ChatNativeFile;
+        const part = native.bytes ? { name: native.name, type: native.type, bytes: () => native.bytes!() } : native;
+        formData.append("file", part as unknown as Blob);
+      }
+      return core.data<ChatAttachmentDto>({ method: "POST", path: `/chat/conversations/${id}/attachments`, tenantSlug: slug, formData, signal: opts.signal });
+    },
+    /**
+     * Signed links to the photos and files of some of a conversation's messages (up to CHAT_ATTACHMENT_LINKS_PER_CALL),
+     * leaving out any this member may no longer see. They last minutes: keep them in memory only, never store or log them.
+     */
+    attachmentLinks: (slug: string, id: string, messageIds: readonly string[]) =>
+      core.data<ChatAttachmentLinksDto>({ path: `/chat/conversations/${id}/attachments`, tenantSlug: slug, query: { messageId: [...messageIds] } }),
     groups: {
       /** DISCOVER (open groups, searchable by name), MINE or OWNED. */
       list: (slug: string, query?: Partial<ChatGroupsQuery>) => core.request<CursorPage<ChatGroupDto>>({ path: "/chat/groups", tenantSlug: slug, query: q(query) }),

@@ -1,6 +1,6 @@
 import type { ChatConversationDto, ChatGroupReviewDto } from "@illuminize/shared";
 import { ERROR_CODES } from "@illuminize/shared";
-import { firstMessageNotice, formatRerequestAt, REREQUEST_RECHECK_MS, rerequestDrawAt, rerequestOpenedText, rerequestRefetchIn, sendLimitNotice, threadFooter, watchRerequest, type ThreadFooter } from "@illuminize/shared/chat";
+import { CHAT_ATTACHMENTS_OFF_CAPTION, composerAttachCaption, firstMessageNotice, formatRerequestAt, REREQUEST_RECHECK_MS, rerequestDrawAt, rerequestOpenedText, rerequestRefetchIn, sendLimitNotice, threadFooter, watchRerequest, type ThreadFooter } from "@illuminize/shared/chat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("sendLimitNotice", () => {
@@ -28,15 +28,16 @@ const later = (ms: number) => new Date(NOW.getTime() + ms).toISOString();
 const time = (iso: string) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 const weekday = (iso: string) => new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(iso));
 
-type Thread = Pick<ChatConversationDto, "group" | "peer" | "blockedByMe" | "state" | "canSend" | "canRerequestAt">;
+type Thread = Pick<ChatConversationDto, "group" | "peer" | "blockedByMe" | "state" | "canSend" | "canAttach" | "canRerequestAt">;
 const peer = { id: "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81", fullName: "Priya Sharma", avatarUrl: null, startYear: 2010, batchYear: 2014 };
-const direct = (over: Partial<Thread> = {}): Thread => ({ group: null, peer, blockedByMe: false, state: "REQUEST_SENT", canSend: false, canRerequestAt: later(20 * DAY), ...over });
+const direct = (over: Partial<Thread> = {}): Thread => ({ group: null, peer, blockedByMe: false, state: "REQUEST_SENT", canSend: false, canAttach: false, canRerequestAt: later(20 * DAY), ...over });
 const groupThread = (over: Partial<NonNullable<Thread["group"]>> = {}, canSend = false): Thread => ({
   group: { name: "Weekend runners", visibility: "OPEN", memberCount: 3, archived: false, isOwner: true, ...over },
   peer: null,
   blockedByMe: false,
   state: "ACCEPTED",
   canSend,
+  canAttach: canSend,
   canRerequestAt: null,
 });
 const review = (moderationStatus: ChatGroupReviewDto["moderationStatus"]) => ({ review: { moderationStatus, moderationNote: null, moderatedAt: null, name: "Weekend runners", description: null, shownToMembers: false } });
@@ -44,7 +45,7 @@ const panel = (title: string, text: string, rest: Partial<Extract<ThreadFooter, 
 
 describe("threadFooter", () => {
   it("gives a group that can send the box with nothing above it, and says why one can't", () => {
-    expect(threadFooter(groupThread({}, true), NOW)).toEqual({ kind: "composer", intro: null });
+    expect(threadFooter(groupThread({}, true), NOW)).toEqual({ kind: "composer", intro: null, attachCaption: null });
     expect(threadFooter(groupThread({ archived: true }), NOW, review("APPROVED"))).toEqual(panel("This group has been archived", "You can read it, but nobody can send messages in it any more."));
     expect(threadFooter(groupThread(), NOW, review("PENDING"))).toEqual(panel("Waiting for an admin to approve this group", "Nobody else can see it yet. Messages can be sent once it's approved."));
     expect(threadFooter(groupThread(), NOW, review("REJECTED"))).toEqual(
@@ -68,7 +69,7 @@ describe("threadFooter", () => {
       panel("Priya Sharma wants to send you a message", "Accept to reply. If you decline, they won't be told.", { action: "ANSWER_REQUEST" }),
     );
     expect(threadFooter(direct({ state: "REQUEST_DECLINED", canSend: true, canRerequestAt: null }), NOW)).toEqual(panel("You declined this request", "Priya Sharma hasn't been told.", { action: "ACCEPT_DECLINED" }));
-    expect(threadFooter(direct({ state: "ACCEPTED", canSend: true, canRerequestAt: null }), NOW)).toEqual({ kind: "composer", intro: null });
+    expect(threadFooter(direct({ state: "ACCEPTED", canSend: true, canAttach: true, canRerequestAt: null }), NOW)).toEqual({ kind: "composer", intro: null, attachCaption: null });
     expect(threadFooter(direct({ state: "ACCEPTED", canSend: false, canRerequestAt: null }), NOW)).toEqual(panel("You can't message Priya Sharma right now", "You can still read the conversation."));
   });
 
@@ -79,7 +80,11 @@ describe("threadFooter", () => {
     );
     // Its requests used up, or the date gone by while the answer still can't send (a clock ahead of the server's): no line.
     for (const canRerequestAt of [null, later(-1000), NOW.toISOString()]) expect(threadFooter(direct({ canRerequestAt }), NOW)).toEqual(panel("Request sent", "You can send more once Priya Sharma accepts."));
-    expect(threadFooter(direct({ canSend: true, canRerequestAt: later(-DAY) }), NOW)).toEqual({ kind: "composer", intro: "Your next message asks Priya Sharma again, as a new request." });
+    expect(threadFooter(direct({ canSend: true, canRerequestAt: later(-DAY) }), NOW)).toEqual({
+      kind: "composer",
+      intro: "Your next message asks Priya Sharma again, as a new request.",
+      attachCaption: "Photos and files can be sent once Priya Sharma accepts.",
+    });
   });
 
   it("gives a closed thread the date it can be asked again from, or says it's read-only once its requests are used up", () => {
@@ -94,6 +99,7 @@ describe("threadFooter", () => {
     expect(threadFooter(direct({ state: "CLOSED", canSend: true, canRerequestAt: later(-HOUR) }), NOW)).toEqual({
       kind: "composer",
       intro: "This conversation has closed. Sending a message asks Priya Sharma to chat again.",
+      attachCaption: "Photos and files can be sent once Priya Sharma accepts.",
     });
   });
 
@@ -112,7 +118,43 @@ describe("threadFooter", () => {
       said.push(rerequestOpenedText(direct({ state })));
     }
     said.push(firstMessageNotice("Priya Sharma"), firstMessageNotice(null));
+    for (const chatAttachments of [true, false]) said.push(composerAttachCaption(null, { chatAttachments }, "Priya Sharma"), composerAttachCaption(null, { chatAttachments }, null));
+    // The words are there to be checked: a waiting request's composer says when photos and files can be sent.
+    expect(JSON.stringify(said)).toContain("Photos and files can be sent once");
     expect(JSON.stringify(said)).not.toMatch(/declin|block|reject|ignor|refus|turned down|unavailable/i);
+  });
+
+  it("gives the box a caption where photos and files can't be added, and none where they can", () => {
+    const off = { chatAttachments: false };
+    const on = { chatAttachments: true };
+    const footer = (c: Thread, features?: { chatAttachments: boolean }) => threadFooter(c, NOW, null, features);
+    const caption = (f: ThreadFooter) => (f.kind === "composer" ? f.attachCaption : "<panel>");
+    // A chat or a group that can attach: the button, no caption, whatever the features say.
+    expect(caption(footer(direct({ state: "ACCEPTED", canSend: true, canAttach: true, canRerequestAt: null }), on))).toBeNull();
+    expect(caption(footer(groupThread({}, true)))).toBeNull();
+    // One that can send but not attach can only have the switch off.
+    expect(caption(footer(direct({ state: "ACCEPTED", canSend: true, canAttach: false, canRerequestAt: null })))).toBe(CHAT_ATTACHMENTS_OFF_CAPTION);
+    expect(caption(footer({ ...groupThread({}, true), canAttach: false }))).toBe(CHAT_ATTACHMENTS_OFF_CAPTION);
+    // Asking again waits for an answer, unless the switch is known to be off, which is the better reason.
+    for (const state of ["REQUEST_SENT", "CLOSED"] as const) {
+      const asking = direct({ state, canSend: true, canRerequestAt: later(-HOUR) });
+      expect(caption(footer(asking))).toBe("Photos and files can be sent once Priya Sharma accepts.");
+      expect(caption(footer(asking, on))).toBe("Photos and files can be sent once Priya Sharma accepts.");
+      expect(caption(footer(asking, off))).toBe(CHAT_ATTACHMENTS_OFF_CAPTION);
+    }
+    expect(CHAT_ATTACHMENTS_OFF_CAPTION).toBe("Photos and files are turned off for this institution.");
+  });
+});
+
+describe("composerAttachCaption", () => {
+  it("says a first message waits for an answer, by name, or the switch when it's known to be off", () => {
+    expect(composerAttachCaption(null, null, "Priya Sharma")).toBe("Photos and files can be sent once Priya Sharma accepts.");
+    expect(composerAttachCaption(null, { chatAttachments: true }, null)).toBe("Photos and files can be sent once this member accepts.");
+    expect(composerAttachCaption(null, { chatAttachments: false }, "Priya Sharma")).toBe(CHAT_ATTACHMENTS_OFF_CAPTION);
+  });
+
+  it("is never there when the thread can attach, even on features read before the switch came on", () => {
+    expect(composerAttachCaption({ group: null, state: "ACCEPTED", canAttach: true }, { chatAttachments: false }, "Priya Sharma")).toBeNull();
   });
 });
 

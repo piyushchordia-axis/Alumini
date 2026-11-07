@@ -74,6 +74,7 @@ describe("emptyThreadText", () => {
     group: null,
     state: "ACCEPTED",
     canSend: true,
+    canAttach: true,
     canRerequestAt: null,
     blockedByMe: false,
     unread: 0,

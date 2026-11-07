@@ -50,7 +50,7 @@ function metadataKeys(api: string): Set<string> {
  * never go into metadata (CLAUDE.md), and a phone number given as a value is dropped under any key.
  */
 const SHOWN_KEYS = new Set([
-  ...["access", "action", "adminIds", "adminOf", "amountMinor", "attempted", "billingModel", "changes", "channels", "clearedDegrees"],
+  ...["access", "action", "adminIds", "adminOf", "amountMinor", "attachmentCount", "attempted", "billingModel", "changes", "channels", "clearedDegrees"],
   ...["closedPlans", "contentId", "contentType", "conversationId", "count", "created", "customFields", "effectiveFrom", "fields"],
   ...["force", "forcedOff", "from", "heldSuspensions", "institutions", "invitationId", "job", "key", "membershipIds", "memberships"],
   ...["messageCount", "messageIds", "note", "period", "periodEnd", "periodStart", "reason", "reportId", "role", "rows", "scope"],

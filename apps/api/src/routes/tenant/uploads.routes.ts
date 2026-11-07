@@ -4,6 +4,7 @@ import multer from "multer";
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { byUser, rateLimit } from "../../middleware/rateLimit";
+import { tenantDailyQuota } from "../../middleware/tenantQuota";
 import { ok, route } from "../../middleware/validate";
 import { keys } from "../../redis/keys";
 import { findMyInvitation } from "../../services/invitations.service";
@@ -48,25 +49,6 @@ function canUpload(ctx: AppContext): RequestHandler {
   };
 }
 
-/** Per-institution daily cap across all its members. */
-function tenantDailyQuota(ctx: AppContext): RequestHandler {
-  return async (req, _res, next) => {
-    try {
-      const day = new Date().toISOString().slice(0, 10);
-      const key = keys.uploadsDay(req.tenantCtx!.tenant.id, day);
-      const n = await ctx.redis.incr(key);
-      if (n === 1) await ctx.redis.expire(key, 86_400 + 3600);
-      if (n > ctx.config.UPLOADS_PER_TENANT_DAILY_CAP) {
-        ctx.logger.warn({ tenantId: req.tenantCtx!.tenant.id, n }, "Tenant upload quota reached");
-        return next(AppError.rateLimited(3600, "This institution has reached today's upload limit. Please try again tomorrow."));
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
-}
-
 /**
  * Checks `?purpose=` before anything is counted or the file is read, so a request the handler would refuse (a client
  * newer than this API, say) costs neither the member's hourly uploads nor the institution's daily ones.
@@ -83,7 +65,12 @@ export function uploadRoutes(ctx: AppContext): Router {
     canUpload(ctx),
     validQuery,
     rateLimit(ctx, { bucket: "uploads", limit: 20, windowSec: 3600, keyFn: byUser }),
-    tenantDailyQuota(ctx),
+    tenantDailyQuota(ctx, {
+      key: keys.uploadsDay,
+      cap: (config) => config.UPLOADS_PER_TENANT_DAILY_CAP,
+      message: "This institution has reached today's upload limit. Please try again tomorrow.",
+      logMessage: "Tenant upload quota reached",
+    }),
     singleFile,
     route({ query: uploadQuerySchema }, async ({ req, res, query }) => {
       const file = req.file;

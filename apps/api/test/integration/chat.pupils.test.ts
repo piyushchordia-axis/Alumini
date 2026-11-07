@@ -60,7 +60,7 @@ describe.skipIf(!dbAvailable)("current pupils", () => {
         const pupil = await memberSession(ctx, tenant.id, rule.member());
         const id = "4f0f7c1e-2b7a-4d7a-9a3e-2f4d5c6b7a81";
         const api = chatApi(ctx, tenant.slug, pupil);
-        for (const res of [await api.direct(alum.membership.id), await api.list(), await api.list("REQUESTS"), await api.get(id), await api.messages(id), await api.send(id), await api.read(id, 1), await api.mute(id, null), await api.accept(id), await api.decline(id), await api.badge(), await api.blocks(), await api.block(alum.membership.id), await api.unblock(alum.membership.id), await api.report(id)]) {
+        for (const res of [await api.direct(alum.membership.id), await api.list(), await api.list("REQUESTS"), await api.get(id), await api.messages(id), await api.send(id), await api.read(id, 1), await api.mute(id, null), await api.accept(id), await api.decline(id), await api.badge(), await api.blocks(), await api.block(alum.membership.id), await api.unblock(alum.membership.id), await api.report(id), await api.attach(id, Buffer.from("%PDF-1.4"), { filename: "a.pdf", contentType: "application/pdf" }), await api.links(id, [id])]) {
           expect(res.status, res.request.url).toBe(403);
           expect(res.body.error.code, res.request.url).toBe("FEATURE_DISABLED");
           expect(res.headers["cache-control"]).toBe("no-store");

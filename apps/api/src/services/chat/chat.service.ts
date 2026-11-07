@@ -1,5 +1,5 @@
 import type { ChatBadgeDto, ChatConversationDto, ChatConversationsQuery, ChatDirectLookupDto, ChatDirectResultDto, ChatMessageDto, ChatMessagesQuery, CursorPage } from "@illuminize/shared";
-import { enabledGroupVisibilities, isCurrentPupil } from "@illuminize/shared";
+import { enabledGroupVisibilities } from "@illuminize/shared";
 import type { AppContext } from "../../context";
 import type { DbClient, Tx } from "../../db/client";
 import { toChatLastMessageDto, toChatMemberDto, toChatMessageDto } from "../../dto/chat.dto";
@@ -35,30 +35,37 @@ import {
   type ParticipantRow,
   type ThreadRow,
 } from "../../repositories/chat.repo";
+import { summarizeChatAttachments, type ChatAttachmentSummary } from "../../repositories/chatAttachments.repo";
 import { countInvites, lockGroupRow, recordInviteDecline, suppressInvitesFrom } from "../../repositories/chatGroups.repo";
 import { findMembershipById } from "../../repositories/memberships.repo";
-import type { MembershipRow, TenantContext, TenantRow } from "../../types/request";
+import type { MembershipRow, TenantContext } from "../../types/request";
+import { attachmentsByMessage, messageAttachments } from "./attachments.service";
 import {
   asSeenBy,
   assertKindEnabled,
+  assertMaySend,
+  attachmentsNotYet,
+  attachmentsOff,
+  attachmentsOn,
   blockedByYou,
   chatTenantOf,
   contactUnavailable,
   enabledKinds,
   freshChatTenant,
+  groupNotSendable,
   groupSendable,
   inviteCutoff,
   isGroupLive,
   isReachable,
   peerIdOf,
   planSend,
+  planTakesAttachments,
   requestPending,
   threadKindOf,
   threadView,
   toConversationGroupDto,
   unreadOf,
   type ChatTenant,
-  type ChatThreadKind,
 } from "./common";
 import { appendMessage, chatRecipientOf, chatRecipients, GROUP_PUSH_WINDOW, publishChanged, publishChangedTo, queuePushEvent } from "./fanout";
 
@@ -74,8 +81,11 @@ const CHAT_REQUEST_LIMIT = { bucket: "chat-request", limit: 20, windowSec: 24 * 
 const GROUP_SEND_LIMIT = { bucket: "chat-send-group", limit: 120, windowSec: 60 };
 
 interface SendInput {
+  /** Empty for a message of photos and files alone. */
   body: string;
   clientKey: string;
+  /** Uploads to this conversation the message carries, in order: claimed by the send, so each goes in one message only. */
+  attachmentIds?: string[];
 }
 
 /**
@@ -88,24 +98,37 @@ async function redactedSendersFor(db: DbClient, membershipId: string, inGroup: b
 
 const isRedacted = (message: Pick<ChatMessageRow, "senderMembershipId">, redacted: Set<string>) => !!message.senderMembershipId && redacted.has(message.senderMembershipId);
 
-/** What a page of threads needs besides their rows: each one's newest message, and for groups the counts and who's redacted. */
+/**
+ * What a page of threads needs besides their rows: each one's newest message with its photos and files counted, and for
+ * groups the counts and who's redacted.
+ */
 interface ThreadExtras {
   last: Map<string, MessageWithSender>;
+  attachments: Map<string, ChatAttachmentSummary>;
   groupUnread: Map<string, number>;
   redacted: Set<string>;
 }
 
 async function loadExtras(db: DbClient, membershipId: string, rows: ThreadRow[]): Promise<ThreadExtras> {
   const groupIds = rows.filter((r) => r.group).map((r) => r.conversation.id);
+  const last = await findLastVisibleMessages(db, membershipId, rows.map((r) => r.conversation.id));
+  const redacted = await redactedSendersFor(db, membershipId, groupIds.length > 0);
+  // Counted in one query for the page, and only for what a preview may describe. Redaction is a group's alone: a direct
+  // thread's history stays as it was after a block, so its last message keeps its photos and files.
+  const groupIdSet = new Set(groupIds);
+  const described = [...last.entries()]
+    .filter(([conversationId, { message }]) => message.kind === "TEXT" && !message.removedAt && !(groupIdSet.has(conversationId) && isRedacted(message, redacted)))
+    .map(([, row]) => row);
   return {
-    last: await findLastVisibleMessages(db, membershipId, rows.map((r) => r.conversation.id)),
+    last,
+    attachments: await summarizeChatAttachments(db, described.map(({ message }) => message.id)),
     groupUnread: await countGroupUnread(db, membershipId, groupIds),
-    redacted: await redactedSendersFor(db, membershipId, groupIds.length > 0),
+    redacted,
   };
 }
 
 /** A group thread as one of its members sees it. Always ACCEPTED: nobody asks to join a conversation they're already in. */
-function toGroupConversationDto(row: ThreadRow & { group: ChatGroupRow }, extras: ThreadExtras): ChatConversationDto {
+function toGroupConversationDto(tenant: Pick<ChatTenant, "features">, row: ThreadRow & { group: ChatGroupRow }, extras: ThreadExtras): ChatConversationDto {
   const { conversation, participant, group } = row;
   const me = participant.membershipId;
   const last = extras.last.get(conversation.id);
@@ -117,19 +140,20 @@ function toGroupConversationDto(row: ThreadRow & { group: ChatGroupRow }, extras
     group: toConversationGroupDto(group, me),
     state: "ACCEPTED",
     canSend: groupSendable(group),
+    canAttach: groupSendable(group) && attachmentsOn(tenant.features),
     canRerequestAt: null,
     blockedByMe: false,
     unread: extras.groupUnread.get(conversation.id) ?? 0,
     lastReadSeq: Math.min(participant.lastReadSeq, last?.message.seq ?? 0),
     mutedUntil: participant.mutedUntil?.toISOString() ?? null,
     lastMessageAt: conversation.lastMessageAt.toISOString(),
-    lastMessage: last ? toChatLastMessageDto(last.message, last.sender, me, { inGroup: true, redacted: isRedacted(last.message, extras.redacted) }) : null,
+    lastMessage: last ? toChatLastMessageDto(last.message, last.sender, me, { inGroup: true, redacted: isRedacted(last.message, extras.redacted), attachments: extras.attachments.get(last.message.id) ?? null }) : null,
   };
 }
 
-function toConversationDto(tenant: Pick<TenantRow, "type" | "timezone">, row: ThreadRow, extras: ThreadExtras, now: Date): ChatConversationDto {
+function toConversationDto(tenant: Pick<ChatTenant, "type" | "timezone" | "features">, row: ThreadRow, extras: ThreadExtras, now: Date): ChatConversationDto {
   const { conversation, participant, peer, group } = row;
-  if (group) return toGroupConversationDto({ ...row, group }, extras);
+  if (group) return toGroupConversationDto(tenant, { ...row, group }, extras);
   const last = extras.last.get(conversation.id);
   const view = threadView(tenant, row, now);
   // A request shows its text only when opened. A requester's own row stays the same whatever became of their request.
@@ -142,7 +166,7 @@ function toConversationDto(tenant: Pick<TenantRow, "type" | "timezone">, row: Th
     ...view,
     // The stored position can pass what they can see, because unblocking marks withheld rows read, and that would count them.
     lastReadSeq: Math.min(view.lastReadSeq, last?.message.seq ?? 0),
-    lastMessage: showsMessage && last ? toChatLastMessageDto(last.message, last.sender, participant.membershipId, { inGroup: false, redacted: false }) : null,
+    lastMessage: showsMessage && last ? toChatLastMessageDto(last.message, last.sender, participant.membershipId, { inGroup: false, redacted: false, attachments: extras.attachments.get(last.message.id) ?? null }) : null,
   };
 }
 
@@ -199,7 +223,10 @@ export async function listMessages(ctx: AppContext, tenantCtx: TenantContext, ac
   const thread = await loadEnabledThread(ctx.db, tenant, me, id);
   const page = await listThreadMessages(ctx.db, thread.participant, query);
   const redacted = await redactedSendersFor(ctx.db, me, !!thread.group);
-  return { data: page.data.map((r) => toChatMessageDto(r.message, r.sender, me, isRedacted(r.message, redacted))), nextCursor: page.nextCursor };
+  // One query for the page, for the messages whose photos and files this member may see.
+  const described = page.data.filter(({ message }) => message.kind === "TEXT" && !message.removedAt && !isRedacted(message, redacted));
+  const attachments = await attachmentsByMessage(ctx.db, described.map(({ message }) => message.id));
+  return { data: page.data.map((r) => toChatMessageDto(r.message, r.sender, me, isRedacted(r.message, redacted), attachments.get(r.message.id))), nextCursor: page.nextCursor };
 }
 
 /**
@@ -222,6 +249,11 @@ async function sendLocked(ctx: AppContext, tx: Tx, tenant: ChatTenant, actor: Ch
   const seen = asSeenBy(conversation, participant);
   const plan = created ? "REQUEST" : planSend(seen, me, now);
   if (plan === "WAIT") throw requestPending();
+  if (input.attachmentIds?.length) {
+    if (!attachmentsOn(tenant.features)) throw attachmentsOff();
+    // Before the request limit, so a refused send isn't counted as asking. A block by the other member passes, as for words.
+    if (!planTakesAttachments(plan)) throw attachmentsNotYet();
+  }
   if (plan === "REQUEST") await consumeRateLimit(ctx, CHAT_REQUEST_LIMIT, me);
   const requestCount = created || seen.requesterMembershipId !== me ? 1 : seen.requestCount + 1;
   // Someone who replied while blocked already believes it's accepted, so their first message to get through really accepts it.
@@ -244,7 +276,7 @@ async function sendLocked(ctx: AppContext, tx: Tx, tenant: ChatTenant, actor: Ch
     await changeDirectState(tx, conversation.id, { directState: "ACCEPTED" });
   }
 
-  const row = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender: actor.membership, body: input.body, clientKey: input.clientKey, withheld: blocks.byOther, isRequest: plan === "REQUEST" });
+  const row = await appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender: actor.membership, body: input.body, clientKey: input.clientKey, attachmentIds: input.attachmentIds, withheld: blocks.byOther, isRequest: plan === "REQUEST" });
   if (plan === "ACCEPT" || (settlesAcceptance && !blocks.byOther)) await publishChanged(ctx, tx, tenant.slug, conversation.id, { actorMembershipId: me });
   // Asking again uses up the one message, so the asker's other devices must stop offering more. Only theirs, and the same
   // whether or not they're blocked, so it tells them nothing they can't already see.
@@ -260,7 +292,9 @@ async function sendToGroupLocked(ctx: AppContext, tx: Tx, tenant: ChatTenant, ac
   const me = actor.membership.id;
   const original = await findMessageByClientKey(tx, conversation.id, me, input.clientKey);
   if (original) return original;
-  if (!groupSendable(group)) throw AppError.conflict(group.archivedAt ? "This group has been archived, so it's read-only" : "This group can't take messages until an admin approves it");
+  if (!groupSendable(group)) throw groupNotSendable(group);
+  // Before the group's limit, which is everyone's, so a refused send takes none of it.
+  if (input.attachmentIds?.length && !attachmentsOn(tenant.features)) throw attachmentsOff();
   try {
     await consumeRateLimit(ctx, GROUP_SEND_LIMIT, conversation.id);
   } catch (err) {
@@ -268,13 +302,15 @@ async function sendToGroupLocked(ctx: AppContext, tx: Tx, tenant: ChatTenant, ac
     if (err instanceof AppError && err.code === "RATE_LIMITED") throw new AppError(429, "CHAT_GROUP_BUSY", "This group is very busy right now. Try again in a moment.", err.details);
     throw err;
   }
-  return appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender: actor.membership, body: input.body, clientKey: input.clientKey, pushWindow: GROUP_PUSH_WINDOW });
+  return appendMessage(ctx, tx, { tenantSlug: tenant.slug, conversation, sender: actor.membership, body: input.body, clientKey: input.clientKey, attachmentIds: input.attachmentIds, pushWindow: GROUP_PUSH_WINDOW });
 }
 
-/** Checked against the institution as it is now, because the request's copy of it can be minutes old. */
-function assertMaySend(tenant: ChatTenant, actor: ChatActor, kind: ChatThreadKind): void {
-  assertKindEnabled(tenant.features, kind);
-  if (isCurrentPupil(tenant, actor.membership)) throw AppError.forbidden("Chat isn't available to current pupils", "FEATURE_DISABLED");
+/**
+ * The sender's copy of what a send returned, with the photos and files it carries, read once it has committed: a retry
+ * returns the original, which may hold others than this request named.
+ */
+async function sentMessageDto(db: DbClient, message: ChatMessageRow, sender: MembershipRow): Promise<ChatMessageDto> {
+  return toChatMessageDto(message, sender, sender.id, false, await messageAttachments(db, message));
 }
 
 /** Sends to a member, opening the thread if there isn't one. */
@@ -284,7 +320,7 @@ export async function sendDirect(ctx: AppContext, tenantCtx: TenantContext, acto
   const { message, conversationId } = await runInTransaction(ctx, async (tx) => {
     await limitLockWait(tx);
     const tenant = await freshChatTenant(tx, tenantId);
-    assertMaySend(tenant, actor, "DIRECT");
+    assertMaySend(tenant, actor.membership, "DIRECT");
     const target = await findMembershipById(tx, tenantId, input.membershipId);
     if (!target) throw AppError.notFound("Member not found");
     if (target.id === me) throw AppError.badRequest("You can't message yourself");
@@ -299,7 +335,7 @@ export async function sendDirect(ctx: AppContext, tenantCtx: TenantContext, acto
     const participant = (await findParticipant(tx, conversation.id, me))!;
     return { message: await sendLocked(ctx, tx, tenant, actor, { conversation, participant, created }, input), conversationId: conversation.id };
   });
-  return { conversation: await getConversation(ctx, tenantCtx, actor, conversationId), message: toChatMessageDto(message, actor.membership, me) };
+  return { conversation: await getConversation(ctx, tenantCtx, actor, conversationId), message: await sentMessageDto(ctx.db, message, actor.membership) };
 }
 
 export async function sendMessage(ctx: AppContext, tenantCtx: TenantContext, actor: ChatActor, conversationId: string, input: SendInput): Promise<ChatMessageDto> {
@@ -314,11 +350,11 @@ export async function sendMessage(ctx: AppContext, tenantCtx: TenantContext, act
     // A group moderation has hidden is its owner's alone to know of, as on every read.
     if (conversation.kind === "GROUP" && (!group || (!isGroupLive(group) && group.ownerMembershipId !== me))) throw AppError.notFound("Conversation not found");
     const tenant = await freshChatTenant(tx, tenantId);
-    assertMaySend(tenant, actor, threadKindOf(conversation, group));
+    assertMaySend(tenant, actor.membership, threadKindOf(conversation, group));
     if (group) return sendToGroupLocked(ctx, tx, tenant, actor, conversation, group, input);
     return sendLocked(ctx, tx, tenant, actor, { conversation, participant, created: false }, input);
   });
-  return toChatMessageDto(message, actor.membership, me);
+  return sentMessageDto(ctx.db, message, actor.membership);
 }
 
 /**

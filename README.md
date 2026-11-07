@@ -223,8 +223,8 @@ before showing the demo.
 ### Feature switches
 
 Admins switch each member section on or off under **Admin → Settings**: Community feed, Jobs, Funding, Events &
-meetups, Member directory, Business directory, Messaging, Groups and Mentorship. Switching one off hides it and deletes
-nothing. The rules live in `packages/shared/src/lib/features.ts`.
+meetups, Member directory, Business directory, Messaging, Groups, Chat attachments and Mentorship. Switching one off
+hides it and deletes nothing. The rules live in `packages/shared/src/lib/features.ts`.
 
 - **Defaults by type.** Messaging, Groups and Mentorship (`SCHOOL_OFF_FEATURES`) start off for schools, because members
   can contact each other privately there, and on for universities and colleges. Everything else starts on. A school's
@@ -241,11 +241,17 @@ nothing. The rules live in `packages/shared/src/lib/features.ts`.
   Messaging too, because an invite-only group of two is a private chat.
 - **Referrals have no switch.** `referralsEnabled(features)` is Jobs and Messaging together, so a school starts with
   them off.
+- **Chat attachments.** While it's on, members can send photos and PDFs in accepted direct chats and in groups, never
+  in a message request. It starts on everywhere, schools included (where Messaging and Groups start off anyway), and has
+  no prerequisite: it does nothing while Messaging and Groups are both off, which the settings form says. Off, the API
+  refuses new uploads and sends that carry them ("Photos and files in chat are turned off for this institution.", 403
+  `FEATURE_DISABLED`), and a conversation's `canAttach` turns false; words still go, and photos and files already sent
+  stay and still open.
 - **Changed keys only.** The settings form sends only the switches the admin changed, and the API applies them on top
   of what's stored, under a row lock (`applyFeatureChange`), so a stale tab or two admins saving at once can't undo
   each other's change.
-- **Off is immediate where it matters.** Sending a message, opening a chat and chat pushes read the settings fresh,
-  not from the five-minute institution cache.
+- **Off is immediate where it matters.** Sending a message, uploading a chat photo or file, opening a chat and chat
+  pushes read the settings fresh, not from the five-minute institution cache.
 - **Empty lists offer only what's on.** An empty list says what it holds and offers the way on, under the screen's
   own name for it: Write a post, Post a job, Add a business, Plan a gathering, I'm raising or I'm investing, and Create
   group. A search or a filter that found nothing offers to clear it ("Show all …" on Jobs, Businesses and the
@@ -763,9 +769,9 @@ OTP delivery is pluggable (`OTP_PROVIDER`):
 ### Background jobs
 
 Work that can wait (push notifications and Expo receipts, outbound messages, invitations, announcements, celebrations,
-the weekly digest, chat pushes, staff alerts for escalated chat reports and the sweep of unsaved profile and background
-photos) runs on BullMQ queues in Redis: `jobs`, `messages` and `chat`. Code inside a request queues a job; it never calls
-slow providers itself.
+the weekly digest, chat pushes, staff alerts for escalated chat reports, the sweep of unsaved profile and background
+photos and the sweep of chat photos and files never sent) runs on BullMQ queues in Redis: `jobs`, `messages` and
+`chat`. Code inside a request queues a job; it never calls slow providers itself.
 
 - **Where workers run.** `WORKER_MODE=inline` (the default outside production, so `pnpm demo` needs nothing extra)
   runs them inside the API process. In production the default is `separate`: run `pnpm worker` locally, or
@@ -774,6 +780,14 @@ slow providers itself.
   they are queued only once it commits and dropped if it rolls back. ESLint rejects raw `db.transaction(...)`.
 - **Adding a job.** Declare its payload in `src/jobs/definitions.ts` (with attempts and backoff), add a handler to
   `src/jobs/handlers.ts`, and for recurring work an entry in `src/jobs/schedules.ts` (synced when workers start).
+- **Unsent chat files.** A chat photo or PDF is uploaded before its message is sent, and the send claims it. Every hour
+  `chat.sweepAttachments` (schedule `chat-attachments-sweep`, an empty payload) deletes the uploads no send claimed
+  within a day (`CHAT_ATTACHMENT_UNSENT_HOURS`), in batches of 200: each batch's rows go in a transaction and their
+  files leave private storage once it commits, so a failed batch leaves rows and files as they were, never a row
+  pointing at a missing file. It skips uploads a send has locked to claim (`SKIP LOCKED`), and a send that comes after
+  the sweep finds its upload gone (`CHAT_ATTACHMENT_GONE`: "A photo or file in this message is no longer available.
+  Remove it and add it again."). A sent photo or file lasts as long as its message; account deletion removes the
+  member's unsent and withheld ones.
 - **Tests** use an in-memory queue that runs only when a test calls `ctx.jobs.drain()`. The BullMQ tests need a real
   Redis and are skipped without one (CI sets `REQUIRE_REAL_REDIS=1`).
 - **Redis** must keep jobs: use `maxmemory-policy noeviction` and AOF persistence in production.
@@ -1357,10 +1371,16 @@ All responses use `{ data }`, cursor lists `{ data, nextCursor }`, pages `{ data
 | Auth | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all`, `POST /auth/email/verify` |
 | Me | `GET /me`, `GET /me/profile-copy` (`?exclude=<slug>`), `GET/POST/DELETE /me/email`, `POST/DELETE /me/push-tokens`, `POST /me/delete` |
 | Tenant `/t/:slug` | `memberships` (register, me, update, invitation, `me/profile-nudge/dismiss`, `me/welcome/done`, `me/appearance`), `profile-fields`, `uploads` (`?purpose=image\|avatar\|backdrop`), `directory` (+ `filters`, and one member's profile), `jobs` (+ `seekers`, and referral requests: `jobs/:id/referrals`, `jobs/referrals/mine`, `jobs/referrals/summary`, `jobs/referrals/:id/accept/decline/withdraw/report`), `funding`, `businesses`, `posts` (+ comments, reactions, `poll/vote`), `events` (+ rsvp, attendees, cancel), `reports`, `notifications`, `notification-prefs`, `celebrations` (today, wishes), `digest/latest`, `payments` (get, confirm) |
-| Tenant chat `/t/:slug/chat` | `direct` (send a first message; `direct/:membershipId` finds a thread), `conversations` (`?inbox=MAIN\|REQUESTS`; one; `messages` with `?cursor` or `?afterSeq`; send; `read`, `mute`, `accept`, `decline`), `badge`, `blocks` (list, block, unblock), `messages/:id/report`, `groups` (list, create, `invites` for the member's own invitations; per group: get, edit or archive, `members`, `invite-candidates`, `join`, `leave`, `invites` to invite, `invites/accept`, `invites/decline`, `members/:membershipId` to remove) |
+| Tenant chat `/t/:slug/chat` | `direct` (send a first message; `direct/:membershipId` finds a thread), `conversations` (`?inbox=MAIN\|REQUESTS`; one; `messages` with `?cursor` or `?afterSeq`; send, with up to 4 `attachmentIds`; `attachments`: POST uploads one photo or PDF as multipart `file` with its name in a UTF-8 `name` field, GET signs links for `?messageId=` repeated, up to 50; `read`, `mute`, `accept`, `decline`), `badge`, `blocks` (list, block, unblock), `messages/:id/report`, `groups` (list, create, `invites` for the member's own invitations; per group: get, edit or archive, `members`, `invite-candidates`, `join`, `leave`, `invites` to invite, `invites/accept`, `invites/decline`, `members/:membershipId` to remove) |
 | Tenant mentorship `/t/:slug/mentorship` | `me` (get, save, stop mentoring), `summary`, `mentors` (+ one), `requests` (send, list, `accept/decline/withdraw/end/report`) |
 | Tenant admin `/t/:slug/admin` | `dashboard`, `analytics`, `exports/members.csv`, `exports/activity.csv`, `members` (approve/reject/suspend/reinstate/role/profile, approve-all-pending), `mentors/:membershipId/remove`, `moderation` (approve/reject/remove/restore/pin), `reports` (resolve/dismiss), `chat-reports` (list; `view`, `resolve`, `dismiss` are POSTs), `settings`, `branding`, `profile-fields`, `invitations` (import/send/revoke), `announcements/audience`, `audit` |
 | Platform `/platform` | `tenants` (create/update/settings/admins), `tenants/:id/billing` (plans/usage/snapshots), `stats`, `analytics/comparison`, `exports/comparison.csv`, `jobs/run`, `users` (platform-admin toggle), `audit`, `messages` (test send, status), `chat-reports` (escalated, no text) |
+
+Chat photos and files are never addressed in a message: a message carries their kind, type, size, a PDF's name and a
+photo's width and height, and the links come only from `GET /chat/conversations/:id/attachments` (10 minutes; a message
+the member may not see is left out, never refused on its own) and a chat report's audited view (15 minutes). A first
+message to someone (`POST /chat/direct`) takes words only. With local storage the links open at `GET /files/:token`,
+outside `/api/v1`.
 
 The directory and the jobs board filter by query parameter, besides `cursor` and `limit`:
 
@@ -1382,6 +1402,9 @@ over answers 429 `RATE_LIMITED` with a retry time. Tests skip them unless `RATE_
 | `chat-send`, `chat-send-hour` | 60 a minute and 600 an hour | sending a message, in any thread |
 | `chat-send-group` | 120 a minute per group | everyone's sends in one group (`CHAT_GROUP_BUSY`) |
 | `chat-request` | 20 a day | new message requests, counted whether or not the recipient has blocked the sender |
+| `chat-attach` | 60 an hour | uploading a chat photo or PDF; one the conversation would refuse (a request, the switch off) is turned away before anything counts |
+| `chat-attach-bytes` | 200 MB a day | what a member's chat uploads add up to as stored (a photo re-encoded, with its thumbnail), counted in KB with `consumeRateLimit` before anything is saved |
+| `chat-file-links` | 300 a minute | signed links to chat photos and files, up to 50 messages a request |
 | `chat-read` | 120 a minute | marking read, mute, accept, decline, thread lookup, invitation search |
 | `chat-block` | 60 an hour | block and unblock |
 | `chat-report` | 30 an hour | reporting a message or a mentorship or referral request |
@@ -1398,6 +1421,13 @@ over answers 429 `RATE_LIMITED` with a retry time. Tests skip them unless `RATE_
 
 Older buckets include OTP requests and checks, token refresh, content creation (`content-create`, 30 an hour),
 comments, poll votes, content reports, uploads, wishes, invitation imports, exports and email confirmation.
+
+Two daily quotas per institution, all its members together, run in tests too (`apps/api/src/middleware/tenantQuota.ts`,
+counted per UTC day): `UPLOADS_PER_TENANT_DAILY_CAP` (default 2000) image uploads, and
+`CHAT_FILES_PER_TENANT_DAILY_CAP` (default 3000) chat photos and files ("This institution has reached today's limit on
+photos and files in chat. Please try again tomorrow."). A chat file is counted against it, and against the member's
+`chat-attach-bytes`, only once it has passed the type and size checks, just before it is saved, so a refused file costs
+the institution nothing.
 
 ## Development
 

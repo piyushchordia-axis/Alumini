@@ -20,6 +20,7 @@ import {
   type DeliveryCandidate,
   type DeliveryScope,
 } from "../../repositories/chat.repo";
+import { claimChatAttachmentsFor } from "./attachments.service";
 import { enabledKinds, isGroupLive, threadKindOf } from "./common";
 
 export interface ChatRecipient {
@@ -177,6 +178,11 @@ export interface AppendInput {
   body: string;
   meta?: Record<string, unknown> | null;
   clientKey?: string | null;
+  /**
+   * The sender's uploads to this conversation that the message carries, in order. Claimed here, so a send naming one that
+   * isn't theirs to claim fails whole (CHAT_ATTACHMENT_GONE). Deliveries describe them and never link to them.
+   */
+  attachmentIds?: string[];
   /** Only the sender's own devices will ever hear of it. */
   withheld?: boolean;
   /** It's a request the others haven't accepted, so they're told something arrived and not what it says. */
@@ -195,7 +201,8 @@ export interface AppendInput {
 
 /**
  * Adds a message to a conversation the caller has locked, inside the caller's transaction, and delivers it once that
- * commits. Never opens a transaction or touches ctx.db: nested sends doing that could freeze the whole pool.
+ * commits. Never opens a transaction or touches ctx.db: nested sends doing that could freeze the whole pool. Its uploads
+ * are locked last, after the conversation and the participant rows, the order every chat write takes.
  */
 export async function appendMessage(ctx: AppContext, tx: Tx, input: AppendInput): Promise<ChatMessageRow> {
   const { conversation, sender, tenantSlug } = input;
@@ -216,12 +223,15 @@ export async function appendMessage(ctx: AppContext, tx: Tx, input: AppendInput)
   if (readsThread && senderId) await updateParticipant(tx, conversation.id, senderId, { lastReadSeq: row.seq });
   // Whoever can see this has news again. Anyone it's withheld from stays where they were.
   await thawParticipants(tx, conversation.id, input.withheld ? senderId : undefined);
+  const attachmentIds = input.attachmentIds ?? [];
+  if (attachmentIds.length > 0 && !senderId) throw new Error("Only a member's message can carry attachments");
+  const attachments = attachmentIds.length > 0 ? await claimChatAttachmentsFor(tx, { ids: attachmentIds, conversationId: conversation.id, uploaderMembershipId: senderId!, messageId: row.id }) : [];
 
   const recipients = await chatRecipients(tx, conversation.id, { actorMembershipId: senderId });
   const own = recipients.filter((r) => r.membershipId === senderId);
   const others = input.withheld ? [] : recipients.filter((r) => r.membershipId !== senderId);
   await afterCommit(ctx, tx, async () => {
-    const payload = (viewer: string | null) => ({ tenantSlug, conversationId: conversation.id, message: toChatMessageDto(row, sender, viewer) });
+    const payload = (viewer: string | null) => ({ tenantSlug, conversationId: conversation.id, message: toChatMessageDto(row, sender, viewer, false, attachments) });
     if (own.length > 0) ctx.realtime.emit(toRooms(own), "chat:message", payload(senderId));
     if (others.length === 0) return;
     const ids = { tenantId: conversation.tenantId, conversationId: conversation.id };

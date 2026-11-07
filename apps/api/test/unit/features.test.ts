@@ -17,6 +17,7 @@ import {
   resolveFeatures,
   retypeToSchool,
   SCHOOL_OFF_FEATURES,
+  TENANT_FEATURE_LABELS,
   TENANT_FEATURES,
   TENANT_TYPES,
   toggleFeature,
@@ -52,6 +53,30 @@ describe("the businesses key", () => {
     const { features, forcedOff } = retypeToSchool("COLLEGE", { businesses: true });
     expect(features.businesses).toBe(true);
     expect(forcedOff).not.toContain("businesses");
+  });
+});
+
+describe("the chat attachments key", () => {
+  it("starts on for every type, schools included, needing nothing else", () => {
+    for (const type of TENANT_TYPES) expect(defaultFeaturesFor(type).chatAttachments, type).toBe(true);
+    expect(SCHOOL_OFF_FEATURES).not.toContain("chatAttachments");
+    expect(FEATURE_PREREQUISITES.chatAttachments).toBeUndefined();
+    expect(TENANT_FEATURE_LABELS.chatAttachments).toBe("Chat attachments");
+  });
+
+  it("reads on for a row stored before the key existed, and off once an admin turns it off", () => {
+    for (const type of TENANT_TYPES) expect(resolveFeatures(type, { feed: true }).chatAttachments, type).toBe(true);
+    expect(resolveFeatures("COLLEGE", { chatAttachments: false }).chatAttachments).toBe(false);
+    expect(applyFeatureChange("COLLEGE", {}, { chatAttachments: false })).toEqual({ features: { ...allOn(), chatAttachments: false }, conflict: null });
+  });
+
+  it("stays as it is when Messaging and Groups go off, and isn't forced off by retyping to a school", () => {
+    // It does nothing while both are off, which the help says, rather than being a prerequisite's dependent.
+    expect(applyFeatureChange("COLLEGE", {}, { messaging: false, groups: false }).features.chatAttachments).toBe(true);
+    expect(toggleFeature(defaultFeaturesFor("COLLEGE"), "messaging", false).chatAttachments).toBe(true);
+    const { features, forcedOff } = retypeToSchool("COLLEGE", { chatAttachments: true });
+    expect(features.chatAttachments).toBe(true);
+    expect(forcedOff).not.toContain("chatAttachments");
   });
 });
 
@@ -379,13 +404,19 @@ describe("joinList", () => {
 describe("featureHelpText", () => {
   it("explains the prerequisites at every institution", () => {
     for (const type of TENANT_TYPES.filter((t) => t !== "SCHOOL")) expect(featureHelpText(type)).toEqual([...FEATURE_HELP]);
-    expect(FEATURE_HELP).toHaveLength(3);
+    expect(FEATURE_HELP).toHaveLength(4);
+  });
+
+  it("says what Chat attachments does, and that it needs a kind of chat to do anything, as no prerequisite can say", () => {
+    expect(FEATURE_HELP[1]).toBe(
+      "Chat attachments lets members send photos and PDF files in messages and groups. It does nothing while Messaging and Groups are both off. Turning it off stops new ones; photos and files already sent stay.",
+    );
   });
 
   it("adds why the school-off switches start off at a school, in the words the web console used", () => {
     const text = featureHelpText("SCHOOL");
-    expect(text.slice(0, 3)).toEqual([...FEATURE_HELP]);
-    expect(text[3]).toBe(
+    expect(text.slice(0, 4)).toEqual([...FEATURE_HELP]);
+    expect(text[4]).toBe(
       "Messaging, Groups and Mentorship start off for schools because members can contact each other privately there. If you turn them on, current pupils still can't use them. Turning Messaging on also opens referral requests in Jobs, which current pupils can't use either.",
     );
   });

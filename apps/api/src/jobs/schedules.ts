@@ -25,4 +25,6 @@ export const scheduledJobs: ScheduledJob[] = [
   { id: "avatar-sweep", job: "uploads.sweepAvatars", data: {}, repeat: { every: 6 * 60 * 60_000 } },
   // Reports that escalate after filing, when an institution's admins change. One escalated at filing is alerted then.
   { id: "chat-reports-staff-alert", job: "chatReports.alertStaff", data: {}, repeat: { every: 5 * 60_000 } },
+  // Chat photos and files uploaded and never sent, a day after; nothing else deletes them.
+  { id: "chat-attachments-sweep", job: "chat.sweepAttachments", data: {}, repeat: { every: 60 * 60_000 } },
 ];

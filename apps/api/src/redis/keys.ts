@@ -24,6 +24,8 @@ export const keys = {
   emailVerifyAddressDay: (addressHash: string) => `email:verify:addr:${addressHash}`,
   emailVerifyGlobalDay: (day: string) => `email:verify:global:${day}`,
   uploadsDay: (tenantId: string, day: string) => `uploads:day:${tenantId}:${day}`,
+  /** Chat photos and files uploaded in one institution on one (UTC) day, all its members together. */
+  chatFilesDay: (tenantId: string, day: string) => `chat:files:day:${tenantId}:${day}`,
   /** Invitations queued for sending by one institution on one (billing time zone) day. */
   invitesDay: (tenantId: string, day: string) => `invites:day:${tenantId}:${day}`,
   active: (membershipId: string) => `active:${membershipId}`,

@@ -160,7 +160,12 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   pick (`useImageUpload` with `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with
   `prepareImageFile` on web) and check the prepared file with `imageFileProblem`, and the phone deletes both the
   picker's copy and the prepared one afterwards. A member's background photo (purpose `backdrop`) follows the profile
-  photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it.
+  photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it. Chat photos and PDFs keep
+  their own ledger instead: `uploadChatAttachment` (`services/chat/attachments.service.ts`) stores them in private
+  storage (`ctx.privateStorage`, never `storeUpload`, `/uploads`, the `uploads` table or the public bucket) with a row
+  in `chat_attachments`, which a send claims inside `appendMessage`'s transaction; photos still go through
+  `processImage`, and the server still decides the type by the bytes. Members reach them only by short-lived signed
+  links (`chatAttachmentLinks`, and staff the report's audited view), never an address in a DTO or a socket event.
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
   details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
   date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.

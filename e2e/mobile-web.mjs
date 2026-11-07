@@ -3219,6 +3219,8 @@ try {
     await expectChoice(choice("radio", "Admin must approve members"), "Admin must approve members", { checked: true });
     const funding = choice("checkbox", "Funding");
     await expectChoice(funding, "the Funding switch", { checked: true });
+    // Chat attachments is a switch like the rest, as on the web: on by default, waiting for nothing.
+    await expectChoice(choice("checkbox", "Chat attachments"), "the Chat attachments switch", { checked: true, disabled: false });
     await fitsPhone("the console's settings", funding);
     // Drawn as on the web, in the Samaj's colour: chosen, the ink box (a radio's ring) on the wash with a drawn tick; the
     // labels stay dark enough to read on it, and a clear box keeps a grey edge.

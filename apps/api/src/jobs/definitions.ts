@@ -47,6 +47,8 @@ export interface JobPayloads {
   "uploads.sweepAvatars": Record<string, never>;
   /** Alert Illuminize staff to chat reports that have become theirs since they were filed (see sweepEscalatedChatReports). */
   "chatReports.alertStaff": Record<string, never>;
+  /** Delete chat photos and files uploaded but never sent, with their rows (see sweepUnsentChatAttachments). No names or keys in it. */
+  "chat.sweepAttachments": Record<string, never>;
 }
 
 export type JobName = keyof JobPayloads;
@@ -81,4 +83,5 @@ export const JOB_POLICIES: { [N in JobName]: JobPolicy } = {
   "chat.pushGroupInvite": { queue: "chat", attempts: 3, backoff: { type: "exponential", delayMs: 5_000 } },
   "uploads.sweepAvatars": { queue: "jobs", attempts: 1 },
   "chatReports.alertStaff": { queue: "jobs", attempts: 1 },
+  "chat.sweepAttachments": { queue: "jobs", attempts: 1 },
 };

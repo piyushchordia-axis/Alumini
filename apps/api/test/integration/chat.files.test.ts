@@ -22,7 +22,7 @@ import {
   lockChatAttachmentsForClaim,
   lockUnsentChatAttachmentsBefore,
   summarizeChatAttachments,
-  withheldAndUnsentChatAttachmentKeysOf,
+  withheldChatAttachmentKeysOf,
   type ChatAttachmentInsert,
   type ChatAttachmentRow,
 } from "../../src/repositories/chatAttachments.repo";
@@ -421,13 +421,18 @@ describe.skipIf(!dbAvailable)("chat files in private storage", () => {
       });
       await ctx.db.update(chatMessages).set({ withheld: true }).where(eq(chatMessages.id, m3!.id));
 
-      const keys = await withheldAndUnsentChatAttachmentKeysOf(ctx.db, [t.a.id]);
-      expect(keys.sort()).toEqual([unsent.storageKey, unsent.thumbKey!, withheld.storageKey].sort());
-      expect(await withheldAndUnsentChatAttachmentKeysOf(ctx.db, [])).toEqual([]);
+      expect(await withheldChatAttachmentKeysOf(ctx.db, [t.a.id])).toEqual([withheld.storageKey]);
+      expect(await withheldChatAttachmentKeysOf(ctx.db, [])).toEqual([]);
 
-      await runInTransaction(ctx, (tx) => deleteUnsentChatAttachmentsOf(tx, [t.a.id]));
+      // The unsent ones' keys come from the rows the delete took, so an upload saved meanwhile can't lose its files.
+      expect(await runInTransaction(ctx, (tx) => deleteUnsentChatAttachmentsOf(tx, []))).toEqual([]);
+      const deleted = await runInTransaction(ctx, (tx) => deleteUnsentChatAttachmentsOf(tx, [t.a.id]));
+      expect(deleted.sort()).toEqual([unsent.storageKey, unsent.thumbKey!].sort());
       expect(await findChatAttachmentById(ctx.db, unsent.id)).toBeUndefined();
       expect(await findChatAttachmentById(ctx.db, withheld.id)).toBeDefined();
+      expect(await findChatAttachmentById(ctx.db, theirs.id)).toBeDefined();
+      // Nothing is left to delete, and nothing is said to be.
+      expect(await runInTransaction(ctx, (tx) => deleteUnsentChatAttachmentsOf(tx, [t.a.id]))).toEqual([]);
       // A withheld message's attachments go with it.
       await ctx.db.delete(chatMessages).where(eq(chatMessages.id, m3!.id));
       expect(await findChatAttachmentById(ctx.db, withheld.id)).toBeUndefined();

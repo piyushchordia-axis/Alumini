@@ -1,4 +1,7 @@
 import {
+  CHAT_ATTACHMENT_GONE_TEXT,
+  CHAT_ATTACHMENTS_NOT_YET_TEXT,
+  CHAT_ATTACHMENTS_OFF_TEXT,
   CHAT_GROUP_INVITE_TTL_DAYS,
   CHAT_MAX_REQUESTS_PER_PAIR,
   CHAT_REREQUEST_AFTER_DAYS,
@@ -15,7 +18,7 @@ import type { DbClient } from "../../db/client";
 import { AppError } from "../../lib/errors";
 import { GROUP_KIND_OF, type ChatGroupRow, type ChatThreadKind, type ConversationRow, type ParticipantRow, type ThreadRow } from "../../repositories/chat.repo";
 import { findTenantWithSettingsById } from "../../repositories/tenants.repo";
-import type { TenantContext, TenantRow } from "../../types/request";
+import type { MembershipRow, TenantContext, TenantRow } from "../../types/request";
 
 export type ChatTenant = TenantRow & { features: TenantFeatures };
 export type { ChatThreadKind };
@@ -68,6 +71,12 @@ export function assertGroupEnabled(features: TenantFeatures, visibility: ChatGro
   assertKindEnabled(features, GROUP_KIND_OF[visibility]);
 }
 
+/** Checked against the institution as it is now, because the request's copy of it can be minutes old. */
+export function assertMaySend(tenant: ChatTenant, member: Pick<MembershipRow, "batchYear" | "dateOfBirth">, kind: ChatThreadKind): void {
+  assertKindEnabled(tenant.features, kind);
+  if (isCurrentPupil(tenant, member)) throw AppError.forbidden("Chat isn't available to current pupils", "FEATURE_DISABLED");
+}
+
 // --- Groups ---
 
 /** Members may see it: an admin approved it and hasn't since rejected or removed it. An edit waiting for review leaves it so. */
@@ -75,6 +84,8 @@ export const isGroupLive = (g: Pick<ChatGroupRow, "approvedAt" | "moderationStat
 
 /** Messages can be sent in it. An archived group, or one moderation has frozen or not yet let out, is read-only. */
 export const groupSendable = (g: Pick<ChatGroupRow, "approvedAt" | "moderationStatus" | "archivedAt">): boolean => isGroupLive(g) && !g.archivedAt;
+
+export const groupNotSendable = (g: Pick<ChatGroupRow, "archivedAt">) => AppError.conflict(g.archivedAt ? "This group has been archived, so it's read-only" : "This group can't take messages until an admin approves it");
 
 /**
  * Who may invite: the owner, or in an open group anyone in it. Never while an edit waits for review, because inviting is how
@@ -139,6 +150,10 @@ export const contactUnavailable = () => AppError.conflict("This member can't be 
 export const blockedByYou = () => AppError.conflict("Unblock this member to send them a message", "CHAT_BLOCKED_BY_YOU");
 /** The same words for every reason, because a different refusal would give a decline away. */
 export const requestPending = () => AppError.conflict("You can't send more in this conversation yet", "CHAT_REQUEST_PENDING");
+export const attachmentsOff = () => AppError.forbidden(CHAT_ATTACHMENTS_OFF_TEXT, "FEATURE_DISABLED");
+/** For a request or asking again, whatever became of the last request, so a decline or a block can't show. */
+export const attachmentsNotYet = () => AppError.conflict(CHAT_ATTACHMENTS_NOT_YET_TEXT, "CHAT_ATTACHMENTS_NOT_YET");
+export const attachmentGone = () => AppError.conflict(CHAT_ATTACHMENT_GONE_TEXT, "CHAT_ATTACHMENT_GONE");
 
 /**
  * The thread as this member believes it stands. Normally that's the conversation row. A send withheld from the other member
@@ -162,6 +177,12 @@ export function nextRequestAt(conversation: Pick<ConversationRow, "requesterMemb
 
 /** What a send does in this thread. REQUEST: asks (again). ACCEPT: answers their request by replying. WAIT: refused. */
 export type SendPlan = "SEND" | "REQUEST" | "ACCEPT" | "WAIT";
+
+/** Whether this institution takes photos and files in chat, from its resolved switches (ChatTenant.features). */
+export const attachmentsOn = (features: Pick<TenantFeatures, "chatAttachments">): boolean => features.chatAttachments;
+
+/** Photos and files go only where the thread is, or by this send becomes, an accepted chat: never in a request, asking again included. */
+export const planTakesAttachments = (plan: SendPlan): boolean => plan === "SEND" || plan === "ACCEPT";
 
 export function planSend(conversation: ConversationRow, membershipId: string, now: Date): SendPlan {
   const mayAskAgain = () => {
@@ -196,8 +217,16 @@ function threadState(conversation: ConversationRow, membershipId: string): ChatT
 
 export const unreadOf = (conversation: Pick<ConversationRow, "lastSeq">, participant: Pick<ParticipantRow, "lastReadSeq" | "frozenSortAt">): number => (participant.frozenSortAt ? 0 : Math.max(conversation.lastSeq - participant.lastReadSeq, 0));
 
-/** Everything about a thread that depends on who's asking, and when. */
-export function threadView(tenant: Pick<TenantRow, "type" | "timezone">, row: ThreadRow, now: Date): Pick<ChatConversationDto, "origin" | "state" | "canSend" | "canRerequestAt" | "blockedByMe" | "unread" | "lastReadSeq" | "mutedUntil" | "lastMessageAt"> {
+/**
+ * Everything about a thread that depends on who's asking, and when. `tenant.features` are its resolved switches. Whether a
+ * send could carry photos and files follows the plan worked out from the thread as this member sees it, so a request
+ * waiting, declined or met by a block reads the same.
+ */
+export function threadView(
+  tenant: Pick<ChatTenant, "type" | "timezone" | "features">,
+  row: ThreadRow,
+  now: Date,
+): Pick<ChatConversationDto, "origin" | "state" | "canSend" | "canAttach" | "canRerequestAt" | "blockedByMe" | "unread" | "lastReadSeq" | "mutedUntil" | "lastMessageAt"> {
   const { participant, peer } = row;
   const me = participant.membershipId;
   const conversation = asSeenBy(row.conversation, participant);
@@ -206,10 +235,12 @@ export function threadView(tenant: Pick<TenantRow, "type" | "timezone">, row: Th
   // Only worth saying where a send is refused until later: elsewhere it would be a date with no meaning, and a thread whose other member is gone has no later.
   const waits = (state === "REQUEST_SENT" || state === "CLOSED") && !!peer;
   const blockedByMe = !!row.blockedByMe;
+  const canSend = plan !== "WAIT" && !blockedByMe && isReachable(tenant, peer);
   return {
     origin: conversation.origin,
     state,
-    canSend: plan !== "WAIT" && !blockedByMe && isReachable(tenant, peer),
+    canSend,
+    canAttach: canSend && planTakesAttachments(plan) && attachmentsOn(tenant.features),
     canRerequestAt: waits ? (nextRequestAt(conversation, me)?.toISOString() ?? null) : null,
     blockedByMe,
     unread: unreadOf(conversation, participant),

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, gt, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import type { DbClient, Tx } from "../db/client";
 import { chatAttachments, chatMessages } from "../db/schema";
 
@@ -77,6 +77,35 @@ export async function findChatAttachmentsByMessageIds(db: DbClient, messageIds: 
     .orderBy(asc(chatAttachments.messageId), asc(chatAttachments.position));
 }
 
+/**
+ * The attachments of those of `messageIds` in this conversation that the viewer may still open: after they joined, not
+ * withheld from them (their own withheld messages they see), not removed, and not from a sender whose messages they see
+ * redacted (`redactedSenderIds`, in a group). The rest are left out, never told apart. Each message's in order.
+ */
+export async function findOpenableChatAttachments(
+  db: DbClient,
+  input: { conversationId: string; messageIds: string[]; viewerMembershipId: string; joinedSeq: number; redactedSenderIds: string[] },
+): Promise<ChatAttachmentRow[]> {
+  if (input.messageIds.length === 0) return [];
+  const notRedacted = input.redactedSenderIds.length === 0 ? undefined : or(isNull(chatMessages.senderMembershipId), notInArray(chatMessages.senderMembershipId, input.redactedSenderIds));
+  return db
+    .select(getTableColumns(chatAttachments))
+    .from(chatAttachments)
+    .innerJoin(chatMessages, eq(chatMessages.id, chatAttachments.messageId))
+    .where(
+      and(
+        eq(chatAttachments.conversationId, input.conversationId),
+        eq(chatMessages.conversationId, input.conversationId),
+        inArray(chatAttachments.messageId, input.messageIds),
+        gt(chatMessages.seq, input.joinedSeq),
+        or(eq(chatMessages.withheld, false), eq(chatMessages.senderMembershipId, input.viewerMembershipId)),
+        isNull(chatMessages.removedAt),
+        notRedacted,
+      ),
+    )
+    .orderBy(asc(chatMessages.seq), asc(chatAttachments.position));
+}
+
 /** Counts per message, for the last message of each conversation in a list. Messages with none are left out. */
 export async function summarizeChatAttachments(db: DbClient, messageIds: string[]): Promise<Map<string, ChatAttachmentSummary>> {
   if (messageIds.length === 0) return new Map();
@@ -114,21 +143,30 @@ export async function deleteChatAttachmentsByIds(tx: Tx, ids: string[]): Promise
 }
 
 /**
- * The storage keys of what these members uploaded that nobody else ever received: uploads they never sent, and the
- * attachments of their withheld messages. Account deletion removes those files; sent ones stay with their messages.
+ * The storage keys of the attachments of these members' withheld messages, which nobody else ever received. Account
+ * deletion removes those files, and the rows go with the messages (on delete cascade); sent ones stay with theirs. Read
+ * with every conversation of the members locked, so no send can add to them meanwhile.
  */
-export async function withheldAndUnsentChatAttachmentKeysOf(db: DbClient, membershipIds: string[]): Promise<string[]> {
+export async function withheldChatAttachmentKeysOf(db: DbClient, membershipIds: string[]): Promise<string[]> {
   if (membershipIds.length === 0) return [];
   const rows = await db
     .select({ storageKey: chatAttachments.storageKey, thumbKey: chatAttachments.thumbKey })
     .from(chatAttachments)
-    .leftJoin(chatMessages, eq(chatMessages.id, chatAttachments.messageId))
-    .where(and(inArray(chatAttachments.uploaderMembershipId, membershipIds), or(isNull(chatAttachments.messageId), eq(chatMessages.withheld, true))));
+    .innerJoin(chatMessages, eq(chatMessages.id, chatAttachments.messageId))
+    .where(and(inArray(chatAttachments.uploaderMembershipId, membershipIds), eq(chatMessages.withheld, true)));
   return rows.flatMap(chatAttachmentKeys);
 }
 
-/** Deletes these members' unsent uploads. A withheld message's attachments go with the message (on delete cascade). */
-export async function deleteUnsentChatAttachmentsOf(tx: Tx, membershipIds: string[]): Promise<void> {
-  if (membershipIds.length === 0) return;
-  await tx.delete(chatAttachments).where(and(inArray(chatAttachments.uploaderMembershipId, membershipIds), isNull(chatAttachments.messageId)));
+/**
+ * Deletes these members' unsent uploads and returns the storage keys of exactly the rows it deleted, for their files to go
+ * after the commit. An upload takes no conversation lock, so one saved meanwhile is either deleted here with its keys or
+ * left for the sweep, never deleted without them, as it could be if the keys were read in a statement of their own.
+ */
+export async function deleteUnsentChatAttachmentsOf(tx: Tx, membershipIds: string[]): Promise<string[]> {
+  if (membershipIds.length === 0) return [];
+  const rows = await tx
+    .delete(chatAttachments)
+    .where(and(inArray(chatAttachments.uploaderMembershipId, membershipIds), isNull(chatAttachments.messageId)))
+    .returning({ storageKey: chatAttachments.storageKey, thumbKey: chatAttachments.thumbKey });
+  return rows.flatMap(chatAttachmentKeys);
 }

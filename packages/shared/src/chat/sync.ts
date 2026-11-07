@@ -3,7 +3,7 @@ import type { ChatInbox } from "../constants";
 import { CHAT_INBOXES } from "../constants";
 import type { RealtimeClient } from "../realtime/client";
 import type { ChatBadgeDto, ChatConversationDto, ChatMessageDto, CursorPage } from "../types/dto";
-import { addToOutbox, highestSeq, keepNewestPage, markLastMessageRemoved, markMessageRemoved, markOutboxFailed, removeFromOutbox, upsertLiveMessage, type ChatMessagePages, type OutboxEntry } from "./cache";
+import { addToOutbox, highestSeq, keepNewestPage, markLastMessageRemoved, markMessageRemoved, markOutboxFailed, removeFromOutbox, upsertLiveMessage, type ChatMessagePages, type OutboxAttachment, type OutboxEntry } from "./cache";
 import { chatKeys } from "./keys";
 
 type QueryKey = readonly unknown[];
@@ -18,8 +18,11 @@ export interface ChatQueryClient {
 
 export interface ChatSyncApi {
   messages(slug: string, id: string, query: { afterSeq: string; limit: number }): Promise<CursorPage<ChatMessageDto>>;
-  /** `signal` aborts a send that has waited too long, so a request that never answers doesn't hold up the ones behind it. */
-  send(slug: string, id: string, input: { body: string; clientKey: string }, options?: { signal?: AbortSignal }): Promise<ChatMessageDto>;
+  /**
+   * `signal` aborts a send that has waited too long, so a request that never answers doesn't hold up the ones behind it.
+   * `attachmentIds` comes only with uploads to claim.
+   */
+  send(slug: string, id: string, input: { body: string; clientKey: string; attachmentIds?: string[] }, options?: { signal?: AbortSignal }): Promise<ChatMessageDto>;
 }
 
 export interface ChatSyncOptions {
@@ -39,6 +42,12 @@ export interface ChatSyncOptions {
    * message after it at "Sending…" with no way to retry or discard.
    */
   sendTimeoutMs?: number;
+  /**
+   * Called once an entry leaves the outbox for good: its message arrived, or it was discarded (unless the caller keeps what
+   * it held). What it held for the screen, such as a photo's preview, can go then and not before, since a failed send
+   * keeps it to try again.
+   */
+  onOutboxRelease?: (entry: OutboxEntry) => void;
 }
 
 export interface ChatSync {
@@ -47,13 +56,20 @@ export interface ChatSync {
   /** Fetches whatever came after `afterSeq`, or after the newest message held for this thread. */
   fillGap(slug: string, conversationId: string, afterSeq?: number): Promise<void>;
   /**
-   * Shows the message straight away and posts it, after any send to the same thread still under way. Returns the server's
-   * copy, or null if it failed, which leaves it in the outbox.
+   * Shows the message straight away and posts it, after any send to the same thread still under way, with any uploads it
+   * carries. Returns the server's copy, or null if it failed, which leaves it in the outbox.
    */
-  send(slug: string, conversationId: string, body: string, clientKey?: string): Promise<ChatMessageDto | null>;
-  /** Sends a failed message again under its own key, so the server can tell if the first attempt arrived after all. */
+  send(slug: string, conversationId: string, body: string, clientKey?: string, attachments?: OutboxAttachment[]): Promise<ChatMessageDto | null>;
+  /**
+   * Sends a failed message again under its own key, with the same uploads, so the server can tell if the first attempt
+   * arrived after all.
+   */
   retry(slug: string, conversationId: string, clientKey: string): Promise<ChatMessageDto | null>;
-  discard(slug: string, conversationId: string, clientKey: string): void;
+  /**
+   * Drops a failed message. `release: false` keeps what it held out of onOutboxRelease, for a screen putting its words and
+   * uploads back in the composer.
+   */
+  discard(slug: string, conversationId: string, clientKey: string, options?: { release?: boolean }): void;
 }
 
 const BIT = 0x100000000;
@@ -127,12 +143,25 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
     if (qc.getQueryState(key)?.fetchStatus === "fetching") void qc.invalidateQueries({ queryKey: key });
   };
 
+  /** Takes an entry out of the outbox, telling the app it's gone when `release` says so and it was there to take. */
+  const takeFromOutbox = (slug: string, id: string, clientKey: string, release: boolean) => {
+    const key = chatKeys.outbox(slug, id);
+    const entry = (qc.getQueryData(key) as OutboxEntry[] | undefined)?.find((e) => e.clientKey === clientKey);
+    qc.setQueryData(key, (old: OutboxEntry[] | undefined) => removeFromOutbox(old, clientKey));
+    if (!entry || !release) return;
+    try {
+      opts.onOutboxRelease?.(entry);
+    } catch {
+      // Letting go of a preview is tidying up: failing at it mustn't stop a message settling.
+    }
+  };
+
   /** Puts a message in the thread and settles its outbox entry, in whichever order the response and the socket echo land. */
   const settle = (slug: string, id: string, incoming: ChatMessageDto) => {
     const key = chatKeys.messages(slug, id);
-    const message = removedIds.has(incoming.id) ? { ...incoming, body: null, removed: true } : incoming;
+    const message = removedIds.has(incoming.id) ? { ...incoming, body: null, removed: true, attachments: [] } : incoming;
     qc.setQueryData(key, (old: ChatMessagePages | undefined) => upsertLiveMessage(old, message));
-    if (message.clientKey) qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => removeFromOutbox(old, message.clientKey));
+    if (message.clientKey) takeFromOutbox(slug, id, message.clientKey, true);
     // With nothing loaded there was nothing to patch.
     if (!qc.getQueryData(key)) void qc.invalidateQueries({ queryKey: key });
     else refetchIfFetching(key);
@@ -216,7 +245,8 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
         controller?.abort();
         reject(new ApiClientError(0, "NETWORK_ERROR", SEND_TIMED_OUT));
       }, sendTimeoutMs);
-      api.send(slug, id, { body: entry.body, clientKey: entry.clientKey }, { signal: controller?.signal }).then(
+      const attachmentIds = entry.attachments?.map((a) => a.id);
+      api.send(slug, id, { body: entry.body, clientKey: entry.clientKey, ...(attachmentIds?.length ? { attachmentIds } : {}) }, { signal: controller?.signal }).then(
         (message) => {
           clearTimeout(timer);
           resolve(message);
@@ -321,13 +351,15 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
       };
     },
     fillGap,
-    send: (slug, id, body, clientKey = newClientKey()) => post(slug, id, { clientKey, conversationId: id, body, status: "sending", createdAt: new Date().toISOString() }),
+    send: (slug, id, body, clientKey = newClientKey(), attachments) =>
+      post(slug, id, { clientKey, conversationId: id, body, ...(attachments?.length ? { attachments } : {}), status: "sending", createdAt: new Date().toISOString() }),
     retry(slug, id, clientKey) {
       const entry = (qc.getQueryData(chatKeys.outbox(slug, id)) as OutboxEntry[] | undefined)?.find((e) => e.clientKey === clientKey);
-      return entry ? post(slug, id, { clientKey, conversationId: id, body: entry.body, status: "sending", createdAt: entry.createdAt }) : Promise.resolve(null);
+      if (!entry) return Promise.resolve(null);
+      return post(slug, id, { clientKey, conversationId: id, body: entry.body, ...(entry.attachments ? { attachments: entry.attachments } : {}), status: "sending", createdAt: entry.createdAt });
     },
-    discard(slug, id, clientKey) {
-      qc.setQueryData(chatKeys.outbox(slug, id), (old: OutboxEntry[] | undefined) => removeFromOutbox(old, clientKey));
+    discard(slug, id, clientKey, { release = true } = {}) {
+      takeFromOutbox(slug, id, clientKey, release);
     },
   };
 }

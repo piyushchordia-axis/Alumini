@@ -11,6 +11,13 @@ export const chatKeys = {
   threads: (slug: string) => ["chat", slug, "messages"] as const,
   messages: (slug: string, id: string) => ["chat", slug, "messages", id] as const,
   outbox: (slug: string, id: string) => ["chat", slug, "outbox", id] as const,
+  /**
+   * Signed links to a conversation's photos and files, every set of messages asked for. Under "chat", so signing out drops
+   * them, and apart from "messages", so reading a thread again doesn't sign them all again.
+   */
+  attachments: (slug: string, id: string) => ["chat", slug, "attachments", id] as const,
+  /** The links to some of its messages' photos and files, however the ids come: they're sorted, so one set is one key. */
+  attachmentLinks: (slug: string, id: string, messageIds: readonly string[]) => ["chat", slug, "attachments", id, [...messageIds].sort()] as const,
   badge: (slug: string) => ["chat", slug, "badge"] as const,
   blocks: (slug: string) => ["chat", slug, "blocks"] as const,
   /** Every list on the Groups screens, invitations included. */
