@@ -22,19 +22,18 @@ import {
   type SocialLinkKind,
 } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
-import clsx from "clsx";
 import type { ReactNode } from "react";
 import { Controller } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { CommaListInput } from "@/components/common/CommaListInput";
 import { CountrySelect } from "@/components/common/CountrySelect";
 import { SkillsInput } from "@/components/common/SkillsInput";
-import { IconCheck, IconChevronDown } from "@/components/icons";
+import { IconChevronDown } from "@/components/icons";
 import { AvatarPicker } from "@/components/profile/AvatarPicker";
 import { CustomFieldInputs } from "@/components/profile/CustomFieldInputs";
 import { EducationListInput, ExperienceListInput } from "@/components/profile/HistoryListInputs";
 import { errorMessageOf, pastYears, yearValue, type ProfileFormController } from "@/components/profile/useProfileForm";
-import { Checkbox, FormField, Input, Select, Textarea } from "@/components/ui";
+import { Checkbox, FormField, Input, Select, Textarea, ToggleChip } from "@/components/ui";
 import { api } from "@/lib/api";
 import { mentorsPath } from "@/lib/mentors";
 
@@ -328,19 +327,9 @@ export function ProfileAboutSection({ form: f }: { form: ProfileFormController }
                     {OPEN_TO.map((o) => {
                       const on = chosen.includes(o);
                       return (
-                        <button
-                          key={o}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => field.onChange(on ? chosen.filter((x) => x !== o) : [...chosen, o])}
-                          className={clsx(
-                            "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                            on ? "border-primary bg-primary text-on-primary" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400",
-                          )}
-                        >
-                          {on && <IconCheck size={16} />}
+                        <ToggleChip key={o} on={on} onClick={() => field.onChange(on ? chosen.filter((x) => x !== o) : [...chosen, o])}>
                           {OPEN_TO_LABELS[o]}
-                        </button>
+                        </ToggleChip>
                       );
                     })}
                   </div>

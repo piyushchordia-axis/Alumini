@@ -355,7 +355,11 @@ saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts`, `l
   - **links**: LinkedIn, website, GitHub, Instagram and X (500 characters each);
   - **Open to**: Hiring, Collaborating and Investing. Open to work stays the job-seeker profile, and Mentor comes from
     the mentor profile: profiles and directory cards carry `isMentor` by the Mentors list's own rule, and the edit
-    screen links to **Offer to mentor** for a member who can mentor and doesn't yet.
+    screen links to **Offer to mentor** for a member who can mentor and doesn't yet. On both apps Open to, like the
+    institution's multiple-choice questions, is a row of chips at least 44 points tall, each a button that says whether
+    it's chosen (web `ToggleChip`, the phone's `Chip check`). A chosen one is on the brand's wash with a thin ring, its
+    name in the ink after a tick, so it isn't told by colour alone. The chips wrap onto as many lines as they need,
+    and a name wider than the whole row wraps inside its chip rather than running past the form.
 - **Years here.** Every member gives the year they joined and the year they left or will leave, so people can tell who
   is who. A school, college or university asks "Year you joined" and "Year you left (or will leave)", both required. A
   community (type OTHER, such as the Samaj) asks "Member since", required, and "Until (leave blank if you still are)",
@@ -420,7 +424,8 @@ saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts`, `l
   included (`experiences.1.endYear`).
 
 **Registration** walks through the same three sections on both apps, under a step bar: "Step 1 of 3 · Basics", then
-Work and About you.
+Work and About you. Each step's name sits under its bar in a third of the row and, at large text, wraps at its spaces
+rather than being cut short.
 
 1. **Basics** ("Your photo, name and years here, so people know it's you."): the photo, the name, the two years, worded
    for the institution (see "Years here" above), what they do, date of birth, city and country, and the institution's
@@ -1699,10 +1704,15 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     facts go to one column on a 320-point screen where two would just fit, and a word wider than the whole row (at
     the largest text sizes) still breaks, inside the row rather than past it. The charts' label column (the phone's
     `HBarChart`, 38%) doesn't use it yet.
-  - Be a mentor's area chips at large text: on the web, at twice the text size on a screen under about 450 pixels,
-    "Entrepreneurship" wraps inside its chip (most names do at 320), because the chip's padding and box and the page's
-    margins grow with the text; on the phone, whose labels stop at twice the usual size, it may wrap on a 320-point
-    phone past about 1.8×. Each chip stays inside the form.
+  - Chips at large text (Be a mentor's areas, Open to, the institution's multiple-choice questions and the phone's
+    report reasons): the phone's chip and choice labels stop growing at twice the usual size (`CONTROL_TEXT_MAX_SCALE`)
+    while the rest of the screen keeps growing, and a name wider than the whole row wraps inside its chip, which stays
+    inside the form. On the web, at twice the text size on a screen under about 450 pixels, the mentor area
+    "Entrepreneurship" wraps inside its chip (most area names do at 320), because the chip's padding and box and the
+    page's margins grow with the text; on the phone it may wrap on a 320-point phone past about 1.8×. Registration's
+    step names, a third of the row each and not capped, wrap at their spaces (after the number first), but a word wider
+    than its third breaks inside it (on the web from about 1.75 times the text size on a 320-pixel screen, and past
+    twice it on 390), though never cut short.
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
     apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
     SVG set.

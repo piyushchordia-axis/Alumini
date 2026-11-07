@@ -577,6 +577,47 @@ export async function expectChoiceLook(choice, boxSelector, where, { checked, ti
 }
 
 /**
+ * Fails unless `chip` (one chip of several that can be chosen together: web ToggleChip, the phone's Chip with `check`)
+ * says and draws its state as both apps do, in any institution colour, as paintedColour sees it: aria-pressed is
+ * `chosen`, no "✓" glyph, and its label (its last child) reads at 4.5:1 on it.
+ * - Chosen: a wash, not white, with a drawn tick that shows at 3:1 on it (WCAG 1.4.11), so it isn't told by colour
+ *   alone. `tones` ({ ink, wash }, one of BRAND_TONES) pins the wash to the institution's, and the label and the tick to
+ *   its ink.
+ * - Not chosen: white, or all but (a hovered one), with no tick.
+ * Gives { chip, label }: what the label sits on (the chip as painted) and the label's colour.
+ */
+export async function expectChipLook(chip, where, { chosen, tones }) {
+  const pressed = await chip.getAttribute("aria-pressed");
+  if (pressed !== String(chosen)) throw new Error(`${where} is aria-pressed="${pressed}", expected "${chosen}"`);
+  const glyph = (await chip.innerText()).match(/[✓✔]/);
+  if (glyph) throw new Error(`${where} draws its tick as the glyph ${glyph[0]}`);
+  const text = await expectReadable(chip.locator(":scope > :last-child"), `${where}'s label`);
+  const result = { chip: text.behind, label: text.colour };
+  const fromWhite = Math.max(...text.behind.split(" ").map((c) => 255 - Number(c)));
+  const ticks = chip.locator("svg");
+  if (!chosen) {
+    if (await ticks.count()) throw new Error(`${where} draws a tick, though it isn't chosen`);
+    // Slate-50, a hovered one, is 7 from white; the seeded brands' washes are 32 to 35.
+    if (fromWhite >= 10) throw new Error(`${where} is rgb ${text.behind} though it isn't chosen, not white`);
+    return result;
+  }
+  if (fromWhite < 20) throw new Error(`${where} is all but white (rgb ${text.behind}) once chosen, not a wash`);
+  if (tones && text.behind !== tones.wash) throw new Error(`${where} is rgb ${text.behind} once chosen, not the institution's wash (rgb ${tones.wash})`);
+  if (tones && text.colour !== tones.ink) throw new Error(`${where}'s label is rgb ${text.colour} once chosen, not the institution's ink (rgb ${tones.ink})`);
+  if ((await ticks.count()) !== 1 || !(await ticks.first().isVisible())) throw new Error(`${where} draws no tick once chosen`);
+  let stroke;
+  try {
+    stroke = await paintedColour(ticks.first().locator("path").first(), "stroke");
+  } catch (error) {
+    throw new Error(`${where}'s tick: ${error.message}`);
+  }
+  const contrast = contrastOf(stroke.colour, stroke.behind);
+  if (contrast < 3) throw new Error(`${where}'s tick (rgb ${stroke.colour}) is ${contrast.toFixed(2)}:1 on it (rgb ${stroke.behind}), under 3:1`);
+  if (tones && stroke.colour !== tones.ink) throw new Error(`${where}'s tick is rgb ${stroke.colour}, not the institution's ink (rgb ${tones.ink})`);
+  return result;
+}
+
+/**
  * Fails unless the initials `locator` finds (the element holding the letters, as getByText finds it), standing in for a
  * photo, read at 4.5:1 on a circle or tile of their own (rounded itself, or filling a rounded frame of about its size
  * that clips it, as a company's tile fills its bordered frame), so initials that lost their tone and sit on the card

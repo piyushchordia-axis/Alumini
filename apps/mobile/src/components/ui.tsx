@@ -264,13 +264,59 @@ export function focusOn(target: Focusable | null | undefined) {
   else AccessibilityInfo.sendAccessibilityEvent(target, "focus");
 }
 
-/** `tall` makes it a full 44-point target, for a choice that matters, such as a report's reason. */
-export function Chip({ label, active, onPress, color, tall = false, onLayout }: { label: string; active?: boolean; onPress?: () => void; color?: string; tall?: boolean; onLayout?: PressableProps["onLayout"] }) {
+/**
+ * A chip that is pressed to choose it, its state in aria-pressed. Chosen, it is the solid brand colour, as the one choice of
+ * a ChipSelect still is. With `check` (Open to, the institution's multiple-choice questions, a report's reason), chosen,
+ * it takes the wash, a thin ring and the ink, with a tick before its label, so it isn't told by colour alone, which a pale
+ * brand's fill would be, as the web's ToggleChip is.
+ *
+ * `tall` makes it a full 44-point target, for a choice that matters. `fit` is for a chip in a wrapping row (`flexWrap:
+ * "wrap"`): it is never wider than the row, so chips wrap to the next line first, and a label wraps inside its chip (at its
+ * spaces, and inside a word only as a last resort) only when the chip alone is wider than the row. The label grows with
+ * the system text size up to CONTROL_TEXT_MAX_SCALE.
+ */
+export function Chip({
+  label,
+  active,
+  onPress,
+  color,
+  tall = false,
+  fit = false,
+  check = false,
+  onLayout,
+}: {
+  label: string;
+  active?: boolean;
+  onPress?: () => void;
+  color?: string;
+  tall?: boolean;
+  fit?: boolean;
+  check?: boolean;
+  onLayout?: PressableProps["onLayout"];
+}) {
   const theme = useTheme();
   const c = color ?? theme.primary;
+  const ticked = check && !!active;
   return (
-    <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" {...toggleState(!!active)} style={[styles.chip, tall ? styles.chipTall : null, active ? { backgroundColor: c, borderColor: c } : null]}>
-      <Text style={[styles.chipText, active ? { color: theme.onPrimary } : null]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      onLayout={onLayout}
+      accessibilityRole="button"
+      {...toggleState(!!active)}
+      style={[
+        styles.chip,
+        tall ? styles.chipTall : null,
+        fit ? { maxWidth: "100%" } : null,
+        ticked ? { backgroundColor: theme.primaryWash, borderColor: theme.primaryRing } : active ? { backgroundColor: c, borderColor: c } : null,
+      ]}
+    >
+      {ticked && <IconCheck size={16} color={theme.primaryInk} strokeWidth={2.5} />}
+      <Text
+        maxFontSizeMultiplier={CONTROL_TEXT_MAX_SCALE}
+        style={[styles.chipText, fit ? { flexShrink: 1, minWidth: 0 } : null, ticked ? { color: theme.primaryInk } : active ? { color: theme.onPrimary } : null]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -662,7 +708,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text },
   error: { color: STATUS_TONES.danger.ink, fontSize: 12 },
   hint: { color: colors.muted, fontSize: 12 },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   chipText: { fontSize: 13, color: colors.text },
   chipTall: { minHeight: 44, justifyContent: "center", paddingHorizontal: 14 },
   tabs: { backgroundColor: "#e2e8f0", borderRadius: radius.md, padding: 3, overflow: "hidden" },

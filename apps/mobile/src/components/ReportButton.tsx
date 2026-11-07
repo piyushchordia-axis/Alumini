@@ -55,7 +55,7 @@ export function ReportButton({ slug, contentType, contentId, label, onReported }
             <Text style={{ fontSize: 18, fontWeight: "700", color: colors.text }}>{label ?? "Report content"}</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {REPORT_REASONS.map((r) => (
-                <Chip key={r} tall={!!label} label={REPORT_REASON_LABELS[r]} active={reason === r} onPress={() => setReason(r)} />
+                <Chip key={r} tall fit check label={REPORT_REASON_LABELS[r]} active={reason === r} onPress={() => setReason(r)} />
               ))}
             </View>
             <Input accessibilityLabel="Details (optional)" placeholder="Anything the admins should know? (optional)" value={details} onChangeText={setDetails} maxLength={1000} multiline autoComplete="off" />

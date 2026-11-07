@@ -2,7 +2,7 @@ import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, ST
 import { Text, View } from "react-native";
 import { DateTimeField } from "@/components/DateTimeField";
 import { Chip, ChipSelect, Input, Muted } from "@/components/ui";
-import { colors, useTheme } from "@/theme";
+import { colors } from "@/theme";
 
 export type FieldAnswers = ProfileFieldAnswers;
 
@@ -26,7 +26,6 @@ export function CustomFieldInputs({
   onChange: (key: string, value: ProfileFieldValue | null) => void;
   audience?: ProfileFieldAudience;
 }) {
-  const theme = useTheme();
   return (
     <>
       {fields.map((f) => {
@@ -78,12 +77,12 @@ export function CustomFieldInputs({
           case "MULTI_SELECT": {
             const chosen = Array.isArray(v) ? v : [];
             return (
-              <View key={f.key} style={{ gap: 6 }}>
+              <View key={f.key} role="group" aria-label={f.label} style={{ gap: 6 }}>
                 <Text style={{ fontWeight: "600", color: colors.text, fontSize: 13 }}>{label}</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                   {choiceOptionsWithCurrent(f.options, chosen).map((o) => {
                     const on = chosen.includes(o.value);
-                    return <Chip key={o.value} label={o.label} active={on} color={theme.primary} onPress={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])} />;
+                    return <Chip key={o.value} label={o.label} active={on} tall fit check onPress={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])} />;
                   })}
                 </View>
                 {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Muted>{hint}</Muted> : null}

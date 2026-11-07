@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdPhotoPreparation, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -267,6 +267,57 @@ try {
 
     // Step 3: about you, with the institution's own (seeded, optional) question.
     await heading("Step 3 of 3 · About you").waitFor();
+    // Open to: 44px chips that say and draw their state alike. Chosen, Hiring is on Demo University's wash, in its ink,
+    // with a tick, so it isn't told by colour alone; pressed again, it's white with no tick.
+    const openTo = page.getByRole("group", { name: "Open to", exact: true }).getByRole("button");
+    for (const chip of await openTo.all()) {
+      const { height } = await chip.boundingBox();
+      if (height < 44) throw new Error(`the Open to chip "${await chip.innerText()}" is ${height}px tall, under 44`);
+      await expectChipLook(chip, `the Open to chip "${await chip.innerText()}"`, { chosen: false });
+    }
+    const hiring = page.getByRole("group", { name: "Open to", exact: true }).getByRole("button", { name: "Hiring", exact: true });
+    await hiring.click();
+    await expectChipLook(hiring, "Open to Hiring, chosen", { chosen: true, tones: BRAND_TONES.demoUniversity });
+    await hiring.click();
+    await expectChipLook(hiring, "Open to Hiring, pressed again", { chosen: false });
+    // A step name too long for its third of the bar wraps at its spaces, the number's first, rather than being cut short:
+    // at one and a half times the text size, "3 About you" takes two lines on a 390px phone, and on a 320px one every
+    // word is still whole and nothing clipped.
+    const lineCount = (locator) =>
+      locator.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+      });
+    const stepNames = page.getByRole("navigation", { name: "Registration steps", exact: true }).locator("[data-step-name]");
+    const stepNamesWhole = async (where) => {
+      const cut = await stepNames.evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent));
+      if (cut.length) throw new Error(`the step names ${cut.join(", ")} are cut short ${where}`);
+      await expectWholeWords(stepNames, `the step names ${where}`);
+    };
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => (document.documentElement.style.fontSize = "150%"));
+    try {
+      await stepNamesWhole("at 1.5 times the text size");
+      if ((await lineCount(stepNames.filter({ hasText: "About you" }))) < 2) throw new Error(`"3 About you" fits one line at 1.5 times the text size on a 390px phone, so this no longer checks that step names wrap`);
+      await page.setViewportSize({ width: 320, height: 700 });
+      await stepNamesWhole("at 1.5 times the text size on a 320px phone");
+      // At twice the text size on a 320px phone, "Collaborating" is wider than the whole row: it wraps inside its chip
+      // (inside the word, the last resort), and every chip stays inside the form, with nothing to scroll sideways.
+      await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+      const row = await page.getByRole("group", { name: "Open to", exact: true }).boundingBox();
+      for (const chip of await openTo.all()) {
+        const box = await chip.boundingBox();
+        if (box.x < row.x - 0.5 || box.x + box.width > row.x + row.width + 0.5) throw new Error(`the Open to chip "${await chip.innerText()}" runs past the form at twice the text size on a 320px phone`);
+      }
+      const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      if (sideways > 0) throw new Error(`registration's About you scrolls ${sideways}px sideways at twice the text size on a 320px phone`);
+      const collaborating = page.getByRole("group", { name: "Open to", exact: true }).getByRole("button", { name: "Collaborating", exact: true });
+      if ((await lineCount(collaborating.locator(":scope > :last-child"))) < 2) throw new Error(`"Collaborating" fits its chip at twice the text size on a 320px phone, so this no longer checks that a chip's name wraps inside it`);
+    } finally {
+      await page.evaluate(() => (document.documentElement.style.fontSize = ""));
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
     await page.getByLabel("Hostel").selectOption({ label: "Tagore" });
     await shot("03c-register-about");
     // A problem the server finds opens the step holding it, with its input focused.

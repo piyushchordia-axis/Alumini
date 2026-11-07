@@ -150,6 +150,35 @@ export const Choice = forwardRef<HTMLInputElement, ChoiceInputProps & { label: R
 });
 
 /**
+ * A chip of several that can be chosen together (Open to, the institution's multiple-choice questions): a 44px button
+ * whose state is in aria-pressed. On, it takes the wash, a thin ring and the ink, with a tick before its label, so it
+ * isn't told by colour alone, as the phone's `Chip check` is; hover goes on the off state only. In a wrapping row (`flex
+ * flex-wrap`) it is never wider than the row: chips wrap to the next line first, and a label wraps inside its chip (at
+ * its spaces, and inside a word only as a last resort) only when the chip alone is wider than the row.
+ */
+export const ToggleChip = forwardRef<HTMLButtonElement, Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "aria-pressed"> & { on: boolean }>(function ToggleChip(
+  { on, className, children, ...rest },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-pressed={on}
+      className={clsx(
+        "inline-flex min-h-11 max-w-full min-w-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink motion-reduce:transition-none",
+        on ? "border-primary-ring bg-primary-wash text-primary-ink" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50",
+        className,
+      )}
+      {...rest}
+    >
+      {on && <IconCheck size={16} strokeWidth={2.5} />}
+      <span className="min-w-0 break-words">{children}</span>
+    </button>
+  );
+});
+
+/**
  * A label + control + error/hint stack. Wrap a single input (the default) so clicking the label focuses it. Pass
  * `group` when the children are several controls or buttons (colour pickers, image uploaders): a wrapping <label>
  * would forward clicks on the caption to the first button inside. Pass `htmlFor` for one input with buttons beside it

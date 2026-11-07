@@ -336,11 +336,12 @@ function StepBar({ step, furthest, locked, onPick }: { step: ProfileStep; furthe
         const n = (i + 1) as ProfileStep;
         const current = n === step;
         const name = `Step ${n}: ${PROFILE_SECTION_TITLES[section]}`;
-        // Drawn as a bar over "1 Basics"; heard as "Step 1: Basics".
+        // Drawn as a bar over "1 Basics"; heard as "Step 1: Basics". A name too long for its third of the row (at large
+        // text) wraps at its spaces rather than being cut short.
         const body = (
           <View aria-hidden style={{ gap: 6 }}>
             <View style={[styles.stepBar, { backgroundColor: n <= step ? theme.primary : n <= furthest ? theme.primarySoft : colors.border }]} />
-            <Text numberOfLines={1} style={[styles.stepLabel, current ? styles.stepLabelCurrent : null]}>
+            <Text style={[styles.stepLabel, current ? styles.stepLabelCurrent : null]}>
               {n} {PROFILE_SECTION_TITLES[section]}
             </Text>
           </View>
@@ -448,9 +449,11 @@ function CopyBanner({ copy, message, note, onUse, onUndo }: CopyBannerProps) {
 const styles = StyleSheet.create({
   stack: { gap: spacing.lg },
   steps: { flexDirection: "row", gap: spacing.sm },
-  step: { minHeight: 44, justifyContent: "flex-end", paddingBottom: 4 },
+  // From the top, so the bars stay in line when one name wraps onto a second line: 12 + bar 6 + gap 6 + a line of 16 + 4
+  // fills the 44 points.
+  step: { minHeight: 44, paddingTop: 12, paddingBottom: 4 },
   stepBar: { height: 6, borderRadius: radius.full },
-  stepLabel: { fontSize: 12, fontWeight: "500", color: colors.muted },
+  stepLabel: { fontSize: 12, lineHeight: 16, fontWeight: "500", color: colors.muted },
   stepLabelCurrent: { fontWeight: "700", color: colors.text },
   heading: { fontSize: 18, fontWeight: "700", color: colors.text },
   hint: { fontSize: 13, lineHeight: 18, color: colors.muted },

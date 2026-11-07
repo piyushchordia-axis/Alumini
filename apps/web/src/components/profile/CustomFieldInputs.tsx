@@ -1,6 +1,6 @@
 import { choiceOptionsWithCurrent, formatProfileFieldValue, profileFieldHint, type ProfileFieldAnswers, type ProfileFieldAudience, type ProfileFieldDto, type ProfileFieldValue } from "@illuminize/shared";
 import clsx from "clsx";
-import { FormField, Input, Select, Textarea } from "@/components/ui";
+import { FormField, Input, Select, Textarea, ToggleChip } from "@/components/ui";
 
 export type FieldAnswers = ProfileFieldAnswers;
 
@@ -85,15 +85,9 @@ export function CustomFieldInputs({
                 {choiceOptionsWithCurrent(f.options, chosen).map((o) => {
                   const on = chosen.includes(o.value);
                   return (
-                    <button
-                      key={o.value}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])}
-                      className={clsx("rounded-full border px-3 py-1 text-sm transition", on ? "border-primary bg-primary text-on-primary" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400")}
-                    >
+                    <ToggleChip key={o.value} on={on} onClick={() => onChange(f.key, on ? chosen.filter((x) => x !== o.value) : [...chosen, o.value])}>
                       {o.label}
-                    </button>
+                    </ToggleChip>
                   );
                 })}
               </div>

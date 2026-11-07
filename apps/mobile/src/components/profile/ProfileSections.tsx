@@ -241,7 +241,7 @@ export function ProfileAboutSection({ form: f }: { form: ProfileDraftController 
           <Row>
             {OPEN_TO.map((o) => {
               const on = d.openTo.includes(o);
-              return <Chip key={o} label={OPEN_TO_LABELS[o]} active={on} tall color={theme.primary} onPress={() => set("openTo", on ? d.openTo.filter((x) => x !== o) : [...d.openTo, o])} />;
+              return <Chip key={o} label={OPEN_TO_LABELS[o]} active={on} tall fit check onPress={() => set("openTo", on ? d.openTo.filter((x) => x !== o) : [...d.openTo, o])} />;
             })}
           </Row>
           <Muted>Shown on your profile and your directory card, where members can filter by it.</Muted>

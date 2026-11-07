@@ -67,6 +67,11 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   that isn't white unless it's a bare row (`tile: false`, as the web's `Checkbox` is); and its label readable at 4.5:1
   either way. `tones` pins the box and the wash to `BRAND_TONES`. A disabled choice's faded box can't be read: check
   its label instead.
+- `expectChipLook(chip, where, { chosen, tones })` checks a toggle chip (the web's `ToggleChip`, the phone's `Chip
+  check`), a button with no box of its own, which `expectChoiceLook` can't read: its aria-pressed is `chosen`, it
+  draws no "✓" or "✔" glyph, and its label (the chip's last child) reads at 4.5:1 on it. Chosen: a wash that isn't
+  white and one drawn SVG tick at 3:1 on it. Not chosen: white, or all but (a hovered slate-50), with no tick. `tones`
+  pins a chosen chip's wash, label and tick to `BRAND_TONES` (the wash and the ink).
 - `fitsPhone(where, content)` fails when a screen of the phone app's web build is wider than the phone: the page, or
   any scrolling area around `content`, which react-native-web clips rather than widening the page.
 - `expectWholeWords(locator, where)` fails when text in the elements breaks a word across lines ("Entrepreneurshi p"),
@@ -97,7 +102,11 @@ Covers:
   joined", "Year you left (or will leave)"), and an end year before the start refused; the Work step's heading taking
   focus, the step bar, Back and the browser's Back going to the step before with nothing lost, the browser's Back and
   Back on a Basics with something typed asking "Leave registration?" and Cancel staying, Skip for now putting Work back
-  as it was last accepted, the profile question on About you, a server error sending the member back to Work with the
+  as it was last accepted, the profile question on About you, Open to's chips on About you (each 44px tall; Hiring
+  chosen on Demo University's wash, in its ink, with a drawn tick, then white again with none, `expectChipLook`), the
+  step bar's names at one and a half times the text size ("3 About you" on two lines on a 390px screen, and on 390 and
+  320 every word whole and nothing cut short), at twice the text size on 320 "Collaborating" wrapping inside its chip
+  and every chip inside the form with no sideways scrolling, a server error sending the member back to Work with the
   headline focused, and the photo arriving with the profile;
 - the first-entry walk-through, which the front door opens on a page of its own with no app navigation and no Back on
   its first screen: "Welcome, Smoke" focused and described by "1 of 3", the brand cover's short name, Demo
@@ -256,7 +265,9 @@ Covers:
   not opening again by itself when she waits again; Approve sending the status the notice showed, and the notice then
   showing Approved); a member's page showing Kiran Joshi's whole profile (headline, skills, past role, studies
   elsewhere, Open to), his initials in the same tone of his own in the list and on his page, and Make admin and Remove admin role each asking first (Cancel sending nothing), each toast
-  naming Kiran, and both changes in the recent activity by the admin's name; his answers' Cancel putting back the
+  naming Kiran, and both changes in the recent activity by the admin's name; his answers' Clubs and societies chips
+  each 44px tall, the chosen ones on Demo College's wash, in its ink, with a drawn tick, and the others white with none
+  (`expectChipLook`), before and after a press; his answers' Cancel putting back the
   saved ones, and the admin's own page, with its answers being edited, linking from its recent activity to Kiran's
   page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
@@ -352,7 +363,8 @@ Covers:
   registration?", Cancel staying with the name and Leave going to the landing screen; the years filled by their labels
   ("Year you joined *", "Year you left (or will leave) *"), never by position, so a past role's Start year can't be
   taken for them, and Continue with no start year staying on Basics with "Enter the year you joined"; the step bar going
-  back with Work kept, Skip for now putting Work back as it was last accepted, Back from About you and from Work, a
+  back with Work kept, Skip for now putting Work back as it was last accepted, Open to's chips on About you as on the
+  web (44 points tall, Hiring chosen and cleared, `expectChipLook`), Back from About you and from Work, a
   server error sending the member back to Work with the page still held, and Join the network leaving the screen (it
   isn't held) for the walk-through, with nothing holding it;
 - the first-entry walk-through, above the tabs with no tab bar showing: "Welcome, Mobile" focused and described by "1
@@ -504,9 +516,13 @@ Covers:
   what she does; two across with every word whole, and whole again on a 320-point screen), her mentor profile listed
   in Mentors with its areas and availability, no sideways scrolling, and
   Remove as mentor asking first (Cancel sends nothing); her answers edited, Chapter saved as Diaspora ("Answers saved"),
-  then Surat chosen and cancelled, the saved answer standing and the next edit starting from it; View profile in the app
-  leaving the console for her profile, back on the tabs; an admin-managed question (added by the script) given to the
-  admin as a text box, saying only admins see the answer, and sent by Save; Parth Joshi made an admin and the role taken
+  then Surat chosen and cancelled, the saved answer standing and the next edit starting from it (on the way, the
+  Community interests chips each 44 points tall with every word whole, on a 320-point screen too and inside it, the
+  chosen ones on the Samaj's wash, in its ink, with a drawn tick, and one pressed, then dropped by Cancel, the next
+  edit starting without it); View profile in the app leaving the console for her profile, back on the tabs; an
+  admin-managed question (added by the script) given to the admin as a text box, saying only admins see the answer, and
+  sent by Save, and an interest (added by the script) wider than a whole 320-point row wrapping inside its chip, at its
+  spaces, inside the row and the screen; Parth Joshi made an admin and the role taken
   away again, each through its confirmation (Cancel first sends nothing), the Admin badge following, and his recent
   activity naming Jignesh Patel with the changes made; the audit log from the console's home, opening on All, its
   Members chip showing Diya's rejection with its reason, a prefix typed by hand that is no chip's ("membership.app")
@@ -528,12 +544,13 @@ Covers:
   more, Back returning to Notifications, and the notice tapped again once the script lists the post as waiting, the
   queue cached by the first visit fetched again rather than taken for the answer, so the post opens with no "isn't
   waiting" line; Open in app leaving the console for the post's own page with one tab bar; Hetal's post reported from
-  the feed, then the console's "Open reports, 1" tile opening Reports on Open with its count, the row labelled Spam,
-  Post and Published (never the raw status), with the reporter, the details and the post's words; Dismiss refused
-  (answered by the script) as already handled, closing the sheet, saying so and refetching the list; Resolve, keep
-  content with a note, then "No open reports" and the note under Resolved; and a report notice (answered by the script)
-  for it saying it has already been handled, then, tapped again once the script lists it as open, the Open list fetched
-  again and the report shown with no "already handled" line;
+  the feed (the reasons 44 points tall, Spam chosen on the Samaj's wash, in its ink, with a drawn tick,
+  `expectChipLook`), then the console's "Open reports, 1" tile opening Reports on Open with its count, the row
+  labelled Spam, Post and Published (never the raw status), with the reporter, the details and the post's words;
+  Dismiss refused (answered by the script) as already handled, closing the sheet, saying so and refetching the list;
+  Resolve, keep content with a note, then "No open reports" and the note under Resolved; and a report notice (answered
+  by the script) for it saying it has already been handled, then, tapped again once the script lists it as open, the
+  Open list fetched again and the report shown with no "already handled" line;
 - chat reports in the console, as the Samaj admin, the list and every view answered by the script (so no view writes an
   audit row) and each view the app asks for counted: the tile and the row with the open count, the Open tab with it, the
   privacy lines, and who reported whom and why with no words anywhere in the page until View messages; the thread
@@ -770,6 +787,16 @@ University after.
 - [ ] Links open the phone's browser, and coming back finds the app where it was: LinkedIn on Priya's profile
       (Directory), Apply and the address in How to apply on "Backend Engineer (Node.js)", its website under About the
       company, and the map link in the Mumbai alumni coffee meetup. The meetup's email address opens the mail app.
+- [ ] Chips, on the narrowest phone you have, at the usual text size and then the largest: Open to in Edit profile →
+      About you, Clubs and societies on About you of Rahul's registration at Demo College, and the reasons in Report
+      (a post's Report link). Every chip is at least a fingertip tall, its name whole and inside the screen: a name too
+      long for the row wraps inside its chip, never past the edge. A chosen Open to, club or reason is on the light
+      brand tint with a thin ring, its name in the brand colour with a tick before it; choosing one may move the chips
+      after it along. The labels stop growing at twice the usual size. TalkBack or VoiceOver reads each chip as a
+      button and says whether it's selected.
+- [ ] Registration's step bar at the largest text size (on Rahul's registration at Demo College): a step name too long
+      for its third of the row ("3 About you") goes onto a second line, at its spaces, rather than ending in "…", and
+      the three bars stay in line above the names.
 
 ### 4. Photos
 

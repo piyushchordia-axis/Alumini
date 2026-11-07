@@ -194,9 +194,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     checks the badge (pinned to the institution's `BRAND_TONES`) and the actions with `expectEmptyState`.
   - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black. Brand-coloured
     text and icons use the ink (web `text-primary-ink`, mobile `theme.primaryInk`) and text on the brand colour uses
-    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the choices, the Open to and
-    multiple-choice chips and the reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move
-    over when touched). A chosen state is a wash, a thin ring and the ink, as the reaction chips are (web
+    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the choices, the toggle chips and the
+    reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move over when touched). A chosen
+    state is a wash, a thin ring and the ink, as the reaction chips and the toggle chips are (web
     `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
     a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
     they can't outrank it. The ink reads at 4.5:1 on white, the plain page, the brand's 12% tint and its own wash, in
@@ -216,7 +216,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     (Be a mentor's areas) are `Choice fit` chips in a wrapping row, each as wide as its label and never wider than the
     row, not a fixed grid that squeezes a long name; the phone's `Choice` labels stop growing at
     `CONTROL_TEXT_MAX_SCALE` (twice the usual size), and its padding, box and gap are `CHOICE_SIZES` (mobile
-    `lib/layout.ts`), which `mentorshipLabels.test.ts` sizes the area chips from.
+    `lib/layout.ts`), which `mentorshipLabels.test.ts` sizes the area chips from. Toggle chips (Open to, the
+    multiple-choice questions, the phone's report reasons) are web `ToggleChip` and the phone's `Chip check`: 44px
+    buttons with aria-pressed, chosen on the wash with the ring and the ink and an `IconCheck` before the name, so not
+    by colour alone; e2e checks them with `expectChipLook`. A phone chip in a wrapping row passes `fit` (never wider
+    than the row), and every `Chip` label stops at `CONTROL_TEXT_MAX_SCALE`. `ChipSelect` (one choice among chips, as
+    in the filters) is still the solid brand with `onPrimary`, which a pale brand's fill barely tells from white: it
+    moves over when touched.
   - **Side-by-side text.** Text laid in columns (job and member facts, the console's tiles, the landing's sections)
     takes as many as leave room for its longest word, down to one: web `fitColumns` (`lib/layout.ts`) as a `grid`'s
     style, mobile `FitGrid`, both sized by shared `lib/layout.ts`. Not a fixed fraction (`grid-cols-2` on a phone,

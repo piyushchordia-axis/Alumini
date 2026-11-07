@@ -340,13 +340,14 @@ function StepList({ step, furthest, locked, onPick }: { step: ProfileStep; furth
           const n = (i + 1) as ProfileStep;
           const current = n === step;
           const name = `Step ${n}: ${PROFILE_SECTION_TITLES[section]}`;
-          // Drawn as a bar over "1 Basics"; heard as "Step 1: Basics".
+          // Drawn as a bar over "1 Basics"; heard as "Step 1: Basics". The number and the name are one run of text, as on
+          // the phone, so a name too long for its third of the row (at large text) wraps at its spaces, the number's
+          // first, and has the whole third, rather than being cut short.
           const body = (
             <span aria-hidden className="block">
               <span className={clsx("block h-1.5 rounded-full", n <= step ? "bg-primary" : n <= furthest ? "bg-primary/35" : "bg-slate-200")} />
-              <span className={clsx("mt-2 flex items-center gap-1.5 text-xs", current ? "font-semibold text-slate-900" : "font-medium text-slate-500")}>
-                <span className="tabular-nums">{n}</span>
-                <span className="truncate">{PROFILE_SECTION_TITLES[section]}</span>
+              <span data-step-name className={clsx("mt-2 block break-words text-xs group-hover:text-primary-ink", current ? "font-semibold text-slate-900" : "font-medium text-slate-500")}>
+                <span className="tabular-nums">{n}</span> {PROFILE_SECTION_TITLES[section]}
               </span>
             </span>
           );
@@ -358,7 +359,7 @@ function StepList({ step, furthest, locked, onPick }: { step: ProfileStep; furth
                   aria-label={name}
                   disabled={locked}
                   onClick={(e) => !isRepeatClick(e) && onPick(n)}
-                  className="block min-h-11 w-full rounded-md pb-1 pt-2 text-left transition hover:[&_.truncate]:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed"
+                  className="group block min-h-11 w-full rounded-md pb-1 pt-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed"
                 >
                   {body}
                 </button>

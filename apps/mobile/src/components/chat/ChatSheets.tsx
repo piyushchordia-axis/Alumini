@@ -179,7 +179,7 @@ export function ChatReportSheet({
         <Text style={{ fontSize: 13, fontWeight: "600", color: "#334155" }}>Reason</Text>
         <View role="group" aria-label="Reason" style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
           {REPORT_REASONS.map((r) => (
-            <Chip key={r} tall label={REPORT_REASON_LABELS[r]} active={reason === r} onPress={() => setReason(r)} />
+            <Chip key={r} tall fit check label={REPORT_REASON_LABELS[r]} active={reason === r} onPress={() => setReason(r)} />
           ))}
         </View>
       </View>

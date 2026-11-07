@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -251,7 +251,20 @@ try {
     if ((await headlineBox.inputValue()) !== "Not this one") throw new Error("going back a step lost what was typed on the Work step");
     await pressStepButton("Skip for now");
     await stepHeading(3, "About you").waitFor();
+    // Open to: 44-point chips that say and draw their state alike, as on the web. Chosen, Hiring is on Demo University's
+    // wash, in its ink, with a tick, so it isn't told by colour alone; pressed again, it's white with no tick.
+    const openToGroup = page.getByRole("group", { name: "Open to", exact: true }).locator("visible=true").last();
+    for (const chip of await openToGroup.getByRole("button").all()) {
+      const { height } = await chip.boundingBox();
+      if (height < 44) throw new Error(`the Open to chip "${await chip.innerText()}" is ${height}px tall, under 44`);
+      await expectChipLook(chip, `the Open to chip "${await chip.innerText()}"`, { chosen: false });
+    }
+    const hiring = openToGroup.getByRole("button", { name: "Hiring", exact: true });
+    await hiring.click();
+    await expectChipLook(hiring, "Open to Hiring, chosen", { chosen: true, tones: BRAND_TONES.demoUniversity });
     await shot("m03c-register-about");
+    await hiring.click();
+    await expectChipLook(hiring, "Open to Hiring, pressed again", { chosen: false });
     await pressStepButton("Back");
     await stepHeading(2, "Work").waitFor();
     if ((await headlineBox.inputValue()) !== "") throw new Error("Skip for now kept what was typed on the Work step");
@@ -4079,11 +4092,39 @@ try {
       await memberButton("Edit answers").click();
       await memberButton("Surat").click();
       if (!(await pressed(memberButton("Surat")))) throw new Error("the Surat chip isn't chosen after pressing it");
+      // Community interests, a question with several answers: 44-point chips, words whole on a 320-point phone too, each
+      // saying and drawing its state alike, chosen ones on the Samaj's wash, in its ink, with a tick. One pressed here is
+      // dropped by Cancel with the rest.
+      const interests = shown(page.getByRole("group", { name: "Community interests", exact: true }));
+      const interestChips = interests.getByRole("button");
+      for (const chip of await interestChips.all()) {
+        const where = `the interest "${await chip.innerText()}"`;
+        const { height } = await chip.boundingBox();
+        if (height < 44) throw new Error(`${where} is ${height}px tall, under 44`);
+        await expectChipLook(chip, where, { chosen: await pressed(chip), tones: BRAND_TONES.samaj });
+      }
+      const firstInterestName = await interestChips.first().innerText();
+      const firstInterest = interests.getByRole("button", { name: firstInterestName, exact: true });
+      const wasChosen = await pressed(firstInterest);
+      await firstInterest.click();
+      await expectChipLook(firstInterest, "the first interest, pressed", { chosen: !wasChosen, tones: BRAND_TONES.samaj });
+      await expectWholeWords(interestChips, "the Community interests chips");
+      await page.setViewportSize({ width: 320, height: 700 });
+      try {
+        await expectWholeWords(interestChips, "the Community interests chips on a 320-point phone");
+        for (const chip of await interestChips.all()) {
+          const box = await chip.boundingBox();
+          if (box.x + box.width > 320) throw new Error(`the interest "${await chip.innerText()}" runs past the edge of a 320-point phone`);
+        }
+      } finally {
+        await page.setViewportSize({ width: 390, height: 844 });
+      }
       await memberButton("Cancel").click();
       await shown(page.getByText("Diaspora", { exact: true })).waitFor();
       if (await page.getByText("Surat", { exact: true }).locator("visible=true").count()) throw new Error("Cancel kept the answer it was meant to drop");
       await memberButton("Edit answers").click();
       if (!(await pressed(memberButton("Diaspora"))) || (await pressed(memberButton("Surat")))) throw new Error("editing again didn't start from the saved answer, Diaspora");
+      if ((await pressed(firstInterest)) !== wasChosen) throw new Error(`editing again didn't start from the saved interests: Cancel kept "${firstInterestName}" ${wasChosen ? "dropped" : "chosen"}`);
       await memberButton("Cancel").click();
       if (later.length) throw new Error(`Cancel still sent ${later.join(", ")}`);
     } finally {
@@ -4098,13 +4139,16 @@ try {
 
     // An admin-managed question (added by the script: the Samaj's own two are members' to answer) is the admin's to
     // answer here, with a hint that the member never sees it, and Save sends it. The script takes it out of what goes to
-    // the API, which doesn't know it.
+    // the API, which doesn't know it. It also gives Community interests a name wider than a whole row (never chosen, so
+    // never sent), whose chip has to wrap it.
     const OFFICE = { id: "00000000-0000-4000-8000-0000000000f1", key: "e2e_office_notes", label: "Office notes", helpText: null, type: "LONG_TEXT", options: [], required: false, visibility: "ADMINS", memberEditable: false, filterable: false, position: 99, archivedAt: null };
+    const LONG_INTEREST = { value: "e2e-long-interest", label: "Navratri garba nights, Diwali melas and the cultural programmes in every chapter" };
     const fieldsUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/profile-fields(\?|$)/;
     await page.route(fieldsUrl, async (route) => {
       if (route.request().method() !== "GET") return route.fallback();
       const response = await route.fetch();
-      return route.fulfill({ response, json: { data: [...(await response.json()).data, OFFICE] } });
+      const fields = (await response.json()).data.map((f) => (f.key === "interests" ? { ...f, options: [...f.options, LONG_INTEREST] } : f));
+      return route.fulfill({ response, json: { data: [...fields, OFFICE] } });
     });
     const profileUrl = new RegExp(`/admin/members/${nishaId}/profile$`);
     const office = [];
@@ -4120,6 +4164,26 @@ try {
       await page.goto(SAMAJ + `/admin/members/${nishaId}`);
       await shown(page.getByText("Office notes", { exact: true })).waitFor();
       await memberButton("Edit answers").click();
+      // On a 320-point phone the long interest's chip is no wider than the row: its name wraps inside it, at its spaces,
+      // and nothing runs past the screen.
+      await page.setViewportSize({ width: 320, height: 700 });
+      try {
+        const interests = shown(page.getByRole("group", { name: "Community interests", exact: true }));
+        const longChip = interests.getByRole("button", { name: LONG_INTEREST.label, exact: true });
+        const row = await interests.boundingBox();
+        const box = await longChip.boundingBox();
+        if (box.x < row.x - 0.5 || box.x + box.width > Math.min(row.x + row.width, 320) + 0.5) throw new Error(`the long interest's chip (${Math.round(box.x)} to ${Math.round(box.x + box.width)}) runs past its row (${Math.round(row.x)} to ${Math.round(row.x + row.width)}) on a 320-point phone`);
+        const lines = await longChip.locator(":scope > :last-child").evaluate((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+        });
+        if (lines < 2) throw new Error(`the long interest fits one line on a 320-point phone (${lines}), so this no longer checks that a chip's name wraps inside it`);
+        await expectWholeWords(longChip, "the long interest on a 320-point phone");
+        await fitsPhone("Nisha's answers on a 320-point phone", interests);
+      } finally {
+        await page.setViewportSize({ width: 390, height: 844 });
+      }
       const notes = shown(page.getByLabel("Office notes", { exact: true }));
       if ((await notes.evaluate((el) => el.tagName)) !== "TEXTAREA") throw new Error("the admin-managed question isn't an input for the admin");
       await shown(page.getByText("Only admins see this answer.", { exact: true })).waitFor();
@@ -4489,7 +4553,14 @@ try {
       .last();
     await card.getByRole("button", { name: "Report this content", exact: true }).click();
     const sheet = shown(page.getByRole("dialog", { name: "Report content", exact: true }));
-    await sheet.getByRole("button", { name: "Spam", exact: true }).click();
+    // The reasons are 44-point chips; the chosen one is on the Samaj's wash, in its ink, with a tick, as Open to's are, so
+    // a pale brand's fill isn't all that tells it from the rest.
+    const spam = sheet.getByRole("button", { name: "Spam", exact: true });
+    await spam.click();
+    for (const name of ["Spam", "Harassment", "Inappropriate content", "Misinformation", "Other"]) {
+      if ((await sheet.getByRole("button", { name, exact: true }).boundingBox()).height < 44) throw new Error(`the reason "${name}" is under 44 points tall`);
+    }
+    await expectChipLook(spam, "the chosen reason, Spam", { chosen: true, tones: BRAND_TONES.samaj });
     await sheet.getByLabel("Details (optional)", { exact: true }).fill("e2e check");
     const filed = page.waitForResponse((r) => r.request().method() === "POST" && /\/t\/shri-gujarati-samaj\/reports$/.test(r.url()));
     await sheet.getByRole("button", { name: "Submit report", exact: true }).click();

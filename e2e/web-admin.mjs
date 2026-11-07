@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
+import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChipLook, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectReadable, expectSameTone, expectSvgNoEmoji, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -161,11 +161,23 @@ try {
     const onRequest = (r) => r.method() === "PATCH" && r.url().endsWith("/profile") && patches.push(r.url());
     page.on("request", onRequest);
     try {
-      const firstClub = () => page.getByRole("group", { name: "Clubs and societies", exact: true }).getByRole("button").first();
+      const clubs = page.getByRole("group", { name: "Clubs and societies", exact: true }).getByRole("button");
+      const firstClub = () => clubs.first();
       await page.getByRole("button", { name: "Edit answers", exact: true }).click();
+      // Each club is a 44px chip that says and draws its state alike: chosen ones on Demo College's wash, in its ink, with
+      // a tick, so they aren't told by colour alone.
+      await firstClub().waitFor();
+      for (const club of await clubs.all()) {
+        const where = `the club "${await club.innerText()}"`;
+        const { height } = await club.boundingBox();
+        if (height < 44) throw new Error(`${where} is ${height}px tall, under 44`);
+        const chosen = (await club.getAttribute("aria-pressed")) === "true";
+        await expectChipLook(club, where, { chosen, tones: BRAND_TONES.demoCollege });
+      }
       const saved = await firstClub().getAttribute("aria-pressed");
       await firstClub().click();
       if ((await firstClub().getAttribute("aria-pressed")) === saved) throw new Error("the club didn't change when pressed");
+      await expectChipLook(firstClub(), "the first club, pressed", { chosen: saved !== "true", tones: BRAND_TONES.demoCollege });
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       await page.getByRole("button", { name: "Edit answers", exact: true }).click();
       if ((await firstClub().getAttribute("aria-pressed")) !== saved) throw new Error("editing again didn't start from the saved answers");
