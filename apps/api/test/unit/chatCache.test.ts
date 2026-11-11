@@ -318,7 +318,7 @@ describe("createChatSync", () => {
     };
   }
 
-  function setup(opts: { active?: { slug: string; conversationId: string | null } | null; api?: Partial<ChatSyncApi>; onOutboxRelease?: (entry: OutboxEntry) => void } = {}) {
+  function setup(opts: { active?: { slug: string; conversationId: string | null } | null; api?: Partial<ChatSyncApi>; onOutboxRelease?: (entry: OutboxEntry, how: { sent: boolean }) => void } = {}) {
     const qc = new QueryClient();
     const realtime = fakeRealtime();
     const api = {
@@ -1072,15 +1072,16 @@ describe("createChatSync", () => {
     });
 
     it("lets go of an entry once, when its message arrives, whichever of the response and the echo comes first", async () => {
-      const released: OutboxEntry[] = [];
+      const released: Array<{ entry: OutboxEntry; sent: boolean }> = [];
       let answer!: (m: ChatMessageDto) => void;
-      const s = setup({ api: { send: vi.fn(() => new Promise<ChatMessageDto>((resolve) => (answer = resolve))) }, onOutboxRelease: (e) => released.push(e) });
+      const s = setup({ api: { send: vi.fn(() => new Promise<ChatMessageDto>((resolve) => (answer = resolve))) }, onOutboxRelease: (entry, { sent }) => released.push({ entry, sent }) });
       s.load(pages([[1]]));
       const delivered = message(2, { body: "", clientKey: "client-key-1", attachments: [photo("a1")] });
       const sending = s.sync.send(SLUG, CONVERSATION, "", "client-key-1", [outboxPhoto("a1")]);
       expect(released).toEqual([]);
       s.live(delivered);
-      expect(released).toEqual([expect.objectContaining({ clientKey: "client-key-1", attachments: [outboxPhoto("a1")] })]);
+      // Sent: the app may keep a photo's preview a little longer, for the bubble that arrived.
+      expect(released).toEqual([{ entry: expect.objectContaining({ clientKey: "client-key-1", attachments: [outboxPhoto("a1")] }), sent: true }]);
       answer(delivered);
       await sending;
       s.live(delivered);
@@ -1090,7 +1091,8 @@ describe("createChatSync", () => {
     it("holds on to a failed entry's uploads, and lets go when it's discarded, unless the screen takes them back", async () => {
       const released: string[] = [];
       const send = vi.fn<ChatSyncApi["send"]>().mockRejectedValue(new ApiClientError(429, "RATE_LIMITED", "Too many requests"));
-      const s = setup({ api: { send }, onOutboxRelease: (e) => released.push(e.clientKey) });
+      // Discarded, not sent: no bubble will show its previews, so the app lets them go at once.
+      const s = setup({ api: { send }, onOutboxRelease: (e, { sent }) => released.push(`${e.clientKey}${sent ? " sent" : ""}`) });
       s.load(pages([[1]]));
       await s.sync.send(SLUG, CONVERSATION, "", "client-key-1", attachments);
       await s.sync.send(SLUG, CONVERSATION, "", "client-key-2", attachments);

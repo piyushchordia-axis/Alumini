@@ -1,4 +1,5 @@
 import { REPORT_REASONS, REPORT_REASON_LABELS, type ChatReportCreateInput, type ReportReason } from "@illuminize/shared";
+import { CHAT_REPORT_INTRO } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useState } from "react";
 import { Button, FormField, Modal, Select, Textarea } from "@/components/ui";
@@ -96,7 +97,7 @@ export function ReportMessageDialog({ slug, messageId, onClose }: { slug: string
     <ChatReportDialog
       open={!!messageId}
       title="Report message"
-      intro="Admins will see this message and up to 10 around it."
+      intro={CHAT_REPORT_INTRO}
       submit={(input) => api.chat.report(slug, messageId!, input)}
       onClose={onClose}
     />

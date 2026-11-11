@@ -1,5 +1,21 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, isMuted, newClientKey, sendLimitNotice, threadFooter, threadItems, type ChatRow, type OutboxEntry, type RerequestLine, type ThreadItem } from "@illuminize/shared/chat";
+import {
+  chatKeys,
+  conversationTitle,
+  directThreadSubtitle,
+  emptyThreadText,
+  groupMessages,
+  isMuted,
+  messageSenderName,
+  newClientKey,
+  sendLimitNotice,
+  threadFooter,
+  threadItems,
+  type ChatRow,
+  type OutboxEntry,
+  type RerequestLine,
+  type ThreadItem,
+} from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
@@ -11,11 +27,13 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatHeader, ChatNotice, ChatOff, ChatScreen, iconButton, StatusLine, useLeaveChatScreen } from "@/components/chat/ChatFrame";
 import { ConversationOptionsSheet, ReportMessageSheet } from "@/components/chat/ChatSheets";
 import { DayRow, MessageRow, type MessageActions } from "@/components/chat/MessageRow";
+import { PhotoViewer } from "@/components/chat/PhotoViewer";
 import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconAlert, IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, EmptyState, ErrorText, Spinner } from "@/components/ui";
+import { Button, EmptyState, ErrorText, focusOn, Spinner, type Focusable } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
+import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { chatSync, patchConversation } from "@/lib/chat";
@@ -119,9 +137,14 @@ function Thread({ id }: { id: string }) {
 
   const dk = draftKey(slug, id);
   const setDraft = useChatStore((s) => s.setDraft);
+  const tray = useChatAttachments(slug, id, dk);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [reporting, setReporting] = useState<string | null>(null);
+  // The photo viewer: which message's photos, which one, and the button that opened it. `open` goes false first on iOS,
+  // which says when the viewer has gone, so a report sheet asked for from it can take its place.
+  const [viewing, setViewing] = useState<{ messageId: string; index: number; opener: Focusable | null; open: boolean } | null>(null);
+  const reportAfterViewer = useRef<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
@@ -159,22 +182,29 @@ function Thread({ id }: { id: string }) {
     },
   });
 
-  /** What became of a send that didn't go. Too many too fast puts the words back to send later, if the box is free for them. */
+  /**
+   * What became of a send that didn't go. Too many too fast puts the words, and the photos and files with them, back to
+   * send later, if the box and the tray are free for them.
+   */
   const settleFailure = (clientKey: string, text: string) => {
     const failed = qc.getQueryData<OutboxEntry[]>(outboxKey)?.find((e) => e.clientKey === clientKey);
     const notice = sendLimitNotice(failed?.code);
     if (!notice) return;
     setNotice(notice);
-    if (!useChatStore.getState().drafts[dk]) {
-      chatSync.discard(slug, id, clientKey);
+    const { drafts, trays } = useChatStore.getState();
+    if (!drafts[dk] && !trays[dk]?.length) {
+      // Kept rather than released: the tray takes over its uploads and their prepared photos.
+      chatSync.discard(slug, id, clientKey, { release: false });
       setDraft(dk, text);
+      tray.restore(failed?.attachments ?? []);
     }
   };
   const send = (text: string) => {
     setNotice(null);
     setDraft(dk, "");
+    const attachments = tray.take();
     const clientKey = newClientKey();
-    void chatSync.send(slug, id, text, clientKey).then((sent) => {
+    void chatSync.send(slug, id, text, clientKey, attachments).then((sent) => {
       if (!sent) settleFailure(clientKey, text);
     });
   };
@@ -188,7 +218,24 @@ function Thread({ id }: { id: string }) {
     },
     onDiscard: (clientKey) => chatSync.discard(slug, id, clientKey),
     onReport: setReporting,
+    onOpenPhoto: (messageId, index, opener) => {
+      setSelected(null);
+      setViewing({ messageId, index, opener, open: true });
+    },
+    onProblem: setStatus,
   };
+
+  /** The viewer has gone: a report asked for from it opens now, or focus goes back to the photo that opened it. */
+  const viewerGone = () => {
+    const opener = viewing?.opener;
+    setViewing(null);
+    const report = reportAfterViewer.current;
+    reportAfterViewer.current = null;
+    if (report) setReporting(report);
+    else focusOn(opener);
+  };
+  // On iOS the viewer is hidden first and gone once it says so (onDismiss); elsewhere it goes at once.
+  const closeViewer = () => (Platform.OS === "ios" ? setViewing((v) => (v ? { ...v, open: false } : v)) : viewerGone());
 
   // Scrolling. The list is inverted, so an offset of 0 is the newest message.
   const listRef = useRef<FlatList<ChatRow>>(null);
@@ -231,10 +278,13 @@ function Thread({ id }: { id: string }) {
   const c = conversation.data;
   const name = conversationTitle(c);
   const muted = isMuted(c, now);
-  const composer = (intro: string | null) => <ChatComposer draftKey={dk} onSend={send} notice={notice} intro={intro} />;
+  // Kept on screen while the tray still holds something, even once photos and files can't go here any more, so it can be
+  // emptied; the paperclip only while they can (canAdd).
+  const attach = c.canAttach || tray.tray.length > 0 ? { tray: tray.tray, canAdd: c.canAttach, onAddPhotos: tray.addPhotos, onAddFiles: tray.addFiles, onRemove: tray.remove, onRetry: tray.retry } : null;
+  const composer = (intro: string | null, attachCaption: string | null) => <ChatComposer draftKey={dk} onSend={send} notice={notice} intro={intro} attach={attach} attachCaption={attachCaption} />;
   const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : directThreadSubtitle(c, muted);
 
-  const f = threadFooter(c, footerNow, group.data);
+  const f = threadFooter(c, footerNow, group.data, tenant.settings.features);
   const footerActions = (): ReactNode => {
     if (f.kind !== "panel" || !c.peer) return undefined;
     switch (f.action) {
@@ -260,7 +310,11 @@ function Thread({ id }: { id: string }) {
         return undefined;
     }
   };
-  const footer = (): ReactNode => (f.kind === "composer" ? composer(f.intro) : <Panel title={f.title} text={f.text} when={f.when} actions={footerActions()} />);
+  const footer = (): ReactNode => (f.kind === "composer" ? composer(f.intro, f.attachCaption) : <Panel title={f.title} text={f.text} when={f.when} actions={footerActions()} />);
+
+  const viewed = viewing ? items.find((item) => item.message?.id === viewing.messageId)?.message : undefined;
+  const viewedPhotos = viewed?.attachments.filter((a) => a.kind === "PHOTO") ?? [];
+  const viewedMine = viewed?.sender?.id === me;
 
   const firstLoadFailed = !messages.data && !!messages.error;
   const hasNew = !pinned && newestKey !== seenKey;
@@ -327,7 +381,11 @@ function Thread({ id }: { id: string }) {
               </View>
             }
             renderItem={({ item: row }) =>
-              row.type === "day" ? <DayRow label={row.label} /> : <MessageRow row={row} me={me} showSenders={!!c.group} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
+              row.type === "day" ? (
+                <DayRow label={row.label} />
+              ) : (
+                <MessageRow slug={slug} conversationId={id} row={row} me={me} showSenders={!!c.group} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
+              )
             }
           />
         )}
@@ -349,6 +407,29 @@ function Thread({ id }: { id: string }) {
       <StatusLine text={status} persistent />
       {footer()}
 
+      {/* Gone with the message's photos (removed, say). */}
+      {viewing && viewed && viewedPhotos.length > 0 && (
+        <PhotoViewer
+          key={`${viewing.messageId}:${viewing.index}`}
+          open={viewing.open}
+          slug={slug}
+          conversationId={id}
+          message={viewed}
+          photos={viewedPhotos}
+          startIndex={viewing.index}
+          who={viewedMine ? "you" : messageSenderName(viewed)}
+          onReport={
+            !viewedMine && !viewed.removed && !viewed.redacted
+              ? () => {
+                  reportAfterViewer.current = viewed.id;
+                  closeViewer();
+                }
+              : undefined
+          }
+          onClose={closeViewer}
+          onDismiss={viewerGone}
+        />
+      )}
       <ConversationOptionsSheet slug={slug} conversation={c} open={optionsOpen} onClose={() => setOptionsOpen(false)} onBlock={() => setConfirmBlock(true)} onStatus={setStatus} />
       {c.peer && <BlockConfirmSheet slug={slug} member={c.peer} open={confirmBlock} onClose={() => setConfirmBlock(false)} onDone={() => setStatus(`${name} is blocked`)} />}
       <ReportMessageSheet

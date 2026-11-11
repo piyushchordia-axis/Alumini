@@ -107,3 +107,102 @@ function download(name: string, text: string, mime: string) {
   // Revoking straight away can cancel the download in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
+
+/** A PDF picked for a chat message: its copy on the phone, or on the web build the browser's own File, and what it is. */
+export interface PickedChatFile {
+  /** The copy in the app's own storage on a phone; "" on the web build. */
+  uri: string;
+  name: string;
+  type: string;
+  size: number | null;
+  /** The web build's File, which uploads as it is. */
+  file?: File;
+}
+
+/**
+ * Lets the member pick PDFs for a chat message, at most `limit` where the picker can say so (the web build's can't, and the
+ * tray turns the rest away), or none if they cancel. As with pickTextFile, a phone reads each from a copy in the app's own
+ * storage, here kept until its upload is done or it's taken out of the tray (discardPickedFile). Its size is read from the
+ * copy, since a picker may not know it.
+ */
+export async function pickChatFiles({ limit = 1 }: { limit?: number } = {}): Promise<PickedChatFile[]> {
+  const web = Platform.OS === "web";
+  const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: Platform.OS !== "ios", multiple: limit > 1, base64: false });
+  if (result.canceled) return [];
+  const picked: PickedChatFile[] = [];
+  for (const asset of result.assets) {
+    if (web) {
+      // The File is what goes; the picker's object address isn't needed.
+      forget(asset.uri, true);
+      if (asset.file) picked.push({ uri: "", name: asset.name, type: asset.file.type || asset.mimeType || "", size: asset.file.size, file: asset.file });
+      continue;
+    }
+    let size = asset.size ?? null;
+    try {
+      size = new FsFile(asset.uri).size;
+    } catch {
+      // The picker's own figure, or none: the server checks the bytes anyway.
+    }
+    picked.push({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? "", size });
+  }
+  return picked;
+}
+
+/** Deletes a picked file's copy (on the web build, lets its address go). Best effort, as forget. */
+export function discardPickedFile(uri: string) {
+  if (uri) forget(uri, Platform.OS === "web");
+}
+
+/** Where openPrivateFile puts what it hands over, in the app's cache: only ever the latest file. */
+const OPENED_FILES = "chat-files";
+const PRIVATE_FILE_UTI: Readonly<Record<string, string>> = { "application/pdf": "com.adobe.pdf", "image/jpeg": "public.jpeg", "image/png": "public.png", "image/webp": "org.webmproject.webp" };
+
+function emptyOpenedFiles(): Directory {
+  const folder = new Directory(Paths.cache, OPENED_FILES);
+  try {
+    if (folder.exists) folder.delete();
+  } catch {
+    // Best effort: the next open, or sign-out, tries again.
+  }
+  return folder;
+}
+
+/**
+ * Opens a chat file or photo from its signed link: on a phone it's downloaded into the app's cache and handed to the share
+ * sheet (to open in a PDF reader, save to Files, send on), and on the web build it downloads as the web app's do, from a
+ * link in this tab with no referrer. As saveFile does, the folder holds only the latest file, since the app it went to may
+ * read it after the sheet closes; forgetOpenedFiles empties it at sign-out. Throws, in words for the member, when it
+ * can't be downloaded (an expired link, say) or the phone can't share files.
+ */
+export async function openPrivateFile(url: string, name: string, mime: string): Promise<void> {
+  if (Platform.OS === "web") return downloadFromLink(url);
+  const folder = emptyOpenedFiles();
+  folder.create({ intermediates: true, idempotent: true });
+  const fileName = name.replace(/[\\/:*?"<>|]+/g, "_") || "download";
+  let file: FsFile;
+  try {
+    file = await FsFile.downloadFileAsync(url, new FsFile(folder, fileName), { idempotent: true });
+  } catch {
+    // The native error can quote the address, a signed link: say what happened instead.
+    throw new Error("That couldn't be downloaded. Check your connection, then try again.");
+  }
+  if (!(await Sharing.isAvailableAsync())) throw new Error("This device can't share files.");
+  await Sharing.shareAsync(file.uri, { mimeType: mime, UTI: PRIVATE_FILE_UTI[mime], dialogTitle: name });
+}
+
+/** Deletes whatever openPrivateFile last handed over, as signing out does. */
+export function forgetOpenedFiles() {
+  if (Platform.OS !== "web") emptyOpenedFiles();
+}
+
+/** The web build's download of a signed link: the server sends it as an attachment, so the page stays where it is. */
+function downloadFromLink(url: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  a.rel = "noreferrer";
+  a.referrerPolicy = "no-referrer";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}

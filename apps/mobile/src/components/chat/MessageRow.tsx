@@ -1,6 +1,8 @@
-import { messageSenderName, systemLineText, type ChatRow } from "@illuminize/shared/chat";
+import { attachmentA11yText, CHAT_FILE_DEFAULT_NAME, fileOpenLabel, messageSenderName, PHOTO_GRID_WIDTH, photoOpenLabel, systemLineText, type ChatRow } from "@illuminize/shared/chat";
 import { memo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import { MessageAttachments, PendingAttachments, useOpenAttachment } from "@/components/chat/MessageAttachments";
+import type { Focusable } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
 type MessageRowData = Extract<ChatRow, { type: "message" }>;
@@ -9,7 +11,14 @@ export interface MessageActions {
   onRetry: (clientKey: string) => void;
   onDiscard: (clientKey: string) => void;
   onReport: (messageId: string) => void;
+  /** Opens the viewer on a message's photo `index` (among its photos); `opener` takes focus back when it closes. */
+  onOpenPhoto: (messageId: string, index: number, opener: Focusable | null) => void;
+  /** Something about a photo or file went wrong, for the screen to say. */
+  onProblem: (text: string) => void;
 }
+
+/** The bubble's padding around its photos and files. */
+const MEDIA_INSET = 4;
 
 const REMOVED = "This message was removed";
 const HIDDEN = "Hidden because you blocked this member";
@@ -27,10 +36,13 @@ export function DayRow({ label }: { label: string }) {
 
 /**
  * One message. Text is shown as text and nothing else: no links, no markdown, line breaks kept, long unbroken strings
- * wrapped. Tapping it shows its time and, for someone else's message, Report message; screen readers get the report as an
- * action on the message itself.
+ * wrapped. Photos and files sit above the words. Tapping it, or holding a photo or file, shows its time and, for someone
+ * else's message, Report message; screen readers hear the photos and files counted, and get reporting and opening each
+ * one as actions on the message itself.
  */
 export const MessageRow = memo(function MessageRow({
+  slug,
+  conversationId,
   row,
   me,
   showSenders = false,
@@ -38,6 +50,8 @@ export const MessageRow = memo(function MessageRow({
   selected,
   onSelect,
 }: {
+  slug: string;
+  conversationId: string;
   row: MessageRowData;
   /** This member's id, so a system line about them reads "You". */
   me: string;
@@ -48,6 +62,8 @@ export const MessageRow = memo(function MessageRow({
   onSelect: () => void;
 }) {
   const theme = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const { opening, open: openFile } = useOpenAttachment(slug, conversationId, actions.onProblem);
   const { item, mine, startsGroup, endsGroup, timeLabel } = row;
   const message = item.message;
   const pending = item.pending;
@@ -71,6 +87,18 @@ export const MessageRow = memo(function MessageRow({
   const text = removed ? REMOVED : hidden ? HIDDEN : (message?.body ?? pending?.body ?? "");
   const muted = removed || hidden;
   const state = pending ? (failed ? "not sent" : "sending") : timeLabel;
+  // A removed or hidden message's DTO has none; a send still going shows its previews from this device.
+  const attachments = muted ? [] : (message?.attachments ?? pending?.attachments ?? []);
+  const hasMedia = attachments.length > 0;
+  // As wide as a photo grid gets, within the bubble's 85% of the row.
+  const mediaWidth = Math.min(PHOTO_GRID_WIDTH, Math.floor((windowWidth - spacing.md * 2) * 0.85) - MEDIA_INSET * 2);
+  const summary = attachmentA11yText(attachments);
+  const spoken = summary ? (text ? `${summary} ${text}` : summary.replace(/\.$/, "")) : text;
+  const photos = attachments.filter((a) => a.kind === "PHOTO");
+  const files = attachments.filter((a) => a.kind === "FILE");
+  // iOS reads the bubble as one element, so its photo and file buttons can't be reached there: it offers them as actions.
+  const mediaActions = message && hasMedia ? [...photos.map((_, i) => ({ name: `photo:${i}`, label: photoOpenLabel(i, photos.length) })), ...files.map((f) => ({ name: `file:${f.id}`, label: fileOpenLabel(f.name ?? CHAT_FILE_DEFAULT_NAME) }))] : [];
+  const a11yActions = [...(reportable ? [{ name: "report", label: "Report message" }] : []), ...mediaActions];
 
   return (
     <View style={{ alignItems: mine ? "flex-end" : "flex-start", marginTop: startsGroup ? spacing.md : 2, paddingHorizontal: spacing.md }}>
@@ -82,15 +110,23 @@ export const MessageRow = memo(function MessageRow({
       )}
       <Pressable
         onPress={onSelect}
-        accessibilityLabel={`${who}: ${text}, ${state}`}
+        accessibilityLabel={`${who}: ${spoken}, ${state}`}
         accessibilityHint={reportable ? "Shows the time and Report message" : "Shows the time"}
-        accessibilityActions={reportable ? [{ name: "report", label: "Report message" }] : undefined}
+        accessibilityActions={a11yActions.length ? a11yActions : undefined}
         onAccessibilityAction={(e) => {
-          if (e.nativeEvent.actionName === "report" && message) actions.onReport(message.id);
+          const name = e.nativeEvent.actionName;
+          if (!message) return;
+          if (name === "report") actions.onReport(message.id);
+          else if (name.startsWith("photo:")) actions.onOpenPhoto(message.id, Number(name.slice(6)), null);
+          else if (name.startsWith("file:")) {
+            const file = files.find((f) => f.id === name.slice(5));
+            if (file) void openFile(message.id, file);
+          }
         }}
         style={[
           // At least 44 points tall, because tapping a bubble is the way to Report message.
-          { maxWidth: "85%", minHeight: 44, justifyContent: "center", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
+          { maxWidth: "85%", minHeight: 44, justifyContent: "center", borderRadius: 18 },
+          hasMedia ? { width: mediaWidth + MEDIA_INSET * 2, padding: MEDIA_INSET } : { paddingHorizontal: 14, paddingVertical: 8 },
           muted
             ? { borderWidth: 1, borderStyle: "dashed", borderColor: "#cbd5e1", backgroundColor: colors.card }
             : mine
@@ -99,9 +135,32 @@ export const MessageRow = memo(function MessageRow({
           endsGroup ? (mine ? { borderBottomRightRadius: 6 } : { borderBottomLeftRadius: 6 }) : null,
         ]}
       >
-        <Text selectable={!muted} style={{ fontSize: 15, lineHeight: 21, color: muted ? colors.muted : mine ? "#fff" : colors.text, fontStyle: muted ? "italic" : "normal" }}>
-          {text}
-        </Text>
+        {hasMedia &&
+          (message ? (
+            <MessageAttachments
+              slug={slug}
+              conversationId={conversationId}
+              message={message}
+              width={mediaWidth}
+              opening={opening}
+              onOpenPhoto={actions.onOpenPhoto}
+              onOpenFile={(file) => void openFile(message.id, file)}
+              onLongPress={onSelect}
+            />
+          ) : (
+            <PendingAttachments attachments={pending?.attachments ?? []} width={mediaWidth} />
+          ))}
+        {text ? (
+          <Text
+            selectable={!muted}
+            style={[
+              { fontSize: 15, lineHeight: 21, color: muted ? colors.muted : mine ? theme.onPrimary : colors.text, fontStyle: muted ? "italic" : "normal" },
+              hasMedia ? { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 } : null,
+            ]}
+          >
+            {text}
+          </Text>
+        ) : null}
       </Pressable>
       {pending ? (
         failed ? (

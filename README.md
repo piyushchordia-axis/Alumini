@@ -634,6 +634,17 @@ count it.
     The file inputs list only those three types, so iPhone Safari hands a HEIC photo over as a JPEG.
   - Each app then checks the prepared file (`imageFileProblem`) and uploads it with a 90-second timeout, given up on
     when the screen closes.
+- **Chat photos and PDFs are private.** What members send in chat (see **Direct messages**) never goes through
+  `/uploads` or the `uploads` ledger: `POST /t/:slug/chat/conversations/:id/attachments` stores it in private storage
+  with a row in `chat_attachments`, and it opens only through a link signed for one member for 10 minutes (see
+  **Deployment notes**). A photo is read by its bytes and re-encoded as above, so its EXIF and GPS position go, with a
+  WebP thumbnail of at most 480 pixels for the thread; a PDF is stored as it is and always downloads, never opens in the
+  page. The apps prepare a chat photo as they prepare any other, but the phone keeps its prepared copy as the photo's
+  preview, in the tray and then in the bubble while the message sends, until its tray item is removed or its outbox
+  entry is released, then deletes it: a sent message's 60 seconds later, kept as the bubble's placeholder while the
+  thumbnail loads, a discarded one's at once. The picker's own copy is still deleted at once, a PDF's copy once it has
+  uploaded, and signing out (or leaving a group, for that group's) deletes every one. The web keeps its previews as
+  object URLs, released the same way.
 - **Both apps** use an `AvatarPicker`: a 96px round preview with initials, **Add photo**, **Change photo** and **Remove
   photo**, the photo prepared as above, progress, and cancel. Errors show inline and are announced. Saving waits while
   a photo uploads. On a phone the system editor crops the photo square; the web relies on the server's crop. An avatar
@@ -823,7 +834,8 @@ Long descriptions take bullet lists and clickable links, with no other formattin
   business descriptions and member bios. `RICH_TEXT_HINT` ("Start a line with - for a bullet point. Links become
   clickable.") sits under those fields in the forms, and cards show a plain excerpt with the markers gone
   (`plainExcerpt`).
-- Posts, comments and chat stay plain text on purpose: links in the feed invite spam, and chat is text only.
+- Posts, comments and chat stay plain text on purpose: links in the feed invite spam. A chat message's photos and PDFs
+  go beside its words, never in them (see **Direct messages**).
 
 ### Billing / chargeback (offline)
 
@@ -1117,10 +1129,10 @@ website, and a contact email and phone. Each member may have up to five listings
 
 ### Direct messages
 
-Members message each other one to one under **Messages**, or with **Message this member** on a profile. Chat is text
-only: uploads can be read by anyone with their link, so an attachment wouldn't be private, and the message box says
-so. The tables are `chat_*` (`apps/api/src/db/schema/chat.ts`) and the client is `api.chat`, because "messages"
-already means outbound WhatsApp, SMS and email.
+Members message each other one to one under **Messages**, or with **Message this member** on a profile. Once a chat is
+accepted, a message can carry photos and PDFs as well as words (see **Photos and files** below). The tables are
+`chat_*` (`apps/api/src/db/schema/chat.ts`) and the client is `api.chat`, because "messages" already means outbound
+WhatsApp, SMS and email.
 
 - **Message requests.** A first message to someone is a request. Before it goes, a note above the box welcomes it
   ("Say hello to Priya Nair") and says it arrives as a request, with a tip for writing it and nothing about a decline
@@ -1146,6 +1158,34 @@ already means outbound WhatsApp, SMS and email.
   (`comparableFooter`), and a unit test checks that nothing a requester reads mentions a decline or a block. The
   blocker can't send until they unblock. Blocking also withdraws or silently suppresses mentorship and referral
   requests between the two, and their group invitations to each other.
+- **Photos and files.** In an accepted chat (and a group: see **Groups**) the paperclip beside the box, **Add photos or
+  a file**, adds up to 4 photos (JPEG, PNG or WebP, made at most 2048 pixels and 5 MB) and PDFs (up to 10 MB) to a
+  message. On the web it opens a file chooser that takes several at once, and a file pasted or dropped on the box goes
+  in too; on the phone a sheet offers **Photos** (the library, each photo prepared on the device: see **Photos and
+  uploads**) and **PDF file** (the document picker). Each waits in a tray above the box while it uploads, with a remove
+  button, a spinner, and **Try again** with the reason when it didn't go up, and a line read out politely says what is
+  uploading or failed. Send goes once there are words or something uploaded and nothing is still uploading or failed,
+  so a message can be photos and files alone. The paperclip is there only when the thread's `canAttach` says so: a
+  first message and asking again can't carry any, and the line under the box says "Photos and files can be sent once
+  Priya Nair accepts." (from `threadFooter`, so a request waiting, declined or met by a block reads the same), or
+  "Photos and files are turned off for this institution." where the switch is off (see **Feature switches**).
+- **Photos and files in a thread.** Photos sit above a message's words in a grid (shared `photoGridLayout`: one up to
+  260 pixels wide, two side by side, three or four two by two) sized from each photo's own width and height before
+  anything loads, so the thread doesn't jump. Each PDF is a white card, whatever the bubble's colour, with its name,
+  "PDF · 1.2 MB" and **Download** on the web; on the phone the whole row opens it, downloading it and then offering the
+  share sheet. A screen reader hears what a message holds before its words ("Priya Nair: A photo and a file."). A photo
+  opens a viewer over the thread, named "Photo 1 of 2 from Priya Nair", with Close, Previous and Next, **Download
+  photo** (**Share photo** on the phone) and, on someone else's message, **Report message**. On the web, Esc closes it
+  and the arrow keys page, with focus kept inside and handed back to the photo; on the phone it pages by swiping and
+  Android's Back closes it. Nothing animates for anyone who asked for less motion. A photo that won't load says "Photo
+  didn't load" with **Try again**. The inbox previews a message by what it holds: "Photo", "3 photos", "File:
+  notes.pdf", "2 attachments", and "Photo · See you there" with words. Pushes never name a photo or file.
+- **Links, never addresses.** A message carries what its photos and files are, never where. The apps ask for links only
+  as messages come near the screen, in one request for all that do at once (`createAttachmentLinkLoader` in
+  `@illuminize/shared/chat`, over `GET /chat/conversations/:id/attachments`), keep them in memory only (the phone's
+  images in expo-image's memory cache) and ask again when they're about to expire or a photo fails to load. Signing out
+  forgets them, with any upload under way, the previews, and any PDF the phone opened. A photo or file lasts as long as
+  its message.
 - **Ordering and retries.** Each conversation has a gapless `seq`, handed out under the conversation's row lock, and
   pages are read by `seq`, never by time. Every send carries a `clientKey`: a retry with the same key gets the original
   message back and uses no `seq`. The apps keep unsent messages in an outbox, send one at a time per thread, and offer
@@ -1201,6 +1241,9 @@ A group is a shared chat room. Any member who can use chat creates one under **G
 - **Delivery.** Group sends share the direct-message path, with a limit of 120 a minute per group
   (`CHAT_GROUP_BUSY`). Unread counts text messages, not lines like "joined the group". A member who blocked someone sees
   their messages as "Blocked member", with no text.
+- **Photos and files.** A group that can take messages takes photos and PDFs too, with the same paperclip, tray,
+  limits, grid and viewer as a direct chat (see **Direct messages**), while Chat attachments is on. A member who blocked
+  the sender gets none of a "Blocked member" message's photos or files, and no link to them, as with its text.
 - **A new owner.** When the owner leaves, is suspended or deletes their account, the member who has been in it longest
   and can still run it takes over. A group nobody can take over is archived.
 
@@ -1260,9 +1303,10 @@ Chat messages stay out of `CONTENT_TYPES` and `moderation_items` (a group is the
 because admins can read everything in that view. Instead:
 
 - **Reporting a message.** A member picks **Report message** on someone else's message. The dialog says "Admins will
-  see this message and up to 10 around it." Filing freezes that list of ids, worked out for the reporter: up to five
-  either side, leaving out anything from before they joined, withheld from them, redacted for them or already removed.
-  Members can't report their own messages, system lines or withheld messages. A mentorship or referral request's note
+  see this message and up to 10 around it, with any photos and files in them." (`CHAT_REPORT_INTRO`, on both apps).
+  Filing freezes that list of ids, worked out for the reporter: up to five either side, leaving out anything from before
+  they joined, withheld from them, redacted for them or already removed. Members can't report their own messages,
+  system lines or withheld messages. A mentorship or referral request's note
   is reported with **Report request**, which keeps a copy of the note.
 - **The queue.** **Admin → Chat reports** shows who reported whom, why and when, and no text. The dashboard's **Open chat
   reports** tile and the nav item always show, even with Messaging off, because an admin may switch it off during an

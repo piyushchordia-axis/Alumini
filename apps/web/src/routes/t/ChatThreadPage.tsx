@@ -1,5 +1,19 @@
 import type { ChatConversationDto, ChatGroupDto, ChatMessageDto } from "@illuminize/shared";
-import { chatKeys, conversationTitle, directThreadSubtitle, emptyThreadText, groupMessages, newClientKey, sendLimitNotice, threadFooter, threadItems, type OutboxEntry, type RerequestLine, type ThreadItem } from "@illuminize/shared/chat";
+import {
+  chatKeys,
+  conversationTitle,
+  directThreadSubtitle,
+  emptyThreadText,
+  groupMessages,
+  messageSenderName,
+  newClientKey,
+  sendLimitNotice,
+  threadFooter,
+  threadItems,
+  type OutboxEntry,
+  type RerequestLine,
+  type ThreadItem,
+} from "@illuminize/shared/chat";
 import { errorMessage, fatalQueryError, isApiClientError, isTransientError } from "@illuminize/shared/client";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -10,12 +24,14 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
 import { ConversationOptions } from "@/components/chat/ConversationOptions";
 import { MessageList, type MessageActions } from "@/components/chat/MessageList";
+import { PhotoViewer } from "@/components/chat/PhotoViewer";
 import { ReportMessageDialog } from "@/components/chat/ReportMessageDialog";
 import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
 import { Button, EmptyState, Loading } from "@/components/ui";
 import { useDocumentVisible, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
+import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { chatSync, inboxFromParams, inboxQuery, isMuted, patchConversation } from "@/lib/chat";
@@ -122,8 +138,11 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
 
   const dk = draftKey(slug, id);
   const setDraft = useChatStore((s) => s.setDraft);
+  const tray = useChatAttachments(slug, id, dk);
   const [notice, setNotice] = useState<string | null>(null);
   const [reporting, setReporting] = useState<string | null>(null);
+  // The photo viewer: which message's photos, which one, and the button that opened it.
+  const [viewing, setViewing] = useState<{ messageId: string; index: number; opener: HTMLElement } | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
@@ -154,22 +173,29 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  /** What became of a send that didn't go. Too many too fast puts the words back to send later, if the box is free for them. */
+  /**
+   * What became of a send that didn't go. Too many too fast puts the words, and the photos and files with them, back to
+   * send later, if the box and the tray are free for them.
+   */
   const settleFailure = (clientKey: string, text: string) => {
     const failed = qc.getQueryData<OutboxEntry[]>(outboxKey)?.find((e) => e.clientKey === clientKey);
     const notice = sendLimitNotice(failed?.code);
     if (!notice) return;
     setNotice(notice);
-    if (!useChatStore.getState().drafts[dk]) {
-      chatSync.discard(slug, id, clientKey);
+    const { drafts, trays } = useChatStore.getState();
+    if (!drafts[dk] && !trays[dk]?.length) {
+      // Kept rather than released: the tray takes over its uploads and their previews.
+      chatSync.discard(slug, id, clientKey, { release: false });
       setDraft(dk, text);
+      tray.restore(failed?.attachments ?? []);
     }
   };
   const send = (text: string) => {
     setNotice(null);
     setDraft(dk, "");
+    const attachments = tray.take();
     const clientKey = newClientKey();
-    void chatSync.send(slug, id, text, clientKey).then((sent) => {
+    void chatSync.send(slug, id, text, clientKey, attachments).then((sent) => {
       if (!sent) settleFailure(clientKey, text);
     });
   };
@@ -183,6 +209,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
     },
     onDiscard: (clientKey) => chatSync.discard(slug, id, clientKey),
     onReport: setReporting,
+    onOpenPhoto: (messageId, index, opener) => setViewing({ messageId, index, opener }),
   };
 
   const inboxHref = `/t/${slug}/app/messages${inboxQuery(inboxFromParams(params))}`;
@@ -206,10 +233,15 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
   const name = conversationTitle(c);
   const muted = isMuted(c, now);
   const profileHref = c.peer && tenant.settings.features.directory ? `/t/${slug}/app/directory/${c.peer.id}` : null;
-  const composer = (keyboardOpen: boolean, intro: string | null) => <ChatComposer draftKey={dk} onSend={send} notice={notice} intro={intro} keyboardOpen={keyboardOpen} autoFocus />;
+  // Kept on screen while the tray still holds something, even once photos and files can't go here any more, so it can be
+  // emptied; the paperclip, pasting and dropping only while they can (canAdd).
+  const attach = c.canAttach || tray.tray.length > 0 ? { tray: tray.tray, canAdd: c.canAttach, onAdd: tray.add, onRemove: tray.remove, onRetry: tray.retry } : null;
+  const composer = (keyboardOpen: boolean, intro: string | null, attachCaption: string | null) => (
+    <ChatComposer draftKey={dk} onSend={send} notice={notice} intro={intro} attach={attach} attachCaption={attachCaption} keyboardOpen={keyboardOpen} autoFocus />
+  );
   const subtitle = c.group ? [pluralize(c.group.memberCount, "member"), c.group.archived && "Archived", muted && "Muted"].filter(Boolean).join(" · ") : directThreadSubtitle(c, muted);
 
-  const f = threadFooter(c, footerNow, group.data);
+  const f = threadFooter(c, footerNow, group.data, tenant.settings.features);
   const footerActions = (): ReactNode => {
     if (f.kind !== "panel" || !c.peer) return undefined;
     switch (f.action) {
@@ -237,7 +269,11 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
         return undefined;
     }
   };
-  const footer = (keyboardOpen: boolean): ReactNode => (f.kind === "composer" ? composer(keyboardOpen, f.intro) : <Panel title={f.title} text={f.text} when={f.when} actions={footerActions()} />);
+  const footer = (keyboardOpen: boolean): ReactNode => (f.kind === "composer" ? composer(keyboardOpen, f.intro, f.attachCaption) : <Panel title={f.title} text={f.text} when={f.when} actions={footerActions()} />);
+
+  const viewed = viewing ? items.find((item) => item.message?.id === viewing.messageId)?.message : undefined;
+  const viewedPhotos = viewed?.attachments.filter((a) => a.kind === "PHOTO") ?? [];
+  const viewedMine = viewed?.sender?.id === me;
 
   const loadingFirst = messages.isLoading;
   const firstLoadFailed = !messages.data && !!messages.error;
@@ -282,6 +318,8 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
             </div>
           ) : (
             <MessageList
+              slug={slug}
+              conversationId={id}
               rows={rows}
               label={c.group ? `Messages in ${name}` : `Messages with ${name}`}
               me={me}
@@ -299,6 +337,22 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
           </p>
           <ConversationOptions slug={slug} conversation={c} open={optionsOpen} onClose={() => setOptionsOpen(false)} onBlock={() => setConfirmBlock(true)} />
           {c.peer && <BlockConfirmDialog slug={slug} member={c.peer} open={confirmBlock} onClose={() => setConfirmBlock(false)} />}
+          {/* Before the report dialog, which opens over it from its Report button. Gone with the message's photos (removed, say). */}
+          {viewing && viewed && viewedPhotos.length > 0 && (
+            <PhotoViewer
+              key={viewing.messageId}
+              slug={slug}
+              conversationId={id}
+              message={viewed}
+              photos={viewedPhotos}
+              startIndex={viewing.index}
+              who={viewedMine ? "you" : messageSenderName(viewed)}
+              opener={viewing.opener}
+              suspended={!!reporting}
+              onReport={!viewedMine && !viewed.removed && !viewed.redacted ? () => setReporting(viewed.id) : undefined}
+              onClose={() => setViewing(null)}
+            />
+          )}
           <ReportMessageDialog slug={slug} messageId={reporting} onClose={() => setReporting(null)} />
           <ConfirmDialog
             open={confirmDecline}

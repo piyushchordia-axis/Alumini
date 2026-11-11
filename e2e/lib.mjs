@@ -855,6 +855,32 @@ export async function bigPhoto(page) {
 }
 
 /**
+ * A small photo with something to see, made in the page: a 720 × 480 JPEG of a sky and a sun. Its 3:2 shape is neither
+ * square nor the 4:3 a chat photo of unknown size is drawn at, so a box sized from it shows where its size came from.
+ */
+export async function landscapePhoto(page, name = "view.jpg") {
+  const base64 = await page.evaluate(async () => {
+    const canvas = Object.assign(document.createElement("canvas"), { width: 720, height: 480 });
+    const g = canvas.getContext("2d");
+    const sky = g.createLinearGradient(0, 0, 0, 480);
+    sky.addColorStop(0, "#38bdf8");
+    sky.addColorStop(1, "#0f766e");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, 720, 480);
+    g.fillStyle = "#facc15";
+    g.beginPath();
+    g.arc(520, 150, 70, 0, Math.PI * 2);
+    g.fill();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+  });
+  return { name, mimeType: "image/jpeg", buffer: Buffer.from(base64, "base64") };
+}
+
+/**
  * Picks a bigPhoto, `pick(file)` choosing it the way the page does, and fails unless the app prepared it before sending
  * it: the request's body (its Content-Length, as Chromium sent it; Playwright's body size leaves out a file part) is
  * under the upload limit, the upload answers 201, and the form shows the stored photo. Gives the stored photo's URL.

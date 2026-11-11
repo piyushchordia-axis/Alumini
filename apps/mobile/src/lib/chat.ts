@@ -2,6 +2,7 @@ import type { ChatConversationDto } from "@illuminize/shared";
 import { activeChat, chatKeys, createChatSync } from "@illuminize/shared/chat";
 import type { QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { forgetChatAttachments, releaseOutboxAttachments } from "@/lib/chatAttachments";
 import { queryClient } from "@/lib/queryClient";
 import { realtime } from "@/lib/realtime";
 import { useAuthStore } from "@/stores/authStore";
@@ -15,12 +16,16 @@ export const chatSync = createChatSync({
   getActive: () => activeChat(useChatStore.getState().focus),
   // The badge is on screen everywhere, and 30 seconds behind a message shows.
   badgeEveryMs: 5_000,
+  // A sent or discarded message's prepared photos can go once nothing will show or send them again.
+  onOutboxRelease: releaseOutboxAttachments,
 });
 
-// Message text and drafts belong to whoever is signed in. Every way out of a session (sign out, a 401, an account deleted) goes through here.
+// Message text, drafts, uploads, prepared photos, photos shown, files opened and file links belong to whoever is signed
+// in. Every way out of a session (sign out, a 401, an account deleted) goes through here.
 useAuthStore.subscribe((state, previous) => {
   if (state.user?.id === previous.user?.id) return;
   useChatStore.getState().forgetConversations();
+  forgetChatAttachments({ signedOut: !!previous.user });
   queryClient.removeQueries({ queryKey: ["chat"] });
 });
 
@@ -32,7 +37,11 @@ export function patchConversation(qc: QueryClient, slug: string, id: string, pat
   );
 }
 
-/** After an action that can change a thread anywhere: its state, the lists, the badge and the profile lookups. Outboxes are left alone. */
+/**
+ * After an action that can change a thread anywhere: its state, the lists, the badge and the profile lookups. Outboxes are
+ * left alone, and so are file links: a message that may no longer be seen comes back without its photos and files, and
+ * signing the links again would only reload every photo.
+ */
 export function refreshChat(qc: QueryClient, slug: string) {
-  return qc.invalidateQueries({ queryKey: chatKeys.all(slug), predicate: (q) => q.queryKey[2] !== "outbox" });
+  return qc.invalidateQueries({ queryKey: chatKeys.all(slug), predicate: (q) => q.queryKey[2] !== "outbox" && q.queryKey[2] !== "attachments" });
 }

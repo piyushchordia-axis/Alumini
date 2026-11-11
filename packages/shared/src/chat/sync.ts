@@ -43,11 +43,11 @@ export interface ChatSyncOptions {
    */
   sendTimeoutMs?: number;
   /**
-   * Called once an entry leaves the outbox for good: its message arrived, or it was discarded (unless the caller keeps what
-   * it held). What it held for the screen, such as a photo's preview, can go then and not before, since a failed send
-   * keeps it to try again.
+   * Called once an entry leaves the outbox for good: its message arrived (`sent`), or it was discarded (unless the caller
+   * keeps what it held). What it held for the screen, such as a photo's preview, can go then and not before, since a
+   * failed send keeps it to try again; a discarded one's has nothing left to show.
    */
-  onOutboxRelease?: (entry: OutboxEntry) => void;
+  onOutboxRelease?: (entry: OutboxEntry, how: { sent: boolean }) => void;
 }
 
 export interface ChatSync {
@@ -143,14 +143,17 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
     if (qc.getQueryState(key)?.fetchStatus === "fetching") void qc.invalidateQueries({ queryKey: key });
   };
 
-  /** Takes an entry out of the outbox, telling the app it's gone when `release` says so and it was there to take. */
-  const takeFromOutbox = (slug: string, id: string, clientKey: string, release: boolean) => {
+  /**
+   * Takes an entry out of the outbox, telling the app it's gone, and whether its message arrived, when `release` says so
+   * and it was there to take.
+   */
+  const takeFromOutbox = (slug: string, id: string, clientKey: string, release: boolean, sent: boolean) => {
     const key = chatKeys.outbox(slug, id);
     const entry = (qc.getQueryData(key) as OutboxEntry[] | undefined)?.find((e) => e.clientKey === clientKey);
     qc.setQueryData(key, (old: OutboxEntry[] | undefined) => removeFromOutbox(old, clientKey));
     if (!entry || !release) return;
     try {
-      opts.onOutboxRelease?.(entry);
+      opts.onOutboxRelease?.(entry, { sent });
     } catch {
       // Letting go of a preview is tidying up: failing at it mustn't stop a message settling.
     }
@@ -161,7 +164,7 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
     const key = chatKeys.messages(slug, id);
     const message = removedIds.has(incoming.id) ? { ...incoming, body: null, removed: true, attachments: [] } : incoming;
     qc.setQueryData(key, (old: ChatMessagePages | undefined) => upsertLiveMessage(old, message));
-    if (message.clientKey) takeFromOutbox(slug, id, message.clientKey, true);
+    if (message.clientKey) takeFromOutbox(slug, id, message.clientKey, true, true);
     // With nothing loaded there was nothing to patch.
     if (!qc.getQueryData(key)) void qc.invalidateQueries({ queryKey: key });
     else refetchIfFetching(key);
@@ -359,7 +362,7 @@ export function createChatSync(opts: ChatSyncOptions): ChatSync {
       return post(slug, id, { clientKey, conversationId: id, body: entry.body, ...(entry.attachments ? { attachments: entry.attachments } : {}), status: "sending", createdAt: entry.createdAt });
     },
     discard(slug, id, clientKey, { release = true } = {}) {
-      takeFromOutbox(slug, id, clientKey, release);
+      takeFromOutbox(slug, id, clientKey, release, false);
     },
   };
 }

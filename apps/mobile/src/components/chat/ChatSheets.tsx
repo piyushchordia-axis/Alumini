@@ -1,5 +1,5 @@
 import { REPORT_REASONS, REPORT_REASON_LABELS, type ChatConversationDto, type ChatReportCreateInput, type ReportReason } from "@illuminize/shared";
-import { CHAT_MUTE_OPTIONS, chatMuteUntil, isMuted, isMutedUntilTurnedOn, type ChatMuteOption } from "@illuminize/shared/chat";
+import { CHAT_MUTE_OPTIONS, CHAT_REPORT_INTRO, chatMuteUntil, isMuted, isMutedUntilTurnedOn, type ChatMuteOption } from "@illuminize/shared/chat";
 import { isApiClientError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -198,7 +198,7 @@ export function ReportMessageSheet({ slug, messageId, onClose, onDone }: { slug:
     <ChatReportSheet
       open={!!messageId}
       title="Report message"
-      intro="Admins will see this message and up to 10 around it."
+      intro={CHAT_REPORT_INTRO}
       submit={(input) => api.chat.report(slug, messageId!, input)}
       onClose={onClose}
       onDone={onDone}

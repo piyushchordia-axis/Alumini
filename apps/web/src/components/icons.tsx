@@ -350,6 +350,23 @@ export function IconUpload(p: IconProps) {
     </Svg>
   );
 }
+/** Adding photos or a file to a chat message. The mobile set draws it the same way. */
+export function IconPaperclip(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3" />
+    </Svg>
+  );
+}
+/** A document, such as a PDF in a chat message. The mobile set draws it the same way. */
+export function IconFile(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" />
+    </Svg>
+  );
+}
 export function IconCopy(p: IconProps) {
   return (
     <Svg {...p}>

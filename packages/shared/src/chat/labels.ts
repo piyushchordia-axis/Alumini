@@ -229,3 +229,6 @@ export function firstMessageNotice(name: string | null | undefined): FirstMessag
     tip: "A line about who you are and why you're getting in touch helps them say hello back.",
   };
 }
+
+/** What a member reporting a message is told admins will see, on both apps. */
+export const CHAT_REPORT_INTRO = "Admins will see this message and up to 10 around it, with any photos and files in them.";

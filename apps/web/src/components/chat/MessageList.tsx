@@ -1,6 +1,7 @@
-import { messageSenderName, systemLineText, type ChatRow } from "@illuminize/shared/chat";
+import { attachmentA11yText, messageSenderName, systemLineText, type ChatRow } from "@illuminize/shared/chat";
 import clsx from "clsx";
-import { memo, useState, type ReactNode } from "react";
+import { memo, useState, type ReactNode, type RefObject } from "react";
+import { MessageAttachments, PendingAttachments } from "@/components/chat/MessageAttachments";
 import { Button } from "@/components/ui";
 import { useChatScroll } from "@/hooks/useChatScroll";
 
@@ -10,13 +11,18 @@ export interface MessageActions {
   onRetry: (clientKey: string) => void;
   onDiscard: (clientKey: string) => void;
   onReport: (messageId: string) => void;
+  /** Opens the viewer on a message's photo `index` (among its photos); `opener` takes focus back when it closes. */
+  onOpenPhoto: (messageId: string, index: number, opener: HTMLElement) => void;
 }
 
 /**
  * A thread's messages, oldest first in the DOM, inside a `role="log"` so a screen reader announces what arrives. Text is
- * rendered as text and nothing else: no links, no markdown, line breaks kept, and long unbroken strings wrapped.
+ * rendered as text and nothing else: no links, no markdown, line breaks kept, and long unbroken strings wrapped. Photos
+ * and files sit above a message's words, their links fetched as the messages come into view.
  */
 export function MessageList({
+  slug,
+  conversationId,
   rows,
   label,
   hasOlder,
@@ -27,6 +33,8 @@ export function MessageList({
   me,
   showSenders = false,
 }: {
+  slug: string;
+  conversationId: string;
   rows: ChatRow[];
   label: string;
   hasOlder: boolean;
@@ -63,7 +71,7 @@ export function MessageList({
                 <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-500">{row.label}</span>
               </div>
             ) : (
-              <Bubble key={row.key} row={row} me={me} showSenders={showSenders} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
+              <Bubble key={row.key} slug={slug} conversationId={conversationId} logRef={ref} row={row} me={me} showSenders={showSenders} actions={actions} selected={selected === row.key} onSelect={() => setSelected((s) => (s === row.key ? null : row.key))} />
             ),
           )}
         </div>
@@ -77,7 +85,28 @@ export function MessageList({
   );
 }
 
-const Bubble = memo(function Bubble({ row, me, showSenders, actions, selected, onSelect }: { row: MessageRow; me: string; showSenders: boolean; actions: MessageActions; selected: boolean; onSelect: () => void }) {
+const Bubble = memo(function Bubble({
+  slug,
+  conversationId,
+  logRef,
+  row,
+  me,
+  showSenders,
+  actions,
+  selected,
+  onSelect,
+}: {
+  slug: string;
+  conversationId: string;
+  /** The scrolling log, which a message's links are fetched a little before it scrolls into. */
+  logRef: RefObject<HTMLElement | null>;
+  row: MessageRow;
+  me: string;
+  showSenders: boolean;
+  actions: MessageActions;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const { item, mine, startsGroup, endsGroup, timeLabel } = row;
   const message = item.message;
   const pending = item.pending;
@@ -98,6 +127,10 @@ const Bubble = memo(function Bubble({ row, me, showSenders, actions, selected, o
   const failed = pending?.status === "failed";
   const reportable = !!message && !mine && !removed && !message.redacted;
   const who = mine ? "You" : message ? messageSenderName(message) : "";
+  // A removed or hidden message's DTO has none; a send still going shows its previews from this device.
+  const attachments = removed || hidden ? [] : (message?.attachments ?? pending?.attachments ?? []);
+  const hasMedia = attachments.length > 0;
+  const text = removed ? "This message was removed" : hidden ? "Hidden because you blocked this member" : (message?.body ?? pending?.body ?? "");
 
   return (
     <div className={clsx("group flex flex-col", mine ? "items-end" : "items-start", startsGroup ? "mt-3" : "mt-0.5")}>
@@ -110,17 +143,26 @@ const Bubble = memo(function Bubble({ row, me, showSenders, actions, selected, o
         <div
           onClick={onSelect}
           className={clsx(
-            "whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-snug [overflow-wrap:anywhere]",
+            "break-words rounded-2xl text-[15px] leading-snug [overflow-wrap:anywhere]",
+            hasMedia ? "p-1" : "px-3.5 py-2",
             removed || hidden
               ? "border border-dashed border-slate-300 bg-white italic text-slate-500"
               : mine
-                ? clsx("bg-primary text-white", pending && !failed && "opacity-70", failed && "ring-2 ring-red-500 ring-offset-1")
+                ? clsx("bg-primary text-on-primary", pending && !failed && "opacity-70", failed && "ring-2 ring-red-500 ring-offset-1")
                 : "bg-slate-100 text-slate-900",
             mine ? endsGroup && "rounded-br-md" : endsGroup && "rounded-bl-md",
           )}
         >
-          <span className="sr-only">{who}: </span>
-          {removed ? "This message was removed" : hidden ? "Hidden because you blocked this member" : (message?.body ?? pending?.body)}
+          <span className="sr-only">
+            {who}: {hasMedia && `${attachmentA11yText(attachments)} `}
+          </span>
+          {hasMedia &&
+            (message ? (
+              <MessageAttachments slug={slug} conversationId={conversationId} message={message} root={logRef} onOpenPhoto={actions.onOpenPhoto} />
+            ) : (
+              <PendingAttachments attachments={pending?.attachments ?? []} />
+            ))}
+          {text && <p className={clsx("whitespace-pre-wrap", hasMedia && "px-2.5 pb-1 pt-1.5")}>{text}</p>}
         </div>
         {reportable && (
           // Beside the bubble rather than under it, so a thread doesn't get taller for a control most people never use.

@@ -1,5 +1,5 @@
 import { memberYearsLine } from "@illuminize/shared";
-import { chatKeys, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
+import { chatKeys, composerAttachCaption, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
@@ -114,7 +114,19 @@ export function NewConversationPage() {
               <FirstMessageNote id={noteId} notice={firstMessageNotice(profile.data?.fullName)} className="my-auto" />
             </div>
           )}
-          {!waiting && <ChatComposer draftKey={dk} onSend={(text) => void send(text)} sending={sending} notice={notice} describedBy={noteId} keyboardOpen={keyboardOpen} autoFocus />}
+          {!waiting && (
+            <ChatComposer
+              draftKey={dk}
+              onSend={(text) => void send(text)}
+              sending={sending}
+              notice={notice}
+              describedBy={noteId}
+              // A first message goes as a request, which carries words only.
+              attachCaption={composerAttachCaption(null, tenant.settings.features, profile.data?.fullName)}
+              keyboardOpen={keyboardOpen}
+              autoFocus
+            />
+          )}
         </>
       )}
     </ChatPane>

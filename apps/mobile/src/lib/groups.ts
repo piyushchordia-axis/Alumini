@@ -3,7 +3,8 @@ import { chatKeys } from "@illuminize/shared/chat";
 import type { QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { refreshChat } from "@/lib/chat";
-import { useChatStore } from "@/stores/chatStore";
+import { forgetThreadAttachments } from "@/lib/chatAttachments";
+import { draftKey, useChatStore } from "@/stores/chatStore";
 
 export type GroupsTab = "discover" | "mine" | "invitations";
 
@@ -25,9 +26,11 @@ export function refreshGroup(qc: QueryClient, slug: string, group?: ChatGroupDto
 
 /**
  * Once a member is out of a group, nothing of its thread stays in memory: an invite-only group is closed to them from now on,
- * and an open one is read afresh if they come back.
+ * and an open one is read afresh if they come back. Its photos and files go too: the tray's uploads, the previews its unsent
+ * messages held (before their outbox goes) and the links to what was sent.
  */
 export function forgetGroupThread(qc: QueryClient, slug: string, id: string) {
+  forgetThreadAttachments(qc, slug, id, draftKey(slug, id));
   for (const key of [chatKeys.messages(slug, id), chatKeys.outbox(slug, id), chatKeys.conversation(slug, id)]) qc.removeQueries({ queryKey: key });
 }
 

@@ -115,6 +115,13 @@ phone-sized preview in the browser. Port 4000 must still be public.
   pause typing, not at every letter. The admin console's **Members** works the same way on the web now, with no
   **Search** button: the rows stay faded while a search loads, their names still links but **Approve** and
   **Suspend** held until the new rows arrive, and the search stays in the address.
+- **Photos and PDFs in chat.** Sign in as Rahul and open his chat with Priya: the paperclip beside the box, **Add photos
+  or a file**, adds up to four photos and PDFs (a file chooser on the web, where a photo pasted or dropped on the box
+  goes in too; on the phone a sheet with **Photos** and **PDF file**). Each waits in a tray while it uploads, and Send
+  goes once they're up, with words or without. In the thread, a photo opens full screen, with **Download photo**
+  (**Share photo** on the phone) and, on someone else's message, **Report message**; a PDF is a card that downloads (on
+  the phone, opens the share sheet). A first message can't carry any: the line under the box says "Photos and files can
+  be sent once … accepts."
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 
@@ -250,10 +257,12 @@ feed its card says **You: yes**.
   3. As Sneha, watch the request appear under Requests, and a number appear on Messages, without reloading. Open it:
      Sneha can **Accept request**, **Decline request** (Priya is never told) or **Block member**. Choose **Accept
      request**.
-  4. Write to each other. Each message shows up in the other window within a second or two.
+  4. Write to each other. Each message shows up in the other window within a second or two. Then, as Priya, choose the
+     paperclip beside the box, add a photo and a PDF, and send them with a few words: Sneha sees the photo in the thread
+     (choose it to see it full screen) and the PDF as a card she can download.
   5. As Sneha, report one of Priya's messages: point at it (on a phone, tap it) and choose the flag beside it, **Report
      message**. Pick a reason and **Send report**. The dialog says admins will see this message and up to 10 around it,
-     and nothing more.
+     with any photos and files in them, and nothing more.
   6. In a third window, or after signing out, sign in to Demo University as its admin (`+91 90000 00001`) and choose
      **Admin**. The dashboard has an **Open chat reports** tile. Open **Chat reports**: it shows who reported whom and
      why, but no messages. Another report is already there: Meera reported a threatening message from Arjun.
@@ -264,8 +273,8 @@ feed its card says **You: yes**.
      again, which is recorded too.
 
   Also try **Conversation options → Block member** in a chat: the other member isn't told, and nothing they send
-  reaches you from then on. **Blocked members**, at the top of Messages, lists them and lets you unblock. Chat is text
-  only, and pushes to a phone never show what a message says.
+  reaches you from then on. **Blocked members**, at the top of Messages, lists them and lets you unblock. Pushes to a
+  phone never show what a message says, or name a photo or file.
 - **Groups.** Sign in as Arjun (`+91 91000 00003`), open **Groups** and, under **Discover**, open **London & UK alumni**
   and **Join group**: you see the whole conversation so far. **Create group** asks whether a group is open (anyone can
   find and join it) or invite-only (only people you invite see it, and they see messages from when they join), and

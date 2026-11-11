@@ -235,14 +235,23 @@ Covers:
 - direct messages between two seeded members (Meera and Sneha): a request, welcomed first by a note named "Say hello to
   Sneha Kulkarni" (its text and tip, the envelope an SVG in Demo University's badge, its words readable, nothing hinting
   at a decline or a block, and the message box described by it: title, text and tip as sentences of their own, as
-  Chromium works the description out over CDP), refused once for going too fast (keeping its words in the box), its
-  Request sent panel giving the date to ask again on a line of its own (a clock, thirty days on in a `<time>`, nothing
-  hinting at a decline or a block), the thread left open past that date (answered by the script a few seconds on)
-  offering the box with its note on the info tone and saying so, accepted live, replies both ways with exactly one
-  bubble each, a thread in a background tab not marking anything read, Try again reusing the client key, a refusal for
-  sending too fast (a warning on the warning tone), a draft surviving a failed refetch, a report (and a second one), a
-  block (the blocked member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap
-  fill, and the thread on a phone;
+  Chromium works the description out over CDP), no paperclip and the line "Photos and files can be sent once Sneha
+  Kulkarni accepts." (a photo dropped on the box answered with the same words as a warning), refused once for going too
+  fast (keeping its words in the box), its Request sent panel giving the date to ask again on a line of its own (a
+  clock, thirty days on in a `<time>`, nothing hinting at a decline or a block), the thread left open past that date
+  (answered by the script a few seconds on) offering the box with its note on the info tone and saying so, and still no
+  paperclip, accepted live, replies both ways with exactly one bubble each, a photo and a PDF sent through the
+  paperclip's chooser (several at once, offering the three photo types and PDF) with a dropped photo (Send held, saying
+  why, while its upload is held back and again once it fails, then Try again uploading it) removed again (focus going to
+  the paperclip) and Send free with nothing typed, arriving live (the photo loaded from a `/files/` link sent `nosniff`
+  and `private, no-store`, the PDF's card with its type and size, the bubble's screen-reader summary, no link in the
+  messages' JSON, one request for links in all), the photo viewer (named for whose photo, focus on Close, Report
+  message, Download photo saving `photo.jpg`, Escape handing focus back to the photo), the PDF downloaded under its name
+  and its link refused (403) with one character of its signature changed, the inbox previewing "2 attachments · …", a
+  thread in a background tab not marking anything read, Try again reusing the client key, a refusal for sending too fast
+  (a warning on the warning tone), a draft surviving a failed refetch, a report (and a second one), a block (the blocked
+  member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap fill, and the thread
+  on a phone, with nothing scrolling sideways;
 - a current pupil (Naina, Demo School) seeing no Messages, Groups, Mentors or referrals, with all of them switched on,
   the feed's Explore row offering Businesses and Funding, and Upcoming events listing the Singapore dinner and
   Founders' Day assembly with Events on the bar, each day in Demo School's ink on its wash;
@@ -497,9 +506,14 @@ Covers:
   and a notification tap landing on its target;
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including the note welcoming the first
   message ("Say hello to Vikram Desai", its text and tip, its envelope in Demo University's badge, its words readable,
-  nothing hinting at a decline), the request refused once for going too fast (on the warning tone), the date to ask
-  again on a line of its own, the thread left open past it offering the box with its note on the info tone, a report
-  from tapping a message, a block, a cold start on a thread, and a lost socket frame recovered by the gap fill;
+  nothing hinting at a decline, no paperclip and the line saying photos and files wait for Vikram to accept), the
+  request refused once for going too fast (on the warning tone), the date to ask again on a line of its own, the thread
+  left open past it offering the box with its note on the info tone and no paperclip, a photo and a PDF added through
+  the paperclip's sheet (Photos and PDF file, each a file chooser on the web build) into the tray (Send held, with words
+  typed, while the photo's upload is held back), the composer still fitting the phone, the bubble's photo, file row and
+  spoken summary on the other side with one request for links, the photo viewer (focus on Close once it has faded in,
+  back on the photo after Close), the PDF downloaded on the web build, a report from tapping a message, a block, a cold
+  start on a thread, and a lost socket frame recovered by the gap fill;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
   (the invitee chosen while the search for their name is on its way keeping that same row once it answers; the
   mentor areas checked on a 320-point screen as on the web, with nothing wider than the screen; the invitation's

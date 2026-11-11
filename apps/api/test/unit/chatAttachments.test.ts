@@ -15,7 +15,12 @@ import {
 } from "@illuminize/shared";
 import {
   CHAT_ATTACHMENT_LINK_FRESH_MS,
+  CHAT_ATTACH_FAILED_TEXT,
+  CHAT_ATTACH_LABEL,
+  CHAT_REPORT_INTRO,
+  CHAT_TRAY_LABEL,
   CHAT_FILE_DEFAULT_NAME,
+  CHAT_FILE_OPEN_HINT,
   attachmentA11yText,
   attachmentPreviewText,
   attachmentSummary,
@@ -23,11 +28,15 @@ import {
   chatAttachmentProblem,
   chatFileName,
   chatUploadTimeoutMs,
+  fileDownloadLabel,
   fileMetaText,
+  fileOpenLabel,
   formatFileSize,
   messagePreviewText,
   photoBoxSize,
   photoGridLayout,
+  photoOpenLabel,
+  photoViewerTitle,
   trayAdd,
   trayAttachments,
   trayFailed,
@@ -447,5 +456,30 @@ describe("the client's attachment calls", () => {
     const { calls, api } = client();
     await api.chat.attachmentLinks("demo", "c1", [ID(1), ID(2)]);
     expect(calls[0]).toMatchObject({ method: "GET", url: `http://api.test/api/v1/t/demo/chat/conversations/c1/attachments?messageId=${ID(1)}&messageId=${ID(2)}` });
+  });
+});
+
+describe("what the apps call photos and files in a thread", () => {
+  it("names each photo by its place, the viewer by whose photos they are, and a file's download by its name", () => {
+    expect(photoOpenLabel(0, 1)).toBe("Open photo 1 of 1");
+    expect(photoOpenLabel(2, 4)).toBe("Open photo 3 of 4");
+    expect(photoViewerTitle(0, 1, "Meera Iyer")).toBe("Photo 1 of 1 from Meera Iyer");
+    expect(photoViewerTitle(1, 2, "you")).toBe("Photo 2 of 2 from you");
+    expect(fileDownloadLabel("notes.pdf")).toBe("Download notes.pdf");
+    expect(fileDownloadLabel(null)).toBe(`Download ${CHAT_FILE_DEFAULT_NAME}`);
+  });
+
+  it("names a file's row on the phone by what tapping it does", () => {
+    expect(fileOpenLabel("notes.pdf")).toBe("Open notes.pdf");
+    expect(fileOpenLabel(null)).toBe(`Open ${CHAT_FILE_DEFAULT_NAME}`);
+    expect(fileOpenLabel("")).toBe(`Open ${CHAT_FILE_DEFAULT_NAME}`);
+    expect(CHAT_FILE_OPEN_HINT).toBe("Downloads it and opens the share sheet");
+  });
+
+  it("keeps the words e2e and both apps look for", () => {
+    expect(CHAT_ATTACH_LABEL).toBe("Add photos or a file");
+    expect(CHAT_TRAY_LABEL).toBe("Attachments to send");
+    expect(CHAT_ATTACH_FAILED_TEXT).toBe("That couldn't be added. Try again.");
+    expect(CHAT_REPORT_INTRO).toBe("Admins will see this message and up to 10 around it, with any photos and files in them.");
   });
 });

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, landscapePhoto, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -1608,6 +1608,11 @@ try {
     await expectEmptyState(firstNote, "the note before a first message", { tones: BRAND_TONES.demoUniversity });
     for (const line of await firstLines.all()) await expectReadable(line, `the note before a first message's "${await line.innerText()}"`);
     if (HINTS_AT_A_DECLINE.test(await firstNote.innerText())) throw new Error(`the note before a first message hints at a decline or a block: "${await firstNote.innerText()}"`);
+    // Photos and files wait for an answer too: no paperclip, and the line under the box says why.
+    const notYet = "Photos and files can be sent once Vikram Desai accepts.";
+    const paperclip = (p) => p.getByRole("button", { name: "Add photos or a file", exact: true }).locator("visible=true");
+    await shown(pageA.getByText(notYet, { exact: true })).waitFor();
+    if (await paperclip(pageA).count()) throw new Error("a first message offers the paperclip");
     await shown(pageA.getByText("2016–2020 · New conversation", { exact: true })).waitFor();
     const asked = `Hello Vikram, could I ask about IIM? ${unique}`;
     // A first message refused for going too fast says so as a thread does, and keeps its words in the box to send again.
@@ -1656,6 +1661,9 @@ try {
     if (introLook.colour !== "224 242 254") throw new Error(`the note on asking again isn't on the info tone: ${introLook.colour}`);
     await expectReadable(intro, "the note on asking again");
     await expectSvgNoEmoji(intro.locator("xpath=.."), "the note on asking again");
+    // Asking again is a request as well, so the box offers no paperclip, and the thread's footer says why.
+    await shown(pageA.getByText(notYet, { exact: true })).waitFor();
+    if (await paperclip(pageA).count()) throw new Error("asking again offers the paperclip");
     await pageA.screenshot({ path: `${SHOTS}/m10a2-chat-ask-again.png` });
     await rerequest.stop();
     // The reload was a cold start, which left nothing under the thread: open it again from Vikram's profile, as before, so
@@ -1703,6 +1711,124 @@ try {
       }
     }
     await pageA.screenshot({ path: `${SHOTS}/m10c-chat-thread.png` });
+
+    // Photos and PDFs, now the chat is accepted, as on the web. The "Text only" line has gone, and the paperclip offers a
+    // sheet of Photos and PDF file, each picker a file chooser on the web build. Each waits in the tray while it uploads,
+    // and Send goes once they're up.
+    if (await pageA.getByText("Text only", { exact: false }).locator("visible=true").count()) throw new Error("the composer still says chat is text only");
+    if (await pageA.getByText("Photos and files can be sent once", { exact: false }).locator("visible=true").count()) throw new Error("an accepted chat says photos and files have to wait");
+    const pdf = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+    const pdfName = `notes-${unique}.pdf`;
+    const attachSheet = (p) => shown(p.getByRole("dialog", { name: "Add to message", exact: true }));
+    const attachThrough = async (choice, file) => {
+      await shown(paperclip(pageA)).click();
+      const sheet = attachSheet(pageA);
+      await sheet.waitFor();
+      await sheet.getByText("JPEG, PNG or WebP, up to 4", { exact: true }).waitFor();
+      await sheet.getByText("Up to 10 MB", { exact: true }).waitFor();
+      const choosing = pageA.waitForEvent("filechooser");
+      await sheet.getByRole("button", { name: choice, exact: true }).click();
+      await (await choosing).setFiles(file);
+      // The sheet has gone by the time the picker opens, so nothing is left over the tray.
+      await attachSheet(pageA).waitFor({ state: "detached" });
+    };
+    // Send waits for the photo's upload, which is held back for a moment: with words in the box it would go, but it's held
+    // (aria-disabled), the status line saying why, and pressing it sends nothing.
+    const caption = `Here you go ${unique}`;
+    await shown(pageA.getByLabel("Write a message")).fill(caption);
+    const sendA = shown(pageA.getByRole("button", { name: "Send message" }));
+    let letUploadThrough;
+    const uploadHeld = new Promise((resolve) => (letUploadThrough = resolve));
+    const uploads = (url) => /\/chat\/conversations\/[^/]+\/attachments$/.test(url.pathname);
+    const holdUpload = (route) => (route.request().method() === "POST" ? uploadHeld.then(() => route.fallback()) : route.fallback());
+    await pageA.route(uploads, holdUpload);
+    await attachThrough("Photos", await landscapePhoto(pageA));
+    const trayA = shown(pageA.getByRole("list", { name: "Attachments to send", exact: true }));
+    await trayA.waitFor();
+    await shown(pageA.getByText("Uploading 1 photo…", { exact: true })).waitFor();
+    if ((await sendA.getAttribute("aria-disabled")) !== "true") throw new Error("Send is free while a photo is still uploading");
+    // Forced: Playwright waits out aria-disabled.
+    await sendA.click({ force: true });
+    if ((await trayA.getByRole("listitem").count()) !== 1) throw new Error("pressing Send while a photo uploads emptied the tray");
+    letUploadThrough();
+    await pageA.unroute(uploads, holdUpload);
+    await attachThrough("PDF file", { name: pdfName, mimeType: "application/pdf", buffer: pdf });
+    await shown(pageA.getByRole("button", { name: "Remove photo 1", exact: true })).waitFor();
+    await shown(pageA.getByRole("button", { name: `Remove ${pdfName}`, exact: true })).waitFor();
+    for (let i = 0; i < 150 && (await sendA.getAttribute("aria-disabled")) === "true"; i++) await pageA.waitForTimeout(100);
+    if ((await sendA.getAttribute("aria-disabled")) === "true") throw new Error(`Send is still held with the tray: "${await trayA.innerText()}"`);
+    if ((await trayA.getByRole("listitem").count()) !== 2) throw new Error(`the tray holds ${await trayA.getByRole("listitem").count()} items, not the photo and the PDF`);
+    // The composer fits the phone with its tray: nothing scrolls sideways and Send is still on screen.
+    const sideways = await pageA.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const sendBox = await sendA.boundingBox();
+    if (sideways > 0 || !sendBox || sendBox.x + sendBox.width > pageA.viewportSize().width) throw new Error(`the composer with its tray doesn't fit the phone: ${sideways}px sideways, Send at ${JSON.stringify(sendBox)}`);
+    await pageA.screenshot({ path: `${SHOTS}/m10c2-chat-tray.png` });
+
+    // B counts its requests for links: one for the message as it arrives, none for opening the photo or the file.
+    const linkCallsB = [];
+    const watchB = (r) => {
+      if (r.method() === "GET" && /\/chat\/conversations\/[0-9a-f-]+\/attachments\?/.test(r.url())) linkCallsB.push(r.url());
+    };
+    pageB.on("request", watchB);
+    // B holds its photos back for a moment, so the photo's box can be measured before the photo is there.
+    let letFilesThrough;
+    const filesHeld = new Promise((resolve) => (letFilesThrough = resolve));
+    const holdFiles = (route) => filesHeld.then(() => route.fallback());
+    await pageB.route(/\/files\//, holdFiles);
+    await send(pageA, caption);
+    await shown(pageA.getByRole("list", { name: "Attachments to send", exact: true })).waitFor({ state: "detached" });
+    await shown(log(pageA).getByRole("button", { name: "Open photo 1 of 1", exact: true })).waitFor();
+
+    // B sees it live: the photo, the PDF as a row with its type and size, and a screen reader hears what the message holds.
+    const photoB = shown(log(pageB).getByRole("button", { name: "Open photo 1 of 1", exact: true }));
+    await photoB.waitFor(live);
+    const fileB = shown(log(pageB).getByRole("button", { name: `Open ${pdfName}`, exact: true }));
+    await fileB.waitFor();
+    await fileB.getByText(`PDF · ${pdf.length} bytes`, { exact: true }).waitFor();
+    await shown(log(pageB).locator(`[aria-label^="Arjun Singh: A photo and a file. ${caption}, "]`)).waitFor();
+    const loaded = (box) => box.locator("img").evaluateAll((imgs) => imgs.some((img) => img.complete && img.naturalWidth > 0));
+    // The box is sized from what the message says of the photo (720 × 480 makes 260 × 173), so nothing moves as it loads.
+    const boxHeld = await photoB.boundingBox();
+    if (await loaded(photoB)) throw new Error("B's photo loaded while held, so its box went unmeasured");
+    if (!boxHeld || Math.abs(boxHeld.width - 260) > 1 || Math.abs(boxHeld.height - 173) > 1) throw new Error(`B's photo is drawn ${boxHeld?.width} × ${boxHeld?.height} before it loads, not 260 × 173 from its 720 × 480`);
+    letFilesThrough();
+    for (let i = 0; i < 100 && !(await loaded(photoB)); i++) await pageB.waitForTimeout(100);
+    if (!(await loaded(photoB))) throw new Error("B's photo didn't load");
+    await pageB.unroute(/\/files\//, holdFiles);
+    const boxLoaded = await photoB.boundingBox();
+    if (Math.abs(boxLoaded.width - boxHeld.width) > 1 || Math.abs(boxLoaded.height - boxHeld.height) > 1) throw new Error(`B's photo moved from ${boxHeld.width} × ${boxHeld.height} to ${boxLoaded.width} × ${boxLoaded.height} as it loaded`);
+    await pageB.screenshot({ path: `${SHOTS}/m10c3-chat-attachments-b.png` });
+
+    // The viewer: named for whose photo it is, the full photo loaded, Download photo (the web build's Share) and Report
+    // message for someone else's, focus on Close once it has faded in, and back on the photo after Close.
+    const focusedOn = (p) => p.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+    const waitForFocus = async (p, label) => {
+      for (let i = 0; i < 30 && (await focusedOn(p)) !== label; i++) await p.waitForTimeout(100);
+      return focusedOn(p);
+    };
+    await photoB.click();
+    const viewerB = shown(pageB.getByRole("dialog", { name: "Photo 1 of 1 from Arjun Singh", exact: true }));
+    await viewerB.waitFor();
+    for (const name of ["Download photo", "Report message"]) await viewerB.getByRole("button", { name, exact: true }).waitFor();
+    // The full photo, not only the thumbnail drawn under it while it loads (at most 480 pixels wide, where the photo is 720).
+    const fullLoaded = () => viewerB.locator("img").evaluateAll((imgs) => imgs.some((img) => img.complete && img.naturalWidth >= 720));
+    for (let i = 0; i < 100 && !(await fullLoaded()); i++) await pageB.waitForTimeout(100);
+    if (!(await fullLoaded())) throw new Error("the full photo didn't load in the viewer");
+    const onOpen = await waitForFocus(pageB, "Close");
+    if (onOpen !== "Close") throw new Error(`the photo viewer starts on "${onOpen}", not Close`);
+    await pageB.screenshot({ path: `${SHOTS}/m10c4-chat-photo-viewer.png` });
+    await viewerB.getByRole("button", { name: "Close", exact: true }).click();
+    await viewerB.waitFor({ state: "detached" });
+    const onClose = await waitForFocus(pageB, "Open photo 1 of 1");
+    if (onClose !== "Open photo 1 of 1") throw new Error(`closing the viewer left focus on "${onClose}", not the photo`);
+
+    // On the web build, opening the PDF downloads it under its own name (a phone shares it).
+    const fileSaving = pageB.waitForEvent("download");
+    await fileB.click();
+    const savedFile = await fileSaving;
+    if (savedFile.suggestedFilename() !== pdfName) throw new Error(`the PDF saved as "${savedFile.suggestedFilename()}"`);
+    if (linkCallsB.length !== 1) throw new Error(`B asked for links ${linkCallsB.length} times, not once for the message`);
+    pageB.off("request", watchB);
 
     // A thread marks what arrives read only while it's being looked at: not under another screen, and not with the app in
     // the background. Each time the message does reach it, so only that rule can keep it unread.
@@ -1791,7 +1917,7 @@ try {
       await shown(log(pageA).getByText(`Ask away! ${unique}`, { exact: false })).click();
       await shown(pageA.getByRole("button", { name: "Report message" })).click();
       const sheet = shown(pageA.getByRole("dialog", { name: "Report message" }));
-      await sheet.getByText("Admins will see this message and up to 10 around it.").waitFor();
+      await sheet.getByText("Admins will see this message and up to 10 around it, with any photos and files in them.").waitFor();
       await sheet.getByRole("button", { name: "Send report" }).click();
       await sheet.waitFor({ state: "detached" });
     };

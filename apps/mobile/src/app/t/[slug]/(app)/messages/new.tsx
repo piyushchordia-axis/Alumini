@@ -1,5 +1,5 @@
 import { memberYearsLine } from "@illuminize/shared";
-import { chatKeys, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
+import { chatKeys, composerAttachCaption, firstMessageNotice, newClientKey, sendLimitNotice, unsentRemainder } from "@illuminize/shared/chat";
 import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -110,7 +110,16 @@ function NewConversation({ to }: { to: string }) {
           <FirstMessageNote notice={firstMessageNotice(profile.data?.fullName)} />
         </ScrollView>
       )}
-      {!waiting && <ChatComposer draftKey={dk} onSend={(text) => void send(text)} sending={sending} notice={notice} />}
+      {!waiting && (
+        <ChatComposer
+          draftKey={dk}
+          onSend={(text) => void send(text)}
+          sending={sending}
+          notice={notice}
+          // A first message goes as a request, which carries words only.
+          attachCaption={composerAttachCaption(null, tenant.settings.features, profile.data?.fullName)}
+        />
+      )}
     </ChatScreen>
   );
 }

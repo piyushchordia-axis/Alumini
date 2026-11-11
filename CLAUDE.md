@@ -169,11 +169,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   server decides by the bytes, never the declared type. A picked file is never uploaded as it is: pickers prepare every
   pick (`useImageUpload` with `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with
   `prepareImageFile` on web) and check the prepared file with `imageFileProblem`, and the phone deletes both the
-  picker's copy and the prepared one afterwards. A member's background photo (purpose `backdrop`) follows the profile
-  photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it. Chat photos and PDFs keep
-  their own ledger instead: `uploadChatAttachment` (`services/chat/attachments.service.ts`) stores them in private
-  storage (`ctx.privateStorage`, never `storeUpload`, `/uploads`, the `uploads` table or the public bucket) with a row
-  in `chat_attachments`, which a send claims inside `appendMessage`'s transaction; photos still go through
+  picker's copy and the prepared one afterwards. The one exception is a chat photo: the phone keeps its prepared copy as
+  the preview until its tray item or outbox entry is released (`onOutboxRelease`), then deletes it: a sent one's 60
+  seconds later, as the bubble's placeholder, a discarded one's (and all at sign-out) at once; the picker's copy still
+  goes straight away (mobile `lib/chatAttachments.ts`). A member's background photo (purpose `backdrop`) follows the
+  profile photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it. Chat photos and
+  PDFs keep their own ledger instead: `uploadChatAttachment` (`services/chat/attachments.service.ts`) stores them in
+  private storage (`ctx.privateStorage`, never `storeUpload`, `/uploads`, the `uploads` table or the public bucket) with
+  a row in `chat_attachments`, which a send claims inside `appendMessage`'s transaction; photos still go through
   `processImage`, and the server still decides the type by the bytes. Members reach them only by short-lived signed
   links (`chatAttachmentLinks`, and staff the report's audited view), never an address in a DTO or a socket event.
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact

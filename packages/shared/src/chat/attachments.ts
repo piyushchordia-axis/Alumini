@@ -394,3 +394,31 @@ export function trayFromAttachments(attachments: readonly OutboxAttachment[]): T
     attachment,
   }));
 }
+
+/** The composer's attach button, by name and as its tooltip. */
+export const CHAT_ATTACH_LABEL = "Add photos or a file";
+/** What the composer's row of picks waiting to be sent is called. */
+export const CHAT_TRAY_LABEL = "Attachments to send";
+/** In place of a photo whose link or image failed, beside a way to try again. */
+export const PHOTO_LOAD_FAILED_TEXT = "Photo didn't load";
+/** Said when a photo or file's link comes back without it: the member may no longer see that message. */
+export const CHAT_ATTACHMENT_UNAVAILABLE_TEXT = "This photo or file is no longer available.";
+/**
+ * Said when adding to the tray failed outright, before anything reached it (a phone's picker short of space, or another
+ * picker still open), rather than nothing. The picker's own words are for developers.
+ */
+export const CHAT_ATTACH_FAILED_TEXT = "That couldn't be added. Try again.";
+
+/** A photo in a message, as the button that opens it is called: "Open photo 2 of 3". `index` counts from 0. */
+export const photoOpenLabel = (index: number, count: number): string => `Open photo ${index + 1} of ${count}`;
+
+/** What the photo viewer is called: "Photo 2 of 3 from Meera Iyer". `index` counts from 0; `who` is "you" for the member's own. */
+export const photoViewerTitle = (index: number, count: number, who: string): string => `Photo ${index + 1} of ${count} from ${who}`;
+
+/** A file's download button, by name: "Download notes.pdf". */
+export const fileDownloadLabel = (name: string | null | undefined): string => `Download ${name || CHAT_FILE_DEFAULT_NAME}`;
+
+/** A file in a message on the phone, where the whole row opens it: "Open notes.pdf". */
+export const fileOpenLabel = (name: string | null | undefined): string => `Open ${name || CHAT_FILE_DEFAULT_NAME}`;
+/** What opening a file on the phone does, for screen readers. */
+export const CHAT_FILE_OPEN_HINT = "Downloads it and opens the share sheet";
