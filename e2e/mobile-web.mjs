@@ -805,7 +805,11 @@ try {
     // the institution's colour (PALE_BRAND) can. My profile's links draw their text and icons on the white card in that
     // colour's ink; Delete my account, a ghost button on the page itself, its page ink; and the feed's New post button
     // its plus on the colour in its on-primary, slate-900, where white would read at 1.25:1, as on the web.
-    const pale = await page.context().newPage();
+    // The tab gets a context of its own holding a copy of this page's signed-in storage: a page from browser.newPage()
+    // can't open another in its context. The copied access token outlives the step (15 minutes), so the tab never
+    // refreshes it, which would rotate the session this page still holds.
+    const paleContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: await page.context().storageState() });
+    const pale = await paleContext.newPage();
     const shown = (locator) => locator.locator("visible=true").last();
     try {
       const paleTenant = await scriptTenant(pale, "demo-university");
@@ -828,7 +832,7 @@ try {
       const plus = await expectReadable(pale.getByRole("button", { name: "New post" }).locator("visible=true").first().getByText("+", { exact: true }), "the feed's New post button on a pale brand");
       if (plus.colour !== PALE_BRAND.onPrimary || plus.behind !== PALE_BRAND.colour) throw new Error(`the feed's New post button on a pale brand is rgb ${plus.colour} on rgb ${plus.behind}, not its on-primary on the colour (rgb ${PALE_BRAND.onPrimary} on rgb ${PALE_BRAND.colour})`);
     } finally {
-      await pale.close();
+      await paleContext.close();
     }
   });
 
