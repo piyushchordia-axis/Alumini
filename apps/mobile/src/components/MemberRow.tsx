@@ -2,7 +2,7 @@ import { memberYearsLine, type MemberCardDto } from "@illuminize/shared";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { Avatar } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, useTheme } from "@/theme";
 
 /**
  * A member's photo and name, linking to their profile, with a grey line under the name: their years, then `meta`, or
@@ -10,6 +10,7 @@ import { colors } from "@/theme";
  */
 export function MemberRow({ slug, member, meta, size = 36 }: { slug: string; member: MemberCardDto; meta?: string; size?: number }) {
   const router = useRouter();
+  const { pageMuted } = useTheme();
   const line = memberYearsLine(member, meta ?? member.headline ?? member.companyName);
   return (
     <Pressable onPress={() => router.push(`/t/${slug}/directory/${member.id}`)} accessibilityRole="link" accessibilityLabel={`${member.fullName}, ${line}`} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
@@ -18,7 +19,8 @@ export function MemberRow({ slug, member, meta, size = 36 }: { slug: string; mem
         <Text style={{ fontWeight: "600", color: colors.text }} numberOfLines={1}>
           {member.fullName}
         </Text>
-        <Text style={{ color: colors.muted, fontSize: 12 }} numberOfLines={1}>
+        {/* Most rows are in a card, but the line reads on the member's background too. */}
+        <Text style={{ color: pageMuted, fontSize: 12 }} numberOfLines={1}>
           {line}
         </Text>
       </View>

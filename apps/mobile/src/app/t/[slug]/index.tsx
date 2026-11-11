@@ -92,7 +92,7 @@ export default function TenantLandingScreen() {
             </View>
           )}
           <Pressable onPress={() => router.replace("/")} accessibilityRole="button" hitSlop={8}>
-            <Text style={{ textAlign: "center", color: colors.faint, fontSize: 12 }}>Choose a different institution</Text>
+            <Text style={{ textAlign: "center", color: colors.muted, fontSize: 12 }}>Choose a different institution</Text>
           </Pressable>
         </View>
       </ScrollView>

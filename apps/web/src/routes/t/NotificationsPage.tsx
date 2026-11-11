@@ -59,7 +59,9 @@ export function NotificationsPage() {
               <>
                 <div className="flex items-start justify-between gap-2">
                   <span className={clsx("text-sm", n.readAt ? "text-slate-700" : "font-semibold text-slate-900")}>{n.title}</span>
-                  <span className="shrink-0 text-xs text-slate-400">{timeAgo(n.createdAt)}</span>
+                  <time dateTime={n.createdAt} className="shrink-0 text-xs text-slate-500">
+                    {timeAgo(n.createdAt)}
+                  </time>
                 </div>
                 {n.body && <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>}
               </>
@@ -67,7 +69,8 @@ export function NotificationsPage() {
             // A request to join that may still wait: its text links to the member, and Approve and Reject sit beside it,
             // never inside the link.
             const request = isTenantAdmin ? memberRequestOf(n) : null;
-            const cls = clsx("block px-4 py-3 transition hover:bg-slate-50", !n.readAt && !request && "bg-primary/5");
+            // Only a read row lights up on hover: on an unread one it would paint over the wash that says it's new.
+            const cls = clsx("block px-4 py-3 transition", n.readAt && "hover:bg-slate-50");
             const markRead = () => !n.readAt && readOne.mutate(n.id);
             const text = to ? (
               <Link to={to} className={cls} onClick={markRead}>
@@ -79,7 +82,8 @@ export function NotificationsPage() {
               </button>
             );
             return (
-              <li key={n.id} className={clsx(request && !n.readAt && "bg-primary/5")}>
+              // Unread: the brand's opaque wash, the same on the phone, with its grey a shade darker (dim-text) to read on it.
+              <li key={n.id} className={clsx(!n.readAt && "bg-primary-wash dim-text")}>
                 {text}
                 {request && (
                   <div className="px-4 pb-3">

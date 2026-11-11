@@ -76,7 +76,7 @@ function ReportRow({ slug, report }: { slug: string; report: AdminReportDto }) {
                 {report.content.excerpt ?? report.content.title}
               </>
             ) : (
-              <em className="text-slate-400">{REPORT_CONTENT_GONE_TEXT}</em>
+              <em className="text-slate-500">{REPORT_CONTENT_GONE_TEXT}</em>
             )}
           </div>
           {report.resolutionNote && <p className="mt-1 text-xs text-slate-500">Resolution: {report.resolutionNote}</p>}

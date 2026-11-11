@@ -62,7 +62,8 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
                   )}
                   {mine && Platform.OS === "web" && <Text style={styles.srOnly}>, your vote</Text>}
                 </View>
-                <Text style={{ color: colors.muted }}>
+                {/* Your choice's bar is the brand's tint, which the count can sit on, so its grey is a shade darker, as on the web. */}
+                <Text style={{ color: mine ? colors.secondary : colors.muted }}>
                   {pct}% ({o.votes})
                 </Text>
               </Row>

@@ -56,6 +56,6 @@ const styles = StyleSheet.create({
   content: { gap: 2, borderRadius: radius.md, backgroundColor: "#f8fafc", padding: spacing.md },
   title: { fontSize: 14, fontWeight: "700", color: colors.text },
   words: { fontSize: 14, lineHeight: 20, color: "#1e293b" },
-  gone: { fontSize: 14, fontStyle: "italic", color: colors.faint },
+  gone: { fontSize: 14, fontStyle: "italic", color: colors.muted },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

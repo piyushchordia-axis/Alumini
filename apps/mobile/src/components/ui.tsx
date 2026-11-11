@@ -134,17 +134,19 @@ export function Button({
 
 /** `ref` reaches the text box, to focus it. */
 export function Input({ label, error, hint, style, ref, ...rest }: TextInputProps & { label?: string; error?: string; hint?: string; ref?: Ref<ComponentRef<typeof TextInput>> }) {
+  const { pageMuted } = useTheme();
   return (
     <View style={{ gap: 4 }}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
         ref={ref}
-        placeholderTextColor={colors.faint}
+        placeholderTextColor={colors.muted}
         accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
         style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline ? { minHeight: 96, textAlignVertical: "top" } : null, style]}
         {...rest}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {/* A form may sit on the member's background rather than in a card. */}
+      {error ? <Text style={styles.error}>{error}</Text> : hint ? <Text style={[styles.hint, { color: pageMuted }]}>{hint}</Text> : null}
     </View>
   );
 }
@@ -572,7 +574,7 @@ export function Spinner({ label }: { label?: string }) {
   return (
     <View style={{ padding: spacing.xl, alignItems: "center", gap: 8 }} accessibilityRole="progressbar" accessibilityLabel={label ?? "Loading"}>
       <ActivityIndicator color={theme.primary} />
-      {label && <Text style={styles.hint}>{label}</Text>}
+      {label && <Text style={[styles.hint, { color: theme.pageMuted }]}>{label}</Text>}
     </View>
   );
 }
@@ -725,10 +727,11 @@ export function FieldError({ error }: { error?: string | null }) {
 }
 
 export function Title({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
+  const { pageMuted } = useTheme();
   return (
     <View style={{ marginBottom: spacing.md }}>
       <Text style={styles.title}>{children}</Text>
-      {sub ? <Text style={styles.hint}>{sub}</Text> : null}
+      {sub ? <Text style={[styles.hint, { color: pageMuted }]}>{sub}</Text> : null}
     </View>
   );
 }
@@ -737,10 +740,14 @@ export function Row({ children, style, gap = spacing.sm }: { children: ReactNode
   return <View style={[{ flexDirection: "row", alignItems: "center", gap, flexWrap: "wrap" }, style]}>{children}</View>;
 }
 
-/** Grey text, one shade darker (slate-600) on a tint or a background photo (theme.pageMuted), so it reads wherever it sits. */
-export function Muted({ children, size = 12 }: { children: ReactNode; size?: number }) {
+/**
+ * Grey text, one shade darker (the secondary grey) on a tint or a background photo (theme.pageMuted), so it reads wherever
+ * it sits. `dim` takes the secondary grey on any page, for a row tinted in the brand (an unread notification), where the
+ * meta grey can fall under 4.5:1.
+ */
+export function Muted({ children, size = 12, dim = false }: { children: ReactNode; size?: number; dim?: boolean }) {
   const { pageMuted } = useTheme();
-  return <Text style={{ color: pageMuted, fontSize: size }}>{children}</Text>;
+  return <Text style={{ color: dim ? colors.secondary : pageMuted, fontSize: size }}>{children}</Text>;
 }
 
 export function Body({ children }: { children: ReactNode }) {
@@ -768,7 +775,8 @@ const styles = StyleSheet.create({
   tab: { flexGrow: 1, paddingVertical: 8, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, borderRadius: 9 },
   tabTall: { minHeight: 44 },
   tabActive: { backgroundColor: "#fff" },
-  tabText: { fontSize: 13, fontWeight: "600", color: colors.muted },
+  // The tray is slate-200, where the meta grey falls under 4.5:1: the secondary grey, as the web's slate-600.
+  tabText: { fontSize: 13, fontWeight: "600", color: colors.secondary },
   tabCount: { backgroundColor: "#cbd5e1", borderRadius: radius.full, paddingHorizontal: 6, minWidth: 18, alignItems: "center" },
   tabCountText: { fontSize: 11, fontWeight: "700", color: colors.text },
   card: {

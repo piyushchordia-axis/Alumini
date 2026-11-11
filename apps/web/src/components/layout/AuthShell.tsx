@@ -13,7 +13,7 @@ export function AuthShell({ tenant, title, subtitle, children, wide }: { tenant?
       <BrandCover tenant={tenant} title={title} subtitle={subtitle} wide={wide} />
       <div className={`relative z-10 mx-auto -mt-20 w-full px-4 pb-12 ${wide ? "max-w-2xl" : "max-w-md"}`}>
         <div className="rounded-2xl border border-[var(--border-subtle)] bg-white p-6 shadow-[var(--shadow-2)] sm:p-8">{children}</div>
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-slate-500">
           <Link to="/" className="hover:underline">
             Choose a different institution
           </Link>

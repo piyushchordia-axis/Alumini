@@ -90,11 +90,22 @@ body,
 
 /* On a member's Institution colour tint or background photo (HomeLayout's data-backdrop, "tint" or "image"), grey text
    steps one shade darker, the meta grey to the secondary one and the faint grey to the meta one, so it reads at least
-   as well as on the plain page, even where the veil lets a dark photo through. The values are written out: here
-   var(--color-slate-500) would read the darker one set on the line above. */
-[data-backdrop] {
+   as well as on the plain page, even where the veil lets a dark photo through. A tinted row (an unread notification,
+   the open conversation, a box on the brand's tint) does the same with .dim-text: the meta grey falls under 4.5:1 on
+   some brands' tints, and the secondary grey reads on any. The values are written out: here var(--color-slate-500)
+   would read the darker one set on the line above. */
+[data-backdrop],
+.dim-text {
   --color-slate-500: #475569;
   --color-slate-400: #5b6b80;
+}
+
+/* A placeholder is meta-grey text like a hint, never Tailwind's half-strength current colour, even on a box that
+   doesn't pass placeholder:text-slate-500 itself. */
+@layer base {
+  ::placeholder {
+    color: var(--color-slate-500);
+  }
 }
 
 body {

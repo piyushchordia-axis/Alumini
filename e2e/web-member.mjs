@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, landscapePhoto, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, landscapePhoto, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -501,6 +501,16 @@ try {
     if (look.chip.join(" ") !== tones["--c-primary-wash"]) throw new Error(`the chosen chip is rgb ${look.chip.join(" ")}, not the brand's wash`);
     const count = await card.getByText("1", { exact: true }).evaluate((el) => getComputedStyle(el).color);
     if (count !== "rgb(29, 78, 216)") throw new Error(`the count of a post you reacted to is ${count}, not the brand's ink`);
+    // Grey text on the card is the meta grey or darker, never the faint grey that is for icons: the author's line and the
+    // post's own Edit and Delete.
+    for (const [grey, where] of [
+      [card.locator('a[href*="/app/directory/"]').first().locator(":scope > span:last-child > span:last-child"), "the post's author line"],
+      [card.getByRole("button", { name: "Edit", exact: true }), "the post's Edit"],
+      [card.getByRole("button", { name: "Delete", exact: true }), "the post's Delete"],
+    ]) {
+      const { colour } = await expectReadable(grey, where);
+      if (colour !== GREY_TEXT.plain) throw new Error(`${where} is rgb ${colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
+    }
     await card.locator("a", { hasText: "comments" }).click();
     await page.waitForURL(/\/app\/feed\/[0-9a-f-]+$/);
     await page.waitForSelector('h2:has-text("Comments")');
@@ -512,6 +522,8 @@ try {
     await page.click('button:has-text("Reply")');
     await page.waitForSelector("text=First comment!");
     await noComments.waitFor({ state: "detached" });
+    // A comment sits on slate-50, where its meta row (Delete, for its author) still reads.
+    await expectReadable(page.locator("main li", { hasText: "First comment!" }).first().getByRole("button", { name: "Delete", exact: true }), "the comment's Delete");
     await shot("05-post-detail");
   });
 
@@ -2341,6 +2353,13 @@ try {
     await request.waitFor(live);
     // Her years beside her name, since the line below is the preview, and under her name in the thread's header.
     await request.getByText("· 2014–2018", { exact: true }).waitFor();
+    // Unread, its time (a <time>) is in the ink, as on the phone.
+    const requestTime = await expectReadable(request.locator("time"), "an unread request's time in the inbox");
+    if (requestTime.colour !== BRAND_TONES.demoUniversity.ink) throw new Error(`an unread request's time is rgb ${requestTime.colour}, not Demo University's ink (rgb ${BRAND_TONES.demoUniversity.ink})`);
+    // Demo University's ink and primary are the same blue, so the painted colour can't tell the ink from the raw brand
+    // colour, which a pale brand would lose: the class does, as on the Explore row.
+    const requestTimeClasses = (await request.locator("time").getAttribute("class")).split(/\s+/);
+    if (!requestTimeClasses.includes("text-primary-ink") || requestTimeClasses.includes("text-primary")) throw new Error("an unread request's time isn't drawn in text-primary-ink alone");
     await request.click();
     await pageB.locator("header h2").getByText("2014–2018", { exact: true }).waitFor();
     await log(pageB).getByText(asked).waitFor();
@@ -2533,6 +2552,14 @@ try {
     pageB.off("response", filesSeenB);
     // The inbox says what the message held, from the shared preview, before its words.
     await pageA.locator('section[aria-label="Conversations"]').getByText(`You: 2 attachments · ${caption}`, { exact: true }).waitFor(live);
+    // Times are <time>s that read: the open conversation's sits on the brand's tint, so it takes the secondary grey
+    // (dim-text), and it's read, as A's own message came last, so it isn't the ink; a message's is the meta grey.
+    const openTime = pageA.locator('section[aria-label="Conversations"] a[aria-current="page"] time');
+    const openLook = await expectReadable(openTime, "the open conversation's time in the inbox, on its tint");
+    if (openLook.colour !== GREY_TEXT.dim) throw new Error(`the open conversation's time is rgb ${openLook.colour}, not the secondary grey (rgb ${GREY_TEXT.dim}) a tinted row takes`);
+    const messageTime = log(pageA).locator("time").last();
+    if (Number.isNaN(Date.parse(await messageTime.getAttribute("datetime")))) throw new Error(`a message's <time> has datetime "${await messageTime.getAttribute("datetime")}"`);
+    await expectReadable(messageTime, "a message's time in the thread");
 
     // A thread open in a background tab marks nothing read: A's badge counts B's next message until A's tab is in front again.
     const setVisible = (p, visible) =>
@@ -3604,8 +3631,24 @@ try {
   });
 
   await step("notifications page, notification settings + sign out", async () => {
+    // An unread notice (scripted) is the brand's opaque wash, as on the phone, with its grey a shade darker (dim-text) to
+    // read on it, and hovered it keeps the wash: only a read row lights up.
+    const unreadBody = `Members can see it on the feed now (${unique}).`;
+    const unread = await scriptNotification(page, "demo-university", { type: "CONTENT_APPROVED", data: { contentType: "POST", contentId: "00000000-0000-4000-8000-0000000000ac" }, title: "Your post is live", body: unreadBody });
+    unread.update({ readAt: null });
     await page.click('a[aria-label^="Notifications"]');
     await page.waitForSelector("h1:has-text('Notifications')");
+    const unreadRow = page.locator("main li", { hasText: unreadBody });
+    await unreadRow.waitFor();
+    for (const hovered of [false, true]) {
+      const how = hovered ? "hovered" : "at rest";
+      if (hovered) await unreadRow.getByRole("link").hover();
+      const unreadTime = await expectReadable(unreadRow.locator("time"), `an unread notice's time, ${how}`);
+      if (unreadTime.behind !== BRAND_TONES.demoUniversity.wash) throw new Error(`an unread notice, ${how}, is rgb ${unreadTime.behind}, not Demo University's wash (rgb ${BRAND_TONES.demoUniversity.wash})`);
+      if (unreadTime.colour !== GREY_TEXT.dim) throw new Error(`an unread notice's time, ${how}, is rgb ${unreadTime.colour}, not the secondary grey (rgb ${GREY_TEXT.dim})`);
+      await expectReadable(unreadRow.getByText(unreadBody, { exact: true }), `an unread notice's text, ${how}`);
+    }
+    await unread.stop();
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await page.waitForSelector("h1:has-text('Notification settings')");
     // Mentorship is on here and this member can use it, so its requests and answers have a row of their own.

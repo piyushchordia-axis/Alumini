@@ -45,7 +45,7 @@ export function ReportButton({ slug, contentType, contentId, label, onReported }
         <Button title={label} variant="ghost" onPress={() => setOpen(true)} style={{ borderColor: "transparent" }} />
       ) : (
         <Pressable onPress={() => setOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Report this content">
-          <Text style={{ color: colors.faint, fontSize: 12 }}>Report</Text>
+          <Text style={{ color: colors.muted, fontSize: 12 }}>Report</Text>
         </Pressable>
       )}
       <Modal visible={open} animationType="slide" transparent onRequestClose={close}>

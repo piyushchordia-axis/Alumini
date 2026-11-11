@@ -179,7 +179,7 @@ export function ChatComposer({
           ref={box}
           accessibilityLabel="Write a message"
           placeholder="Write a message"
-          placeholderTextColor={colors.faint}
+          placeholderTextColor={colors.muted}
           multiline
           // Off: on the web build the browser would otherwise keep the draft for session restore, on disk, past sign-out.
           autoComplete="off"

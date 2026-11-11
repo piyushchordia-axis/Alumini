@@ -98,7 +98,7 @@ export function DateTimeField({ label, value, onChange, mode = "datetime", error
         accessibilityLabel={`${label}${value ? `, ${display(value, mode)}` : ""}`}
         style={{ borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
       >
-        <Text style={{ fontSize: 15, color: value ? colors.text : colors.faint }}>{value ? display(value, mode) : (placeholder ?? (mode === "date" ? "Choose a date" : "Choose date and time"))}</Text>
+        <Text style={{ fontSize: 15, color: value ? colors.text : colors.muted }}>{value ? display(value, mode) : (placeholder ?? (mode === "date" ? "Choose a date" : "Choose date and time"))}</Text>
       </Pressable>
     );
 

@@ -42,7 +42,7 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
             {name}
             {years ? <Text style={{ fontWeight: "400", color: colors.muted }}> · {years}</Text> : null}
           </Text>
-          <Text style={{ fontSize: 12, fontWeight: unread ? "700" : "400", color: unread ? theme.primary : colors.faint }}>{time}</Text>
+          <Text style={{ fontSize: 12, fontWeight: unread ? "700" : "400", color: unread ? theme.primaryInk : colors.muted }}>{time}</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: unread ? colors.text : colors.muted, fontStyle: c.lastMessage && !c.lastMessage.body ? "italic" : "normal" }}>

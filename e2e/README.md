@@ -165,8 +165,9 @@ Covers:
   to their sections of My profile, and Not now leaving focus on the note in its place and the card gone after a reload;
 - post, react (the theme writing Demo University's tones; the chosen chip their wash, apart from its tray and from
   white, with its icon filled in their ink at 3:1 or more on it, which the pointer still resting on it doesn't repaint,
-  and the count in that ink), comment (the new post's "No comments yet" box, its icon in the institution's ink on a
-  round wash, inviting the first reply and gone once there is one) and edit; the live bell (a second member's reaction
+  and the count in that ink; its author line and its own Edit and Delete readable, the meta grey and never the faint
+  one), comment (the new post's "No comments yet" box, its icon in the institution's ink on a round wash, inviting the
+  first reply and gone once there is one; the comment's Delete readable on its slate-50) and edit; the live bell (a second member's reaction
   arrives with no reload); the pinned strip, a region named "Pinned posts" holding the seeded announcement and welcome, each a white card saying
   Pinned once (an SVG pin, in the ink) above its author and framed 1px in Demo University's edge (3:1 on white,
   `cardEdges`), the announcement with its badge (its ink readable and its edge at 3:1) and a 4px left edge in the ink,
@@ -264,14 +265,17 @@ Covers:
   fast (keeping its words in the box), its Request sent panel giving the date to ask again on a line of its own (a
   clock, thirty days on in a `<time>`, nothing hinting at a decline or a block), the thread left open past that date
   (answered by the script a few seconds on) offering the box with its note on the info tone and saying so, and still no
-  paperclip, accepted live, replies both ways with exactly one bubble each, a photo and a PDF sent through the
+  paperclip, the request's time in B's inbox (a `<time>`) in Demo University's ink while it's unread (drawn with
+  `text-primary-ink` alone, since that ink is also its brand colour), accepted live,
+  replies both ways with exactly one bubble each, a photo and a PDF sent through the
   paperclip's chooser (several at once, offering the three photo types and PDF) with a dropped photo (Send held, saying
   why, while its upload is held back and again once it fails, then Try again uploading it) removed again (focus going to
   the paperclip) and Send free with nothing typed, arriving live (the photo loaded from a `/files/` link sent `nosniff`
   and `private, no-store`, the PDF's card with its type and size, the bubble's screen-reader summary, no link in the
   messages' JSON, one request for links in all), the photo viewer (named for whose photo, focus on Close, Report
   message, Download photo saving `photo.jpg`, Escape handing focus back to the photo), the PDF downloaded under its name
-  and its link refused (403) with one character of its signature changed, the inbox previewing "2 attachments · …", a
+  and its link refused (403) with one character of its signature changed, the inbox previewing "2 attachments · …"
+  (the open conversation's `<time>` there in the secondary grey on its tint, and a message's `<time>` readable), a
   thread in a background tab not marking anything read, Try again reusing the client key, a refusal for sending too fast
   (a warning on the warning tone), a draft surviving a failed refetch, a report (and a second one), a block (the blocked
   member's messages never arrive, even after the unblock), a lost socket frame recovered by the gap fill, and the thread
@@ -305,7 +309,9 @@ Covers:
   fails; the directory's next page refused, said above Load more with the cards kept, then loaded by pressing it
   again; a directory search refused while the cards before it are kept: no Load more for them while its answer is
   held, then the error, whose Retry loading keeps it and focus, busy, while the retry is held, with no kept cards back
-  over it; notification settings, through a Settings link named by its word alone (its icon is silent); sign out;
+  over it; an unread notice (scripted) on Demo University's opaque wash, hovered or not, its `<time>` in the secondary
+  grey and its text readable; notification settings, through a Settings link named by its word alone (its icon is
+  silent); sign out;
 - an ADMIN_APPROVAL tenant: Submit for approval, with the note that an admin will review the profile, landing on the
   pending screen; and a forced sign-out leaving nothing cached;
 - empty states drawing their icon in the institution's ink on a round wash at 3:1 (`expectEmptyState`): the directory's
@@ -346,7 +352,8 @@ Covers:
   naming Kiran, and both changes in the recent activity by the admin's name; his answers' Clubs and societies chips
   each 44px tall, the chosen ones on Demo College's wash, in its ink, with a drawn tick, and the others white with none
   (`expectChipLook`), before and after a press; his answers' Cancel putting back the
-  saved ones, and the admin's own page, with its answers being edited, linking from its recent activity to Kiran's
+  saved ones, and the admin's own row saying You and own page saying "This is you." (each readable, the meta grey), the
+  page, with its answers being edited, linking from its recent activity to Kiran's
   page, held from the visit before, which opens with no editor; approving a pending job after its full preview (the
   Robotics Intern's stipend, with its title an h2 and its parts h3s under the page's h1, and its skills compared with
   nothing of the admin's), and a pending business listing whose contact details show only once opened; a group waiting
@@ -413,7 +420,7 @@ Covers:
   University's blue, Demo College's green), onboarding an institution (the welcome message's hint saying new members
   see it too) with its first admin, whose years are asked under a college's labels, an end before the start refused on
   its box with nothing created, and the admin then listed with 2010–2014 on the Admins tab; a billing plan and usage,
-  stats and user search (Suresh Patil's number typed digit by digit asking fewer times than its digits, the users
+  stats (the subtitle in the meta grey, readable on the console's page) and user search (Suresh Patil's number typed digit by digit asking fewer times than its digits, the users
   listed staying, faded under "Updating results…", with Make or Revoke platform admin held while the script holds the
   answer, until his row alone replaces them), the institution comparison and its CSV,
   the chat reports list showing only escalated reports (and rows on a phone: the nav item's open count, why each is
@@ -485,7 +492,8 @@ Covers:
   once, after the feed's posts are in;
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
-  taking it back, the author's initials on the post in the member's own tone, not the institution's colours, the same as
+  taking it back, the post's author line and its own Edit and Delete readable (the meta grey, never the faint one), the
+  author's initials on the post in the member's own tone, not the institution's colours, the same as
   on the app bar's My profile, beside the app bar's Demo University initials in its ink on its tint, the post's page
   saying "No comments yet" under a level-2 Comments heading, in its own box (the icon in the institution's ink on a round wash) with "Be the first to
   reply.", as on the web, the celebrations
@@ -510,7 +518,8 @@ Covers:
   under Connect, Community and You headings, its rows at least 44 tall, each with a line exposed as its description
   (Funding's "Members raising and investing", My posts' "Everything you've shared"), and on a 320×568 screen sitting
   in an area that scrolls, which the mouse wheel scrolls to an uncovered Sign out; My posts from the More hub, its tabs
-  scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px;
+  scrolling rather than truncating, "Past events" and "Upcoming events" whole at 320px, and a tab not chosen labelled
+  in the secondary grey, readable on its slate-200 tray;
 - jobs: seeded cards with place, pay, experience and "+1 more" skills, and Zylo Labs's and Deloitte's initials in a
   tone from each company's name, two tones apart and not the institution's; "Backend" typed letter by letter into
   Search jobs asking fewer times than its letters, the cards listed staying, faded under "Updating results…", while
@@ -545,7 +554,8 @@ Covers:
 - notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold
   (a funding listing first with its answer held back: its bar, Back and the title Funding, there from the first frame
   over the listing's outline, one progressbar named "Loading" and no spinner, until the listing comes, Back focused
-  meanwhile keeping focus then), and a notification tap landing on its target;
+  meanwhile keeping focus then), and a notification tap landing on its target (the notice, unread, on Demo University's
+  opaque wash with its time in the secondary grey, as on the web; a read one white, its time in the meta grey);
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including the note welcoming the first
   message ("Say hello to Vikram Desai", its text and tip, its envelope in Demo University's badge, its words readable,
   nothing hinting at a decline, no paperclip and the line saying photos and files wait for Vikram to accept), the
@@ -555,7 +565,10 @@ Covers:
   typed, while the photo's upload is held back), the composer still fitting the phone, the bubble's photo, file row and
   spoken summary on the other side with one request for links, the photo viewer (focus on Close once it has faded in,
   back on the photo after Close), the PDF downloaded on the web build, a report from tapping a message, a block, a cold
-  start on a thread, and a lost socket frame recovered by the gap fill;
+  start on a thread, and a lost socket frame recovered by the gap fill; the times as on the web: the request's in
+  Vikram's inbox in the ink while unread (and, since Demo University's ink is also its brand colour, in a pale yellow's
+  ink in a tab of his own served that colour as the institution's, with no new sign-in), a message's readable, and the
+  thread's, read, in the meta grey; the day's label on its slate-200 chip in the secondary grey;
 - groups, mentorship and referrals, as on the web, between two generated members and a member the run registers
   (the invitee chosen while the search for their name is on its way keeping that same row once it answers; the
   mentor areas checked on a 320-point screen as on the web, with nothing wider than the screen; the invitation's
@@ -635,7 +648,7 @@ Covers:
   refreshes; the Approved tab, its answer held back by the script (`holdGets`), showing its skeleton (one progressbar
   named "Loading", its blocks gently pulsing and not its card) and none of Rejected's rows or buttons until its own arrive; searching for Nisha
   (the rows listed staying, faded under "Updating results…", with Parth Joshi's link marked busy and his Suspend held,
-  while the script holds the answer), and for Jignesh, whose own row says "You" with no actions; the app started again with less motion asked for, the same
+  while the script holds the answer), and for Jignesh, whose own row says "You" (readable) with no actions; the app started again with less motion asked for, the same
   skeleton standing still while Approved's answer is held again; and a second page (answered by the script) loading on
   scroll, a row repeated across the pages shown once;
 - a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
@@ -995,6 +1008,11 @@ the console (part 14).
       Jobs ("No openings match", Show all openings, the Search jobs box), Businesses (a city of "nowhere", Show all
       businesses), Mentors (an availability nobody has, Clear filters, the Search mentors box) and, signed out, the
       institution picker ("No institutions found", Clear search).
+- [ ] Small grey text reads easily outdoors at Demo University and at Shri Gujarati Samaj, on iOS and Android: a
+      chat's time in Messages and under its newest message, an unread notification's time on its brand-tinted row
+      (tap Mark all read afterwards), a post's Edit and Delete, and a tab not chosen on My posts on its grey tray. The
+      start screen's and the country and option pickers' arrows are drawn chevrons, not text, and TalkBack or VoiceOver
+      doesn't stop on them.
 
 ### 6. Navigation
 

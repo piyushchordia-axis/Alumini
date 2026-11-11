@@ -260,7 +260,16 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     the page) and faint `#748297` (icons, control borders and tag edges, never text). The web's `index.css` `@theme`
     redraws Tailwind's `slate-500` and `slate-400` as meta and faint, so they aren't Tailwind's values (`text-slate-500`
     is the meta grey) and `[data-backdrop]` steps each one shade darker; the phone has `colors.secondary`,
-    `colors.muted` (meta) and `colors.faint`. `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an
+    `colors.muted` (meta) and `colors.faint`. Grey text is the meta grey or darker, placeholders included (web
+    `text-slate-500`, `placeholder:text-slate-500`; mobile `colors.muted`, `Muted` on the page); `slate-400` and
+    `colors.faint` are for icons, borders and tag edges only, so a decorative caret is `IconChevronDown` /
+    `IconChevronRight` in the faint grey, hidden from screen readers, never "▾" or "›". A row or box tinted in the brand
+    puts its grey text in the secondary grey: web `.dim-text` (it steps `slate-500` and `slate-400` as `[data-backdrop]`
+    does) on an unread notification, the open conversation, your poll vote's bar and the composer's announcement box;
+    mobile `<Muted dim>` or `colors.secondary`, as on an unread notification, your poll vote, and the unchosen `Tabs`
+    label and the chat's day label on their slate-200 trays. An unread notification is the opaque wash on both apps
+    (web `bg-primary-wash`, mobile `theme.primaryWash`), and only a read one lights up on hover. The web writes chat and
+    notification times in `<time dateTime>`. `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an
     edge (3:1), an ink (4.5:1 on the fill, white and the page) and a solid (under white text): web
     `bg-tone-success-fill`, `border-tone-success-edge`, `text-tone-success-ink`, `bg-tone-success-solid` and so on; the
     phone reads `STATUS_TONES`. `brandTones` also gives `edge`, the brand as a line at 3:1 on white and the plain page

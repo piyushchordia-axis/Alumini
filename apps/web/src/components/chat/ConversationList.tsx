@@ -22,7 +22,8 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
       <NavLink
         to={`/t/${slug}/app/messages/${c.id}${query}`}
         className={({ isActive }) =>
-          clsx("flex min-h-16 items-center gap-3 px-4 py-3 transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", isActive ? "bg-primary/10" : "hover:bg-slate-50")
+          // The open conversation's tint takes the secondary grey (dim-text), which reads on any brand's 10%.
+          clsx("flex min-h-16 items-center gap-3 px-4 py-3 transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", isActive ? "bg-primary/10 dim-text" : "hover:bg-slate-50")
         }
       >
         <span className="relative shrink-0">
@@ -40,15 +41,17 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
               {name}
               {years && <span className="font-normal text-slate-500"> · {years}</span>}
             </span>
-            <span className={clsx("shrink-0 text-xs", unread ? "font-semibold text-primary" : "text-slate-400")}>{formatChatTime(c.lastMessageAt, now)}</span>
+            <time dateTime={c.lastMessageAt} className={clsx("shrink-0 text-xs", unread ? "font-semibold text-primary-ink" : "text-slate-500")}>
+              {formatChatTime(c.lastMessageAt, now)}
+            </time>
           </span>
           <span className="flex items-center gap-2">
             <span className={clsx("truncate text-sm", unread ? "text-slate-800" : "text-slate-500", !c.lastMessage?.body && c.lastMessage && "italic")}>{conversationPreview(c)}</span>
             <span className="ml-auto flex shrink-0 items-center gap-1">
               {c.group?.archived && <Badge>Archived</Badge>}
               {muted && (
-                <span className="flex text-slate-400" title="Muted">
-                  <IconBellOff size={14} />
+                <span className="flex" title="Muted">
+                  <IconBellOff size={14} className="text-slate-400" />
                   <span className="sr-only">Muted</span>
                 </span>
               )}

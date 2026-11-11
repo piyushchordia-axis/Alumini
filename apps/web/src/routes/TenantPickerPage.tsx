@@ -1,7 +1,7 @@
 import { countryName, tenantSearchEmpty } from "@illuminize/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
-import { IconBuilding, IconSearch, IconSpark } from "@/components/icons";
+import { IconBuilding, IconChevronRight, IconSearch, IconSpark } from "@/components/icons";
 import { Avatar, Button, Card, EmptyState, ErrorBox, Input, ListSkeleton } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useTenantList } from "@/hooks/useTenant";
@@ -72,11 +72,11 @@ export function TenantPickerPage() {
                   {[t.city, countryName(t.country)].filter(Boolean).join(", ")}
                 </div>
               </div>
-              <span className="text-slate-400">›</span>
+              <IconChevronRight size={16} className="text-slate-400" />
             </Link>
           ))}
         </div>
-        <p className="mt-8 text-center text-xs text-slate-400">
+        <p className="mt-8 text-center text-xs text-slate-500">
           Illuminize staff?{" "}
           <Link to="/platform/login" className="underline">
             Platform console

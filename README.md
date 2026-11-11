@@ -706,7 +706,16 @@ looks the same on the web and the phone and stays readable in any institution co
 - **Greys.** `GREYS`, darkest first: text, body (labels), secondary `#475569` (excerpts, and grey on a tinted surface),
   meta `#5b6b80` (times, places, counts, bylines and hints: 5.44:1 on white, 4.97 on the page) and faint `#748297`
   (icons, borders and tag edges, never text). The web's `index.css` redraws Tailwind's `slate-500` and `slate-400` as
-  meta and faint; the phone's `colors` take them by name.
+  meta and faint; the phone's `colors` take them by name. No text is drawn in the faint grey on either app, in the
+  member app or either console: times, bylines, counts, Edit and Delete, Report, "Sending…", "You" in the members list
+  and placeholders are the meta grey, and a picker's caret is a drawn chevron in the faint grey, hidden from screen
+  readers. Grey text on a row or box tinted in the brand takes the secondary grey (the web's `.dim-text`, the phone's
+  `Muted dim`), because the meta grey falls under 4.5:1 on some brands' tints: an unread notification, which both apps
+  draw on the brand's opaque wash (hovering lights up only a read one), the open conversation in the web's inbox, your
+  vote's bar in a poll and the web composer's announcement box. A screen's own tabs on the phone (`Tabs`, as on My
+  posts) label a tab not chosen in the secondary grey too, on their slate-200 tray (the web's are `slate-600`), and so
+  does a chat's day label on the phone, whose chip is slate-200 to stand apart from the chat's page. The web
+  writes chat and notification times as `<time>` elements with their date and time.
 - **Status tones.** `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an edge (3:1 on white and
   the page), an ink (4.5:1 on the fill, white and the page) and a solid (under white text). The web has them as
   `bg-tone-success-fill`, `border-tone-success-edge`, `text-tone-success-ink`, `bg-tone-success-solid` and so on; the

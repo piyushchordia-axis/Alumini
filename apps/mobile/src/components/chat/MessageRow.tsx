@@ -23,12 +23,15 @@ const MEDIA_INSET = 4;
 const REMOVED = "This message was removed";
 const HIDDEN = "Hidden because you blocked this member";
 
-/** A day's label between messages. */
+/**
+ * A day's label between messages. Its chip is slate-200, to stand apart from the chat's slate-100 page, where the meta
+ * grey falls under 4.5:1: the secondary grey, as on the Tabs tray.
+ */
 export function DayRow({ label }: { label: string }) {
   return (
     <View style={{ alignItems: "center", marginVertical: spacing.md }}>
       <View style={{ backgroundColor: "#e2e8f0", borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 2 }}>
-        <Text style={{ fontSize: 12, fontWeight: "600", color: colors.muted }}>{label}</Text>
+        <Text style={{ fontSize: 12, fontWeight: "600", color: colors.secondary }}>{label}</Text>
       </View>
     </View>
   );
@@ -73,7 +76,7 @@ export const MessageRow = memo(function MessageRow({
     const line = showSenders ? systemLineText(message, !message.redacted && message.sender?.id === me) : message.body;
     return (
       <Text style={{ textAlign: "center", fontSize: 12, color: colors.muted, marginVertical: spacing.md, paddingHorizontal: spacing.lg }}>
-        {line} <Text style={{ color: colors.faint }}>· {timeLabel}</Text>
+        {line} · {timeLabel}
       </Text>
     );
   }
@@ -176,11 +179,11 @@ export const MessageRow = memo(function MessageRow({
             </Pressable>
           </View>
         ) : (
-          <Text style={{ fontSize: 11, color: colors.faint, marginTop: 2, paddingHorizontal: spacing.xs }}>Sending…</Text>
+          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2, paddingHorizontal: spacing.xs }}>Sending…</Text>
         )
       ) : selected ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-          <Text style={{ fontSize: 11, color: colors.faint, paddingHorizontal: spacing.xs }}>{timeLabel}</Text>
+          <Text style={{ fontSize: 11, color: colors.muted, paddingHorizontal: spacing.xs }}>{timeLabel}</Text>
           {reportable && (
             <Pressable onPress={() => actions.onReport(message.id)} accessibilityRole="button" accessibilityLabel="Report message" style={smallButton}>
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.danger }}>Report message</Text>
@@ -188,7 +191,7 @@ export const MessageRow = memo(function MessageRow({
           )}
         </View>
       ) : endsGroup ? (
-        <Text style={{ fontSize: 11, color: colors.faint, marginTop: 2, paddingHorizontal: spacing.xs }}>{timeLabel}</Text>
+        <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2, paddingHorizontal: spacing.xs }}>{timeLabel}</Text>
       ) : null}
     </View>
   );

@@ -118,7 +118,7 @@ export default function LoginScreen() {
           <ErrorText error={error ? errorMessage(error) : null} />
           <Button title="Verify and continue" onPress={() => void verify()} loading={busy} disabled={code.length < 6} />
           <Pressable onPress={() => (cooldown > 0 ? undefined : void request())} disabled={cooldown > 0} accessibilityRole="button" hitSlop={8}>
-            <Text style={{ textAlign: "center", color: cooldown > 0 ? colors.faint : theme.primary }}>{cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}</Text>
+            <Text style={{ textAlign: "center", color: cooldown > 0 ? colors.muted : theme.primary }}>{cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}</Text>
           </Pressable>
           <Pressable onPress={() => setStep("phone")} accessibilityRole="button" hitSlop={8}>
             <Text style={{ textAlign: "center", color: colors.muted, fontSize: 12 }}>Change number</Text>

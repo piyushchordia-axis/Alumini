@@ -61,7 +61,7 @@ function AdminMemberDetail({ membershipId }: { membershipId: string }) {
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             {!isSelf && <MemberActionButtons member={m} actions={actions} />}
             {!isSelf && m.status === "APPROVED" && <RoleChange member={m} tenantName={tenant.name} actions={actions} />}
-            {isSelf && <span className="text-sm text-slate-400">This is you.</span>}
+            {isSelf && <span className="text-sm text-slate-500">This is you.</span>}
           </div>
         </ProfileSummary>
         {/* The work, studies, links and bio are in ProfileDetails below; these are the facts it doesn't show. */}

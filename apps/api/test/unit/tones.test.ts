@@ -22,7 +22,7 @@ const WHITE = "#ffffff";
 const PAGE = PLAIN_PAGE_COLOR;
 /** slate-50, the lightest surface grey text and tags sit on (a comment, a table header). */
 const SLATE_50 = "#f8fafc";
-/** The phone's Tabs tray (colors.border), on which an unchosen tab's label sits. */
+/** The phone's slate-200 trays (colors.border): the Tabs tray, under an unchosen tab's label, and a chat's day chip. */
 const TABS_TRAY = "#e2e8f0";
 /** The four seeded institutions' colours (seed.ts): Demo University, Demo College, Demo School and the Samaj. */
 const SEEDED = ["#1d4ed8", "#047857", "#b45309", "#c2410c"];
@@ -56,6 +56,8 @@ describe("GREYS", () => {
 
   it("give the secondary grey 4.5:1 on every tinted surface: the Tabs tray, any brand's wash or 10% tint, and the veil over a black photo", () => {
     expect(contrastRatio(GREYS.secondary, TABS_TRAY)).toBeCloseTo(6.15, 2);
+    // Which is why a label on it isn't the meta grey.
+    expect(contrastRatio(GREYS.meta, TABS_TRAY)).toBeLessThan(4.5);
     expect(contrastRatio(GREYS.secondary, mixHex(PAGE, "#000000", BACKDROP_SCRIM))).toBeGreaterThanOrEqual(4.5);
     for (const c of sampledColours()) {
       expect(contrastRatio(GREYS.secondary, brandTones(c).wash), `${c}'s wash`).toBeGreaterThanOrEqual(4.5);
@@ -149,8 +151,8 @@ describe("form controls' edges", () => {
   it("are what both apps' fields draw: the web's controlClass and the phone's Input", () => {
     const web = readFileSync(resolve(ROOT, "apps/web/src/components/ui/index.tsx"), "utf8");
     const control = /const controlClass =\s*"([^"]+)"/.exec(web)?.[1]?.split(/\s+/) ?? [];
-    expect(control).toEqual(expect.arrayContaining(["border", "border-slate-400", "focus:border-primary-ink"]));
-    expect(control.filter((c) => /^border-slate-[23]00$/.test(c))).toEqual([]);
+    expect(control).toEqual(expect.arrayContaining(["border", "border-slate-400", "focus:border-primary-ink", "placeholder:text-slate-500"]));
+    expect(control.filter((c) => /^border-slate-[23]00$/.test(c) || /^placeholder:text-slate-[34]00$/.test(c))).toEqual([]);
     expect(/const invalidControlClass = "([^"]+)"/.exec(web)?.[1]).toBe("border-tone-danger-edge");
     const mobile = readFileSync(resolve(ROOT, "apps/mobile/src/components/ui.tsx"), "utf8");
     expect(/^\s*input: \{([^}]*)\}/m.exec(mobile)?.[1]).toMatch(/\bborderColor: colors\.faint\b/);
@@ -187,9 +189,14 @@ describe("apps/web/src/index.css", () => {
     expect(declared).toEqual(expected);
   });
 
-  it("steps grey text one shade darker on a tint or a photo: the meta grey to the secondary one, the faint grey to the meta one", () => {
-    const backdrop = block(/(^|,\s*)\[data-backdrop\](\s*,|$)/);
-    expect(backdrop).toEqual({ "--color-slate-500": GREYS.secondary, "--color-slate-400": GREYS.meta });
+  it("steps grey text one shade darker on a tint or a photo, and in a tinted row (.dim-text): the meta grey to the secondary one, the faint grey to the meta one", () => {
+    const darker = { "--color-slate-500": GREYS.secondary, "--color-slate-400": GREYS.meta };
+    expect(block(/(^|,\s*)\[data-backdrop\](\s*,|$)/)).toEqual(darker);
+    expect(block(/(^|,\s*)\.dim-text(\s*,|$)/)).toEqual(darker);
+  });
+
+  it("draws every placeholder in the meta grey, even in a box that doesn't say so itself", () => {
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).toMatch(/::placeholder\s*\{\s*color:\s*var\(--color-slate-500\);\s*\}/);
   });
 
   it("starts with the default institution colour's tones, as applyTenantTheme writes them", () => {

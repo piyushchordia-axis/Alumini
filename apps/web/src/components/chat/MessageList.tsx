@@ -116,7 +116,7 @@ const Bubble = memo(function Bubble({
     const text = showSenders ? systemLineText(message, !message.redacted && message.sender?.id === me) : message.body;
     return (
       <p className="my-3 px-4 text-center text-xs text-slate-500 [overflow-wrap:anywhere]">
-        {text} <span className="text-slate-400">· {timeLabel}</span>
+        {text} · <time dateTime={message.createdAt}>{timeLabel}</time>
       </p>
     );
   }
@@ -196,10 +196,15 @@ const Bubble = memo(function Bubble({
             </button>
           </div>
         ) : (
-          <span className="mt-0.5 px-1 text-[11px] text-slate-400">Sending…</span>
+          <span className="mt-0.5 px-1 text-[11px] text-slate-500">Sending…</span>
         )
       ) : (
-        (endsGroup || selected) && <span className="mt-0.5 px-1 text-[11px] text-slate-400">{timeLabel}</span>
+        (endsGroup || selected) &&
+        message && (
+          <time dateTime={message.createdAt} className="mt-0.5 px-1 text-[11px] text-slate-500">
+            {timeLabel}
+          </time>
+        )
       )}
     </div>
   );

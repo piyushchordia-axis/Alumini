@@ -2,6 +2,7 @@ import { countriesPopularFirst, countryByCode, flagEmoji, POPULAR_COUNTRY_CODES,
 import { useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { IconChevronDown } from "@/components/icons";
 import { toggleState } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -44,10 +45,12 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
         accessibilityLabel={`${label}${selected ? `, ${selected.name}${variant === "dial" ? ` ${selected.dial}` : ""}` : ""}`}
         style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 }}
       >
-        <Text style={{ fontSize: 15, color: selected ? colors.text : colors.faint }} numberOfLines={1}>
+        <Text style={{ fontSize: 15, color: selected ? colors.text : colors.muted }} numberOfLines={1}>
           {fieldText}
         </Text>
-        <Text style={{ color: colors.faint }}>▾</Text>
+        <View aria-hidden>
+          <IconChevronDown size={16} color={colors.faint} />
+        </View>
       </Pressable>
       {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : null}
 
@@ -65,7 +68,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
                 value={q}
                 onChangeText={setQ}
                 placeholder="Search by name or code (e.g. India, +44)"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={colors.muted}
                 autoFocus
                 autoCorrect={false}
                 accessibilityLabel="Search countries"
@@ -105,7 +108,8 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
                   >
                     <Text style={{ fontSize: 20 }}>{flagEmoji(item.code)}</Text>
                     <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>{item.name}</Text>
-                    <Text style={{ fontSize: 14, color: colors.muted }}>{variant === "dial" ? item.dial : item.code}</Text>
+                    {/* The chosen row is the brand's tint, where the meta grey can fall under 4.5:1. */}
+                    <Text style={{ fontSize: 14, color: active ? colors.secondary : colors.muted }}>{variant === "dial" ? item.dial : item.code}</Text>
                   </Pressable>
                 );
               }}

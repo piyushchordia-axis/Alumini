@@ -111,7 +111,7 @@ export function MyProfilePage() {
             <li key={m.id} className="flex items-center gap-3 py-2">
               <Avatar name={m.tenant.shortName ?? m.tenant.name} src={m.tenant.logoUrl} size="sm" brandColor={m.tenant.primaryColor} />
               <span className="flex-1 text-sm">
-                {m.tenant.name} <span className="text-slate-400">· {m.status.toLowerCase()}</span>
+                {m.tenant.name} <span className="text-slate-500">· {m.status.toLowerCase()}</span>
               </span>
               {m.tenant.slug !== tenant.slug && (
                 <Link to={`/t/${m.tenant.slug}/app`} className="text-sm text-primary underline">
@@ -125,7 +125,7 @@ export function MyProfilePage() {
           <Link to="/?switch=1" className="text-sm text-primary underline">
             Join another institution
           </Link>
-          {others.length === 0 && <span className="text-xs text-slate-400">You're a member of one institution.</span>}
+          {others.length === 0 && <span className="text-xs text-slate-500">You're a member of one institution.</span>}
         </div>
       </Card>
       <Card className="p-5">

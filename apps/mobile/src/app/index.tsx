@@ -3,7 +3,7 @@ import { Redirect, useRouter } from "expo-router";
 import { useRef, useState, type ComponentRef } from "react";
 import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { IconBuilding, IconSearch, IconSpark } from "@/components/icons";
+import { IconBuilding, IconChevronRight, IconSearch, IconSpark } from "@/components/icons";
 import { Avatar, Button, EmptyState, ErrorText, Input, ListSkeleton, Spinner } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useTenantList } from "@/hooks/useTenant";
@@ -81,7 +81,9 @@ export default function TenantPickerScreen() {
               <Text style={{ fontWeight: "600", color: colors.text }}>{t.name}</Text>
               <Text style={{ color: colors.muted, fontSize: 12 }}>{[t.city, countryName(t.country)].filter(Boolean).join(", ")}</Text>
             </View>
-            <Text style={{ color: colors.faint }}>›</Text>
+            <View aria-hidden>
+              <IconChevronRight size={16} color={colors.faint} />
+            </View>
           </Pressable>
         )}
       />

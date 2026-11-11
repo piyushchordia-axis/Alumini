@@ -79,7 +79,7 @@ export function EventDetailPage() {
               <h1 className="text-xl font-semibold text-slate-900">{e.title}</h1>
               <p className="text-slate-600">
                 {formatDateTime(e.startAt, e.timezone)}
-                {e.endAt ? ` – ${formatDateTime(e.endAt, e.timezone)}` : ""} <span className="text-xs text-slate-400">({e.timezone})</span>
+                {e.endAt ? ` – ${formatDateTime(e.endAt, e.timezone)}` : ""} <span className="text-xs text-slate-500">({e.timezone})</span>
               </p>
               <p className="flex items-center gap-1.5 text-slate-600">
                 <IconMapPin size={16} className="text-slate-400" />

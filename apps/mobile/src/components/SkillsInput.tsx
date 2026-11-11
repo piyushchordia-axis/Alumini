@@ -106,7 +106,7 @@ export function SkillsInput({
         value={text}
         accessibilityLabel={label}
         placeholder={full ? `${max} skills added` : placeholder}
-        placeholderTextColor={colors.faint}
+        placeholderTextColor={colors.muted}
         autoCorrect={false}
         autoComplete="off"
         enterKeyHint="enter"
@@ -124,7 +124,7 @@ export function SkillsInput({
         }}
         style={[styles.input, error ? { borderColor: colors.danger } : null]}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : note ? <Text style={styles.note}>{note}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : note ? <Text style={styles.note}>{note}</Text> : hint ? <Text style={[styles.hint, { color: theme.pageMuted }]}>{hint}</Text> : null}
       {value.length > 0 && (
         <View role="list" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
           {value.map((skill) => (

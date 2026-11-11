@@ -110,7 +110,7 @@ export function PostComposer({ inputRef }: { inputRef?: Ref<HTMLTextAreaElement>
             </fieldset>
           )}
           {announce && (
-            <fieldset className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+            <fieldset className="dim-text space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
               <legend className="flex items-center gap-1.5 px-1 font-medium text-slate-800">
                 <IconAnnounce size={16} /> Announcement
               </legend>
@@ -146,7 +146,7 @@ export function PostComposer({ inputRef }: { inputRef?: Ref<HTMLTextAreaElement>
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          {membership.role !== "TENANT_ADMIN" && <p className="hidden text-xs text-slate-400 sm:block">Subject to moderation</p>}
+          {membership.role !== "TENANT_ADMIN" && <p className="hidden text-xs text-slate-500 sm:block">Subject to moderation</p>}
           <Button
             onClick={() => (billed ? setConfirming(true) : create.mutate())}
             loading={create.isPending}

@@ -220,8 +220,14 @@ try {
       // The admin's own page links to Kiran from its recent activity. With Kiran's page held from the visit before, an
       // editor open on the admin's own answers mustn't follow to Kiran's, where Save would write the admin's answers.
       await page.goto(`${BASE}/t/demo-college/admin/members?status=APPROVED&q=Suresh%20Patil`);
+      // Where another member's row has actions, the admin's own says You, and their page "This is you.": grey text in
+      // the meta grey, which reads, not the faint grey.
+      const ownRow = await expectReadable(page.locator("main li", { hasText: "Suresh Patil" }).first().getByText("You", { exact: true }), "You on the admin's own row");
+      if (ownRow.colour !== GREY_TEXT.plain) throw new Error(`You on the admin's own row is rgb ${ownRow.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
       await page.locator("li").getByRole("link", { name: "Suresh Patil", exact: true }).first().click();
       await page.getByText("This is you.", { exact: true }).waitFor();
+      const ownPage = await expectReadable(page.getByText("This is you.", { exact: true }), "This is you. on the admin's own page");
+      if (ownPage.colour !== GREY_TEXT.plain) throw new Error(`"This is you." on the admin's own page is rgb ${ownPage.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
       const toKiran = page.getByRole("link", { name: `membership ${kiranId.slice(0, 8)}`, exact: true }).first();
       await toKiran.click();
       await page.waitForURL(`**/admin/members/${kiranId}`);
@@ -1489,6 +1495,9 @@ try {
     await page.goto(`${BASE}/platform/stats`);
     await page.waitForSelector("text=Institutions");
     await page.waitForSelector(`text=Smoke Institute ${unique}`);
+    // The platform console's grey text is the same meta grey, readable on its page.
+    const statsLine = await expectReadable(page.locator("main h1 + p").first(), "the platform stats page's subtitle");
+    if (statsLine.colour !== GREY_TEXT.plain) throw new Error(`the platform stats page's subtitle is rgb ${statsLine.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
     await page.goto(`${BASE}/platform/users`);
     const rows = page.locator("main ul li");
     await rows.nth(1).waitFor();

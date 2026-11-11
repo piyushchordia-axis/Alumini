@@ -155,11 +155,11 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
           {post.isMine ? (
             <>
               {!editing && !removed && (
-                <button type="button" className="text-xs text-slate-400 hover:text-slate-700" onClick={startEditing}>
+                <button type="button" className="text-xs text-slate-500 hover:text-slate-700" onClick={startEditing}>
                   Edit
                 </button>
               )}
-              <button type="button" className="text-xs text-slate-400 hover:text-red-600" onClick={() => confirm("Delete this post?") && remove.mutate()}>
+              <button type="button" className="text-xs text-slate-500 hover:text-red-600" onClick={() => confirm("Delete this post?") && remove.mutate()}>
                 Delete
               </button>
             </>

@@ -157,10 +157,10 @@ function MembersList({ onWrite }: { onWrite: (q: string) => void }) {
                       <MemberStatusBadge status={m.status} />
                     </div>
                     <div className="mt-0.5 break-words text-xs text-slate-500">{memberListMeta(m, formatDate)}</div>
-                    {m.statusReason && <div className="text-xs text-slate-400">Reason: {m.statusReason}</div>}
+                    {m.statusReason && <div className="text-xs text-slate-500">Reason: {m.statusReason}</div>}
                   </div>
                 </div>
-                <div className="shrink-0 sm:ml-2">{m.id === me?.id ? <span className="text-xs text-slate-400">You</span> : <MemberActionButtons member={m} actions={actions} compact disabled={kept} />}</div>
+                <div className="shrink-0 sm:ml-2">{m.id === me?.id ? <span className="text-xs text-slate-500">You</span> : <MemberActionButtons member={m} actions={actions} compact disabled={kept} />}</div>
               </li>
             ))}
           </ul>

@@ -22,7 +22,7 @@ export function SeekerCard({ slug, seeker }: { slug: string; seeker: JobSeekerDt
           </div>
         )}
       </dl>
-      <p className="mt-2 text-xs text-slate-400">Updated {timeAgo(seeker.updatedAt)}</p>
+      <p className="mt-2 text-xs text-slate-500">Updated {timeAgo(seeker.updatedAt)}</p>
     </Card>
   );
 }

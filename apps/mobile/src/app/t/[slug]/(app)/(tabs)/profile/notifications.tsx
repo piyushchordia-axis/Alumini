@@ -64,8 +64,11 @@ export default function NotificationsScreen() {
           // No withAnchor, unlike a push: an admin notice's console screen goes back to this list, not the console's home.
           const to = notificationHref(slug, n.type, n.data, { isAdmin: isTenantAdmin });
           const request = isTenantAdmin ? memberRequestOf(n) : null;
+          const unread = !n.readAt;
           return (
-            <View style={[styles.row, { backgroundColor: n.readAt ? "#fff" : theme.primarySoft }]}>
+            // Unread: the brand's opaque wash, as on the web, which no background photo shows through, with its grey a shade
+            // darker (Muted dim) to read on it.
+            <View style={[styles.row, { backgroundColor: unread ? theme.primaryWash : colors.card }]}>
               {/* The notice's text, and beside it, never inside it, a request's Approve and Reject. */}
               <Pressable
                 accessibilityRole="button"
@@ -76,10 +79,10 @@ export default function NotificationsScreen() {
                 style={styles.text}
               >
                 <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                  <Text style={{ flex: 1, fontWeight: n.readAt ? "400" : "600", color: colors.text }}>{n.title}</Text>
-                  <Muted>{timeAgo(n.createdAt)}</Muted>
+                  <Text style={{ flex: 1, fontWeight: unread ? "600" : "400", color: colors.text }}>{n.title}</Text>
+                  <Muted dim={unread}>{timeAgo(n.createdAt)}</Muted>
                 </View>
-                {n.body && <Muted size={13}>{n.body}</Muted>}
+                {n.body && <Muted dim={unread} size={13}>{n.body}</Muted>}
               </Pressable>
               {request && (
                 <View style={styles.request}>

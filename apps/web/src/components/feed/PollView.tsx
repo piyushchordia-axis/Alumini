@@ -42,7 +42,8 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
         const pct = total ? Math.round((o.votes / total) * 100) : 0;
         if (showResults) {
           return (
-            <div key={o.id} className="relative overflow-hidden rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            // Your choice's bar is the brand's tint, which the count can sit on, so its grey steps darker (dim-text).
+            <div key={o.id} className={clsx("relative overflow-hidden rounded-lg border border-slate-200 px-3 py-2 text-sm", mine && "dim-text")}>
               <div className={clsx("absolute inset-y-0 left-0", mine ? "bg-primary/20" : "bg-slate-100")} style={{ width: `${pct}%` }} aria-hidden />
               <div className="relative flex justify-between gap-2">
                 <span className={clsx(mine && "font-semibold text-slate-900")}>
@@ -55,7 +56,7 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
                   )}
                 </span>
                 <span className="tabular-nums text-slate-600">
-                  {pct}% <span className="text-xs text-slate-400">({o.votes})</span>
+                  {pct}% <span className="text-xs text-slate-500">({o.votes})</span>
                 </span>
               </div>
             </div>

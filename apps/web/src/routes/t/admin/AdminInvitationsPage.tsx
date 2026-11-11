@@ -419,7 +419,7 @@ export function AdminInvitationsPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">
                       {deliveryText(inv, timeAgo)}
-                      {times && <div className="text-slate-400">{times}</div>}
+                      {times && <div className="text-slate-500">{times}</div>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap justify-end gap-1">

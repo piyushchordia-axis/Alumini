@@ -543,6 +543,16 @@ try {
     expectSameTone(onPost, await expectInitials(myProfile.getByText("MS", { exact: true }), "the app bar's initials"), "the member's initials on the post and in the app bar");
     const appBarLogo = page.getByRole("heading", { name: "DemoU", exact: true }).locator("visible=true").last().locator("xpath=preceding-sibling::*[1]");
     await expectInstitutionInitials(appBarLogo.getByText("D", { exact: true }), demoUniversity, "Demo University's initials in the app bar");
+    // Grey text on the card is the meta grey or darker, as on the web, never the faint grey that is for icons: the
+    // author's line and the post's own Edit and Delete.
+    for (const [grey, where] of [
+      [card.getByRole("link", { name: /^Mobile Smoke, 2010–2014 · / }).getByText(/^2010–2014 · /), "the post's author line"],
+      [card.getByRole("button", { name: "Edit post", exact: true }).getByText("Edit", { exact: true }), "the post's Edit"],
+      [card.getByRole("button", { name: "Delete post", exact: true }).getByText("Delete", { exact: true }), "the post's Delete"],
+    ]) {
+      const { colour } = await expectReadable(grey, where);
+      if (colour !== GREY_TEXT.plain) throw new Error(`${where} is rgb ${colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
+    }
     await shot("m04b2-reaction-chosen");
     await chosen.click();
     await card.locator('[aria-label="Like"][aria-pressed="false"]').waitFor();
@@ -991,6 +1001,10 @@ try {
     await selectedBarTab("More").waitFor();
     const pastEvents = (selected) => page.locator(`[role="tab"][aria-selected="${selected}"]`).getByText("Past events", { exact: true }).locator("visible=true").first();
     await pastEvents(false).waitFor();
+    // A tab not chosen is labelled in the secondary grey (the web's in slate-600): on the slate-200 tray the meta grey
+    // reads under 4.5:1.
+    const unchosenTab = await expectReadable(pastEvents(false), "the unchosen Past events tab on its tray");
+    if (unchosenTab.colour !== GREY_TEXT.dim) throw new Error(`an unchosen tab's label is rgb ${unchosenTab.colour}, not the secondary grey (rgb ${GREY_TEXT.dim})`);
     await shot("m09-my-content");
     // The tabs fit at the usual width, so go narrower. A squeezed label stays one line tall, so its height proves nothing: look for clipped text.
     await page.setViewportSize({ width: 320, height: 700 });
@@ -1683,7 +1697,13 @@ try {
     await page.getByRole("button", { name: "Edit profile" }).locator("visible=true").first().waitFor();
 
     const notification = await scriptNotification(page, "demo-university", { type: "CONTENT_APPROVED", data: { contentType: "FUNDING", contentId: funding.split("/").pop() }, title: "Your listing was approved" });
+    // Unread, its row is the brand's opaque wash, as on the web, with its time a shade darker (Muted dim) to read on it.
+    notification.update({ readAt: null });
     await page.goto(BASE + "/t/demo-university/profile/notifications");
+    const unreadTime = page.getByText("Your listing was approved", { exact: true }).locator("visible=true").first().locator("xpath=following-sibling::*[1]");
+    const unreadLook = await expectReadable(unreadTime, "an unread notice's time");
+    if (unreadLook.behind !== BRAND_TONES.demoUniversity.wash) throw new Error(`an unread notice's row is rgb ${unreadLook.behind}, not Demo University's wash (rgb ${BRAND_TONES.demoUniversity.wash})`);
+    if (unreadLook.colour !== GREY_TEXT.dim) throw new Error(`an unread notice's time is rgb ${unreadLook.colour}, not the secondary grey (rgb ${GREY_TEXT.dim})`);
     await page.getByText("Your listing was approved", { exact: true }).click();
     await page.waitForURL(funding);
     await page.getByText("Embedded credit for SME marketplaces", { exact: false }).locator("visible=true").first().waitFor();
@@ -1693,6 +1713,9 @@ try {
     // A chat notice opens its thread above the tabs. One this member isn't in says so, with a way back, rather than going blank.
     const removed = await scriptNotification(page, "demo-university", { type: "CHAT_MESSAGE_REMOVED", data: { conversationId: "00000000-0000-4000-8000-0000000000aa", messageId: "00000000-0000-4000-8000-0000000000ab" }, title: "An admin removed a message you sent" });
     await page.goto(BASE + "/t/demo-university/profile/notifications");
+    // Read, a row is white, its time in the meta grey.
+    const readLook = await expectReadable(page.getByText("An admin removed a message you sent", { exact: true }).locator("visible=true").first().locator("xpath=following-sibling::*[1]"), "a read notice's time");
+    if (readLook.behind !== WHITE || readLook.colour !== GREY_TEXT.plain) throw new Error(`a read notice's time is rgb ${readLook.colour} on rgb ${readLook.behind}, not the meta grey (rgb ${GREY_TEXT.plain}) on white`);
     await page.getByText("An admin removed a message you sent", { exact: true }).click();
     await page.waitForURL("**/t/demo-university/messages/00000000-0000-4000-8000-0000000000aa");
     await page.getByText("This conversation isn't available").locator("visible=true").first().waitFor();
@@ -1832,6 +1855,22 @@ try {
     await request.waitFor(live);
     // His years beside his name, since the line below is the preview, and under his name in the thread's header.
     await request.getByText("· 2011–2015", { exact: true }).waitFor();
+    // Unread, its time is in the ink, as on the web.
+    const requestTime = await expectReadable(request.getByText(/^\d{1,2}:\d{2}/), "an unread request's time in the inbox");
+    if (requestTime.colour !== BRAND_TONES.demoUniversity.ink) throw new Error(`an unread request's time is rgb ${requestTime.colour}, not Demo University's ink (rgb ${BRAND_TONES.demoUniversity.ink})`);
+    // Demo University's ink is its brand colour, so that can't tell the ink from the raw brand colour, which a pale brand
+    // would lose. A tab of B's own (the same session, no new sign-in) served a pale yellow as the institution's colour
+    // draws the time in that colour's ink (brandTones("#fde68a").ink, #6d694f), then closes, opening nothing.
+    const paleB = await contextB.newPage();
+    const paleTenant = await scriptTenant(paleB, "demo-university");
+    paleTenant.rewrite((t) => ({ ...t, primaryColor: "#fde68a" }));
+    await paleB.goto(`${app}/messages`);
+    await shown(paleB.locator('[role="tab"]').getByText("Requests", { exact: true })).click();
+    const paleRequest = shown(paleB.getByRole("link", { name: /^Arjun Singh, 2011–2015, / }));
+    await paleRequest.waitFor();
+    const paleTime = await expectReadable(paleRequest.getByText(/^\d{1,2}:\d{2}/), "an unread request's time in the inbox on a pale brand");
+    if (paleTime.colour !== "109 105 79") throw new Error(`an unread request's time on a pale yellow brand is rgb ${paleTime.colour}, not that colour's ink (rgb 109 105 79)`);
+    await paleB.close();
     await pageB.screenshot({ path: `${SHOTS}/m10b-chat-request-arrived.png` });
     await request.click();
     await shown(pageB.getByText("2011–2015", { exact: true })).waitFor();
@@ -1859,6 +1898,11 @@ try {
       }
     }
     await pageA.screenshot({ path: `${SHOTS}/m10c-chat-thread.png` });
+    // The time under the newest message is the meta grey, which reads on the chat's page. The day's label sits on a
+    // slate-200 chip, where the meta grey falls under 4.5:1, so it takes the secondary grey, as an unchosen tab does.
+    await expectReadable(log(pageA).getByText(/^\d{1,2}:\d{2}/).last(), "a message's time in the thread");
+    const dayLabel = await expectReadable(log(pageA).getByText(/^(Today|Yesterday)$/).first(), "the day's label in the thread");
+    if (dayLabel.colour !== GREY_TEXT.dim) throw new Error(`the day's label in the thread is rgb ${dayLabel.colour}, not the secondary grey (rgb ${GREY_TEXT.dim})`);
 
     // Photos and PDFs, now the chat is accepted, as on the web. The "Text only" line has gone, and the paperclip offers a
     // sheet of Photos and PDF file, each picker a file chooser on the web build. Each waits in the tray while it uploads,
@@ -2116,6 +2160,11 @@ try {
     await shown(pageA.getByRole("button", { name: "Back" })).click();
     await pageA.waitForURL("**/t/demo-university/feed");
     await tabBar(pageA).first().waitFor();
+    // B's inbox: the thread, read (B's own message came last), gives its time in the meta grey, not the ink.
+    await pageB.goto(`${app}/messages`);
+    const readRow = shown(pageB.getByRole("link", { name: /^Arjun Singh, 2011–2015, / }));
+    const readTime = await expectReadable(readRow.getByText(/^\d{1,2}:\d{2}/), "a read conversation's time in the inbox");
+    if (readTime.colour !== GREY_TEXT.plain) throw new Error(`a read conversation's time is rgb ${readTime.colour}, not the meta grey (rgb ${GREY_TEXT.plain})`);
     await contextA.close();
     await contextB.close();
   });
@@ -4414,8 +4463,11 @@ try {
     await search.fill("Jignesh");
     await page.waitForURL(/q=Jignesh/);
     await shown(page.getByText("Jignesh Patel", { exact: true })).waitFor();
-    // In the Approved list, not More's "You" heading, which may be mounted under the console.
-    await shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByText("You", { exact: true }).waitFor();
+    // In the Approved list, not More's "You" heading, which may be mounted under the console. Grey, in the meta grey that
+    // reads, as on the web.
+    const ownRow = shown(page.getByRole("tabpanel", { name: "Approved", exact: true })).getByText("You", { exact: true });
+    await ownRow.waitFor();
+    await expectReadable(ownRow, "You on the admin's own row");
     if (await page.getByRole("button", { name: /Jignesh Patel$/ }).locator("visible=true").count()) throw new Error("the admin's own row offers actions on himself");
     // A search that finds nobody says what it looks at; its Clear search is the box's own, not a second one in the box.
     await search.fill("Zzyzx");

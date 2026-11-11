@@ -1,5 +1,6 @@
 import { COUNTRIES, POPULAR_COUNTRY_CODES, countryByCode, flagEmoji, phoneCountryNote, readPhoneEntry, type PhoneEntry } from "@illuminize/shared";
 import { useState } from "react";
+import { IconChevronDown } from "@/components/icons";
 import { Input } from "@/components/ui";
 
 const popular = POPULAR_COUNTRY_CODES.map((c) => countryByCode(c)!).filter(Boolean);
@@ -21,7 +22,7 @@ export function PhoneInput({ value, onChange, autoFocus }: { value: PhoneEntry; 
           <span>
             {flagEmoji(selected.code)} {selected.dial}
           </span>
-          <span className="text-slate-400">▾</span>
+          <IconChevronDown size={16} className="text-slate-400" />
         </div>
         <select
           aria-label={`Country code, ${selected.name} ${selected.dial}`}

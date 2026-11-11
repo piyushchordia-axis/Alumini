@@ -2,6 +2,7 @@ import { STATUS_TONES } from "@illuminize/shared";
 import { useState } from "react";
 import { FlatList, Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { IconChevronDown } from "@/components/icons";
 import { toggleState } from "@/components/ui";
 import { colors, radius, spacing, useTheme } from "@/theme";
 
@@ -46,12 +47,15 @@ export function OptionPicker<T extends string>({ label, value, options, onChange
         accessibilityLabel={`${label}, ${selected ? selected.label : placeholder}`}
         style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, minHeight: 46, borderWidth: 1, borderColor: error ? colors.danger : colors.faint, backgroundColor: "#fff", borderRadius: radius.md, paddingHorizontal: 12 }}
       >
-        <Text style={{ flexShrink: 1, fontSize: 15, color: selected ? colors.text : colors.faint }} numberOfLines={1}>
+        <Text style={{ flexShrink: 1, fontSize: 15, color: selected ? colors.text : colors.muted }} numberOfLines={1}>
           {selected ? selected.label : placeholder}
         </Text>
-        <Text style={{ color: colors.faint }}>▾</Text>
+        <View aria-hidden>
+          <IconChevronDown size={16} color={colors.faint} />
+        </View>
       </Pressable>
-      {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: colors.muted, fontSize: 12 }}>{hint}</Text> : null}
+      {/* As Input's hint, which may sit on the member's background. */}
+      {error ? <Text style={{ color: STATUS_TONES.danger.ink, fontSize: 12 }}>{error}</Text> : hint ? <Text style={{ color: theme.pageMuted, fontSize: 12 }}>{hint}</Text> : null}
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "bottom", "left", "right"]}>

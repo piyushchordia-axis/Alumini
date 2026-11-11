@@ -115,11 +115,11 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
           <Row gap={14}>
             {!removed && (
               <Pressable onPress={() => router.push(`/t/${slug}/feed/edit/${post.id}`)} accessibilityRole="button" accessibilityLabel="Edit post" hitSlop={8}>
-                <Text style={{ color: colors.faint, fontSize: 12 }}>Edit</Text>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>Edit</Text>
               </Pressable>
             )}
             <Pressable onPress={() => Alert.alert("Delete post?", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => remove.mutate() }])} accessibilityRole="button" accessibilityLabel="Delete post" hitSlop={8}>
-              <Text style={{ color: colors.faint, fontSize: 12 }}>Delete</Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>Delete</Text>
             </Pressable>
           </Row>
         ) : (
