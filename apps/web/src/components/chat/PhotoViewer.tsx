@@ -36,35 +36,78 @@ export function PhotoViewer({
   slug,
   conversationId,
   message,
-  photos,
-  startIndex,
-  who,
-  opener,
-  suspended = false,
-  onReport,
-  onClose,
-}: {
+  ...rest
+}: Omit<PhotoViewerFrameProps<ChatAttachmentDto>, "sentAt" | "srcOf" | "missing" | "retrying" | "onRetry" | "onDownload" | "onImageError"> & {
   slug: string;
   conversationId: string;
   message: ChatMessageDto;
-  photos: ChatAttachmentDto[];
+}) {
+  const qc = useQueryClient();
+  const links = useQuery(attachmentLinksQuery(slug, conversationId, message.id));
+  const linkOf = (photo: ChatAttachmentDto) => links.data?.links.find((l) => l.id === photo.id);
+  return (
+    <PhotoViewerFrame
+      {...rest}
+      sentAt={message.createdAt}
+      srcOf={(photo) => linkOf(photo)?.url ?? null}
+      missing={(photo) => !linkOf(photo) && (!!links.error || !!links.data)}
+      retrying={links.isFetching}
+      onRetry={() => void links.refetch()}
+      onDownload={(photo) => void downloadAttachment(qc, slug, conversationId, message.id, photo.id)}
+    />
+  );
+}
+
+interface PhotoViewerFrameProps<A extends ChatAttachmentDto> {
+  photos: A[];
   startIndex: number;
   /** Whose photos they are, "you" for the member's own. */
   who: string;
+  /** When the message was sent, as an ISO time. */
+  sentAt: string;
   /** The photo button that opened it, which takes focus back. */
   opener: HTMLElement | null;
   suspended?: boolean;
+  /** The full photo's address, or null while it isn't known. */
+  srcOf: (photo: A) => string | null;
+  /** Its link can't be had (left out of an answer, or the request failed): show the failure. */
+  missing: (photo: A) => boolean;
+  /** Links are being fetched again: a failure waits for them. */
+  retrying?: boolean;
+  /** Try again on a photo that didn't load; without it the failure shows with no button. */
+  onRetry?: () => void;
+  onDownload: (photo: A) => void;
+  /** The full photo failed to load, perhaps because its link ran out. */
+  onImageError?: (photo: A) => void;
   /** Only for someone else's message. */
   onReport?: () => void;
   onClose: () => void;
-}) {
-  const qc = useQueryClient();
+}
+
+/**
+ * The viewer itself, knowing nothing about where its links come from: the member's PhotoViewer fetches them, while a chat
+ * report's view in the consoles has them already, signed for that view, and offers no Report message.
+ */
+export function PhotoViewerFrame<A extends ChatAttachmentDto>({
+  photos,
+  startIndex,
+  who,
+  sentAt: sentAtIso,
+  opener,
+  suspended = false,
+  srcOf,
+  missing,
+  retrying = false,
+  onRetry,
+  onDownload,
+  onImageError,
+  onReport,
+  onClose,
+}: PhotoViewerFrameProps<A>) {
   const [index, setIndex] = useState(startIndex);
   const at = Math.min(Math.max(index, 0), photos.length - 1);
   const photo = photos[at]!;
   const count = photos.length;
-  const links = useQuery(attachmentLinksQuery(slug, conversationId, message.id));
-  const link = links.data?.links.find((l) => l.id === photo.id);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
@@ -72,9 +115,9 @@ export function PhotoViewer({
   const titleId = useId();
   const timeId = useId();
   const title = photoViewerTitle(at, count, who);
-  const src = link?.url ?? null;
-  const broken = !links.isFetching && ((!!src && failedSrc === src) || (!link && (!!links.error || !!links.data)));
-  const sentAt = new Date(message.createdAt);
+  const src = srcOf(photo);
+  const broken = !retrying && ((!!src && failedSrc === src) || (!src && missing(photo)));
+  const sentAt = new Date(sentAtIso);
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -123,10 +166,10 @@ export function PhotoViewer({
             {title}
           </h2>
           <p id={timeId} className="truncate text-sm text-slate-300">
-            <time dateTime={message.createdAt}>{sentAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time>
+            <time dateTime={sentAtIso}>{sentAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time>
           </p>
         </div>
-        <ViewerButton label="Download photo" onClick={() => void downloadAttachment(qc, slug, conversationId, message.id, photo.id)}>
+        <ViewerButton label="Download photo" onClick={() => onDownload(photo)}>
           <IconDownload />
         </ViewerButton>
         {onReport && (
@@ -148,9 +191,11 @@ export function PhotoViewer({
           <div className="flex flex-col items-center gap-2 text-center text-slate-200">
             <IconAlert size={28} />
             <p className="text-sm">{PHOTO_LOAD_FAILED_TEXT}</p>
-            <button type="button" onClick={() => void links.refetch()} className="min-h-11 rounded-lg border border-white/40 px-4 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-              Try again
-            </button>
+            {onRetry && (
+              <button type="button" onClick={onRetry} className="min-h-11 rounded-lg border border-white/40 px-4 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                Try again
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -162,7 +207,10 @@ export function PhotoViewer({
                 alt=""
                 referrerPolicy="no-referrer"
                 onLoad={() => setLoadedSrc(src)}
-                onError={() => setFailedSrc(src)}
+                onError={() => {
+                  setFailedSrc(src);
+                  onImageError?.(photo);
+                }}
                 className={clsx("max-h-full max-w-full object-contain", loadedSrc !== src && "invisible")}
               />
             )}

@@ -173,8 +173,11 @@ function emptyOpenedFiles(): Directory {
  * link in this tab with no referrer. As saveFile does, the folder holds only the latest file, since the app it went to may
  * read it after the sheet closes; forgetOpenedFiles empties it at sign-out. Throws, in words for the member, when it
  * can't be downloaded (an expired link, say) or the phone can't share files.
+ *
+ * `stillWanted` is asked once the download is done: when it says no (a chat report's view closed meanwhile, emptying the
+ * folder), the file is deleted rather than handed over, and nothing is thrown.
  */
-export async function openPrivateFile(url: string, name: string, mime: string): Promise<void> {
+export async function openPrivateFile(url: string, name: string, mime: string, stillWanted: () => boolean = () => true): Promise<void> {
   if (Platform.OS === "web") return downloadFromLink(url);
   const folder = emptyOpenedFiles();
   folder.create({ intermediates: true, idempotent: true });
@@ -183,10 +186,13 @@ export async function openPrivateFile(url: string, name: string, mime: string): 
   try {
     file = await FsFile.downloadFileAsync(url, new FsFile(folder, fileName), { idempotent: true });
   } catch {
+    if (!stillWanted()) return;
     // The native error can quote the address, a signed link: say what happened instead.
     throw new Error("That couldn't be downloaded. Check your connection, then try again.");
   }
-  if (!(await Sharing.isAvailableAsync())) throw new Error("This device can't share files.");
+  const canShare = await Sharing.isAvailableAsync();
+  if (!stillWanted()) return forget(file.uri, false);
+  if (!canShare) throw new Error("This device can't share files.");
   await Sharing.shareAsync(file.uri, { mimeType: mime, UTI: PRIVATE_FILE_UTI[mime], dialogTitle: name });
 }
 

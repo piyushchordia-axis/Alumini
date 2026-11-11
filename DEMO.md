@@ -272,7 +272,8 @@ feed its card says **You: yes**.
      **Admin**. The dashboard has an **Open chat reports** tile. Open **Chat reports**: it shows who reported whom and
      why, but no messages. Another report is already there: Meera reported a threatening message from Arjun.
   7. Choose **View messages** on Sneha's report. You see the reported message and the few around it, and nothing else
-     of their chat. Choose **Remove message** and confirm: it becomes "This message was removed" in both members'
+     of their chat. Priya's photo and PDF, if they're among them, show under her message: choose the photo to see it,
+     or download the PDF, for 15 minutes after View messages. Choose **Remove message** and confirm: it becomes "This message was removed" in both members'
      chats, and Priya is told. Then open **Audit log**: your view is recorded as `chat_report.view`, and the removal as
      `chat_report.resolve`. Leaving Chat reports hides the messages, so seeing them again means choosing View messages
      again, which is recorded too.

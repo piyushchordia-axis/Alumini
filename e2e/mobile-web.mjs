@@ -5177,7 +5177,9 @@ try {
   /**
    * Answers the chat reports list (two open reports, or with `many`, the message report after eleven others, less those
    * in `dismissed`), each view (the one for `slow` late by `delay`, and each failing with the next of `viewFails`, taken
-   * as it is asked for), a dismiss (which takes the report off the list) and the dashboard's open count.
+   * as it is asked for), a dismiss (which takes the report off the list) and the dashboard's open count. The reported
+   * message has a photo and a PDF, whose links carry the mark (as does the PDF's name) and are answered with a PNG (the
+   * photo's thumbnail with a 404 while `thumbFails`).
    */
   const scriptChatReports = async () => {
     if (!raviId) {
@@ -5187,6 +5189,11 @@ try {
       if (!raviId) throw new Error("Ravi Mehta isn't among the approved members");
     }
     const at = new Date().toISOString();
+    const fileLink = (name) => `${API}/files/${CHAT_MARK}-${name}`;
+    const attachments = [
+      { id: "00000000-0000-4000-8000-0000000000f1", kind: "PHOTO", name: null, contentType: "image/png", size: 68, width: 1, height: 1, url: fileLink("photo"), thumbUrl: fileLink("thumb"), downloadUrl: fileLink("photo-download") },
+      { id: "00000000-0000-4000-8000-0000000000f2", kind: "FILE", name: `${CHAT_MARK}-evidence.pdf`, contentType: "application/pdf", size: 1258291, width: null, height: null, url: fileLink("file"), thumbUrl: null, downloadUrl: fileLink("file-download") },
+    ];
     const member = (id, fullName) => ({ id, fullName, avatarUrl: null });
     const hetal = member("00000000-0000-4000-8000-0000000000d3", "Hetal Shah");
     const ravi = member(raviId, "Ravi Mehta");
@@ -5200,20 +5207,26 @@ try {
         noteSnapshot: null,
         resolutionNote: null,
         messages: [
-          { id: "00000000-0000-4000-8000-0000000000e1", kind: "SYSTEM", sender: null, body: `Hetal Shah accepted the request ${CHAT_MARK}-system`, removed: false, isTarget: false, createdAt: at },
-          { id: "00000000-0000-4000-8000-0000000000e2", kind: "TEXT", sender: ravi, body: `Answer me or else ${CHAT_MARK}-reported`, removed: false, isTarget: true, createdAt: at },
-          { id: "00000000-0000-4000-8000-0000000000e3", kind: "TEXT", sender: hetal, body: `Please stop ${CHAT_MARK}-removed`, removed: true, isTarget: false, createdAt: at },
+          { id: "00000000-0000-4000-8000-0000000000e1", kind: "SYSTEM", sender: null, body: `Hetal Shah accepted the request ${CHAT_MARK}-system`, removed: false, isTarget: false, attachments: [], createdAt: at },
+          { id: "00000000-0000-4000-8000-0000000000e2", kind: "TEXT", sender: ravi, body: `Answer me or else ${CHAT_MARK}-reported`, removed: false, isTarget: true, attachments, createdAt: at },
+          { id: "00000000-0000-4000-8000-0000000000e3", kind: "TEXT", sender: hetal, body: `Please stop ${CHAT_MARK}-removed`, removed: true, isTarget: false, attachments: [], createdAt: at },
         ],
+        filesExpireAt: new Date(Date.now() + 15 * 60_000).toISOString(),
       },
-      [REQUEST_REPORT]: { ...requestReport, details: null, noteSnapshot: `Refer me or I'll tell everyone ${CHAT_MARK}-note`, resolutionNote: null, messages: [] },
+      [REQUEST_REPORT]: { ...requestReport, details: null, noteSnapshot: `Refer me or I'll tell everyone ${CHAT_MARK}-note`, resolutionNote: null, messages: [], filesExpireAt: null },
     };
     const others = Array.from({ length: 11 }, (_, i) => report(`00000000-0000-4000-8000-0000000001${String(i).padStart(2, "0")}`, "MESSAGE", "SPAM", member(`00000000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`, `Member ${i + 1}`)));
-    const state = { views: [], lists: 0, dismissed: [], dismissBody: null, slow: null, delay: 0, many: false, viewFails: [] };
+    const state = { views: [], lists: 0, dismissed: [], dismissBody: null, slow: null, delay: 0, many: false, viewFails: [], thumbFails: false };
     const open = () => (state.many ? [...others, messageReport] : [messageReport, requestReport]).filter((r) => !state.dismissed.includes(r.id));
     const listUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports(\?|$)/;
     const viewUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/([^/]+)\/view$/;
     const dismissUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/chat-reports\/([^/]+)\/dismiss$/;
     const dashboardUrl = /\/api\/v1\/t\/shri-gujarati-samaj\/admin\/dashboard$/;
+    const filesUrl = "**/files/e2e-*";
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    await page.route(filesUrl, (route) =>
+      state.thumbFails && route.request().url().endsWith(`${CHAT_MARK}-thumb`) ? route.fulfill({ status: 404, body: "" }) : route.fulfill({ status: 200, contentType: "image/png", headers: { "cache-control": "private, no-store" }, body: png }),
+    );
     await page.route(listUrl, (route) => {
       if (route.request().method() !== "GET") return route.fallback();
       state.lists += 1;
@@ -5244,7 +5257,7 @@ try {
       }
     });
     state.stop = async () => {
-      for (const url of [listUrl, viewUrl, dismissUrl, dashboardUrl]) await page.unroute(url);
+      for (const url of [listUrl, viewUrl, dismissUrl, dashboardUrl, filesUrl]) await page.unroute(url);
     };
     return state;
   };
@@ -5287,24 +5300,83 @@ try {
       if (await marks()) throw new Error("the chat reports list shows reported words before anyone asked to see them");
       expectViews(chat, 0, "before any View");
 
+      // The photo's thumbnail fails at first, as a dropped request would, while its link still works.
+      chat.thumbFails = true;
       await row.getByRole("button", { name: "View messages", exact: true }).click();
       await row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }).waitFor();
       expectViews(chat, 1, "after one View");
       await row.getByText(`He keeps writing ${CHAT_MARK}-details`).waitFor();
       for (const text of ["Reported message", "System message", "Removed"]) await row.getByText(text, { exact: true }).waitFor();
-      const thread = (await row.getByRole("listitem").allInnerTexts()).map((t) => /-(system|reported|removed)$/.exec(t.trim())?.[1]);
+      // By the line each message's words end on: the reported one's photo and file follow its words.
+      const thread = (await row.getByRole("listitem").allInnerTexts()).map((t) => /-(system|reported|removed)$/m.exec(t.trim())?.[1]);
       if (thread.join() !== "system,reported,removed") throw new Error(`the thread reads ${thread.join(", ")}, not oldest first`);
       await row.getByRole("link", { name: "Ravi Mehta's member page", exact: true }).waitFor();
-      for (const name of ["Remove message", "Resolve, keep message", "Dismiss", "Hide"]) {
+      // A photo that didn't load while the links still work fails alone: the PDF still opens, nothing says the links are
+      // lost, and the photo's own Try again loads it again from the same link with no other view.
+      const photoRetry = row.getByRole("button", { name: "Try again", exact: true });
+      await photoRetry.waitFor();
+      await row.getByRole("button", { name: `Open ${CHAT_MARK}-evidence.pdf`, exact: true }).waitFor();
+      if (await row.getByText("Photos and files no longer open", { exact: false }).count()) throw new Error("one photo that didn't load lost the whole view's photos and files");
+      await shot("m19a-admin-chat-report-photo-failed");
+      chat.thumbFails = false;
+      await photoRetry.click();
+      // The reported message's photo and PDF under its words, from the view's own links, and how long those last.
+      const photo = row.getByRole("button", { name: "Open photo 1 of 1", exact: true });
+      await photo.waitFor();
+      if (!(await photo.evaluate((el) => el === document.activeElement))) throw new Error("focus didn't stay on the photo it loaded again");
+      expectViews(chat, 1, "for a photo loaded again");
+      await row.getByText(`${CHAT_MARK}-evidence.pdf`, { exact: true }).waitFor();
+      await row.getByText("PDF · 1.2 MB", { exact: true }).waitFor();
+      await row.getByText("Photos and files open for 15 minutes after you choose View messages.", { exact: true }).waitFor();
+      for (let i = 0; i < 50 && !(await photo.locator("img").evaluateAll((imgs) => imgs.some((img) => img.complete && img.naturalWidth > 0))); i++) await page.waitForTimeout(100);
+      if (!(await photo.locator("img").evaluateAll((imgs) => imgs.some((img) => img.complete && img.naturalWidth > 0)))) throw new Error("the reported photo's thumbnail didn't load");
+      for (const name of ["Remove message", "Resolve, keep message", "Dismiss", "Hide", "Open photo 1 of 1", `Open ${CHAT_MARK}-evidence.pdf`]) {
         const box = await row.getByRole("button", { name, exact: true }).boundingBox();
         if (!box || box.height < 44) throw new Error(`"${name}" is ${box?.height}px tall, under 44px`);
       }
       await fitsPhone("chat reports with a thread open", row.getByText(`Answer me or else ${CHAT_MARK}-reported`, { exact: true }));
       await shot("m19-admin-chat-report");
+
+      // The photo opens over the screen with no Report message: this is the report.
+      await photo.click();
+      const viewer = shown(page.getByRole("dialog", { name: "Photo 1 of 1 from Ravi Mehta", exact: true }));
+      await viewer.waitFor();
+      await viewer.getByRole("button", { name: "Download photo", exact: true }).waitFor();
+      if (await viewer.getByRole("button", { name: "Report message" }).count()) throw new Error("a chat report's photo viewer offers Report message");
+      await viewer.getByRole("button", { name: "Close", exact: true }).click();
+      await viewer.waitFor({ state: "detached" });
+      if (!(await photo.evaluate((el) => el === document.activeElement))) throw new Error("focus didn't go back to the photo when its viewer closed");
+
+      // Once the links have run out (the page's clock 16 minutes on), the photo fails as one that didn't load, focus goes
+      // from the pressed photo to Try again, and Try again is another view, which brings new links: the messages close
+      // while it comes, and focus then goes to the line saying how long the new ones last.
+      const focusedText = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
+      await page.evaluate(() => {
+        const now = Date.now;
+        Date.now = () => now() + 16 * 60_000;
+      });
+      await photo.click();
+      await row.getByText("Photos and files no longer open. Trying again gets new links and is another recorded view.", { exact: true }).waitFor();
+      await row.getByRole("img", { name: "Photo didn't load", exact: true }).waitFor();
+      if (await page.getByRole("dialog", { name: /^Photo 1 of 1/ }).count()) throw new Error("a photo whose link had run out opened anyway");
+      if (await row.getByRole("button", { name: `Open ${CHAT_MARK}-evidence.pdf`, exact: true }).count()) throw new Error("a file whose link had run out could still be opened");
+      await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "Try again", null, { timeout: 5000 }).catch(async () => {
+        throw new Error(`focus went to "${await focusedText()}", not Try again, when the pressed photo stopped opening`);
+      });
+      await shot("m19b-admin-chat-report-files-lost");
+      expectViews(chat, 1, "before Try again");
+      await row.getByRole("button", { name: "Try again", exact: true }).click();
+      await photo.waitFor();
+      await row.getByRole("button", { name: `Open ${CHAT_MARK}-evidence.pdf`, exact: true }).waitFor();
+      expectViews(chat, 2, "for Try again");
+      const filesLine = "Photos and files open for 15 minutes after you choose View messages.";
+      await page.waitForFunction((text) => document.activeElement?.textContent?.trim() === text, filesLine, { timeout: 5000 }).catch(async () => {
+        throw new Error(`focus went to "${await focusedText()}" after Try again, not the files line`);
+      });
       await row.getByRole("button", { name: "Hide", exact: true }).click();
       await noMarks("after Hide");
       await row.getByRole("button", { name: "View messages", exact: true }).waitFor();
-      expectViews(chat, 1, "after Hide");
+      expectViews(chat, 2, "after Hide");
     } finally {
       await chat.stop();
     }

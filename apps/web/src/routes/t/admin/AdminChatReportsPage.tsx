@@ -1,5 +1,7 @@
 import {
   CHAT_REPORTS_SUBTITLE,
+  CHAT_REPORT_FILES_LOST_TEXT,
+  CHAT_REPORT_FILES_TEXT,
   CHAT_REPORT_MESSAGE_GONE_TEXT,
   CHAT_REPORT_TARGET_KIND_LABELS,
   CHAT_REPORT_VIEW_HINT,
@@ -10,6 +12,8 @@ import {
   chatReportDoneText,
   chatReportEmptyText,
   chatReportEmptyTitle,
+  chatReportFilesOpen,
+  chatReportHasFiles,
   chatReportHeadline,
   chatReportMemberLinkText,
   chatReportPrompt,
@@ -17,6 +21,7 @@ import {
   chatReportTabs,
   chatReportViewLabel,
   parseChatReportStatus,
+  type AdminChatAttachmentDto,
   type AdminChatReportDto,
   type AdminChatReportMessageDto,
   type AdminChatReportViewDto,
@@ -25,13 +30,16 @@ import {
 import { errorMessage, isOutOfDate, unlessOutOfDate } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type Ref } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { AttachmentGrid } from "@/components/chat/AttachmentGrid";
+import { PhotoViewerFrame } from "@/components/chat/PhotoViewer";
 import { IconCheck } from "@/components/icons";
-import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, Notice, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
 import { api } from "@/lib/api";
+import { downloadFromUrl } from "@/lib/download";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { invalidateTenant } from "@/lib/invalidate";
 import { qk } from "@/lib/queryKeys";
@@ -40,8 +48,24 @@ import { toast } from "@/stores/uiStore";
 const CLOSE_ACTIONS: readonly ChatReportCloseAction[] = ["remove", "resolve", "dismiss"];
 const VARIANT: Readonly<Record<ChatReportCloseAction, "danger" | "outline" | "ghost">> = { remove: "danger", resolve: "outline", dismiss: "ghost" };
 
-/** Each message as it reads in the thread, oldest first, with the reported one marked. */
-function ReportedMessages({ messages }: { messages: AdminChatReportMessageDto[] }) {
+/**
+ * What a view's photos and files do: whether they still open, and what opening, downloading, a photo failing to load and
+ * its Try again do.
+ */
+interface ReportFiles {
+  lost: boolean;
+  onOpen: (message: AdminChatReportMessageDto, index: number, opener: HTMLElement) => void;
+  onDownload: (attachment: AdminChatAttachmentDto) => void;
+  onFailed: () => void;
+  onRetry: () => void;
+}
+
+/**
+ * Each message as it reads in the thread, oldest first, with the reported one marked, and its photos and files under it
+ * from the links the view came with. Once they no longer open, the photos fail as a photo that didn't load does, and the
+ * files lose their Download. Until then, a photo that didn't load fails alone, and loads again from its link.
+ */
+function ReportedMessages({ messages, files }: { messages: AdminChatReportMessageDto[]; files: ReportFiles }) {
   if (messages.length === 0) return <p className="text-sm text-slate-500">{CHAT_REPORT_MESSAGE_GONE_TEXT}</p>;
   return (
     <ol className="space-y-2">
@@ -53,17 +77,71 @@ function ReportedMessages({ messages }: { messages: AdminChatReportMessageDto[] 
             {m.isTarget && <Badge tone="danger">Reported message</Badge>}
             {m.removed && <Badge>Removed</Badge>}
           </div>
-          <p className="mt-1 whitespace-pre-wrap break-words text-slate-800">{m.body}</p>
+          {m.body && <p className="mt-1 whitespace-pre-wrap break-words text-slate-800">{m.body}</p>}
+          {m.attachments.length > 0 && (
+            <div className="mt-2">
+              <AttachmentGrid
+                compact
+                attachments={m.attachments}
+                sourceOf={(a) => (files.lost ? { src: null, broken: true } : { src: a.thumbUrl ?? a.url })}
+                onOpen={(index, opener) => files.onOpen(m, index, opener)}
+                onDownload={files.lost ? undefined : files.onDownload}
+                onImageError={files.onFailed}
+                onRetry={files.onRetry}
+              />
+            </div>
+          )}
         </li>
       ))}
     </ol>
   );
 }
 
+/**
+ * Under a thread with photos or files: how long they open for, and once they don't, Try again, which is another view.
+ * The links are never fetched again by themselves, as that would be a view nobody chose.
+ */
+function ReportFilesNote({ lost, retrying, noteRef, retryRef, onRetry }: { lost: boolean; retrying: boolean; noteRef: Ref<HTMLParagraphElement>; retryRef: Ref<HTMLButtonElement>; onRetry: () => void }) {
+  const lostId = useId();
+  return (
+    <div>
+      {/* Focused after a Try again that worked, as its button goes. */}
+      <p ref={noteRef} tabIndex={-1} className="text-xs text-slate-500 focus:outline-none">
+        {CHAT_REPORT_FILES_TEXT}
+      </p>
+      {/* Mounted while empty, so the warning is read out when it comes. */}
+      <div role="status">
+        {lost && (
+          <Notice tone="warning" className="mt-2">
+            <p id={lostId}>{CHAT_REPORT_FILES_LOST_TEXT}</p>
+          </Notice>
+        )}
+      </div>
+      {lost && (
+        <Button ref={retryRef} size="sm" variant="outline" className="mt-2" aria-describedby={lostId} loading={retrying} onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReportDto }) {
   const qc = useQueryClient();
-  // Kept here and nowhere else. A query would refetch, and a useMutation would keep the text in the mutation cache, and every fetch writes an audit row.
+  // Kept here and nowhere else, the links to its photos and files with it. A query would refetch, and a useMutation would
+  // keep the text in the mutation cache, and every fetch writes an audit row.
   const [view, setView] = useState<AdminChatReportViewDto | null>(null);
+  // When the view arrived, which its photos and files open for a while after (chatReportFilesOpen).
+  const receivedAt = useRef(0);
+  // Its photos and files no longer open: their links ran out.
+  const [lost, setLost] = useState(false);
+  // The photo open over the page, from the view's own links.
+  const [viewing, setViewing] = useState<{ messageId: string; index: number; opener: HTMLElement } | null>(null);
+  const filesNote = useRef<HTMLParagraphElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  // Once they stop working, what had focus may go (the photo viewer, a photo that becomes a mark, a Download that goes),
+  // and focus goes to Try again rather than the page.
+  const focusRetry = useRef(false);
   const [opening, setOpening] = useState(false);
   const [modal, setModal] = useState<ChatReportCloseAction | null>(null);
   // A response that lands after the row closed or went away must not bring the text back.
@@ -74,22 +152,38 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
     },
     [],
   );
+  useEffect(() => {
+    if (!lost || !focusRetry.current) return;
+    focusRetry.current = false;
+    retryButton.current?.focus();
+  }, [lost]);
+  // A view, or none, and nothing of the one before: no photo open and no links lost.
+  const show = (next: AdminChatReportViewDto | null) => {
+    setView(next);
+    setLost(false);
+    setViewing(null);
+  };
   const failed = (e: unknown) => {
     toast.error(errorMessage(e));
     if (isOutOfDate(e)) {
-      setView(null);
+      show(null);
       setModal(null);
       void invalidateTenant(qc, slug);
     }
   };
-  const open = async () => {
+  /** Views the report, which writes an audit row; true once its answer is shown. */
+  const open = async (): Promise<boolean> => {
     const mine = ++latest.current;
     setOpening(true);
     try {
       const result = await api.admin.chatReports.view(slug, report.id);
-      if (latest.current === mine) setView(result);
+      if (latest.current !== mine) return false;
+      receivedAt.current = Date.now();
+      show(result);
+      return true;
     } catch (e) {
       if (latest.current === mine) failed(e);
+      return false;
     } finally {
       if (latest.current === mine) setOpening(false);
     }
@@ -97,9 +191,37 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
   const close = () => {
     latest.current += 1;
     setOpening(false);
-    setView(null);
+    show(null);
     setModal(null);
   };
+  /**
+   * The links have run out. Focus goes to Try again when the admin just pressed a photo or a Download (`pressed`), which
+   * goes, or the photo viewer was open, which closes; not for a photo failing to load by itself.
+   */
+  const markLost = (pressed: boolean) => {
+    setLost(true);
+    if (pressed || viewing) focusRetry.current = true;
+    setViewing(null);
+  };
+  const filesOpen = () => chatReportFilesOpen(receivedAt.current, Date.now());
+  // Each checks the links haven't run out first: on the web, following one that has would leave the page for the refusal.
+  // A photo that fails to load while they should still work (a dropped request, a stored copy gone) fails alone.
+  const files: ReportFiles = {
+    lost,
+    onOpen: (message, index, opener) => (filesOpen() ? setViewing({ messageId: message.id, index, opener }) : markLost(true)),
+    onDownload: (attachment) => (filesOpen() ? downloadFromUrl(attachment.downloadUrl) : markLost(true)),
+    onFailed: () => {
+      if (!filesOpen()) markLost(false);
+    },
+    onRetry: () => {
+      if (!filesOpen()) markLost(true);
+    },
+  };
+  const retryFiles = async () => {
+    if (await open()) filesNote.current?.focus();
+  };
+  const viewed = viewing && view?.messages.find((m) => m.id === viewing.messageId);
+  const viewedPhotos = viewed ? viewed.attachments.filter((a) => a.kind === "PHOTO") : [];
   // Called straight, not through useMutation: the admin's note may quote the message, and a mutation keeps what it sent
   // in its cache. The dialog shows the call as busy, and stays open with the note if it fails.
   const closeReport = async (action: ChatReportCloseAction, note: string) => {
@@ -110,7 +232,7 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
       failed(e);
       throw e;
     }
-    setView(null);
+    show(null);
     setModal(null);
     void invalidateTenant(qc, slug);
     toast.success(chatReportDoneText(action));
@@ -132,7 +254,8 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
               <span className="font-medium">Reporter's note:</span> {view.details}
             </p>
           )}
-          {report.targetKind === "MESSAGE" ? <ReportedMessages messages={view.messages} /> : <p className="whitespace-pre-wrap break-words rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-slate-800">{view.noteSnapshot}</p>}
+          {report.targetKind === "MESSAGE" ? <ReportedMessages messages={view.messages} files={files} /> : <p className="whitespace-pre-wrap break-words rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-slate-800">{view.noteSnapshot}</p>}
+          {chatReportHasFiles(view) && <ReportFilesNote lost={lost} retrying={opening} noteRef={filesNote} retryRef={retryButton} onRetry={() => void retryFiles()} />}
           {view.resolutionNote && <p className="break-words text-xs text-slate-500">Resolution: {view.resolutionNote}</p>}
           {report.reported && (
             <p className="text-xs text-slate-500">
@@ -161,6 +284,21 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
           </Button>
           <span className="text-xs text-slate-500">{CHAT_REPORT_VIEW_HINT}</span>
         </div>
+      )}
+      {/* No Report message: this is the report. Download and every photo come from the view's links. */}
+      {viewing && viewed && viewedPhotos.length > 0 && (
+        <PhotoViewerFrame
+          photos={viewedPhotos}
+          startIndex={viewing.index}
+          who={chatReportSenderLabel(viewed)}
+          sentAt={viewed.createdAt}
+          opener={viewing.opener}
+          srcOf={(photo) => photo.url}
+          missing={() => false}
+          onDownload={files.onDownload}
+          onImageError={files.onFailed}
+          onClose={() => setViewing(null)}
+        />
       )}
       {/* Only while the messages are open, so a note typed and cancelled (it may quote the message) goes with them on
           Hide, an out-of-date answer or leaving, as on the phone, rather than waiting pre-filled for the next view. */}

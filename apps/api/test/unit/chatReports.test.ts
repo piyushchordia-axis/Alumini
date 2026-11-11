@@ -1,5 +1,8 @@
 import {
+  CHAT_REPORT_FILES_LOST_TEXT,
+  CHAT_REPORT_FILES_TEXT,
   CHAT_REPORT_LINK_PAGE_LIMIT,
+  CHAT_REPORT_LINK_TTL_SEC,
   CHAT_REPORT_TARGET_KINDS,
   CHAT_REPORT_VIEW_CLOSED,
   DELETED_MEMBER_NAME,
@@ -10,6 +13,8 @@ import {
   chatReportDoneText,
   chatReportEmptyText,
   chatReportEmptyTitle,
+  chatReportFilesOpen,
+  chatReportHasFiles,
   chatReportHeadline,
   chatReportLinkStep,
   chatReportMemberLinkText,
@@ -100,6 +105,32 @@ describe("a chat report's buttons", () => {
     expect(chatReportNotDoneText("remove", "Network request failed")).toBe("The report wasn't resolved: Network request failed");
     expect(chatReportNotDoneText("resolve", "e")).toBe("The report wasn't resolved: e");
     expect(chatReportNotDoneText("dismiss", "e")).toBe("The report wasn't dismissed: e");
+  });
+});
+
+describe("a chat report's photos and files", () => {
+  const photo = { id: "a1", kind: "PHOTO" as const, name: null, contentType: "image/jpeg", size: 1000, width: 10, height: 10, url: "u", thumbUrl: "t", downloadUrl: "d" };
+
+  it("says how long they open for, from the links' own lifetime, and what trying again costs", () => {
+    expect(CHAT_REPORT_LINK_TTL_SEC).toBe(900);
+    expect(CHAT_REPORT_FILES_TEXT).toBe("Photos and files open for 15 minutes after you choose View messages.");
+    expect(CHAT_REPORT_FILES_LOST_TEXT).toBe("Photos and files no longer open. Trying again gets new links and is another recorded view.");
+  });
+
+  it("has files when any message has one, a removed message's included, and none for a request or a thread of text", () => {
+    expect(chatReportHasFiles({ messages: [{ attachments: [] }, { attachments: [photo] }] })).toBe(true);
+    expect(chatReportHasFiles({ messages: [{ attachments: [] }, { attachments: [] }] })).toBe(false);
+    expect(chatReportHasFiles({ messages: [] })).toBe(false);
+  });
+
+  it("opens them until half a minute before their links run out, counted from when the view arrived on this device", () => {
+    const at = Date.UTC(2026, 10, 11, 9, 0, 0);
+    const ttl = CHAT_REPORT_LINK_TTL_SEC * 1000;
+    expect(chatReportFilesOpen(at, at)).toBe(true);
+    expect(chatReportFilesOpen(at, at + ttl - 30_001)).toBe(true);
+    expect(chatReportFilesOpen(at, at + ttl - 30_000)).toBe(false);
+    expect(chatReportFilesOpen(at, at + ttl)).toBe(false);
+    expect(chatReportFilesOpen(at, at + 16 * 60_000)).toBe(false);
   });
 });
 

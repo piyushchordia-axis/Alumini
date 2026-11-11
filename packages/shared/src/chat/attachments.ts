@@ -145,6 +145,8 @@ export function attachmentA11yText(attachments: ReadonlyArray<Pick<ChatAttachmen
 /** How wide a message's photos are drawn, in points or CSS pixels, and the gap between two. */
 export const PHOTO_GRID_WIDTH = 260;
 export const PHOTO_GRID_GAP = 4;
+/** A photo's square in a compact grid (a chat report's view in the consoles): a row of thumbnails, each one opening it. */
+export const PHOTO_COMPACT_SIDE = 72;
 const PHOTO_MIN_HEIGHT = 120;
 const PHOTO_MAX_HEIGHT = 320;
 // A photo whose size isn't known (a pending one before it's read) is drawn as a landscape photo.

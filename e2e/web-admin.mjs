@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChipLook, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, holdGets, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, bigPhoto, cardEdges, expectChipLook, expectChoiceLook, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, holdGets, holdPhotoPreparation, pageColours, paintedColour, scriptNotification, textColour } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -960,6 +960,102 @@ try {
     await page.locator('div[role="dialog"]').waitFor({ state: "detached" });
     await row.locator('button:text-is("Hide")').click();
     await row.locator('button:has-text("View messages")').waitFor();
+  });
+
+  await step("a reported photo and file show in the audited view and go with Hide", async () => {
+    // The seeded thread has no photos or files, so the real view (two more audited views, View and Try again, which the
+    // next step allows) gets a photo and a PDF on the reported message, with links to addresses the script answers. The
+    // mark is in the links and the file's name, so the page's HTML shows whether any of them stayed.
+    const mark = `e2e-report-files-${unique}`;
+    const link = (name) => `${API}/files/${mark}-${name}`;
+    const attachments = [
+      { id: "00000000-0000-4000-8000-0000000000f1", kind: "PHOTO", name: null, contentType: "image/png", size: 68, width: 1, height: 1, url: link("photo"), thumbUrl: link("thumb"), downloadUrl: link("photo-download") },
+      { id: "00000000-0000-4000-8000-0000000000f2", kind: "FILE", name: `${mark}-evidence.pdf`, contentType: "application/pdf", size: 1258291, width: null, height: null, url: link("file"), thumbUrl: null, downloadUrl: link("file-download") },
+    ];
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    const viewUrl = "**/admin/chat-reports/*/view";
+    const filesUrl = "**/files/e2e-*";
+    // The thumbnail fails at first, as a dropped request would, while its link still works.
+    let thumbFails = true;
+    let views = 0;
+    await page.route(filesUrl, (route) =>
+      thumbFails && route.request().url().endsWith(`${mark}-thumb`) ? route.fulfill({ status: 404, body: "" }) : route.fulfill({ status: 200, contentType: "image/png", headers: { "cache-control": "private, no-store" }, body: png }),
+    );
+    await page.route(viewUrl, async (route) => {
+      views += 1;
+      const response = await route.fetch();
+      const { data } = await response.json();
+      const messages = data.messages.map((m) => (m.isTarget ? { ...m, attachments } : m));
+      await route.fulfill({ response, json: { data: { ...data, messages, filesExpireAt: new Date(Date.now() + 15 * 60_000).toISOString() } } });
+    });
+    const focusedText = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
+    try {
+      await page.goto(`${BASE}/t/demo-university/admin/chat-reports`);
+      const row = page.locator("li", { hasText: "Arjun" }).first();
+      await row.locator('button:has-text("View messages")').click();
+      await row.locator(`text=${SEEDED_BODY}`).waitFor();
+      // A photo that didn't load while the links still work fails alone: the file keeps its Download, nothing says the
+      // links are lost, and its own Try again loads it again from the same link with no other view.
+      const photoRetry = row.getByRole("button", { name: "Try again", exact: true });
+      await photoRetry.waitFor();
+      await row.getByRole("button", { name: `Download ${mark}-evidence.pdf`, exact: true }).waitFor();
+      if (await row.getByText("Photos and files no longer open", { exact: false }).count()) throw new Error("one photo that didn't load lost the whole view's photos and files");
+      await shot("a08e1a-chat-report-photo-failed");
+      thumbFails = false;
+      await photoRetry.click();
+      const photo = row.getByRole("button", { name: "Open photo 1 of 1", exact: true });
+      await photo.waitFor();
+      await page.waitForFunction((m) => [...document.querySelectorAll("img")].some((img) => img.src.includes(`${m}-thumb`) && img.complete && img.naturalWidth > 0), mark);
+      if (!(await photo.evaluate((el) => el === document.activeElement))) throw new Error("focus didn't stay on the photo it loaded again");
+      if (views !== 1) throw new Error(`loading a photo again asked for ${views} views, not 1`);
+      await row.getByText(`${mark}-evidence.pdf`, { exact: true }).waitFor();
+      await row.getByText("PDF · 1.2 MB", { exact: true }).waitFor();
+      await row.getByRole("button", { name: `Download ${mark}-evidence.pdf`, exact: true }).waitFor();
+      await row.getByText("Photos and files open for 15 minutes after you choose View messages.", { exact: true }).waitFor();
+      for (const target of [photo, row.getByRole("button", { name: `Download ${mark}-evidence.pdf`, exact: true })]) {
+        const box = await target.boundingBox();
+        if (!box || box.height < 44 || box.width < 44) throw new Error(`"${await target.getAttribute("aria-label")}" is ${box?.width}×${box?.height}px, under 44px`);
+      }
+      await shot("a08e1-chat-report-files");
+
+      // The viewer opens from the view's own links, with Download and no Report message (this is the report).
+      await photo.click();
+      const viewer = page.getByRole("dialog", { name: /^Photo 1 of 1 from Arjun/ });
+      await viewer.waitFor();
+      await viewer.getByRole("button", { name: "Download photo", exact: true }).waitFor();
+      await page.waitForFunction((m) => [...document.querySelectorAll('[role="dialog"] img')].some((img) => img.src.endsWith(`${m}-photo`) && img.complete && img.naturalWidth > 0), mark);
+      if (await viewer.getByRole("button", { name: "Report message" }).count()) throw new Error("a chat report's photo viewer offers Report message");
+      await page.keyboard.press("Escape");
+      await viewer.waitFor({ state: "detached" });
+      if (!(await photo.evaluate((el) => el === document.activeElement))) throw new Error("focus didn't go back to the photo when its viewer closed");
+
+      // Once the links have run out (the page's clock 16 minutes on), pressing the photo opens nothing: the photo fails as
+      // one that didn't load, the file loses its Download, and focus goes to Try again, which is another view.
+      await page.evaluate(() => {
+        const now = Date.now;
+        Date.now = () => now() + 16 * 60_000;
+      });
+      await photo.click();
+      await row.getByText("Photos and files no longer open. Trying again gets new links and is another recorded view.", { exact: true }).waitFor();
+      await row.getByRole("img", { name: "Photo didn't load", exact: true }).waitFor();
+      if (await page.getByRole("dialog").count()) throw new Error("a photo whose link had run out opened anyway");
+      if (await row.getByRole("button", { name: `Download ${mark}-evidence.pdf`, exact: true }).count()) throw new Error("a file whose link had run out could still be downloaded");
+      if ((await focusedText()) !== "Try again") throw new Error(`focus went to "${await focusedText()}", not Try again, when the pressed photo stopped opening`);
+      await shot("a08e1c-chat-report-files-lost");
+      if (views !== 1) throw new Error(`the links running out asked for ${views} views by itself, not 1`);
+      await row.getByRole("button", { name: "Try again", exact: true }).click();
+      await photo.waitFor();
+      await row.getByRole("button", { name: `Download ${mark}-evidence.pdf`, exact: true }).waitFor();
+      if (views !== 2) throw new Error(`Try again asked for ${views} views, not 2`);
+      if ((await focusedText()) !== "Photos and files open for 15 minutes after you choose View messages.") throw new Error(`focus went to "${await focusedText()}" after Try again, not the files line`);
+
+      await row.locator('button:text-is("Hide")').click();
+      await row.locator('button:has-text("View messages")').waitFor();
+      if ((await page.content()).includes(mark)) throw new Error("Hide left the reported photo's links or the file's name in the page");
+    } finally {
+      await page.unroute(viewUrl);
+      await page.unroute(filesUrl);
+    }
   });
 
   await step("viewing a chat report writes an audit row", async () => {

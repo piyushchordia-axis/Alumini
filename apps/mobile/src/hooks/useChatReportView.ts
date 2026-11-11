@@ -1,9 +1,10 @@
-import { CHAT_REPORT_VIEW_CLOSED, chatReportViewMustClose, chatReportViewStep, type AdminChatReportViewDto, type ChatReportViewEvent, type ChatReportViewState } from "@illuminize/shared";
+import { CHAT_REPORT_VIEW_CLOSED, chatReportFilesOpen, chatReportViewMustClose, chatReportViewStep, type AdminChatReportViewDto, type ChatReportViewEvent, type ChatReportViewState } from "@illuminize/shared";
 import { errorMessage, isOutOfDate, type ApiClientError } from "@illuminize/shared/client";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { useAppActive } from "@/hooks/useChat";
 import { api } from "@/lib/api";
+import { forgetOpenedFiles } from "@/lib/files";
 
 const step = (state: ChatReportViewState<AdminChatReportViewDto>, event: ChatReportViewEvent<AdminChatReportViewDto>) => chatReportViewStep(state, event);
 
@@ -19,12 +20,22 @@ const step = (state: ChatReportViewState<AdminChatReportViewDto>, event: ChatRep
  * `onOutOfDate` hears a view refused because the report was handled or has gone, to refresh the list and say so, only
  * while that view is still the one awaited: a late refusal is dropped like a late answer. Any other failure is said in
  * the report's row (`problem`).
+ *
+ * The view's photos and files come with it, their links in the same state and gone with it. A photo is drawn with no
+ * image cache, and a file opened goes to the share sheet from the app's cache, which is emptied (forgetOpenedFiles) when
+ * the view closes: at once on Hide, on blur and when the report leaves the list, and after the app went to the background
+ * only once it's back in front, as the app the file went to may still be reading it (on Android the share sheet itself
+ * sends this one to the background).
  */
 export function useChatReportView(slug: string, { listed, onOutOfDate }: { listed: ReadonlySet<string> | undefined; onOutOfDate: (err: ApiClientError) => void }) {
   const [state, dispatch] = useReducer(step, CHAT_REPORT_VIEW_CLOSED);
   const requests = useRef(0);
   // The request whose answer still counts, for what happens outside the reducer: none once it was answered or closed.
   const awaited = useRef<number | null>(null);
+  // When the shown view arrived, which its photos and files open for a while after (chatReportFilesOpen).
+  const answeredAt = useRef(0);
+  // A view has been shown since the opened files were last forgotten.
+  const filesHeld = useRef(false);
   const active = useAppActive();
   // In render rather than an effect, so no frame after the app has gone inactive still draws the text.
   if (chatReportViewMustClose(state, active, listed)) dispatch({ type: "close" });
@@ -34,10 +45,21 @@ export function useChatReportView(slug: string, { listed, onOutOfDate }: { liste
     awaited.current = state.awaiting?.request ?? null;
   }, [state.awaiting]);
 
+  const forgetFiles = useCallback(() => {
+    if (!filesHeld.current) return;
+    filesHeld.current = false;
+    forgetOpenedFiles();
+  }, []);
+  useEffect(() => {
+    if (state.shown) filesHeld.current = true;
+    else if (active) forgetFiles();
+  }, [state.shown, active, forgetFiles]);
+
   const close = useCallback(() => {
     awaited.current = null;
     dispatch({ type: "close" });
-  }, []);
+    forgetFiles();
+  }, [forgetFiles]);
   // Its cleanup runs on blur and on unmount.
   useFocusEffect(useCallback(() => close, [close]));
 
@@ -47,7 +69,9 @@ export function useChatReportView(slug: string, { listed, onOutOfDate }: { liste
     awaited.current = request;
     dispatch({ type: "open", request, reportId });
     try {
-      dispatch({ type: "answer", request, view: await api.admin.chatReports.view(slug, reportId) });
+      const view = await api.admin.chatReports.view(slug, reportId);
+      if (awaited.current === request) answeredAt.current = Date.now();
+      dispatch({ type: "answer", request, view });
     } catch (err) {
       const outOfDate = isOutOfDate(err);
       dispatch({ type: "failed", request, text: outOfDate ? null : errorMessage(err) });
@@ -61,6 +85,8 @@ export function useChatReportView(slug: string, { listed, onOutOfDate }: { liste
     /** The report being opened. */
     openingId: state.awaiting?.reportId ?? null,
     problem: state.problem,
+    /** Whether the shown view's photos and files may still be opened, from when it arrived. */
+    filesOpen: () => chatReportFilesOpen(answeredAt.current, Date.now()),
     open,
     close,
   };

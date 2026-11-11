@@ -207,6 +207,7 @@ function ChatReportsQueue({ slug, status, itemId, say, refreshCounts }: { slug: 
             view={viewer.shown?.reportId === item.id ? viewer.shown.view : null}
             opening={viewer.openingId === item.id}
             problem={viewer.problem?.reportId === item.id ? viewer.problem.text : null}
+            filesOpen={viewer.filesOpen}
             onView={() => void viewer.open(item.id)}
             onHide={viewer.close}
             onAsk={(action) => setAsking({ action, report: item, open: true })}

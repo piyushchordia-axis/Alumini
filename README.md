@@ -1390,6 +1390,21 @@ because admins can read everything in that view. Instead:
   a false audit row and leaving the page discards the text. 120 views an hour per admin. The admin's note on closing a
   report may quote the message, so both apps send it with a plain call rather than through a mutation, whose cache
   would keep it, and a note typed and cancelled goes when the messages close.
+- **Photos and files in the view.** Each message's photos and files show under its words, the reported message's
+  included when it has been removed, with links signed in the same transaction for 15 minutes
+  (`CHAT_REPORT_LINK_TTL_SEC`). The audit row counts them (`attachmentCount`) and names none. Both consoles keep the
+  links with the rest of the view in one component's state, so they go with Hide and whatever else drops the view, and
+  say under the thread "Photos and files open for 15 minutes after you choose View messages." The photos are small
+  squares that open the photo viewer with Download (Share on the phone) and no Report message; a file downloads on the
+  web and goes to the share sheet on the phone. The phone keeps none of these photos in an image cache, and deletes the
+  file it last shared when the view closes (when it closed because the app went to the background, once the app is back
+  in front, as the app the file went to may still be reading it); a file still downloading when the view closes is
+  deleted rather than shared. On Android the share sheet counts as leaving the app, so opening a file or sharing a photo
+  closes the view like any other switch to another app, and seeing it again is another recorded view. Nothing fetches
+  the links again by itself: once they have run out (counted from when the view arrived on the device, not by its
+  clock), the photos show that they didn't load, the files can't be opened, and **Try again** views the report again,
+  which is another audited view (on the phone the messages close while it comes, as for any view there). Before then, a
+  photo that didn't load fails alone, and its own Try again loads it again from the same link, with no audit row.
 - **On the phone.** The phone console's Chat reports shows one report's text at a time, in one screen's state, and
   drops it whenever that screen isn't the one in front: another screen opened over it (the reported member's page),
   a tab change, the app going to the background or the app switcher, and the report leaving the list; a note typed in

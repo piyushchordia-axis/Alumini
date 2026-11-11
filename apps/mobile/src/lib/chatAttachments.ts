@@ -361,11 +361,18 @@ const PHOTO_EXTENSIONS: Readonly<Record<string, string>> = { "image/jpeg": "jpg"
 
 /**
  * Opens one of a message's files or photos from fresh links: on a phone, downloaded and handed to the share sheet; on the
- * web build, downloaded (openPrivateFile). A photo goes under a plain name, a file under its own. Throws with words for the
- * member when it can't.
+ * web build, downloaded (openPrivateFile). Throws with words for the member when it can't.
  */
 export async function openAttachment(qc: QueryClient, slug: string, conversationId: string, messageId: string, attachment: ChatAttachmentDto): Promise<void> {
   const link = await freshAttachmentLink(qc, slug, conversationId, messageId, attachment.id);
+  await openAttachmentFrom(link.downloadUrl, attachment);
+}
+
+/**
+ * Opens a file or photo from a download link already in hand, as a chat report's view has: a photo under a plain name, a
+ * file under its own (openPrivateFile, which hands it over only while `stillWanted` says so).
+ */
+export function openAttachmentFrom(downloadUrl: string, attachment: ChatAttachmentDto, stillWanted?: () => boolean): Promise<void> {
   const name = attachment.kind === "FILE" ? (attachment.name ?? CHAT_FILE_DEFAULT_NAME) : `photo.${PHOTO_EXTENSIONS[attachment.contentType] ?? "jpg"}`;
-  await openPrivateFile(link.downloadUrl, name, attachment.contentType);
+  return openPrivateFile(downloadUrl, name, attachment.contentType, stillWanted);
 }

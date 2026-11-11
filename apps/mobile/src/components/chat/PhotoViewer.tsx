@@ -50,40 +50,91 @@ function ViewerButton({ label, onPress, disabled = false, busy = false, buttonRe
  * takes its place.
  */
 export function PhotoViewer({
-  open,
   slug,
   conversationId,
   message,
-  photos,
-  startIndex,
-  who,
-  onReport,
-  onClose,
-  onDismiss,
-}: {
-  open: boolean;
+  ...rest
+}: Omit<PhotoViewerFrameProps<ChatAttachmentDto>, "sentAt" | "cachePolicy" | "linkOf" | "lost" | "retrying" | "onRetry" | "onShare" | "onImageError"> & {
   slug: string;
   conversationId: string;
   message: ChatMessageDto;
-  photos: ChatAttachmentDto[];
+}) {
+  const qc = useQueryClient();
+  const links = useQuery(attachmentLinksQuery(slug, conversationId, message.id));
+  return (
+    <PhotoViewerFrame
+      {...rest}
+      sentAt={message.createdAt}
+      cachePolicy="memory"
+      linkOf={(photo) => links.data?.links.find((l) => l.id === photo.id)}
+      lost={!links.isFetching && (!!links.error || !!links.data)}
+      retrying={links.isFetching}
+      onRetry={() => void links.refetch()}
+      onShare={(photo) => openAttachment(qc, slug, conversationId, message.id, photo)}
+    />
+  );
+}
+
+type PhotoLink = Pick<ChatAttachmentLinkDto, "url" | "thumbUrl">;
+
+interface PhotoViewerFrameProps<A extends ChatAttachmentDto> {
+  open: boolean;
+  photos: A[];
   startIndex: number;
   /** Whose photos they are, "you" for the member's own. */
   who: string;
+  /** When the message was sent, as an ISO time. */
+  sentAt: string;
+  /** "memory" keeps a photo in expo-image's memory to show again; "none" keeps nothing, as for a chat report's view. */
+  cachePolicy: "memory" | "none";
+  /** A photo's links, or undefined while they aren't known or can't be had. */
+  linkOf: (photo: A) => PhotoLink | undefined;
+  /** Links have come back (or failed) without a photo's: show the failure. */
+  lost: boolean;
+  /** Links are being fetched again: a failure waits for them. */
+  retrying: boolean;
+  /** Try again on a photo that didn't load; without it the failure shows with no button. */
+  onRetry?: () => void;
+  /** Shares the photo (on the web build, downloads it); throws with words to say. */
+  onShare: (photo: A) => Promise<void>;
+  /** The full photo failed to load, perhaps because its link ran out. */
+  onImageError?: (photo: A) => void;
   /** Only for someone else's message. */
   onReport?: () => void;
   onClose: () => void;
   /** iOS only: it has gone. */
   onDismiss?: () => void;
-}) {
-  const qc = useQueryClient();
+}
+
+/**
+ * The viewer itself, knowing nothing about where its links come from: the member's PhotoViewer fetches them, while a chat
+ * report's view in the console has them already, signed for that view, keeps no photo in any cache and offers no Report
+ * message.
+ */
+export function PhotoViewerFrame<A extends ChatAttachmentDto>({
+  open,
+  photos,
+  startIndex,
+  who,
+  sentAt,
+  cachePolicy,
+  linkOf,
+  lost,
+  retrying,
+  onRetry,
+  onShare,
+  onImageError,
+  onReport,
+  onClose,
+  onDismiss,
+}: PhotoViewerFrameProps<A>) {
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const count = photos.length;
   const [index, setIndex] = useState(() => Math.min(Math.max(startIndex, 0), count - 1));
   const at = Math.min(Math.max(index, 0), count - 1);
   const photo = photos[at]!;
-  const links = useQuery(attachmentLinksQuery(slug, conversationId, message.id));
-  const list = useRef<FlatList<ChatAttachmentDto>>(null);
+  const list = useRef<FlatList<A>>(null);
   const closeButton = useRef<Focusable>(null);
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -122,7 +173,7 @@ export function PhotoViewer({
     setProblem(null);
     setSharing(true);
     try {
-      await openAttachment(qc, slug, conversationId, message.id, photo);
+      await onShare(photo);
     } catch (err) {
       setProblem(errorMessage(err));
     } finally {
@@ -139,7 +190,7 @@ export function PhotoViewer({
               {title}
             </Text>
             <Text numberOfLines={1} style={styles.time}>
-              {formatDateTime(message.createdAt)}
+              {formatDateTime(sentAt)}
             </Text>
           </View>
           <ViewerButton label={WEB ? "Download photo" : "Share photo"} busy={sharing} onPress={() => void share()}>
@@ -170,7 +221,18 @@ export function PhotoViewer({
               onViewableItemsChanged={onViewable}
               viewabilityConfig={VIEWABILITY}
               renderItem={({ item }) => (
-                <ViewerPhoto photo={item} link={links.data?.links.find((l) => l.id === item.id)} lost={!links.isFetching && (!!links.error || !!links.data)} retrying={links.isFetching} width={stage.width} height={stage.height} quiet={reduceMotion} onRetry={() => void links.refetch()} />
+                <ViewerPhoto
+                  photo={item}
+                  link={linkOf(item)}
+                  lost={lost}
+                  retrying={retrying}
+                  cachePolicy={cachePolicy}
+                  width={stage.width}
+                  height={stage.height}
+                  quiet={reduceMotion}
+                  onRetry={onRetry}
+                  onImageError={onImageError && (() => onImageError(item))}
+                />
               )}
             />
           )}
@@ -194,8 +256,34 @@ export function PhotoViewer({
   );
 }
 
-/** One page: the photo fitted to the screen, its thumbnail under it while it loads, or what to do when it won't. */
-function ViewerPhoto({ photo, link, lost, retrying, width, height, quiet, onRetry }: { photo: ChatAttachmentDto; link: ChatAttachmentLinkDto | undefined; lost: boolean; retrying: boolean; width: number; height: number; quiet: boolean; onRetry: () => void }) {
+/**
+ * One page: the photo fitted to the screen, its thumbnail under it while it loads, or what to do when it won't. Kept in
+ * memory under a key per photo, or with `cachePolicy` "none" not kept at all.
+ */
+function ViewerPhoto({
+  photo,
+  link,
+  lost,
+  retrying,
+  cachePolicy,
+  width,
+  height,
+  quiet,
+  onRetry,
+  onImageError,
+}: {
+  photo: ChatAttachmentDto;
+  link: PhotoLink | undefined;
+  lost: boolean;
+  retrying: boolean;
+  cachePolicy: "memory" | "none";
+  width: number;
+  height: number;
+  quiet: boolean;
+  onRetry?: () => void;
+  onImageError?: () => void;
+}) {
+  const kept = cachePolicy === "memory";
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const uri = link?.url ?? null;
@@ -206,30 +294,35 @@ function ViewerPhoto({ photo, link, lost, retrying, width, height, quiet, onRetr
         <View style={{ alignItems: "center", gap: spacing.sm }}>
           <IconAlert size={28} color={SUBTLE} />
           <Text style={{ fontSize: 14, color: SUBTLE }}>{PHOTO_LOAD_FAILED_TEXT}</Text>
-          <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Try again" style={({ pressed }) => [styles.retry, pressed ? { backgroundColor: "rgba(255,255,255,0.1)" } : null]}>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: "#fff" }}>Try again</Text>
-          </Pressable>
+          {onRetry && (
+            <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Try again" style={({ pressed }) => [styles.retry, pressed ? { backgroundColor: "rgba(255,255,255,0.1)" } : null]}>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: "#fff" }}>Try again</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <>
           {link?.thumbUrl && loadedUri !== uri ? (
             <Image
-              source={{ uri: link.thumbUrl, cacheKey: `chat-${photo.id}-thumb` }}
+              source={{ uri: link.thumbUrl, cacheKey: kept ? `chat-${photo.id}-thumb` : undefined }}
               contentFit="contain"
-              cachePolicy="memory"
+              cachePolicy={cachePolicy}
               transition={0}
               accessible={false}
               style={{ position: "absolute", top: 0, left: spacing.sm, width: width - spacing.sm * 2, height }}
             />
           ) : null}
           <Image
-            source={uri ? { uri, cacheKey: `chat-${photo.id}-full` } : null}
+            source={uri ? { uri, cacheKey: kept ? `chat-${photo.id}-full` : undefined } : null}
             contentFit="contain"
-            cachePolicy="memory"
+            cachePolicy={cachePolicy}
             transition={0}
             accessible={false}
             onLoad={() => setLoadedUri(uri)}
-            onError={() => setFailedUri(uri)}
+            onError={() => {
+              setFailedUri(uri);
+              onImageError?.();
+            }}
             style={{ width: width - spacing.sm * 2, height }}
           />
           {/* A spinner while the photo loads, but nothing that moves for anyone who asked for less motion. */}

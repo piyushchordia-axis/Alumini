@@ -381,7 +381,14 @@ Covers:
 - the reported business listing in Demo University's reports;
 - chat reports: the dashboard tile and nav entry, the queue showing no message until an admin chooses to view it, the
   Open tab counting the open report (1, then 0 once it's resolved), a note typed and cancelled gone from the next
-  view's dialog after Hide, the audit row the view writes, the audit log's Chat reports chip showing only that family
+  view's dialog after Hide, a photo and a PDF under the reported message (the real view, given them by the script, with
+  links the script answers): a thumbnail that fails at first failing alone (the PDF keeps its Download, nothing says the
+  links are lost) and loading again from its own Try again with focus kept on it and no other view, the file's name with
+  "PDF · 1.2 MB" and its Download, the 15-minute line, 44px targets, the photo's viewer with Download and no Report
+  message and focus back on the photo after Escape, with the page's clock past the links' 15 minutes the pressed photo
+  opening nothing, the photo failing, the Download gone and focus on Try again, which asks for a second view (two real
+  `chat_report.view` rows from this step) and puts focus on the 15-minute line, and Hide leaving neither a link nor the
+  file's name in the page; the audit row the view writes, the audit log's Chat reports chip showing only that family
   and the console's Audit log link then showing the whole log again, with no filter written back, the messages
   discarded on leaving the page, a report another admin just handled, removing the reported message, and the page on a
   phone;
@@ -676,10 +683,15 @@ Covers:
   audit row) and each view the app asks for counted: the tile and the row with the open count, the Open tab with it, the
   privacy lines, and who reported whom and why with no words anywhere in the page until View messages; the thread
   oldest first with the reporter's note, "System message", "Reported message" and "Removed", 44px actions, the link to
-  the reported member's page, no sideways scrolling, and Hide taking the words away; the words gone from the page (where
-  hidden screens stay) with that member's page opened over them and after Back, after a tab change, and with the page
-  hidden as when the app goes to the background, each View asked for once; a request report's note with Resolve and no
-  Remove message, while a message's view held back by the script lands after it and is dropped; a view refused by the
+  the reported member's page, no sideways scrolling, the reported message's photo and PDF ("PDF · 1.2 MB", answered by
+  the script) with the 15-minute line, a thumbnail that fails at first failing alone (the PDF still opens) and loading
+  again from its own Try again with focus kept on it and no other view, the photo's viewer with no Report message and
+  focus back on the photo when it closes, and with the page's clock past the links' 15 minutes the photo failing, the
+  PDF no longer opening, focus on Try again, and Try again asking for another view and then putting focus on the
+  15-minute line, and Hide taking the words away; the words, the photo's links and the PDF's name gone from the page
+  (where hidden screens stay) with that member's page opened over them and after Back, after a tab change, and with the
+  page hidden as when the app goes to the background, each View asked for once; a request report's note with Resolve and
+  no Remove message, while a message's view held back by the script lands after it and is dropped; a view refused by the
   hourly limit said in its row, one refused as out of date said under the tabs with the list fetched again, and one
   refused only after another report was opened said nowhere and fetching nothing; the words going when the list's next
   answer leaves the report out, and not coming back when it returns; a note typed in the Remove sheet kept through

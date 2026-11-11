@@ -1,8 +1,8 @@
 import type { ChatAttachmentDto } from "@illuminize/shared";
-import { CHAT_FILE_DEFAULT_NAME, CHAT_FILE_OPEN_HINT, fileMetaText, fileOpenLabel, PHOTO_GRID_WIDTH, PHOTO_LOAD_FAILED_TEXT, photoGridLayout, photoOpenLabel, type PhotoCell } from "@illuminize/shared/chat";
+import { CHAT_FILE_DEFAULT_NAME, CHAT_FILE_OPEN_HINT, fileMetaText, fileOpenLabel, PHOTO_COMPACT_SIDE, PHOTO_GRID_GAP, PHOTO_GRID_WIDTH, PHOTO_LOAD_FAILED_TEXT, photoGridLayout, photoOpenLabel } from "@illuminize/shared/chat";
 import { Image } from "expo-image";
 import { useId, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { IconAlert, IconDownload, IconFile, IconShare } from "@/components/icons";
 import { describedBy, type Focusable } from "@/components/ui";
 import { colors, radius, spacing } from "@/theme";
@@ -32,12 +32,16 @@ const PLACEHOLDER = colors.borderStrong;
  * links: the caller says where each photo comes from, and what opening one, opening a file and trying again do. Without
  * `onOpen` the photos are pictures only, as a sending message's previews are; without `onOpenFile` a file isn't a button.
  * Private photos are kept in memory only (`cachePolicy`), never on disk, so none goes through expo-image's `placeholder`,
- * which it caches on disk whatever the policy: a placeholder is an Image of its own, under the photo.
+ * which it caches on disk whatever the policy: a placeholder is an Image of its own, under the photo. `compact` is the
+ * console's denser look for a chat report's view: the photos as a row of small squares (PHOTO_COMPACT_SIDE), and the files
+ * as wide as the message. There a photo the caller says is `broken` shows only a mark (the caller says why, and offers the
+ * way on), while one whose own image failed offers Try again, which loads it again from the same link and tells `onRetry`.
  */
-export function AttachmentGrid({
+export function AttachmentGrid<A extends ChatAttachmentDto>({
   attachments,
   sourceOf,
   width = PHOTO_GRID_WIDTH,
+  compact = false,
   cachePolicy = "memory",
   retrying = false,
   opening = null,
@@ -47,9 +51,10 @@ export function AttachmentGrid({
   onImageError,
   onLongPress,
 }: {
-  attachments: ChatAttachmentDto[];
-  sourceOf: (attachment: ChatAttachmentDto) => PhotoSource;
+  attachments: A[];
+  sourceOf: (attachment: A) => PhotoSource;
   width?: number;
+  compact?: boolean;
   cachePolicy?: "memory" | "none";
   /** Links are being fetched again: a photo that failed waits for them rather than showing its failure. */
   retrying?: boolean;
@@ -57,8 +62,8 @@ export function AttachmentGrid({
   opening?: string | null;
   /** Opens the photo at `index` among the photos; `opener` is its button, for focus to come back to. */
   onOpen?: (index: number, opener: Focusable | null) => void;
-  onOpenFile?: (attachment: ChatAttachmentDto) => void;
-  /** "Try again" on a photo that didn't load: fetch its links again. */
+  onOpenFile?: (attachment: A) => void;
+  /** "Try again" on a photo that didn't load: fetch its links again (in a compact grid, after it loads again by itself). */
   onRetry?: () => void;
   /** A photo's image failed to load, perhaps because its link expired. */
   onImageError?: () => void;
@@ -68,35 +73,44 @@ export function AttachmentGrid({
   const photos = attachments.filter((a) => a.kind === "PHOTO");
   const files = attachments.filter((a) => a.kind === "FILE");
   const grid = photoGridLayout(photos, width);
+  const tile = (photo: A, i: number, box: ViewStyle) => (
+    <PhotoTile
+      key={photo.id}
+      box={box}
+      compact={compact}
+      source={sourceOf(photo)}
+      label={photoOpenLabel(i, photos.length)}
+      cachePolicy={cachePolicy}
+      retrying={retrying}
+      onOpen={onOpen && ((opener) => onOpen(i, opener))}
+      onRetry={onRetry}
+      onImageError={onImageError}
+      onLongPress={onLongPress}
+    />
+  );
   return (
     <View style={{ gap: spacing.xs }}>
-      {photos.length > 0 && (
-        <View style={{ width: grid.width, height: grid.height }}>
-          {photos.map((photo, i) => (
-            <PhotoTile
-              key={photo.id}
-              cell={grid.cells[i]!}
-              source={sourceOf(photo)}
-              label={photoOpenLabel(i, photos.length)}
-              cachePolicy={cachePolicy}
-              retrying={retrying}
-              onOpen={onOpen && ((opener) => onOpen(i, opener))}
-              onRetry={onRetry}
-              onImageError={onImageError}
-              onLongPress={onLongPress}
-            />
-          ))}
-        </View>
-      )}
+      {photos.length > 0 &&
+        (compact ? (
+          <View style={styles.compactRow}>{photos.map((photo, i) => tile(photo, i, styles.compactTile))}</View>
+        ) : (
+          <View style={{ width: grid.width, height: grid.height }}>
+            {photos.map((photo, i) => {
+              const cell = grid.cells[i]!;
+              return tile(photo, i, { position: "absolute", left: cell.x, top: cell.y, width: cell.width, height: cell.height, borderRadius: radius.md });
+            })}
+          </View>
+        ))}
       {files.map((file) => (
-        <FileRow key={file.id} file={file} width={grid.width || width} busy={opening === file.id} onOpen={onOpenFile} onLongPress={onLongPress} />
+        <FileRow key={file.id} file={file} width={compact ? undefined : grid.width || width} busy={opening === file.id} onOpen={onOpenFile} onLongPress={onLongPress} />
       ))}
     </View>
   );
 }
 
 function PhotoTile({
-  cell,
+  box: place,
+  compact,
   source,
   label,
   cachePolicy,
@@ -106,7 +120,9 @@ function PhotoTile({
   onImageError,
   onLongPress,
 }: {
-  cell: PhotoCell;
+  /** Where it goes and how big it is. */
+  box: ViewStyle;
+  compact: boolean;
   source: PhotoSource;
   label: string;
   cachePolicy: "memory" | "none";
@@ -122,8 +138,41 @@ function PhotoTile({
   const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const { uri } = source;
   const broken = !retrying && (!!source.broken || (!!uri && failedUri === uri));
-  const box = { position: "absolute", left: cell.x, top: cell.y, width: cell.width, height: cell.height, borderRadius: radius.md, overflow: "hidden", backgroundColor: PLACEHOLDER } as const;
+  const box = [place, { overflow: "hidden", backgroundColor: PLACEHOLDER } as const];
 
+  // A compact square is too small for the words. When its link has gone (`broken`), its caller says so beside the grid.
+  // When its own image failed, it loads again from the same link: a button like the photo's, so focus stays on it.
+  if (broken && compact) {
+    if (!source.broken && onOpen) {
+      return (
+        <Pressable
+          ref={ref}
+          onPress={() => {
+            setFailedUri(null);
+            onRetry?.();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          accessibilityHint={PHOTO_LOAD_FAILED_TEXT}
+          {...describedBy(failedId)}
+          style={({ pressed }) => [...box, styles.failed, pressed ? { opacity: 0.85 } : null]}
+        >
+          <IconAlert size={18} color={colors.text} />
+          <Text style={styles.compactRetryText}>Try again</Text>
+          {Platform.OS === "web" && (
+            <Text nativeID={failedId} style={styles.srOnly}>
+              {PHOTO_LOAD_FAILED_TEXT}
+            </Text>
+          )}
+        </Pressable>
+      );
+    }
+    return (
+      <View role="img" accessibilityLabel={PHOTO_LOAD_FAILED_TEXT} style={[box, styles.failed]}>
+        <IconAlert size={20} color={colors.text} />
+      </View>
+    );
+  }
   if (broken) {
     return (
       <View style={[box, styles.failed]}>
@@ -166,15 +215,18 @@ function PhotoTile({
       onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [box, pressed ? { opacity: 0.85 } : null]}
+      style={({ pressed }) => [...box, pressed ? { opacity: 0.85 } : null]}
     >
       {image}
     </Pressable>
   );
 }
 
-/** A file in a message: a white card whatever the bubble's colour, so it reads the same in any institution's colour. */
-function FileRow({ file, width, busy, onOpen, onLongPress }: { file: ChatAttachmentDto; width: number; busy: boolean; onOpen?: (file: ChatAttachmentDto) => void; onLongPress?: () => void }) {
+/**
+ * A file in a message: a white card whatever the bubble's colour, so it reads the same in any institution's colour. With
+ * no `width` it is as wide as what holds it, as in a compact grid.
+ */
+function FileRow<A extends ChatAttachmentDto>({ file, width, busy, onOpen, onLongPress }: { file: A; width: number | undefined; busy: boolean; onOpen?: (file: A) => void; onLongPress?: () => void }) {
   const name = file.name ?? CHAT_FILE_DEFAULT_NAME;
   const body = (
     <>
@@ -218,4 +270,8 @@ const styles = StyleSheet.create({
   fileName: { fontSize: 14, fontWeight: "500", color: colors.text },
   fileMeta: { fontSize: 12, color: colors.muted },
   fileAction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  compactRow: { flexDirection: "row", flexWrap: "wrap", gap: PHOTO_GRID_GAP },
+  compactTile: { width: PHOTO_COMPACT_SIDE, height: PHOTO_COMPACT_SIDE, borderRadius: radius.sm },
+  compactRetryText: { fontSize: 12, lineHeight: 15, fontWeight: "700", color: colors.text, textDecorationLine: "underline" },
+  srOnly: { position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 },
 });

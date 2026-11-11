@@ -1,4 +1,4 @@
-import { DELETED_MEMBER_NAME, REPORT_STATUSES, REPORT_STATUS_LABELS, type ChatReportTargetKind, type ReportStatus } from "../constants";
+import { CHAT_REPORT_LINK_TTL_SEC, DELETED_MEMBER_NAME, REPORT_STATUSES, REPORT_STATUS_LABELS, type ChatReportTargetKind, type ReportStatus } from "../constants";
 import type { ChatReportResolveInput } from "../schemas/chat";
 import type { AdminChatReportDto, AdminChatReportMessageDto, ChatMemberDto, DashboardDto } from "../types/dto";
 import { statusTabs, type StatusTab } from "./admin";
@@ -24,6 +24,36 @@ export const CHAT_REPORT_PRIVACY_TEXT = "Messages you open are hidden again when
 
 /** In place of the thread when the reported message has been deleted since. */
 export const CHAT_REPORT_MESSAGE_GONE_TEXT = "This message no longer exists.";
+
+/**
+ * Under a report's thread when its messages hold photos or files. Their links come with the view, signed for
+ * CHAT_REPORT_LINK_TTL_SEC, and are never fetched again by themselves: new ones take another view, which is audited.
+ */
+export const CHAT_REPORT_FILES_TEXT = `Photos and files open for ${CHAT_REPORT_LINK_TTL_SEC / 60} minutes after you choose View messages.`;
+
+/**
+ * Once a view's photos and files no longer open (their links ran out), beside Try again, which views the messages again. A
+ * photo that fails to load before then fails alone, and loads again from its link.
+ */
+export const CHAT_REPORT_FILES_LOST_TEXT = "Photos and files no longer open. Trying again gets new links and is another recorded view.";
+
+/** Whether any of a view's messages has photos or files, for CHAT_REPORT_FILES_TEXT. */
+export function chatReportHasFiles(view: { messages: ReadonlyArray<Pick<AdminChatReportMessageDto, "attachments">> }): boolean {
+  return view.messages.some((m) => m.attachments.length > 0);
+}
+
+/** How long before its links run out a view stops following them, so one opened at the last moment doesn't fail on the way. */
+const CHAT_REPORT_FILES_MARGIN_MS = 30_000;
+
+/**
+ * Whether a view's photos and files may still be opened, `receivedAt` being when the view arrived on this device (both
+ * from Date.now()). Counted from then rather than from the view's filesExpireAt, which is the server's clock, so a phone
+ * or computer whose clock is wrong neither gives up on links that still work nor follows ones that have run out (on the
+ * web, following one would leave the page for the server's refusal).
+ */
+export function chatReportFilesOpen(receivedAt: number, now: number): boolean {
+  return now < receivedAt + CHAT_REPORT_LINK_TTL_SEC * 1000 - CHAT_REPORT_FILES_MARGIN_MS;
+}
 
 /** A member a report names, or DELETED_MEMBER_NAME once they have deleted their account. */
 export function nameOrDeleted(member: Pick<ChatMemberDto, "fullName"> | null | undefined): string {
