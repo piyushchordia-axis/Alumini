@@ -22,11 +22,14 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   (pushed screens; `loadingScreen()` in `components/LoadingScreen.tsx` while one loads), `ChatHeader` (chat
   overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
   to the console's home). Do not use native stack headers for member chrome (see Gotchas). Files the console picks or
-  saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet).
+  saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet),
+  and so do chat's PDFs and opened files (`pickChatFiles`, `openPrivateFile`, `forgetOpenedFiles`).
 - `packages/shared`: constants and enums, zod schemas, DTO types, the typed API client (`src/client`) and realtime
   client, used by all three apps. `src/chat` (`@illuminize/shared/chat`) holds the chat cache, outbox and live sync with
   no React, the navigation's badges (`sectionBadges`, `moreBadgeLabel`) and `chat/empty.ts` what an empty inbox says
   and offers (`emptyChatsHint`, `emptyChatsActions`) and an empty thread's line (`emptyThreadText`);
+  `chat/attachments.ts` chat photos' and files' rules, names, sizes, previews, photo grid, tray and caption, and
+  `chat/attachmentLinks.ts` their links, fetched in batches (`createAttachmentLinkLoader`);
   `src/lib/features.ts` the feature switches and current pupils; `src/lib/sections.ts` the member sections, their
   names (`SECTION_LABELS`) and lines (`SECTION_DESCRIPTIONS`, `sectionDescription`) and More's groups
   (`moreHubGroups`, `MORE_HUB_ROWS`);
@@ -112,12 +115,15 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   advisory lock, shared to file a chat report, exclusive in `assertNoOpenReportAboutActor`), then a membership row
   (`lockMembership`: the target's in `adminTransition`, which takes the actor's report subject first whichever check
   applies; the member's own for per-member limits), the pair (`lockPair`, which blocks take too), mentorship or
-  referral rows, the conversation, a participant. Every emit and push goes to `chatRecipients()` (or `chatRecipientOf`
-  for a badge). Chat writes go over REST only; the socket stays server to client. Message bodies and request notes never
-  go into pushes, notifications, audit metadata, job payloads or logs. In the consoles, a chat report's audited view
-  (and the note closing it) never goes into a query or mutation cache: it lives in one component's state (web
-  `ChatReportRow`; mobile `useChatReportView`, which also drops it on blur and in the background, over
-  `chatReportViewStep` in shared `lib/chatReports.ts`), and a link to a report only scrolls to it.
+  referral rows, the conversation, a participant, and last the uploads a send claims (`lockChatAttachmentsForClaim`, in
+  `appendMessage`). Every emit and push goes to `chatRecipients()` (or `chatRecipientOf` for a badge). Chat writes go
+  over REST only; the socket stays server to client. Message bodies, request notes, and chat files' names and links
+  never go into pushes, notifications, audit metadata (a report's view counts its files, `attachmentCount`), job
+  payloads or logs; previews say "Photo" or "File: notes.pdf" only in the app's inbox. In the consoles, a
+  chat report's audited view (its files' links included, and the note closing it) never goes into a query or mutation
+  cache: it lives in one component's state (web `ChatReportRow`; mobile `useChatReportView`, which also drops it on
+  blur and in the background, over `chatReportViewStep` in shared `lib/chatReports.ts`), and a link to a report only
+  scrolls to it.
 - **Invisible blocks.** A request or invitation that meets a block gets the normal answer and is stored suppressed
   (`withheld`, `suppressed`, `invite_suppressed`); nobody is told. Tests deep-equal the blocked and unblocked views.
   What a thread says under it (the box and its intro, or a panel and its date to ask again) is shared `threadFooter`
@@ -492,12 +498,19 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - sharp decodes and re-encodes every upload, so upload tests use real images made at test time
   (`test/helpers/images.ts`); a few fake bytes after a PNG header get 415. Its native build is per platform: don't
   share `node_modules` between Windows and a dev container.
+- multer reads a part's file name as Latin-1 by default: the chat upload sets `defParamCharset: "utf8"` and prefers the
+  UTF-8 `name` field both apps send.
 - expo-image-picker's `mimeType` and `fileSize` describe the source photo on Android, not the file it hands back (a
   HEIF saved as a JPEG is still labelled image/heif, with the original's size), and iOS returns a HEIC photo as it is
   whenever there is no editing, at any `quality` (quality 1 copies the original file). Trust neither:
   `preparePickedPhoto` saves every pick again and reads the size from the file it wrote. A phone writes a JPEG's
   see-through parts black (expo-image-manipulator paints nothing under them), so anything that may be transparent stays
   a PNG.
+- expo-image keeps a `placeholder` on disk whatever `cachePolicy` says (iOS caches it with the disk policy; Android's
+  placeholder request skips the view's cache options). A private image (a chat photo) is never a placeholder: draw it
+  as an `Image` of its own under the photo, `cachePolicy` "memory" or "none", as `AttachmentGrid` does.
+- Android's share sheet sends the app to the background (`AppState`), closing whatever closes on leaving the app (a chat
+  report's view); delete the shared file only once the app is back in front, as `useChatReportView` does.
 - Hermes may lack parts of `Intl` (compact numbers, some date formatting): shared code the phone app runs writes such
   text by hand, as `formatSalary` and `applicationsLine` do.
 - A page holding a form waits only for its queries' first answer (`loadingFirstTime`, shared `lib/lists.ts`:

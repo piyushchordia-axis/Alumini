@@ -805,10 +805,10 @@ under "Runs" at the end.
 **Expo Go, then a development build.** Expo Go on one iPhone and one Android phone covers almost all of this pass: it
 already has every native module the app uses, including the five added for photo preparation and the admin console's
 files (`expo-image-manipulator`, `expo-file-system`, `expo-document-picker`, `expo-sharing` and `expo-clipboard`). Only
-part 20, pushes and `illuminize://` links, needs a development build, as Expo Go can't receive the app's pushes or open
-its links; a development build made before those five modules were added lacks them and must be rebuilt (part 20 says
-how). After installing (`pnpm install`, or a rebuild), restart Metro (`pnpm mobile`): a server started before the
-install can't find the new modules.
+part 20, pushes and `illuminize://` links (and what chat leaves in the app's files), needs a development build, as Expo
+Go can't receive the app's pushes, open its links or let you read its files; a development build made before those five
+modules were added lacks them and must be rebuilt (part 20 says how). After installing (`pnpm install`, or a rebuild),
+restart Metro (`pnpm mobile`): a server started before the install can't find the new modules.
 
 1. With the phones on the same Wi-Fi as this computer, run `node scripts/setup-local.mjs --lan` so they reach the API
    here, then `pnpm db:reset` and `pnpm demo`. `pnpm demo` starts the API and the web app, not the phone app's Expo
@@ -1090,6 +1090,40 @@ the console (part 14).
       "You can ask again from Mon, 7 Dec if they haven't accepted by then." (no "Invalid Date", and the day and date as
       the web shows them: Hermes writes it with the same `Intl` options as the chat times), and TalkBack or VoiceOver
       read it as one sentence.
+- [ ] Photos and PDFs, in Rahul's chat with Priya. The paperclip beside the box ("Add photos or a file") opens "Add to
+      message" with Photos and PDF file. Photos opens the library for several at once: pick two (on the iPhone one a
+      HEIC photo, on Android a HEIF or 50-megapixel one). Each waits in the tray above the box, faded under a spinner
+      until it's up, and Send stays dimmed until both are; TalkBack or VoiceOver reads "Uploading 2 photos…" once.
+      PDF file opens the document picker: on the iPhone pick a PDF from Files (On My iPhone, then iCloud Drive), on
+      Android from Downloads, then Google Drive. With four in the tray, the paperclip says "You can add up to 4 photos
+      or files to a message." instead of opening the sheet. Remove one with its cross: focus moves to the next cross,
+      or to the paperclip. With the keyboard up, the tray stays above the box. Send with a few words: the photos show
+      at once, the PDF as a white card ("PDF · …"), and Priya's browser shows them too.
+- [ ] iPhone: turn off the app's photo access (Settings → Expo Go → Photos → None), then the paperclip → Photos: "Allow
+      photo access to choose photos." shows above the box, and nothing goes in the tray. Turn access back on. Android 13
+      and later ask for no access to pick photos, so there Photos opens the picker whatever the Photos and videos
+      setting says; only on Android 12 or older (Settings → Apps → Expo Go → Permissions → Files and media, or Storage →
+      Don't allow or Deny, and deny it again if the phone asks) does the line show. On both, cancelling either picker
+      says nothing. Neither failure can be forced, so only note it if it happens: the PDF picker or the photo permission
+      request failing (rather than being cancelled or refused) says "That couldn't be added. Try again." in the same
+      place, and a photo the library can't hand over says "Couldn't open that photo. Try another one."; either way the
+      paperclip works again, with no spinner left turning.
+- [ ] Have Priya send Rahul two photos and a PDF in one message from the browser. Tap the first photo: the viewer fades
+      in over the chat, with Close, Share photo and Report message. Swipe to the second photo and back, and Previous
+      and Next do the same. TalkBack or VoiceOver starts on Close, reads "Photo 1 of 2 from Priya Nair", never leaves
+      the viewer for the chat under it, and after Close is back on the photo that opened it. Android's back button
+      closes it. Share photo opens the share sheet: save the photo to Photos or Files, and it opens there the right
+      way up. Report message: the report sheet opens once the viewer has gone (the iPhone especially); on the first
+      phone Cancel, and on the second send it, with any reason, for part 14. Then turn on Reduce Motion (iPhone:
+      Settings → Accessibility → Motion; Android: Settings → Accessibility → Remove animations) and restart the app,
+      which reads it as it starts. Open a photo not opened since the restart: its small copy shows until the full one
+      replaces it, with no spinner turning over it (with the setting off, one turns while the photo loads, if only for
+      a moment). On the iPhone the viewer also appears at once, with no fade, and Next jumps to the second photo rather
+      than sliding; Android's setting stills the fade by itself, so there the missing spinner is what shows the app
+      read it. Turn it off again.
+- [ ] Tap Priya's PDF card (TalkBack or VoiceOver: "Open …", then "Downloads it and opens the share sheet"): it
+      downloads, then the share sheet offers it under its own name. Open it in Books or Files on the iPhone, or a PDF
+      viewer or Drive on Android: the whole document opens.
 
 ### 8. Groups
 
@@ -1268,7 +1302,9 @@ Still the Samaj admin on both phones, except for Chat reports. Sign Rahul back i
 
 **Chat reports**
 
-Sign one phone in as Demo University's admin (`+91 90000 00001`), which has a seeded open report, for these four.
+Sign one phone in as Demo University's admin (`+91 90000 00001`), which has a seeded open report, for these four. The
+three after them, on Rahul's report from part 7 (Priya's photos and PDF), need both phones signed in as that admin.
+Afterwards, sign both phones back in as the Samaj admin (`+91 90000 00004`) for the rest of this part.
 
 - [ ] Chat reports: the row says who reported whom and why, and no words. View messages, then open the app switcher
       (iPhone: swipe up and hold; Android: Recents): the app's picture there shows no message text, and back in the app
@@ -1283,6 +1319,19 @@ Sign one phone in as Demo University's admin (`+91 90000 00001`), which has a se
 - [ ] From an open report, open "…'s member page", then go back (iPhone swipe back, Android back button): the report
       is closed, with no words. Remove message: with the keyboard up, the note box and Remove stay above it on both
       phones; on Android the back button closes the sheet. Cancel, and Hide.
+- [ ] View messages on Rahul's report: under Priya's message, her photos as small squares and the PDF as a row ("PDF ·
+      …"), and under the thread "Photos and files open for 15 minutes after you choose View messages." A photo opens
+      the viewer with Share photo and no Report message; Android's back button closes it, and after Close TalkBack or
+      VoiceOver is back on that photo. The PDF's row opens the share sheet, and the app chosen opens the whole file.
+- [ ] Android: open the PDF, or Share photo in the viewer. The share sheet sends the app to the background, so the
+      report closes (no words or photos left on screen) while the app chosen can still open the file. Back in the app,
+      View messages shows it again, and the Audit log counts that as another `chat_report.view`.
+- [ ] Links running out: View messages, then keep the app in front for 15 minutes with the screen on (Auto-Lock or
+      Screen timeout at its longest), as locking the phone closes the report. Tap a photo: nothing opens, each photo
+      becomes a warning mark (read as "Photo didn't load"), and "Photos and files no longer open. Trying again gets new
+      links and is another recorded view." shows with Try again, where TalkBack or VoiceOver lands. Try again views the
+      messages again: the photos load, focus goes to the 15-minute line, and the Audit log has one more
+      `chat_report.view`.
 
 **Invitations** (importing a list and the template are in part 15)
 
@@ -1498,8 +1547,8 @@ it. Look for room made twice (a blank band above the keyboard) as well as none.
 
 ### 20. Pushes and links (development build only)
 
-Expo Go can't receive the app's pushes or open `illuminize://` links, so these need a development build on each phone,
-made after the five native modules above were added.
+Expo Go can't receive the app's pushes, open `illuminize://` links or let you read the app's files, so these need a
+development build on each phone, made after the five native modules above were added.
 
 1. Create the Expo project first (README → Mobile → Push notifications), or no pushes arrive. Then, in a second
    terminal, `cd apps/mobile` and:
@@ -1545,6 +1594,16 @@ made after the five native modules above were added.
       text appears anywhere on the lock screen.
 - [ ] As the admin, remove a message the phone member sent (Admin → Chat reports, after reporting it from the
       browser). The push says only "A message you sent was removed", and the admin's note shows only in the app.
+- [ ] No chat photo stays on the phone's disk. Android: from the computer,
+      `adb shell run-as com.illuminize.app ls -l cache/image_manager_disk_cache` lists expo-image's disk cache. iPhone,
+      on the Mac that installed the build: Xcode → Window → Devices and Simulators → the iPhone → Illuminize → Download
+      Container…, then Show Package Contents → AppData/Library/Caches/com.hackemist.SDImageCache. As Rahul the folder
+      may be missing, or on Android hold only Glide's `journal` file: the member app draws nothing else through
+      expo-image (profile photos aren't), so nothing new is the pass here. Have Priya send Rahul a photo and, before
+      opening the chat, list the folder. Open the chat, let the photo load, open it in the viewer and Share photo, then
+      list it again: nothing new. Share photo left the photo in `cache/chat-files` (on the iPhone,
+      `Library/Caches/chat-files`) until signing out, which the first check under **Admin console** looks at. For that
+      check, also send Priya a PDF in this chat from one of the phones, and in the browser have her report it.
 
 **Links**
 
@@ -1587,8 +1646,20 @@ made after the five native modules above were added.
 
 **Admin console**
 
-Sign one phone in to Shri Gujarati Samaj as its admin (`+91 90000 00004`) for these.
+For the first check, each phone in turn signs in as Demo University's admin (`+91 90000 00001`). For the rest, sign
+one phone in to Shri Gujarati Samaj as its admin (`+91 90000 00004`).
 
+- [ ] A reported file leaves the phone, and signing out empties the image cache. In the browser, have Priya post a
+      photo to the feed. Then, on each phone in turn: sign out under More (`cache/chat-files`, on the iPhone
+      `Library/Caches/chat-files`, where Share photo left Rahul's photo under **Messages**, is gone) and sign in as
+      Demo University's admin. In Admin → Moderation, View full content on Priya's post: its photo loads, and the
+      disk-cache folder from **Messages** now holds it, as the console draws it with expo-image's usual disk cache.
+      Under Chat reports, View messages on Priya's report of Rahul's PDF and open the PDF into another app (iPhone:
+      Books; Android: a PDF viewer or Drive), which sends Illuminize to the background and closes the report. With
+      that app still in front, `chat-files` holds the PDF (iPhone: Download Container again; Android:
+      `adb shell run-as com.illuminize.app ls cache/chat-files`); back in Illuminize (no Hide to press: the report has
+      closed), it's gone. Force-quit the app and open it again: the disk-cache folder still holds the post's photo,
+      as a cold start empties nothing. Sign out under More: the folder no longer holds it.
 - [ ] With the app closed, have a new member ask to join: on a computer, join Shri Gujarati Samaj in the web app with a
       number that isn't in the demo data and submit for approval. Tap the push on the phone: the app opens on the new
       member's page in the console, with the console's home under it. Back (and the iPhone's swipe back) goes to the

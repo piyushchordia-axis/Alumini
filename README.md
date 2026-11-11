@@ -1265,9 +1265,10 @@ WhatsApp, SMS and email.
 - **Links, never addresses.** A message carries what its photos and files are, never where. The apps ask for links only
   as messages come near the screen, in one request for all that do at once (`createAttachmentLinkLoader` in
   `@illuminize/shared/chat`, over `GET /chat/conversations/:id/attachments`), keep them in memory only (the phone's
-  images in expo-image's memory cache) and ask again when they're about to expire or a photo fails to load. Signing out
-  forgets them, with any upload under way, the previews, and any PDF the phone opened. A photo or file lasts as long as
-  its message.
+  images in expo-image's memory cache, never its disk cache: the thumbnail under a loading photo is an image of its own,
+  not expo-image's placeholder, which it keeps on disk) and ask again when they're about to expire or a photo fails to
+  load. Signing out forgets them, with any upload under way, the previews, and any PDF the phone opened, and empties
+  expo-image's caches. A photo or file lasts as long as its message.
 - **Ordering and retries.** Each conversation has a gapless `seq`, handed out under the conversation's row lock, and
   pages are read by `seq`, never by time. Every send carries a `clientKey`: a retry with the same key gets the original
   message back and uses no `seq`. The apps keep unsent messages in an outbox, send one at a time per thread, and offer
@@ -1472,9 +1473,10 @@ because admins can read everything in that view. Instead:
 
 **Deleting an account** (Profile → Delete account) runs in one transaction:
 
-- Messages the member sent stay in other people's chats and groups, shown as from a "Deleted member". Their 1:1 threads
-  go read-only. Requests waiting to or from them are declined, and their withheld messages, which nobody received or can
-  review, are deleted.
+- Messages the member sent stay in other people's chats and groups, shown as from a "Deleted member", with their photos
+  and files, as long as each message lasts. Their 1:1 threads go read-only. Requests waiting to or from them are
+  declined, and their withheld messages, which nobody received or can review, are deleted, with the photos and files in
+  them and any they uploaded but never sent; those files leave private storage once the deletion commits.
 - They leave every group. Groups they owned pass to the longest-standing member who can run them, or are archived.
   Invitations they sent disappear.
 - Mentorship and referral requests they sent are withdrawn, those waiting for them close, and mentorships under way end,
@@ -1810,13 +1812,13 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 **To close before launch.**
 
 - **Legal.** There is no privacy policy. Children's data (India's DPDP Act, going by the +91 numbers) and a retention
-  period for messages and for removed message text need a lawyer's review. The policy must also cover keeping a keyed
-  hash of a deleted account's phone number with no expiry (see "Account deletion and suspension"): in the holds, for as
-  long as a suspension or a member's block on them stands, and in the `auth.account_deleted` audit row every deletion
-  writes, held or not, for good, next to the old user id and the request's IP. Whoever has the key can find the number
-  from the hash by trying every number. It must cover too the raw numbers a deletion still leaves: in invitations, in
-  outbound message records, and in the `platform.tenant.create` audit row of an institution whose first admin they
-  were (its `initialAdmin`).
+  period for messages and for removed messages' text, photos and files need a lawyer's review. The policy must also
+  cover keeping a keyed hash of a deleted account's phone number with no expiry (see "Account deletion and suspension"):
+  in the holds, for as long as a suspension or a member's block on them stands, and in the `auth.account_deleted` audit
+  row every deletion writes, held or not, for good, next to the old user id and the request's IP. Whoever has the key
+  can find the number from the hash by trying every number. It must cover too the raw numbers a deletion still leaves:
+  in invitations, in outbound message records, and in the `platform.tenant.create` audit row of an institution whose
+  first admin they were (its `initialAdmin`).
 - **The pupil rule trusts what members enter.** A pupil who gives a false end year or date of birth gets through.
 - **A blocked member's abuse is invisible to admins,** because withheld messages can't be reported.
 - **Reporting a sole admin's message** stops them suspending anyone or changing roles until staff close the report.
@@ -1825,14 +1827,15 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 - **The retaliation rule leaks a little.** Its refusal tells an admin, roughly, when a report about them opened
   (refusals are audited, and the actions limited to 60 an hour).
 - **Nothing has been checked on a real phone yet** beyond what the web export shows. "Checks that need a real phone" in
-  `e2e/README.md` is one ordered pass for an iPhone and an Android phone, in Expo Go but for its last part (pushes and
-  `illuminize://` links, which need a development build), with a Runs table that has no run in it yet. Only a phone can
-  show much of it: the keyboard's autofill of a number, iOS's swipe back and Android's back button between registration
-  steps, HEIC and HEIF photos and 48-megapixel ones, the file pickers (Files, iCloud Drive, Google Drive) and the
-  share sheet, CSV files in Excel, Hermes's number and date text on the charts and their scrubbing and screen-reader
-  stepping, whether the app switcher's picture of the phone console is taken before it clears a chat report's text,
-  scrolling over a background photo on a low-end Android, and the keyboard on the long forms under Android's
-  edge-to-edge windows.
+  `e2e/README.md` is one ordered pass for an iPhone and an Android phone, in Expo Go but for its last part (pushes,
+  `illuminize://` links and what chat leaves in the app's files, which need a development build), with a Runs table
+  that has no run in it yet. Only a phone can show much of it: the keyboard's autofill of a number, iOS's swipe back
+  and Android's back button between registration steps, HEIC and HEIF photos and 48-megapixel ones, the file pickers
+  (Files, iCloud Drive, Google Drive) and the share sheet, photos and PDFs in chat (the pickers, the viewer, opening and
+  sharing, and that no chat photo reaches the image cache on disk), CSV files in Excel, Hermes's number and date text
+  on the charts and their scrubbing and screen-reader stepping, whether the app switcher's picture of the phone console
+  is taken before it clears a chat report's text, scrolling over a background photo on a low-end Android, and the
+  keyboard on the long forms under Android's edge-to-edge windows.
 - **The Docker image and CI's `docker` job haven't run on GitHub yet.** CI runs only on `main` and pull requests.
 
 **Smaller follow-ups.**
@@ -1856,6 +1859,23 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     deleted member until it next refetches.
   - The web app's toasts aren't a live region, so screen readers don't hear them. A chat thread whose box comes back by
     itself repeats its toast in a hidden status line; other toasts don't yet.
+- Chat photos and files:
+  - A link opens for whoever has it until it expires (10 minutes, 15 from a report's view), so one passed on meanwhile
+    still works, as does one handed out before the message was removed or before a member left the group or blocked the
+    sender: with local storage, `/files` checks only that the attachment still exists. S3's presigned links can't be
+    revoked early, and S3 can't send `nosniff`.
+  - Nothing scans PDFs for malware: the API checks only that a file starts as a PDF does, and a PDF always downloads.
+  - There's no total storage quota per institution, only each member's hourly and daily limits and the institution's
+    daily count (`CHAT_FILES_PER_TENANT_DAILY_CAP`).
+  - A member can't unsend a message. An admin's Remove message takes its photos and files out of the thread (members
+    get no new links to them), but keeps them, row and file, for the report's audited view, which any eligible admin
+    can open again, with no expiry: nothing deletes a removed message's photos and files.
+  - An upload shows a spinner, not how far it has got (fetch reports no upload progress). The phone app's Add to
+    message has no camera, and its photo viewer doesn't zoom.
+  - A phone app built before attachments shows a message of photos or files alone as an empty bubble, and one with
+    words as its words alone.
+  - In the consoles' photo viewer, a full-size photo that fails while its link still works says "Photo didn't load"
+    with no Try again there; closing the viewer and opening the photo again loads it again.
 - Mentorship: while mentorship or messaging is off, or the mentor is a current pupil, the decline route is gated but
   report and stop aren't, so a mentee told "declined" in that state knows it came from a report or from stopping.
   Referrals let a decline through with messaging off; moving mentorship's decline outside the gate would close this.
