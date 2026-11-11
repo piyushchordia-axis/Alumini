@@ -25,9 +25,29 @@ export function SheetGroup({ title, children }: { title: string; children: React
  * take the line in too. `name` replaces the label when the link has a count to say ("Groups, 1 invitation"), and
  * `badge` draws that count. The current link is chosen as the sidebar's is: the wash, a thin ring and the page's ink,
  * with hover only on the others. The walk-through's last screen lists sections with it too, and its `onClick` ends the
- * walk-through on the way.
+ * walk-through on the way. `onPointerEnter` and `onFocus` fetch a section's page ahead (useFetchAhead).
  */
-export function SheetTile({ to, icon, label, description, name, badge, onClick }: { to: string; icon: NavIconName; label: string; description: string; name?: string; badge?: ReactNode; onClick?: () => void }) {
+export function SheetTile({
+  to,
+  icon,
+  label,
+  description,
+  name,
+  badge,
+  onClick,
+  onPointerEnter,
+  onFocus,
+}: {
+  to: string;
+  icon: NavIconName;
+  label: string;
+  description: string;
+  name?: string;
+  badge?: ReactNode;
+  onClick?: () => void;
+  onPointerEnter?: () => void;
+  onFocus?: () => void;
+}) {
   const descriptionId = useId();
   return (
     <li>
@@ -36,6 +56,8 @@ export function SheetTile({ to, icon, label, description, name, badge, onClick }
         aria-label={name ?? label}
         aria-describedby={descriptionId}
         onClick={onClick}
+        onPointerEnter={onPointerEnter}
+        onFocus={onFocus}
         className={({ isActive }) =>
           clsx(
             "group/tile flex min-h-14 items-center gap-3 rounded-xl px-3 py-2 transition-colors duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-ink",

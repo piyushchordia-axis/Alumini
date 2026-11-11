@@ -377,6 +377,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     the platform's Institutions and Users searches, wait 300 ms after typing stops (`useDebounced`), with no Search
     button (the platform's audit filter doesn't yet: README → Known gaps); a web console page that writes it into the
     address (`?q=`, `?action=`) starts again when the address changes from elsewhere (`useAddressRestarts`).
+    A member's profile opened from a cached directory card draws its header from the card (`cardInPages`, shared
+    `lib/directory.ts`; `useCachedDirectoryCard`) only until its own query's first answer (`awaitingFirstAnswer`, as a
+    retry puts a query with no data back to pending), with the loaded page's elements in the same places so React keeps
+    them, and never writes the card into that query's cache. A list fetched ahead (`prefetchDirectory`) uses its page's
+    `cursorListOptions`, key and page size (`DIRECTORY_PAGE_SIZE`), so the page opens on it (options without the list's
+    `getNextPageParam` break its next refresh of more than one page), and only while nothing is cached under that key:
+    an infinite query's fetch asks again for every page it holds.
 - **Tests.** Integration tests use `createTestContext()` + `ctx.truncateAll()`, factories in `test/helpers`, and run
   queued jobs with `ctx.jobs.drain()`. `truncateAll` deletes rows with foreign-key checks off, which needs a superuser
   (Docker and CI are); anyone else falls back to TRUNCATE, which makes the suite several times slower.

@@ -37,6 +37,7 @@ import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
+import { usePrefetchDirectoryAfter } from "@/lib/directory";
 import { moveFocus } from "@/lib/focus";
 import { useGroupNotice } from "@/lib/groups";
 import { qk } from "@/lib/queryKeys";
@@ -129,6 +130,7 @@ export default function JobsScreen() {
   const [status, setStatus] = useStatus();
   // Such as "Request sent", from the request form, which has gone.
   useGroupNotice("jobs", setStatus);
+  usePrefetchDirectoryAfter("jobs", jobs.isFetched || seekers.isFetched);
 
   return (
     <SectionScreen>

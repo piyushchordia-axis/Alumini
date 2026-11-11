@@ -4,9 +4,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Text, View } from "react-native";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { ProfileDetailsOutline } from "@/components/profile/ProfileDetailsOutline";
 import { Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { useCachedDirectoryCard } from "@/lib/directory";
 import { formatDate } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
@@ -17,6 +19,19 @@ export default function MemberProfileScreen() {
   const { membershipId = "" } = useLocalSearchParams<{ membershipId: string }>();
   const router = useRouter();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
+  // Opened from a card the directory listed: the header from that card until the profile's first answer, offline too.
+  const card = useCachedDirectoryCard(slug, membershipId, profile);
+  // The same elements in the same places as the loaded screen, the bar with Back, the card and its header, so React
+  // keeps them (where a screen reader is, a photo already shown) and only the outline under the header is swapped.
+  if (card)
+    return (
+      <Screen title="Member">
+        <Card style={{ gap: spacing.md }}>
+          <ProfileSummary profile={card} nameExtras={card.role === "TENANT_ADMIN" && <Badge label="Admin" tone="primary" />} />
+          <ProfileDetailsOutline />
+        </Card>
+      </Screen>
+    );
   if (profile.isLoading) return <Spinner />;
   // Only with nothing to show: a refetch failing in the background keeps the profile on screen.
   if (!profile.data) return <LoadError error={profile.error ?? "Not found"} onRetry={() => void profile.refetch()} onBack={() => router.back()} backLabel="Back" />;

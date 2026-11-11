@@ -13,6 +13,7 @@ import { UpcomingEvents } from "@/components/UpcomingEvents";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { usePrefetchDirectoryAfter } from "@/lib/directory";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
 
@@ -30,6 +31,7 @@ export default function FeedScreen() {
   const pinned = list.first?.pinned ?? [];
   const data: (PostDto | PinnedRow)[] = pinned.length ? [{ id: "pinned", posts: pinned }, ...list.items] : list.items;
   const empty = feedEmpty(member);
+  usePrefetchDirectoryAfter("feed", list.isFetched);
   return (
     <SectionScreen>
       <FlatList

@@ -815,6 +815,29 @@ reads its first page for the pinned posts. The hooks read the shared rules for t
 kept while a retry from the error is on its way), `listHasMore` and `listMayLoadMore` (no next page from kept rows)
 and `listRefreshing` (no pull-to-refresh spinner for a new search).
 
+**Profiles from their card, and the directory ahead of time.** A member's profile opened from the directory (or any
+time their card is cached from a directory list) draws its header from that card at once, on both apps: the photo or
+initials, in the member's tone from their membership id, so they keep their colour when the profile comes, with the
+name, headline, years, place and badges, and an outline of the details under it (`ProfileDetailsOutline`) until the
+full profile arrives (`useCachedDirectoryCard`; `cardInPages` in `packages/shared/src/lib/directory.ts` finds the card
+in the cached pages). The page draws them with the loaded profile's own elements in the same places (the way back, the
+card, `ProfileSummary`), so React keeps them when the profile comes: focus on the way back stays, and a photo already
+shown isn't loaded again. Only until the profile's first answer (`awaitingFirstAnswer`): a retry after an error, which
+puts the query back to pending, doesn't bring the card back over a member the server has just refused. Message, Block
+and Registered wait for the full profile, whose query stays the only source: the card is read from the directory's
+cache and never written into the profile's. The directory's first page (and its filters) is fetched ahead under the
+key and page size the Directory screen asks with (`DIRECTORY_PAGE_SIZE`, `cursorListOptions`), so it opens on its
+cards: on the web when a Directory link (the sidebar, the phone's bar or the More sheet) is pointed at or focused, and
+on the phone once the home section (Feed, or Jobs when the feed is off) has had its first answer, on any network, as it
+is one page of cards (`usePrefetchDirectoryAfter`, `directoryPrefetchSection`). Neither asks for what's cached
+already, fresh or not: the screen refreshes that itself as it opens, and a fetch ahead of it would ask again for every
+page Load more added, under a list being read. A failure is left for the screen to meet. `directory.test.ts` covers
+finding the card, the first answer and which section fetches ahead; the e2e journeys hold a profile's answer to check
+its header from the card on both apps (the initials in the same tone before and after, the heading kept and the way
+back keeping focus), check the web's hover asks for the first page once, before the click, and not again once it's
+cached, and focus on the phone-sized bar's link asks for it, and check the phone's feed and, with the feed off, Jobs,
+opened cold, ask for it once, after their own first answer.
+
 `lists.test.ts` and `skeletons.test.ts` cover the rules and the shapes, and `admin.test.ts` `onlySearchChanged` with
 the consoles' pages and the platform's keys. The e2e journeys hold a list's request (`holdGets` in `e2e/lib.mjs`) to
 check the web notifications skeleton (a status saying "Loading…", pulsing, and still under reduced motion) and the
@@ -1522,7 +1545,8 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
                   buttons, tones and open state; appearance.ts: a member's background; lists.ts: how a list reads
                   its query (listView) and keeps its rows for a new search (onlyFiltersChanged);
-                  skeletons.ts: the skeletons' shapes; admin.ts and its siblings: what both
+                  skeletons.ts: the skeletons' shapes; directory.ts: a profile's card from the cached
+                  directory (cardInPages) and the fetch ahead of it; admin.ts and its siblings: what both
                   admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```

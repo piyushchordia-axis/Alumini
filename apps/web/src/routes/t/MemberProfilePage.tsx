@@ -3,9 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
+import { ProfileDetailsOutline } from "@/components/profile/ProfileDetailsOutline";
 import { Badge, Card, ErrorBox, Loading } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { useCachedDirectoryCard } from "@/lib/directory";
 import { formatDate } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
 
@@ -14,6 +16,25 @@ export function MemberProfilePage() {
   const slug = tenant.slug;
   const { membershipId = "" } = useParams();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
+  // Opened from a card the directory listed: the header from that card until the profile's first answer, offline too.
+  const card = useCachedDirectoryCard(slug, membershipId, profile);
+  const back = (
+    <Link to={`/t/${slug}/app/directory`} className="text-sm text-slate-500 hover:text-slate-800">
+      ← Directory
+    </Link>
+  );
+  // The same elements in the same places as the loaded page, the way back, the card and its header, so React keeps them
+  // (focus on the link, a photo already shown) and only the outline under the header is swapped for the details.
+  if (card)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <Card className="p-6">
+          <ProfileSummary profile={card} nameExtras={card.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>} />
+          <ProfileDetailsOutline className="mt-6 border-t border-slate-100 pt-5" />
+        </Card>
+      </div>
+    );
   if (profile.isLoading) return <Loading />;
   // Only with nothing to show: a refetch failing in the background keeps the profile on screen.
   if (!profile.data) return <ErrorBox error={profile.error ?? "Not found"} />;
@@ -24,9 +45,7 @@ export function MemberProfilePage() {
   const chatOn = canBlock && tenant.settings.features.messaging;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={`/t/${slug}/app/directory`} className="text-sm text-slate-500 hover:text-slate-800">
-        ← Directory
-      </Link>
+      {back}
       <Card className="p-6">
         <ProfileSummary profile={m} nameExtras={m.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}>
           {isSelf && (

@@ -122,6 +122,11 @@ phone-sized preview in the browser. Port 4000 must still be public.
   (**Share photo** on the phone) and, on someone else's message, **Report message**; a PDF is a card that downloads (on
   the phone, opens the share sheet). A first message can't carry any: the line under the box says "Photos and files can
   be sent once … accepts."
+- **Profiles that open at once.** In **Directory**, open **Priya Nair** from her card: her initials, name, headline,
+  years and **Mentor** badge show straight away, from the card, with an outline of the rest until her full profile
+  arrives (on a fast connection it can be over in a blink). On the web, pointing at **Directory** in the menu, or
+  tabbing to it, fetches its first cards ahead, so it opens on them; the phone app fetches them once the feed has
+  loaded.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 

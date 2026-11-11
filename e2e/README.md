@@ -186,12 +186,17 @@ Covers:
   and every answer 44px tall; the meetup's Going and Maybe lists answered empty (scripted), "No one has said yes yet"
   saying "Choose I'm going to be the first." and "No maybes yet" who it would list, each its own box with the icon
   in the institution's ink on a round wash; and London pub night, which is over, saying only that nobody has, inviting
-  no one; the directory: a search by a seeded skill finding Sneha with her Open to badge, the Open to filter behind
-  More filters leaving Priya out (while that search's answer is held back, Sneha's card staying where it was, faded
-  under "Updating results…", the search box keeping focus and no "No members match"), Were there in beside the search ("Were there in 2012" and so on) leaving Priya
-  (2008–2012) out in 2013, finding her in 2012, and Any year taking it off, and Priya's card with her headline, then
-  her profile: headline, skills, her current role before her past one, studies here and elsewhere, and a LinkedIn link
-  with the right target and rel;
+  no one; the directory: pointing at its link in the sidebar asking for its first page (`?limit=24`) before the
+  click, once, so the page opens on those cards; a search by a seeded skill finding Sneha with her Open to badge, the
+  Open to filter behind More filters leaving Priya out (while that search's answer is held back, Sneha's card staying
+  where it was, faded under "Updating results…", the search box keeping focus and no "No members match"), Were there
+  in beside the search ("Were there in 2012" and so on) leaving Priya (2008–2012) out in 2013, finding her in 2012, and
+  Any year taking it off, and Priya's card with her headline, then her profile, drawn from her card while its own
+  answer is held (`holdGets`): her name as the `h1` and her initials in her tone, with the way back to Directory and
+  the rest under "Loading…" (no Registered, no spinner), then the full profile keeping the initials' tone, the same
+  `h1` and focus on the way back: headline, skills, her current role before her past one, studies here and elsewhere,
+  and a LinkedIn link with the right target and rel; and Directory pointed at again asking for nothing, its first
+  page cached;
 - businesses: search and filters, contact details only on a listing's own page; add (its logo a 4000 × 3000 photo of
   over 5 MB, made smaller in the browser before it goes up), edit, find it in My posts and delete it;
 - My profile: the photo picker refusing a text file beside it, Cancel upload pressed while a photo is still being
@@ -232,9 +237,10 @@ Covers:
   and no Explore row at all on a wide screen or with nothing behind More; the Upcoming events strip, not there (nor its
   placeholder) when nothing is coming up or the events can't be fetched, holding its own height while the events load
   (a placeholder of the same height, both keeping a thin scrollbar's room for a mouse), between the celebrations and
-  the composer, then the seeded two soonest first as 44px links with a readable heading, an SVG icon and See all
-  opening Events, each date tile's day in Demo University's ink on its wash, the Mumbai meetup answered "You: yes" by
-  the RSVP step, and Maybe given on Alumni Day's page (opened from the strip, Back being the feed) showing on its link,
+  the composer (and, on that freshly loaded feed, the bar's Directory link, focused, asking for the directory's first
+  page ahead, which nothing had asked for), then the seeded two soonest first as 44px links with a readable heading,
+  an SVG icon and See all opening Events, each date tile's day in Demo University's ink on its wash, the Mumbai meetup
+  answered "You: yes" by the RSVP step, and Maybe given on Alumni Day's page (opened from the strip, Back being the feed) showing on its link,
   then taken back; the strip still there with Events on the bar, and gone on a wide screen and with Events switched off;
 - direct messages between two seeded members (Meera and Sneha): a request, welcomed first by a note named "Say hello to
   Sneha Kulkarni" (its text and tip, the envelope an SVG in Demo University's badge, its words readable, nothing hinting
@@ -454,7 +460,8 @@ Covers:
   ended, going to the feed;
 - the "Complete your profile" card: 0 for a name and years, its three heaviest missing items, Write a headline
   opening Edit profile at Work with Back going to My profile and then the feed, and Not now leaving focus on its note
-  and the card gone after a reload;
+  and the card gone after a reload; that reload, a cold start, asking for the directory's first page (`?limit=24`)
+  once, after the feed's posts are in;
 - a post with a photo (the member's form offering no Announce), editing it, a Like on it (the chosen chip Demo
   University's wash, apart from its tray and from white, with a filled icon in their ink at 3:1 or more on it) and
   taking it back, the author's initials on the post in the member's own tone, not the institution's colours, the same as
@@ -502,10 +509,12 @@ Covers:
   London pub night's, which is over, saying only that nobody has;
 - the directory: a search by a seeded skill finding Sneha, her Open to badge short on the card and in full in its
   name, the Investing filter leaving Priya out (while that search's answer is held back, Sneha's card staying, faded
-  under "Updating results…", with no "No members match"), Were there in chosen from a list behind Filters and counted with them
-  (2013 leaving Priya out, 2012 finding her, Any year taking it off), and Priya's full profile with her years and place
-  ("2008–2012 · London, United Kingdom"), "Registered", her roles in order and a LinkedIn link with the right target
-  and rel;
+  under "Updating results…", with no "No members match"), Were there in chosen from a list behind Filters and counted
+  with them (2013 leaving Priya out, 2012 finding her, Any year taking it off), Priya's profile drawn from her card
+  while its own answer is held (`holdGets`: her name as the top screen's heading, her initials in her tone, Back, a
+  progressbar named Loading and no Registered), and then her full profile, the initials the same tone, the same heading
+  and Back keeping focus, with her years and place ("2008–2012 · London, United Kingdom"), "Registered", her roles in
+  order and a LinkedIn link with the right target and rel;
 - businesses behind More: search, filters and contact details only on a listing's own page; the description's bullets
   as one list with the bullet marks hidden from screen readers, its numbered steps read out from 1 with the numbers on
   the left, and its link; add (its logo changed to a 4000 × 3000 photo of over 5 MB, made smaller before it goes up),
@@ -538,8 +547,9 @@ Covers:
   one line; a second job at the same company filling the website and industry from Use details from your last job at
   Smoke Labs; and "Applications closed", with the email gone, once the job is closed;
 - a current pupil seeing none of them, Explore offering Businesses and Funding and Upcoming events Demo School's two;
-  sections switched off, with no Explore row once nothing is behind More (Upcoming events staying, with Events on the
-  bar) and no Upcoming events once Events is off; the guards (the registration form keeping what's typed,
+  sections switched off, Jobs home with the feed off asking for the directory's first page once, after its jobs are
+  in, with no Explore row once nothing is behind More (Upcoming events staying, with Events on the bar) and no Upcoming
+  events once Events is off; the guards (the registration form keeping what's typed,
   even when the account details fail too); re-applying after a rejection (answered by the script) prefilling every step
   with the reason on each; joining Demo College from its landing screen's Join DCE (it doesn't send a signed-in
   non-member into the form, and forgets Demo College as the institution to start at, so Choose a different institution
@@ -1103,16 +1113,21 @@ second copy of a screen, or back to the page the button was on.
       in the browser), "Email hello@zylolabs.example" and "Call +91 22 5550 0101", with no symbol names. As Rahul, edit
       his Zylo Labs listing in Funding to add an email address and a phone number: its buttons read "Website", "Get in
       touch" and "Call …" the same way.
-- [ ] Open a list for the first time since the app started (Directory, say; on a slow connection if it loads too fast
-      to see): a grey outline in the shape of its cards stands in until they come, pulsing gently, and TalkBack or
-      VoiceOver reads it once as "Loading". Then turn on iOS Reduce Motion (Settings → Accessibility → Motion) or
-      Android's Remove animations, close the app fully and open it again (the setting is read as it starts): the
-      outline stands still.
+- [ ] Open a list for the first time since the app started (Jobs or Events, say, not Directory, which the feed fetches
+      ahead; on a slow connection if it loads too fast to see): a grey outline in the shape of its cards stands in
+      until they come, pulsing gently, and TalkBack or VoiceOver reads it once as "Loading". Then turn on iOS Reduce
+      Motion (Settings → Accessibility → Motion) or Android's Remove animations, close the app fully and open it again
+      (the setting is read as it starts): the outline stands still.
 - [ ] On a slow connection, search Directory for "Sneha", then change it to "Priya", and in Jobs type "Backend", then
       tap Full-time: the cards already listed stay, faded, with "Updating results…" drawn whole on the first card's top
       edge (below the filters and Job type chips on Jobs; not cut off on Android), and still open when tapped.
       TalkBack or VoiceOver says "Updating results…" once and "busy" after the name of a card reached meanwhile, the
       keyboard stays up, and the pull-to-refresh spinner doesn't appear for the search.
+- [ ] Close the app fully, open it on mobile data and wait for the feed's posts, then turn on airplane mode and open
+      Directory: its cards are there, fetched ahead once the feed was in. On a slow connection, open Priya Nair from her
+      card: her initials, name, headline, years and Mentor badge show at once, with Back, the initials keeping their
+      colour when the rest of her profile comes, and TalkBack or VoiceOver reads the outline under them once as
+      "Loading".
 
 ### 13. Notices with Approve and Reject
 

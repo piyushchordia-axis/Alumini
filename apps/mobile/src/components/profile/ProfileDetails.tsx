@@ -53,6 +53,15 @@ export type ProfileView = Pick<
   | "interests"
 > & { isMentor?: boolean; isOpenToWork?: boolean };
 
+/**
+ * What ProfileSummary draws, which a directory card (DirectoryCardDto) has too, so a profile's header can be drawn from
+ * the card while the profile loads. `id` is the membership id, so the initials keep their colour when the profile comes.
+ */
+export type ProfileSummaryView = Pick<
+  ProfileView,
+  "id" | "fullName" | "avatarUrl" | "startYear" | "batchYear" | "city" | "country" | "professionType" | "companyName" | "designation" | "headline" | "openTo" | "isMentor" | "isOpenToWork"
+>;
+
 /** The line under a member's name: their headline, or else what they do and where, as cards say it. */
 export const profileTagline = (p: Pick<ProfileView, "headline" | "designation" | "professionType" | "companyName">) => p.headline ?? memberRoleLine(p);
 
@@ -85,7 +94,7 @@ export function ProfileBadges({ profile, short }: { profile: BadgeSource; short?
  * Photo, name, the headline under it, years here and place, then the badges, centred as on the web app's phone layout.
  * `nameExtras` sits beside the name (Admin), and `children` below everything.
  */
-export function ProfileSummary({ profile, nameExtras, children }: { profile: ProfileView; nameExtras?: ReactNode; children?: ReactNode }) {
+export function ProfileSummary({ profile, nameExtras, children }: { profile: ProfileSummaryView; nameExtras?: ReactNode; children?: ReactNode }) {
   const place = [profile.city, countryName(profile.country)].filter(Boolean).join(", ");
   const badges = !!profile.isOpenToWork || !!profile.isMentor || profile.openTo.length > 0;
   return (

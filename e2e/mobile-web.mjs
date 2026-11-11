@@ -154,6 +154,36 @@ const expectDateTiles = async (strip, tones, where) => {
 // The events list's card for the Mumbai meetup, a button named from its title (its date tile is hidden): the feed's strip
 // has a link with the same words, which a match by text alone could find.
 const mumbaiCard = () => page.getByRole("button", { name: /^Mumbai alumni coffee meetup/ }).locator("visible=true").first();
+// Opening the app cold (`open`) on its home section, whose list is `homeList` (its path, "posts" or "jobs"), fetches the
+// directory's first page ahead (on any network: one page of cards, under the key and page size Directory asks with) once
+// that list's first answer is in, never before it, and only once.
+const expectDirectoryFetchedAhead = async (homeList, open, where) => {
+  const order = [];
+  const askedDirectory = (r) => {
+    const u = new URL(r.url());
+    if (r.method() === "GET" && u.pathname.endsWith("/t/demo-university/directory") && u.search === "?limit=24") order.push("asked directory");
+  };
+  const answeredHome = (r) => {
+    if (r.request().method() === "GET" && new URL(r.url()).pathname.endsWith(`/t/demo-university/${homeList}`)) order.push(`answered ${homeList}`);
+  };
+  page.on("request", askedDirectory);
+  page.on("response", answeredHome);
+  try {
+    await open();
+    for (let i = 0; i < 50 && !order.includes("asked directory"); i++) await page.waitForTimeout(100);
+    // A moment more catches a second ask.
+    await page.waitForTimeout(300);
+  } finally {
+    page.off("request", askedDirectory);
+    page.off("response", answeredHome);
+  }
+  const asked = order.indexOf("asked directory");
+  const answered = order.indexOf(`answered ${homeList}`);
+  if (asked < 0) throw new Error(`${where}, opened cold, didn't fetch the directory's first page ahead once its ${homeList} were in`);
+  if (answered < 0 || answered > asked) throw new Error(`${where} fetched the directory ahead before its ${homeList} were in (${order.join(", ")})`);
+  const asks = order.filter((e) => e === "asked directory").length;
+  if (asks !== 1) throw new Error(`${where} fetched the directory's first page ahead ${asks} times`);
+};
 // Live updates: record the app's Socket.IO WebSocket once it opens.
 const liveSockets = [];
 page.on("websocket", (ws) => {
@@ -446,9 +476,16 @@ try {
     if (await card.count()) throw new Error("Not now left the profile card on the feed");
     // The button went with the card: focus is on the note in its place.
     if (!(await hiddenNote.evaluate((el) => el.closest("[tabindex]")?.contains(document.activeElement)))) throw new Error("Not now left focus outside the note");
-    // Put away on the server, so it stays away.
-    await page.reload();
-    await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).locator("visible=true").first().waitFor();
+    // Put away on the server, so it stays away. Opened cold, the feed fetches the directory's first page ahead once its
+    // posts are in.
+    await expectDirectoryFetchedAhead(
+      "posts",
+      async () => {
+        await page.reload();
+        await page.getByText("Welcome to the official Demo University alumni network", { exact: false }).locator("visible=true").first().waitFor();
+      },
+      "the feed",
+    );
     if (await card.count()) throw new Error("the profile card came back after a reload");
   });
 
@@ -1316,9 +1353,37 @@ try {
     await card.getByText("Mentor", { exact: true }).waitFor();
     await card.getByText("Product manager at Google, working on consumer apps", { exact: true }).waitFor();
     await shot("m07-directory-filters");
-    // inactive tab stacks stay mounted on web and overlap; dispatch the click straight to the card
-    await hit.dispatchEvent("click");
+    // Opened from her card, her profile draws its header from that card at once, while her own answer is held here: her
+    // name as the screen's heading and her initials in her tone, under the bar with Back, and what only the full profile
+    // holds (Registered, Message, Block) waiting under a progressbar named Loading. The full profile then keeps the
+    // initials' tone, and keeps what was drawn from the card rather than drawing it again: Back keeps focus (where a
+    // keyboard or a screen reader may be) and the heading stays the same element. The screen on top is the last match:
+    // the directory stays mounted under it.
+    const initials = () => page.getByText("PN", { exact: true }).locator("visible=true").last();
+    const heading = page.getByRole("heading", { name: "Priya Nair", exact: true }).locator("visible=true").last();
+    const back = page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
+    const profileHeld = await holdGets(page, (u) => /\/t\/demo-university\/directory\/[0-9a-f-]{36}$/.test(u.pathname));
+    let fromCard;
+    try {
+      // inactive tab stacks stay mounted on web and overlap; dispatch the click straight to the card
+      await hit.dispatchEvent("click");
+      await profileHeld.asked();
+      await heading.waitFor();
+      await back.waitFor();
+      await page.getByRole("progressbar", { name: "Loading", exact: true }).locator("visible=true").last().waitFor();
+      if (await page.getByText(/^Registered /).locator("visible=true").count()) throw new Error("the profile drawn from its card shows Registered, which only the full profile has");
+      fromCard = await expectInitials(initials(), "Priya's initials, drawn from her card");
+      await shot("m07-member-from-card");
+      await back.focus();
+      await heading.evaluate((el) => el.setAttribute("data-e2e-from-card", ""));
+    } finally {
+      profileHeld.release();
+    }
     await page.getByText(/^Registered /).waitFor();
+    await profileHeld.stop();
+    expectSameTone(fromCard, await expectInitials(initials(), "Priya's initials on her full profile"), "Priya's initials from her card and on her full profile");
+    if ((await heading.getAttribute("data-e2e-from-card")) === null) throw new Error("Priya's name drawn from her card was drawn again when her full profile came");
+    if (!(await back.evaluate((el) => el === document.activeElement))) throw new Error("Back lost focus when Priya's full profile came, drawn again rather than kept");
     // Her profile: the headline, skills, her current role then her past one, studies here and elsewhere, and a LinkedIn
     // link that opens in a new tab and passes nothing on. The screen on top is the last match.
     const onTop = (text) => page.getByText(text, { exact: true }).locator("visible=true").last();
@@ -3054,11 +3119,18 @@ try {
     const features = await scriptFeatures(page, "demo-university");
     const open = async (url = "") => page.goto(`${BASE}/t/demo-university${url}`);
 
-    // The feed off: land on the next section, and with four left nothing overflows.
+    // The feed off: land on the next section, and with four left nothing overflows. Jobs is home, so its first answer
+    // sets the directory's first page fetching ahead, as the feed's does.
     features.only("jobs", "directory", "events", "funding");
-    await open();
-    await page.waitForURL("**/t/demo-university/jobs");
-    await page.getByText("Backend Engineer (Node.js)").locator("visible=true").first().waitFor();
+    await expectDirectoryFetchedAhead(
+      "jobs",
+      async () => {
+        await open();
+        await page.waitForURL("**/t/demo-university/jobs");
+        await page.getByText("Backend Engineer (Node.js)").locator("visible=true").first().waitFor();
+      },
+      "Jobs, home with the feed off",
+    );
     await expectBar("Jobs", "Directory", "Events", "Funding", "More");
 
     // Funding off: four sections, and nothing but the member's own rows in the hub. A link to it goes home instead.

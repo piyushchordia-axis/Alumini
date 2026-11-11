@@ -26,7 +26,7 @@ import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
-import { api } from "@/lib/api";
+import { directoryFiltersQuery, directoryPage } from "@/lib/directory";
 import { moveFocus } from "@/lib/focus";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
@@ -82,7 +82,7 @@ export default function DirectoryScreen() {
   const field = Object.entries(custom)
     .filter(([, v]) => v)
     .map(([k, v]) => `${k}:${v}`);
-  const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
+  const facets = useQuery(directoryFiltersQuery(slug));
   const filters = {
     q: search || undefined,
     year: year ? Number(year) : undefined,
@@ -120,7 +120,7 @@ export default function DirectoryScreen() {
   const years = chosenYear !== undefined && !facets.data?.years.includes(chosenYear) ? [...(facets.data?.years ?? []), chosenYear].sort((a, b) => b - a) : (facets.data?.years ?? []);
   const key = qk.directory(slug, filters);
   // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a profile.
-  const list = useInfiniteList(key, (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
+  const list = useInfiniteList(key, directoryPage(slug, filters), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
   const empty = directoryEmpty(!!search || active > 0);
   const searchBox = useRef<ComponentRef<typeof TextInput>>(null);
   const showAll = () => {

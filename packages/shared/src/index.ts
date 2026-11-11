@@ -7,6 +7,7 @@ export * from "./lib/phone";
 export * from "./lib/skills";
 export * from "./lib/profile";
 export * from "./lib/memberYears";
+export * from "./lib/directory";
 export * from "./lib/welcome";
 export * from "./lib/richText";
 export * from "./lib/salary";

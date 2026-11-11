@@ -9,7 +9,7 @@ import { Button, EmptyState, Input, ListSkeleton, LoadMore, PageHeader, Select }
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
-import { api } from "@/lib/api";
+import { directoryFiltersQuery, directoryPage } from "@/lib/directory";
 import { qk } from "@/lib/queryKeys";
 
 export function DirectoryPage() {
@@ -45,10 +45,10 @@ export function DirectoryPage() {
     openTo: openTo || undefined,
     field: field.length ? field : undefined,
   };
-  const facets = useQuery({ queryKey: qk.directoryFilters(slug), queryFn: () => api.directory.filters(slug), staleTime: 5 * 60_000 });
+  const facets = useQuery(directoryFiltersQuery(slug));
   const key = qk.directory(slug, filters);
   // A new search or filter keeps the cards on screen, faded, until its answer comes: they only open a profile.
-  const list = useInfiniteList(key, (cursor) => api.directory.search(slug, { ...filters, cursor, limit: 24 }), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
+  const list = useInfiniteList(key, directoryPage(slug, filters), { keepPreviousWhile: (previous) => onlyFiltersChanged(previous, key) });
   const reset = () => {
     setQ("");
     setYear("");

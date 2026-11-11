@@ -11,6 +11,7 @@ import { useChatScope } from "@/hooks/useChat";
 import { useMemberSections } from "@/hooks/useMemberSections";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
+import { useFetchAhead } from "@/lib/directory";
 import { qk } from "@/lib/queryKeys";
 import { usePollInterval } from "@/lib/realtime";
 import { useAppRouteHandle } from "@/lib/routeHandle";
@@ -34,6 +35,8 @@ export function HomeLayout() {
   const barLinks = bar.map(toLink);
   const overflowLinks = overflow.map(toLink);
   const sections = [...barLinks, ...overflowLinks];
+  // Directory's links, in the sidebar, the bar and the sheet, fetch its first page as they're pointed at or focused.
+  const fetchAhead = useFetchAhead(tenant.slug);
   useChatScope(tenant.slug, chatAvailable(tenant.settings.features, membership.chatEligible));
   const { fullHeight, immersive } = useAppRouteHandle();
 
@@ -130,7 +133,7 @@ export function HomeLayout() {
             {sections.map((i) => {
               const badge = badgeFor(i.section);
               return (
-                <NavLink key={i.to} to={i.to} className={linkClass} aria-label={badge?.label}>
+                <NavLink key={i.to} to={i.to} className={linkClass} aria-label={badge?.label} {...fetchAhead(i.section)}>
                   <NavLabel icon={i.icon} label={i.label} />
                   {badge && <NavBadge count={badge.count} className="ml-auto" />}
                 </NavLink>
@@ -166,7 +169,7 @@ export function HomeLayout() {
         {barLinks.map((i) => {
           const badge = badgeFor(i.section);
           return (
-            <NavLink key={i.to} to={i.to} aria-label={badge?.label} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary-ink" : "text-slate-500")}>
+            <NavLink key={i.to} to={i.to} aria-label={badge?.label} {...fetchAhead(i.section)} className={({ isActive }) => clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive ? "text-primary-ink" : "text-slate-500")}>
               <span className="relative" aria-hidden>
                 <NavIcon name={i.icon} size={20} />
                 {badge && <NavBadge count={badge.count} className="absolute -right-3 -top-1.5" />}
@@ -200,7 +203,7 @@ export function HomeLayout() {
               {group.sections.map((section) => {
                 const i = toLink(section);
                 const badge = badgeFor(section);
-                return <SheetTile key={i.to} to={i.to} icon={i.icon} label={i.label} description={sectionDescription(section, { mentorsWayOut })} name={badge?.label} badge={badge && <NavBadge count={badge.count} />} />;
+                return <SheetTile key={i.to} to={i.to} icon={i.icon} label={i.label} description={sectionDescription(section, { mentorsWayOut })} name={badge?.label} badge={badge && <NavBadge count={badge.count} />} {...fetchAhead(section)} />;
               })}
             </SheetGroup>
           ))}

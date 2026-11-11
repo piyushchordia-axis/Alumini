@@ -1,6 +1,19 @@
 import { listHasMore, listPlaceholder, listUpdating, listView, nextPageError, type CursorPage } from "@illuminize/shared";
-import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
+import { infiniteQueryOptions, useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
 import { useState } from "react";
+
+/**
+ * How a cursor list is fetched and cached: the hook's query, and a fetch ahead of a list not yet open (prefetchDirectory),
+ * so that one lands under the same key, with the same pages, and reads the next cursor the same way when it refreshes.
+ */
+export function cursorListOptions<P extends CursorPage<unknown>>(queryKey: QueryKey, fetchPage: (cursor: string | undefined) => Promise<P>) {
+  return infiniteQueryOptions({
+    queryKey,
+    queryFn: ({ pageParam }) => fetchPage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: P) => last.nextCursor ?? undefined,
+  });
+}
 
 export interface InfiniteListOptions {
   /** Off while the list isn't asked for, such as a tab that isn't open. */
@@ -29,10 +42,7 @@ export function useInfiniteList<P extends CursorPage<unknown>>(queryKey: QueryKe
   const [retried, setRetried] = useState<Error | null>(null);
   const retrying = retried !== null;
   const query = useInfiniteQuery({
-    queryKey,
-    queryFn: ({ pageParam }) => fetchPage(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    ...cursorListOptions(queryKey, fetchPage),
     placeholderData: listPlaceholder(keepPreviousWhile, retrying),
     enabled,
   });

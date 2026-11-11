@@ -51,6 +51,15 @@ export type ProfileView = Pick<
   | "interests"
 > & { isMentor?: boolean; isOpenToWork?: boolean };
 
+/**
+ * What ProfileSummary draws, which a directory card (DirectoryCardDto) has too, so a profile's header can be drawn from
+ * the card while the profile loads. `id` is the membership id, so the initials keep their colour when the profile comes.
+ */
+export type ProfileSummaryView = Pick<
+  ProfileView,
+  "id" | "fullName" | "avatarUrl" | "startYear" | "batchYear" | "city" | "country" | "professionType" | "companyName" | "designation" | "headline" | "openTo" | "isMentor" | "isOpenToWork"
+>;
+
 /** The line under a member's name: their headline, or else what they do and where, as cards say it. */
 export const profileTagline = (p: Pick<ProfileView, "headline" | "designation" | "professionType" | "companyName">) => p.headline ?? memberRoleLine(p);
 
@@ -88,7 +97,7 @@ export function ProfileSummary({
   nameExtras,
   children,
 }: {
-  profile: ProfileView;
+  profile: ProfileSummaryView;
   nameAs?: "h1" | "h2";
   nameExtras?: ReactNode;
   children?: ReactNode;

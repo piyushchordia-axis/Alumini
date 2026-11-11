@@ -949,7 +949,28 @@ try {
   });
 
   await step("directory search and profile", async () => {
+    // Pointing at Directory fetches its first page ahead, under the key and page size the page asks with: the GET goes
+    // before the click, and the page then opens on those cards without asking for them again.
+    const isFirstPage = (r) => {
+      const u = new URL(r.url());
+      return r.method() === "GET" && u.pathname.endsWith("/t/demo-university/directory") && u.search === "?limit=24";
+    };
+    let firstPages = 0;
+    const countFirstPage = (r) => {
+      if (isFirstPage(r)) firstPages += 1;
+    };
+    page.on("request", countFirstPage);
+    const fetchedAhead = page.waitForRequest(isFirstPage, { timeout: 5000 });
+    await page.hover('nav >> text=Directory');
+    await fetchedAhead.catch(() => {
+      throw new Error("pointing at Directory didn't fetch its first page ahead");
+    });
     await page.click('nav >> text=Directory');
+    // A second ask would go as the page mounts, with its cards; a moment more catches one that's late.
+    await page.locator('main a[href*="/app/directory/"]').first().waitFor();
+    await page.waitForTimeout(500);
+    page.off("request", countFirstPage);
+    if (firstPages !== 1) throw new Error(`the directory's first page was asked for ${firstPages} times: fetched ahead on hover, the click should find it cached`);
     const search = page.locator('input[placeholder="Name, company, role or skill"]');
     // The cards listed stay until a search's answer is on the page, so a step waits for that before reading them.
     const answered = (q) => {
@@ -1027,7 +1048,37 @@ try {
     const priya = page.locator("a", { hasText: "Priya Nair" });
     await priya.getByText("Mentor", { exact: true }).waitFor();
     await priya.getByText("Product manager at Google, working on consumer apps").waitFor();
-    await page.click("text=Priya Nair");
+    // Opened from her card, her profile draws its header from that card at once, while her own answer is held here: her
+    // name as the page's heading and her initials in her tone, with the way back, and what only the full profile holds
+    // (Registered, Message, Block) waiting under "Loading…". The full profile then keeps the initials' tone, and what was
+    // drawn from the card rather than drawing it again: the way back keeps focus (a keyboard may be on it) and the
+    // heading stays the same element.
+    const main = page.locator("main");
+    const initials = () => main.getByText("PN", { exact: true });
+    const heading = main.locator("h1", { hasText: "Priya Nair" });
+    const back = main.getByRole("link", { name: /Directory$/ });
+    const profileHeld = await holdGets(page, (u) => /\/t\/demo-university\/directory\/[0-9a-f-]{36}$/.test(u.pathname));
+    let fromCard;
+    try {
+      await page.click("text=Priya Nair");
+      await profileHeld.asked();
+      await heading.waitFor();
+      await back.waitFor();
+      await main.getByRole("status").filter({ hasText: "Loading…" }).waitFor();
+      if (await main.getByText("Registered", { exact: true }).count()) throw new Error("the profile drawn from its card shows Registered, which only the full profile has");
+      if (await main.locator(".animate-spin").count()) throw new Error("the profile drawn from its card spins rather than outlining what's to come");
+      fromCard = await expectInitials(initials(), "Priya's initials, drawn from her card");
+      await shot("08a-member-from-card");
+      await back.focus();
+      await heading.evaluate((el) => el.setAttribute("data-e2e-from-card", ""));
+    } finally {
+      profileHeld.release();
+    }
+    await main.getByText("Registered", { exact: true }).waitFor();
+    await profileHeld.stop();
+    expectSameTone(fromCard, await expectInitials(initials(), "Priya's initials on her full profile"), "Priya's initials from her card and on her full profile");
+    if ((await heading.getAttribute("data-e2e-from-card")) === null) throw new Error("Priya's name drawn from her card was drawn again when her full profile came");
+    if (!(await back.evaluate((el) => el === document.activeElement))) throw new Error("the way back to Directory lost focus when Priya's full profile came, drawn again rather than kept");
     await page.waitForSelector("h1:has-text('Priya Nair')");
     // Her profile: headline, skills, her current role then her past one, studies here and elsewhere, and a LinkedIn link
     // that opens in a new tab and passes nothing on.
@@ -1041,6 +1092,17 @@ try {
     if ((await linkedin.getAttribute("href")) !== "https://www.linkedin.com/in/priya-nair-product") throw new Error("the LinkedIn link goes somewhere else");
     if ((await linkedin.getAttribute("target")) !== "_blank" || !/\bnoopener\b.*\bnoreferrer\b.*\bnofollow\b/.test((await linkedin.getAttribute("rel")) ?? "")) throw new Error("a member's link should open in a new tab with noopener, noreferrer and nofollow");
     await shot("08-member");
+    // Pointing at Directory again asks for nothing: its first page is cached, fresh or not, and the page refreshes that
+    // itself as it opens, so a fetch ahead never asks again for the pages of a list being read.
+    let again = 0;
+    const countAgain = (r) => {
+      if (isFirstPage(r)) again += 1;
+    };
+    page.on("request", countAgain);
+    await page.hover('nav >> text=Directory');
+    await page.waitForTimeout(500);
+    page.off("request", countAgain);
+    if (again) throw new Error("pointing at Directory with its first page cached asked for it again");
   });
 
   await step("businesses: search and filter, with contact details only on a listing's own page", async () => {
@@ -1720,6 +1782,17 @@ try {
       await held;
       await route.fallback();
     });
+    // The pointer kept clear of the bar for the check on its Directory link below.
+    await page.mouse.move(0, 0);
+    const isFirstDirectoryPage = (r) => {
+      const u = new URL(r.url());
+      return r.method() === "GET" && u.pathname.endsWith("/t/demo-university/directory") && u.search === "?limit=24";
+    };
+    let askedEarly = 0;
+    const countEarly = (r) => {
+      if (isFirstDirectoryPage(r)) askedEarly += 1;
+    };
+    page.on("request", countEarly);
     await page.reload();
     await placeholder.waitFor();
     const reserved = (await placeholder.boundingBox()).height;
@@ -1732,6 +1805,15 @@ try {
     await page.unroute(stripGet);
     if (Math.abs(drawn - reserved) > 1) throw new Error(`Upcoming events is ${drawn}px tall, but held ${reserved}px while it loaded, so the composer jumps`);
     if ((await strip.evaluate(alwaysScrolls)) !== "thin") throw new Error("Upcoming events' list has no thin scrollbar for a mouse to drag");
+    // The bar's Directory link, reached with the keyboard, fetches the directory's first page ahead, as pointing at it
+    // does: nothing has asked for it since the reload, and focus does.
+    page.off("request", countEarly);
+    if (askedEarly) throw new Error("the directory's first page was asked for on the feed before its link was pointed at or focused");
+    const fetchedOnFocus = page.waitForRequest(isFirstDirectoryPage, { timeout: 5000 });
+    await bar.locator('a:has-text("Directory")').focus();
+    await fetchedOnFocus.catch(() => {
+      throw new Error("focusing the bar's Directory link didn't fetch its first page ahead");
+    });
     // In the feed's order: under the celebrations, over the composer.
     await page.locator('textarea[aria-label="New post"]').waitFor();
     const celebrations = page.getByRole("heading", { name: "Celebrating today", exact: true }).locator("xpath=ancestor::section[1]");
