@@ -222,9 +222,11 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `outline-primary-ink`, `ring-primary-ink`; mobile `theme.primaryInk`), brand text on the page itself takes the page
     ink (see Member background; the phone's ghost `Button` and `Spinner` take it everywhere, since it reads in a card
     too), and text or an icon on the brand colour uses `text-on-primary` / `theme.onPrimary`, never white: all from
-    `brandTones`. A soft `ring-primary/20` is only a halo beside a focused field's ink edge, and the Branding form's
-    preview and swatches, which show the colours being chosen, are the one exception. Demo University's ink is its
-    brand blue, so e2e checks brand colours on `PALE_BRAND` (`e2e/lib.mjs`), served in its place by `scriptTenant`.
+    `brandTones`. The readable-colours guard (see Greys and tones) rejects raw brand text and icons on both apps, raw
+    brand outlines and rings on the web, and white on `bg-primary` on the web only. A soft
+    `ring-primary/20` is only a halo beside a focused field's ink edge, and the Branding form's preview and swatches,
+    which show the colours being chosen, are the one exception. Demo University's ink is its brand blue, so e2e checks
+    brand colours on `PALE_BRAND` (`e2e/lib.mjs`), served in its place by `scriptTenant`.
     A chosen state is a wash, a thin ring and the ink, as the reaction chips and the toggle chips are (web
     `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
     a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
@@ -296,7 +298,21 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     `Select`, `Textarea`: `border-slate-400`, `focus:border-primary-ink`, invalid `border-tone-danger-edge`), the chat
     composer and the phone number's country box; mobile `Input`, `CountryPicker`, `OptionPicker`, `DateTimeField`,
     `SkillsInput` and the chat composer (`colors.faint`, `colors.danger` when invalid). Cards, dividers and outline
-    buttons keep their light lines (`colors.border`, `slate-200`/`300`), which aren't a control's only edge.
+    buttons keep their light lines (`colors.border`, `slate-200`/`300`), which aren't a control's only edge. ESLint's
+    `illuminize-colours/readable-colours` (`packages/config/eslint/readable-colours.cjs`) holds web and mobile source
+    to this and to Brand colour. On the web it checks every string, class maps included, for a placeholder in
+    slate-300 or 400, `text-`, `outline-`, `accent-`, `decoration-`, `ring-`, `fill-` or `stroke-primary` and their
+    arbitrary forms (`text-[rgb(var(--c-primary))]`, `accent-[var(--color-primary)]`; a ring's, fill's or stroke's
+    `/20` tint passes), `text-white` beside `bg-primary` (in one string, or across a `className`'s strings), and an
+    inline colour written as the brand variable; and a `className` for `text-slate-400` under any variant but a
+    disabled one (not on an `Icon*` or `svg`, or under an `aria-hidden` that is always true). On the phone it checks
+    what is written on the element: `placeholderTextColor={colors.faint}`, `color: colors.faint` or
+    `color: theme.primary` in a `Text`'s or `TextInput`'s own `style`, and `theme.primary` as an icon's or an
+    `ActivityIndicator`'s `color` or a `RefreshControl`'s `tintColor` or `colors`. It leaves the phone's StyleSheet
+    entries and style maps, the web's `text-slate-400` outside a `className` (a class map may be an icon's), and a
+    colour value held in a variable or passed down as a prop unchecked: keep those to these rules by hand. An icon-only
+    control whose class colours only its icon takes a commented `eslint-disable-next-line`. CI doesn't lint mobile, so
+    the API unit test `readableColours.test.ts` runs the rule over both apps.
   - **Notices.** A note above a box or a form is `Notice` (both apps): `info` on the info tone with `IconInfo`, for what
     is worth knowing before acting (not live; on the web the box it's about lists it in `aria-describedby`), and
     `warning` on the warning tone with `IconAlert`, for what went wrong, which replaces the info note while it shows
@@ -497,6 +513,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   the install will fail to resolve the package. Prefer `npx expo install <pkg>` inside `apps/mobile`.
 - Do not declare React components inside another component's render body (e.g. a local `NavLabel`): ESLint
   `react-hooks/static-components` rejects it. Hoist helpers to module scope.
+- A later flat-config object that sets `no-restricted-syntax` for the same files replaces the earlier one's selectors
+  (the emoji guard's) rather than adding to them, so a new source guard is a plugin rule of its own, as
+  `readable-colours.cjs` is.
 - Tailwind writes two utilities that set the same property in the order of their names, not of the classes on the
   element, so the one whose name sorts later wins: an invalid field's `border-red-400` never beat `border-slate-300`.
   Put a state behind a variant (`focus:`, `aria-invalid:`) or use a name that sorts after (`border-tone-danger-edge`).

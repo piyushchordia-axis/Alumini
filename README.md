@@ -762,15 +762,28 @@ looks the same on the web and the phone and stays readable in any institution co
   web's gradient, from the primary to the secondary colour, is mixed in sRGB, so its lightest point is one of the two,
   which `heroScrim` checks. Before, a fixed veil and white text at 70–90% left pale brands and bright photos at about
   2:1. The phone's status bar sits on the same veil and is light.
+- **Guard.** An ESLint rule, `illuminize-colours/readable-colours` (`packages/config/eslint/readable-colours.cjs`, on
+  in both apps' configs), keeps faint and raw-brand text from coming back. On the web it reads every string, class
+  maps included, and rejects a placeholder in slate-300 or slate-400; the raw brand as text, an outline, a focus ring,
+  an underline, a checkbox's fill or an icon's fill or stroke (`text-primary` and the like, and arbitrary forms such as
+  `text-[rgb(var(--c-primary))]`; a ring's soft `/20` tint passes); white text on the raw brand fill, in one class list
+  or across a `className`'s; and an inline colour written as the brand variable. In a `className` it also rejects grey
+  text in `text-slate-400`, under any variant but a disabled control's, unless the element is an icon or always
+  `aria-hidden`, or sits inside one that is. On the phone it reads what is written on the element and rejects
+  `colors.faint` as a placeholder or as a `Text`'s or `TextInput`'s colour, and the raw brand as a `Text`'s colour or
+  an icon's, a spinner's or a pull-to-refresh's. It doesn't check the phone's StyleSheet entries or the web's
+  `text-slate-400` outside a `className` (see Known gaps). An icon-only button whose class colours only its icon, as
+  the web chat's Report message does, keeps the faint grey behind a commented `eslint-disable-next-line`.
 - **Tests.** `tones.test.ts` pins every pair with `contrastRatio`, the fields' edges with them (and that both apps'
   fields draw them), and checks `index.css` against the shared values; `color.test.ts` checks `heroScrim` across the
-  colour cube, a photo and a gradient; `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted
-  (`expectReadable`, `expectEdge` and `expectIcon` in `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill,
-  skill chips, the success toast, the sign-in page's field edges, and the landing's hero and its veil over Demo
-  University's blue (30%), over a pale colour served in its place (50%) and over a cover photo served with it (55%).
-  On that pale colour (`PALE_BRAND`) they read brand text too: a link and its icon on a card in its ink, a link on the
-  page in its page ink, and the inbox's unread count (and the phone's New post button) on the colour in its
-  `onPrimary`.
+  colour cube, a photo and a gradient; `rsvp.test.ts` the RSVP rules; `readableColours.test.ts` what the guard rejects
+  and allows, and that it finds nothing in either app's source (CI doesn't lint the phone app). The e2e journeys
+  measure what is painted (`expectReadable`, `expectEdge` and `expectIcon` in `e2e/lib.mjs`): badges' ink and edge,
+  the chosen RSVP's fill, skill chips, the success toast, the sign-in page's field edges, and the landing's hero and
+  its veil over Demo University's blue (30%), over a pale colour served in its place (50%) and over a cover photo
+  served with it (55%). On that pale colour (`PALE_BRAND`) they read brand text too: a link and its icon on a card in
+  its ink, a link on the page in its page ink, and the inbox's unread count (and the phone's New post button) on the
+  colour in its `onPrimary`.
 
 ### Lists and loading
 
@@ -1621,6 +1634,9 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   skeletons.ts: the lists' and the pages' outlines; directory.ts: a profile's card from the cached
                   directory (cardInPages) and the fetch ahead of it; admin.ts and its siblings: what both
                   admin consoles share)
+packages/config   shared tsconfig and ESLint configs, with two guards: eslint/no-emoji-icons.cjs (no emoji as icons in
+                  the apps or shared) and eslint/readable-colours.cjs (no faint or raw-brand text in the web and
+                  phone apps)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
 ```
 
@@ -1990,6 +2006,14 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
     apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
     SVG set.
+- Colour and contrast:
+  - The readable-colours guard skips the phone's StyleSheet entries and style maps (it reads only the style written on
+    the element) and, on the web, `text-slate-400` outside a `className` (a class map may be an icon's), as well as a
+    colour value held in a variable or passed down as a prop. Raw brand and white-on-brand classes are checked in any
+    string on the web, class maps included.
+  - On the phone, icons in the faint grey drawn on the page itself, not in a card, can fall below 3:1 over a member's
+    dark background photo (2.52:1 over black under the page's veil). The web steps them to the meta grey on a tint or
+    a photo (`[data-backdrop]`); the phone has no such step.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
 - Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
   note report, are covered by the API tests only.

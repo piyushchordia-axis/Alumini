@@ -3,10 +3,12 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 // By relative path, so the phone app needs no dependency on @illuminize/config and the lockfile doesn't change.
 const noEmojiIcons = require('../../packages/config/eslint/no-emoji-icons.cjs');
+const readableColours = require('../../packages/config/eslint/readable-colours.cjs');
 
 module.exports = defineConfig([
   expoConfig,
   noEmojiIcons,
+  readableColours,
   {
     ignores: ['dist/*'],
   },

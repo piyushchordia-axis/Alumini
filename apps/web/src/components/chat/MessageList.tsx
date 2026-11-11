@@ -172,6 +172,8 @@ const Bubble = memo(function Bubble({
             title="Report message"
             onClick={() => actions.onReport(message.id)}
             className={clsx(
+              // Icon only: slate-400 colours the flag (an icon needs 3:1, and has 3.9 on white), and aria-label names it.
+              // eslint-disable-next-line illuminize-colours/readable-colours
               "absolute left-full top-1/2 ml-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-red-600 focus:opacity-100 focus-visible:outline-2 focus-visible:outline-primary-ink",
               selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:pointer-events-none",
             )}
