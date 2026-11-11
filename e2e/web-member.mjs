@@ -1687,10 +1687,17 @@ try {
   });
 
   const moreButton = page.locator('nav[aria-label="Main"] button:has-text("More")');
+  // React Router draws a navigation as a transition, so for a moment after the address changes the bar can still show the
+  // route before it: read both until they agree with the new one, rather than once each on either side of that commit.
   const expectMoreActive = async (active, where) => {
-    const current = (await moreButton.getAttribute("aria-current")) === "true";
-    const tinted = (await moreButton.getAttribute("class")).split(" ").includes("text-primary-ink");
-    if (current !== active || tinted !== active) throw new Error(`More on ${where}: aria-current ${current}, tinted ${tinted}, expected ${active}`);
+    let current, tinted;
+    for (let i = 0; i < 30; i++) {
+      current = (await moreButton.getAttribute("aria-current")) === "true";
+      tinted = (await moreButton.getAttribute("class")).split(" ").includes("text-primary-ink");
+      if (current === active && tinted === active) return;
+      await page.waitForTimeout(100);
+    }
+    throw new Error(`More on ${where}: aria-current ${current}, tinted ${tinted}, expected ${active}`);
   };
   // A current link, in the sheet or the sidebar, is chosen: Demo University's wash (its tones are pinned in
   // color.test.ts) in a thin inset ring of its ring colour, with its text in the page's ink, readable on the wash.
