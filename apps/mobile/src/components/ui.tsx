@@ -108,7 +108,8 @@ export function Button({
   const compact = size === "compact";
   const theme = useTheme();
   const bg = variant === "primary" ? theme.primary : variant === "danger" ? colors.danger : "transparent";
-  const fg = variant === "primary" ? theme.onPrimary : variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.primaryInk;
+  // A ghost button has no fill and often sits on the page itself, so it takes the page's ink, which reads in a card too.
+  const fg = variant === "primary" ? theme.onPrimary : variant === "danger" ? "#fff" : variant === "outline" ? colors.text : theme.pageInk;
   return (
     <Pressable
       ref={ref}
@@ -573,7 +574,7 @@ export function Spinner({ label }: { label?: string }) {
   const theme = useTheme();
   return (
     <View style={{ padding: spacing.xl, alignItems: "center", gap: 8 }} accessibilityRole="progressbar" accessibilityLabel={label ?? "Loading"}>
-      <ActivityIndicator color={theme.primary} />
+      <ActivityIndicator color={theme.pageInk} />
       {label && <Text style={[styles.hint, { color: theme.pageMuted }]}>{label}</Text>}
     </View>
   );

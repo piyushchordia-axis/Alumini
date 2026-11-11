@@ -23,7 +23,7 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
         to={`/t/${slug}/app/messages/${c.id}${query}`}
         className={({ isActive }) =>
           // The open conversation's tint takes the secondary grey (dim-text), which reads on any brand's 10%.
-          clsx("flex min-h-16 items-center gap-3 px-4 py-3 transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", isActive ? "bg-primary/10 dim-text" : "hover:bg-slate-50")
+          clsx("flex min-h-16 items-center gap-3 px-4 py-3 transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-ink", isActive ? "bg-primary/10 dim-text" : "hover:bg-slate-50")
         }
       >
         <span className="relative shrink-0">
@@ -56,7 +56,7 @@ function ConversationRow({ slug, c, now, query }: { slug: string; c: ChatConvers
                 </span>
               )}
               {unread && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-on-primary">
                   {c.unread > 99 ? "99+" : c.unread}
                   <span className="sr-only"> unread</span>
                 </span>

@@ -68,7 +68,7 @@ export default function FeedScreen() {
         renderItem={({ item }) => ("posts" in item ? <PinnedPosts slug={slug} posts={item.posts} latest={list.items.length > 0} /> : <PostCard slug={slug} post={item} />)}
       />
       <Pressable onPress={() => router.push(`/t/${slug}/feed/new`)} accessibilityRole="button" accessibilityLabel="New post" style={{ position: "absolute", right: 20, bottom: 24, backgroundColor: theme.primary, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 4 }}>
-        <Text style={{ color: "#fff", fontSize: 28, lineHeight: 30 }}>+</Text>
+        <Text style={{ color: theme.onPrimary, fontSize: 28, lineHeight: 30 }}>+</Text>
       </Pressable>
     </SectionScreen>
   );

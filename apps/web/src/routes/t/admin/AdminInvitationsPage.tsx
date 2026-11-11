@@ -136,7 +136,7 @@ function ImportCard({ fieldsQuery, channels, onDone }: { fieldsQuery: UseQueryRe
         accept=".csv,text/csv"
         aria-label="CSV file"
         disabled={!fields || run.isPending}
-        className="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary disabled:opacity-60"
+        className="block text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-ink disabled:opacity-60"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";

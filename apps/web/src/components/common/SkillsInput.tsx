@@ -114,7 +114,7 @@ export function SkillsInput({
                 type="button"
                 onClick={() => remove(skill)}
                 aria-label={`Remove ${skill}`}
-                className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full before:absolute before:-inset-1.5 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink"
               >
                 <IconClose size={14} />
               </button>

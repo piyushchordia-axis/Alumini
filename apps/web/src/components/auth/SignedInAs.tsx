@@ -21,7 +21,7 @@ export function SignedInAs({ phone, onUseDifferentNumber, className }: { phone: 
       <button
         type="button"
         onClick={onUseDifferentNumber}
-        className="min-h-11 rounded-md font-semibold text-primary-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="min-h-11 rounded-md font-semibold text-primary-ink underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink"
       >
         Use a different number
       </button>

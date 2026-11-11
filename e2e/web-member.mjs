@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, landscapePhoto, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, PALE_BRAND, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectIcon, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, holdGets, holdPhotoPreparation, landscapePhoto, paintedColour, pickBigPhoto, reconnect, runJob, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInContext } from "./lib.mjs";
 
 const BASE = process.env.WEB_URL ?? "http://localhost:5173";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -685,6 +685,38 @@ try {
     await page.waitForSelector("text=This week");
     // The banner only: the digest's seeded posts may hold emoji of their own.
     await expectSvgNoEmoji(page.locator('a[href$="/app/digest"]').first(), "the feed's digest banner");
+  });
+
+  await step("brand text and icons read on a pale brand: the ink on a card, the page ink on the page", async () => {
+    // Demo University's ink is its brand blue, so its painted colours can't tell the ink from the raw brand colour. A
+    // pale yellow served as its colour (PALE_BRAND) can. The digest's banner draws its link and icon on the white card in
+    // that colour's ink, and the digest page's directory link, on the page itself, in its page ink, which HomeLayout sets
+    // on the plain page too.
+    const pale = await scriptTenant(page, "demo-university");
+    pale.rewrite((t) => ({ ...t, primaryColor: PALE_BRAND.hex }));
+    const banner = page.locator('a[href$="/app/digest"]').first();
+    try {
+      await page.goto(BASE + "/t/demo-university/app/digest");
+      const onPage = await expectReadable(page.getByRole("link", { name: "See the directory", exact: true }), "the digest's directory link on the page, on a pale brand");
+      if (onPage.colour !== PALE_BRAND.pageInk || onPage.behind !== PAGE_COLOURS.plain) throw new Error(`the digest's directory link on a pale brand is rgb ${onPage.colour} on rgb ${onPage.behind}, not its page ink on the plain page (rgb ${PALE_BRAND.pageInk} on rgb ${PAGE_COLOURS.plain})`);
+      await page.goto(BASE + "/t/demo-university/app/feed");
+      const read = await expectReadable(banner.getByText("Read →", { exact: true }), "the digest banner's Read on a pale brand");
+      const icon = await expectIcon(banner.locator("svg"), "the digest banner's icon on a pale brand");
+      for (const [what, look] of [
+        ["Read", read],
+        ["icon", icon],
+      ]) {
+        if (look.colour !== PALE_BRAND.ink) throw new Error(`the digest banner's ${what} on a pale brand is rgb ${look.colour}, not its ink (rgb ${PALE_BRAND.ink})`);
+      }
+      await shot("04d-feed-pale-brand");
+    } finally {
+      // Whether or not it passed, the steps after this one get Demo University's own colour back: the app reads the
+      // institution afresh on a page load.
+      await pale.stop();
+      await page.goto(BASE + "/t/demo-university/app/feed");
+    }
+    const back = await paintedColour(banner.getByText("Read →", { exact: true }));
+    if (back.colour !== BRAND_TONES.demoUniversity.ink) throw new Error(`after the reload the digest banner's Read is rgb ${back.colour}, not Demo University's ink`);
   });
 
   await step("create a job and view it", async () => {
@@ -2294,14 +2326,26 @@ try {
     await pageA.locator("header h2").getByText("2004–2008 · New conversation", { exact: true }).waitFor();
     const asked = `Hello Sneha, could I ask about Seattle? ${unique}`;
     // A first message refused for going too fast says so as a thread does, and keeps its words in the box to send again.
+    // The refusal is held back first, so the send button's spinner can be read while it sends: drawn in the button's own
+    // on-primary, not the ink, which at Demo University is the button's own blue and would hide it.
     const directUrl = /\/api\/v1\/t\/demo-university\/chat\/direct$/;
+    let refuseFirst;
+    const firstHeld = new Promise((resolve) => (refuseFirst = resolve));
     await pageA.route(directUrl, (route) =>
       route.request().method() === "POST"
-        ? route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: { code: "RATE_LIMITED", message: "e2e RATE_LIMITED" } }) })
+        ? firstHeld.then(() => route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: { code: "RATE_LIMITED", message: "e2e RATE_LIMITED" } }) }))
         : route.fallback(),
     );
     await pageA.getByLabel("Write a message").fill(asked);
     await pageA.getByRole("button", { name: "Send message" }).click();
+    try {
+      // Read from the styles: the button is faded while it sends, which paintedColour refuses.
+      const sendingSpinner = pageA.getByRole("button", { name: "Send message" }).getByRole("status", { name: "Loading" });
+      const spun = await sendingSpinner.evaluate((el) => ({ spinner: getComputedStyle(el).borderLeftColor, button: getComputedStyle(el.closest("button")).color }));
+      if (spun.spinner !== spun.button || spun.button !== "rgb(255, 255, 255)") throw new Error(`the send button's spinner is ${spun.spinner} on a button whose text is ${spun.button}, not Demo University's on-primary, white`);
+    } finally {
+      refuseFirst();
+    }
     await pageA.getByText("You're sending messages quickly. Wait a moment, then send again.", { exact: true }).waitFor();
     if ((await pageA.getByLabel("Write a message").inputValue()) !== asked) throw new Error("a first message refused for going too fast lost its words");
     await pageA.unroute(directUrl);
@@ -2360,6 +2404,20 @@ try {
     // colour, which a pale brand would lose: the class does, as on the Explore row.
     const requestTimeClasses = (await request.locator("time").getAttribute("class")).split(/\s+/);
     if (!requestTimeClasses.includes("text-primary-ink") || requestTimeClasses.includes("text-primary")) throw new Error("an unread request's time isn't drawn in text-primary-ink alone");
+    // As on the phone, a tab of B's own (the same session, no new sign-in) served a pale yellow as the institution's
+    // colour (PALE_BRAND) draws the time in that colour's ink, and the unread count on the colour itself in its
+    // on-primary, slate-900, where white would read at 1.25:1; then closes, opening nothing.
+    const paleB = await contextB.newPage();
+    const paleTenant = await scriptTenant(paleB, "demo-university");
+    paleTenant.rewrite((t) => ({ ...t, primaryColor: PALE_BRAND.hex }));
+    await paleB.goto(`${app}/messages`);
+    await paleB.getByRole("tab", { name: "Requests" }).click();
+    const paleRequest = paleB.locator('[role="tabpanel"] a', { hasText: "Meera Iyer" });
+    const paleTime = await expectReadable(paleRequest.locator("time"), "an unread request's time in the inbox on a pale brand");
+    if (paleTime.colour !== PALE_BRAND.ink) throw new Error(`an unread request's time on a pale brand is rgb ${paleTime.colour}, not its ink (rgb ${PALE_BRAND.ink})`);
+    const paleCount = await expectReadable(paleRequest.getByText("1 unread", { exact: true }), "an unread request's count on a pale brand");
+    if (paleCount.colour !== PALE_BRAND.onPrimary || paleCount.behind !== PALE_BRAND.colour) throw new Error(`an unread request's count on a pale brand is rgb ${paleCount.colour} on rgb ${paleCount.behind}, not its on-primary on the brand (rgb ${PALE_BRAND.onPrimary} on rgb ${PALE_BRAND.colour})`);
+    await paleB.close();
     await request.click();
     await pageB.locator("header h2").getByText("2014–2018", { exact: true }).waitFor();
     await log(pageB).getByText(asked).waitFor();

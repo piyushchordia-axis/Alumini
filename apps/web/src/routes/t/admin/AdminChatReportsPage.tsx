@@ -260,7 +260,7 @@ function ChatReportRow({ slug, report }: { slug: string; report: AdminChatReport
           {report.reported && (
             <p className="text-xs text-slate-500">
               To suspend them, open{" "}
-              <Link to={`/t/${slug}/admin/members/${report.reported.id}`} className="text-primary underline">
+              <Link to={`/t/${slug}/admin/members/${report.reported.id}`} className="text-primary-ink underline">
                 {chatReportMemberLinkText(report.reported)}
               </Link>
               .

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, landscapePhoto, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
+import { API, BRAND_TONES, GREY_TEXT, HINTS_AT_A_DECLINE, INSTITUTION_INITIALS, PAGE_COLOURS, PALE_BRAND, WHITE, apiSession, bigPhoto, cardEdges, drawnOpacity, dropFrames, expectChipLook, expectChoiceLook, expectChosenChip, expectDescription, expectEdge, expectEmptyState, expectIcon, expectInitials, expectInstitutionInitials, expectKeptResults, expectReadable, expectSameTone, expectSvgNoEmoji, expectWholeWords, fitsPhone, holdGets, holdPhotoPreparation, landscapePhoto, pageColours, paintedColour, pickBigPhoto, reconnect, scriptBusiness, scriptConversation, scriptEmptyList, scriptFeatures, scriptJob, scriptMembership, scriptMentor, scriptNotification, scriptTenant, signedInMobileContext, textColour } from "./lib.mjs";
 
 const BASE = process.env.MOBILE_WEB_URL ?? "http://localhost:8081";
 // fileURLToPath, not URL.pathname: on Windows .pathname gives "/C:/…", which fs can't use.
@@ -797,6 +797,39 @@ try {
     // The next step starts on the feed.
     await page.goto(BASE + "/t/demo-university/feed");
     await page.getByRole("button", { name: "New post" }).locator("visible=true").first().waitFor();
+  });
+
+  await step("brand text and icons read on a pale brand: the ink on a card, the page ink on the page, on-primary on the colour", async () => {
+    // Demo University's ink is its brand blue, so its painted colours can't tell the ink from the raw brand colour. A tab
+    // of this member's own (the same session, no new sign-in, leaving this page's stack as it is) served a pale yellow as
+    // the institution's colour (PALE_BRAND) can. My profile's links draw their text and icons on the white card in that
+    // colour's ink; Delete my account, a ghost button on the page itself, its page ink; and the feed's New post button
+    // its plus on the colour in its on-primary, slate-900, where white would read at 1.25:1, as on the web.
+    const pale = await page.context().newPage();
+    const shown = (locator) => locator.locator("visible=true").last();
+    try {
+      const paleTenant = await scriptTenant(pale, "demo-university");
+      paleTenant.rewrite((t) => ({ ...t, primaryColor: PALE_BRAND.hex }));
+      await pale.goto(BASE + "/t/demo-university/profile");
+      const link = shown(pale.getByRole("link", { name: "Notifications", exact: true }).filter({ hasText: "Notifications" }));
+      const text = await expectReadable(link.getByText("Notifications", { exact: true }), "My profile's Notifications link on a pale brand");
+      const icon = await expectIcon(link.locator("svg"), "My profile's Notifications icon on a pale brand");
+      for (const [what, look] of [
+        ["link", text],
+        ["icon", icon],
+      ]) {
+        if (look.colour !== PALE_BRAND.ink || look.behind !== WHITE) throw new Error(`My profile's Notifications ${what} on a pale brand is rgb ${look.colour} on rgb ${look.behind}, not its ink on the white card (rgb ${PALE_BRAND.ink})`);
+      }
+      const remove = shown(pale.getByRole("button", { name: "Delete my account", exact: true })).getByText("Delete my account", { exact: true });
+      const onPage = await expectReadable(remove, "Delete my account on the page, on a pale brand");
+      if (onPage.colour !== PALE_BRAND.pageInk || onPage.behind !== PAGE_COLOURS.plain) throw new Error(`Delete my account on a pale brand is rgb ${onPage.colour} on rgb ${onPage.behind}, not its page ink on the plain page (rgb ${PALE_BRAND.pageInk} on rgb ${PAGE_COLOURS.plain})`);
+      await pale.screenshot({ path: `${SHOTS}/m04k-profile-pale-brand.png` });
+      await pale.goto(BASE + "/t/demo-university/feed");
+      const plus = await expectReadable(pale.getByRole("button", { name: "New post" }).locator("visible=true").first().getByText("+", { exact: true }), "the feed's New post button on a pale brand");
+      if (plus.colour !== PALE_BRAND.onPrimary || plus.behind !== PALE_BRAND.colour) throw new Error(`the feed's New post button on a pale brand is rgb ${plus.colour} on rgb ${plus.behind}, not its on-primary on the colour (rgb ${PALE_BRAND.onPrimary} on rgb ${PALE_BRAND.colour})`);
+    } finally {
+      await pale.close();
+    }
   });
 
   await step("the feed's Explore row opens what's behind More", async () => {
@@ -1860,16 +1893,19 @@ try {
     if (requestTime.colour !== BRAND_TONES.demoUniversity.ink) throw new Error(`an unread request's time is rgb ${requestTime.colour}, not Demo University's ink (rgb ${BRAND_TONES.demoUniversity.ink})`);
     // Demo University's ink is its brand colour, so that can't tell the ink from the raw brand colour, which a pale brand
     // would lose. A tab of B's own (the same session, no new sign-in) served a pale yellow as the institution's colour
-    // draws the time in that colour's ink (brandTones("#fde68a").ink, #6d694f), then closes, opening nothing.
+    // (PALE_BRAND) draws the time in that colour's ink, and the unread count on the colour itself in its on-primary,
+    // slate-900, where white would read at 1.25:1, as on the web; then closes, opening nothing.
     const paleB = await contextB.newPage();
     const paleTenant = await scriptTenant(paleB, "demo-university");
-    paleTenant.rewrite((t) => ({ ...t, primaryColor: "#fde68a" }));
+    paleTenant.rewrite((t) => ({ ...t, primaryColor: PALE_BRAND.hex }));
     await paleB.goto(`${app}/messages`);
     await shown(paleB.locator('[role="tab"]').getByText("Requests", { exact: true })).click();
     const paleRequest = shown(paleB.getByRole("link", { name: /^Arjun Singh, 2011–2015, / }));
     await paleRequest.waitFor();
     const paleTime = await expectReadable(paleRequest.getByText(/^\d{1,2}:\d{2}/), "an unread request's time in the inbox on a pale brand");
-    if (paleTime.colour !== "109 105 79") throw new Error(`an unread request's time on a pale yellow brand is rgb ${paleTime.colour}, not that colour's ink (rgb 109 105 79)`);
+    if (paleTime.colour !== PALE_BRAND.ink) throw new Error(`an unread request's time on a pale yellow brand is rgb ${paleTime.colour}, not that colour's ink (rgb ${PALE_BRAND.ink})`);
+    const paleCount = await expectReadable(paleRequest.getByText("1", { exact: true }), "an unread request's count on a pale brand");
+    if (paleCount.colour !== PALE_BRAND.onPrimary || paleCount.behind !== PALE_BRAND.colour) throw new Error(`an unread request's count on a pale brand is rgb ${paleCount.colour} on rgb ${paleCount.behind}, not its on-primary on the brand (rgb ${PALE_BRAND.onPrimary} on rgb ${PALE_BRAND.colour})`);
     await paleB.close();
     await pageB.screenshot({ path: `${SHOTS}/m10b-chat-request-arrived.png` });
     await request.click();

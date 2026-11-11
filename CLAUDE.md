@@ -216,11 +216,16 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     read it out, which on the web repeats its words in a hidden status line, so e2e matches its title with
     `exact: true`. e2e finds the box from its title (web: the `h3` directly inside it; phone: the title's parent) and
     checks the badge (pinned to the institution's `BRAND_TONES`) and the actions with `expectEmptyState`.
-  - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black. Brand-coloured
-    text and icons use the ink (web `text-primary-ink`, mobile `theme.primaryInk`) and text on the brand colour uses
-    `text-on-primary` / `theme.onPrimary`, all from `brandTones` (Button, Badge, the choices, the toggle chips and the
-    reaction chips do; older spots with `text-primary`, or white on `bg-primary`, move over when touched). A chosen
-    state is a wash, a thin ring and the ink, as the reaction chips and the toggle chips are (web
+  - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black, so the raw brand
+    (web `bg-primary`, mobile `theme.primary`) is only ever a fill, a border or a switch's track. Brand-coloured text,
+    icons, link underlines and focus outlines and rings use the ink (web `text-primary-ink`, `decoration-primary-ink`,
+    `outline-primary-ink`, `ring-primary-ink`; mobile `theme.primaryInk`), brand text on the page itself takes the page
+    ink (see Member background; the phone's ghost `Button` and `Spinner` take it everywhere, since it reads in a card
+    too), and text or an icon on the brand colour uses `text-on-primary` / `theme.onPrimary`, never white: all from
+    `brandTones`. A soft `ring-primary/20` is only a halo beside a focused field's ink edge, and the Branding form's
+    preview and swatches, which show the colours being chosen, are the one exception. Demo University's ink is its
+    brand blue, so e2e checks brand colours on `PALE_BRAND` (`e2e/lib.mjs`), served in its place by `scriptTenant`.
+    A chosen state is a wash, a thin ring and the ink, as the reaction chips and the toggle chips are (web
     `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
     a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
     they can't outrank it. The ink reads at 4.5:1 on white, the plain page, the brand's 12% tint and its own wash, in

@@ -15,7 +15,7 @@ export function RouteErrorPage() {
       <p className="mt-2 max-w-md text-sm text-slate-500">The page hit an unexpected error. Reloading usually fixes it; if it keeps happening, let your alumni office know.</p>
       {message && import.meta.env.DEV && <pre className="mt-3 max-w-lg overflow-x-auto rounded bg-slate-100 p-3 text-left text-xs text-slate-600">{message}</pre>}
       <div className="mt-5 flex gap-3">
-        <button type="button" onClick={() => window.location.reload()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white">
+        <button type="button" onClick={() => window.location.reload()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary">
           Reload
         </button>
         <Link to="/" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">

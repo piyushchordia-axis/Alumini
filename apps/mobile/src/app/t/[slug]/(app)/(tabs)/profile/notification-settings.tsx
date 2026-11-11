@@ -31,7 +31,7 @@ function LevelPicker({ label, value, min, onChange }: { label: string; value: No
             onPress={() => onChange(l)}
             style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: on ? theme.primary : "transparent" }}
           >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: on ? "#fff" : colors.muted }}>{LEVEL_LABELS[l]}</Text>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: on ? theme.onPrimary : colors.muted }}>{LEVEL_LABELS[l]}</Text>
           </Pressable>
         );
       })}
@@ -83,7 +83,7 @@ export default function NotificationSettingsScreen() {
         {!p.hasEmail && (
           <Pressable accessibilityRole="link" onPress={() => router.push(`/t/${slug}/profile/account`)}>
             <Text style={{ color: "#92400e" }}>
-              Add and confirm an email under <Text style={{ textDecorationLine: "underline", color: theme.primary }}>Email & account</Text> to get these by email.
+              Add and confirm an email under <Text style={{ textDecorationLine: "underline", color: theme.primaryInk }}>Email & account</Text> to get these by email.
             </Text>
           </Pressable>
         )}

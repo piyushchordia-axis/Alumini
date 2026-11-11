@@ -24,14 +24,14 @@ export function VerifyEmailPage() {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md p-6 text-center">
-        <IconMail size={40} className="mx-auto block text-primary" />
+        <IconMail size={40} className="mx-auto block text-primary-ink" />
         {confirm.isSuccess ? (
           <>
             <h1 className="mt-3 text-xl font-semibold text-slate-900">Email confirmed</h1>
             <p className="mt-2 text-sm text-slate-600">
               <span className="font-medium">{confirm.data.email}</span> is now the email on your Illuminize account. You can change your email preferences in each institution's notification settings.
             </p>
-            <Link to="/" className="mt-4 inline-block text-primary underline">
+            <Link to="/" className="mt-4 inline-block text-primary-ink underline">
               Continue to Illuminize
             </Link>
           </>

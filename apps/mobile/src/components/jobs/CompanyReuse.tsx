@@ -58,7 +58,7 @@ export function CompanyReuseOffer({ slug, company, excludeId, current, onUse }: 
       {offered && found ? (
         <View style={{ gap: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: theme.primarySoft, backgroundColor: theme.primarySoft, padding: spacing.md }}>
           <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" }}>
-            <IconBuilding size={20} color={theme.primary} />
+            <IconBuilding size={20} color={theme.primaryInk} />
             <Text style={{ flex: 1, fontSize: 14, color: "#334155" }}>{companyReuseText(found.companyName, fill)}</Text>
           </View>
           <Button

@@ -53,7 +53,7 @@ function JobLine({ slug, r }: { slug: string; r: ReferralDto }) {
     <p className="text-sm text-slate-700 [overflow-wrap:anywhere]">
       For{" "}
       {r.job.available && r.job.id ? (
-        <Link to={jobPath(slug, r.job.id)} className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary focus-visible:outline-2 focus-visible:outline-primary">
+        <Link to={jobPath(slug, r.job.id)} className="font-medium text-primary-ink underline decoration-primary-ink/40 underline-offset-2 hover:decoration-primary-ink focus-visible:outline-2 focus-visible:outline-primary-ink">
           {what}
         </Link>
       ) : (

@@ -92,7 +92,7 @@ export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDt
       <p className="text-sm text-slate-600">
         Enter the code sent to <span className="font-medium text-slate-900">{formatPhone(e164)}</span>
         {channel === "whatsapp" ? " on WhatsApp" : channel === "sms" ? " by SMS" : ""}.{" "}
-        <button type="button" className="text-primary underline" onClick={() => setStep("phone")}>
+        <button type="button" className="text-primary-ink underline" onClick={() => setStep("phone")}>
           Change number
         </button>
       </p>
@@ -110,7 +110,7 @@ export function OtpLoginForm({ onSuccess }: { onSuccess: (session: AuthSessionDt
         {cooldown > 0 ? (
           <span>Resend code in {cooldown}s</span>
         ) : (
-          <button type="button" className="text-primary underline" onClick={() => void request()} disabled={busy}>
+          <button type="button" className="text-primary-ink underline" onClick={() => void request()} disabled={busy}>
             Resend code
           </button>
         )}

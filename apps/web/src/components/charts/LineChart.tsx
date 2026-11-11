@@ -44,7 +44,7 @@ export function LineChart({
   return (
     <div ref={ref} className="relative">
       {width > 0 && (
-        <svg width={width} height={height} role="img" aria-label={ariaLabel} tabIndex={0} onKeyDown={onKey} onFocus={() => setActive((a) => a ?? n - 1)} onBlur={() => setActive(null)} className="block rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+        <svg width={width} height={height} role="img" aria-label={ariaLabel} tabIndex={0} onKeyDown={onKey} onFocus={() => setActive((a) => a ?? n - 1)} onBlur={() => setActive(null)} className="block rounded outline-none focus-visible:ring-2 focus-visible:ring-primary-ink">
           {layout.ticks.map((t) => (
             <g key={t.value}>
               <line x1={m.left} x2={m.left + layout.innerW} y1={t.y} y2={t.y} stroke={t.value === 0 ? INK.baseline : INK.grid} strokeWidth={1} shapeRendering="crispEdges" />

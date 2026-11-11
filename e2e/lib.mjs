@@ -548,6 +548,15 @@ export async function expectEdge(locator, where, min = 3) {
 }
 
 /**
+ * Fails unless the SVG icon `svg` (one svg element) shows at `min` contrast (WCAG 1.4.11: 3:1) on what's behind it, as
+ * paintedColour sees them: the stroke of its first shape, which both apps' icons draw in (the web's from currentColor,
+ * the phone's on each shape). Gives { colour, behind, contrast }.
+ */
+export async function expectIcon(svg, where, min = 3) {
+  return expectContrast(svg.locator("path, rect, circle, line, polyline").first(), "stroke", where, min, "shows at");
+}
+
+/**
  * The seeded institutions' ink, wash, solid 12% tint and edge (3:1 on white: a pinned post's frame) ("r g b"), as
  * brandTones gives them for their colours (Demo University's #1d4ed8 is also both apps' default and the platform
  * console's; color.test.ts pins all four inks and washes) and both apps draw them.
@@ -558,6 +567,14 @@ export const BRAND_TONES = {
   demoSchool: { ink: "167 78 12", wash: "243 230 221", tint: "246 234 225", edge: "163 135 119" },
   samaj: { ink: "184 62 14", wash: "245 228 221", tint: "248 232 226", edge: "169 130 120" },
 };
+
+/**
+ * A pale brand no seeded institution has, which the scripts serve in one's place (scriptTenant): `hex`, #fde68a, which
+ * reads at 1.25:1 on white, so neither it as text nor white on it can pass. As "r g b": the colour itself, and what both
+ * apps draw from it (brandTones and pageInk): the ink, for text and icons on white; the page ink, a shade darker on the
+ * plain page; and on-primary, slate-900, for text on the colour.
+ */
+export const PALE_BRAND = { hex: "#fde68a", colour: "253 230 138", ink: "109 105 79", pageInk: "105 102 78", onPrimary: "15 23 42" };
 
 /**
  * Fails unless `box` (one empty state or chat notice: on the web the h3's parent, on the phone its title's) draws its icon

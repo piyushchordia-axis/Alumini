@@ -359,7 +359,7 @@ function StepList({ step, furthest, locked, onPick }: { step: ProfileStep; furth
                   aria-label={name}
                   disabled={locked}
                   onClick={(e) => !isRepeatClick(e) && onPick(n)}
-                  className="group block min-h-11 w-full rounded-md pb-1 pt-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed"
+                  className="group block min-h-11 w-full rounded-md pb-1 pt-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink disabled:cursor-not-allowed"
                 >
                   {body}
                 </button>
@@ -409,7 +409,7 @@ function CopyBanner({ copy, message, messageId, note, noteId, onUse, onUndo }: C
     );
   return (
     <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-      <IconSwitch size={20} className="mt-0.5 text-primary" />
+      <IconSwitch size={20} className="mt-0.5 text-primary-ink" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-900">You have a profile at {source}</p>
         <p className="mt-0.5 text-sm text-slate-600">{portableProfileOfferText(copy)}</p>

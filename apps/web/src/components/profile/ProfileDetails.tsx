@@ -226,7 +226,7 @@ export function ProfileDetails({
               target="_blank"
               rel="noopener noreferrer nofollow"
               title={url}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink"
             >
               <Icon size={16} className="text-slate-500" />
               <span className="[overflow-wrap:anywhere]">{label(url)}</span>

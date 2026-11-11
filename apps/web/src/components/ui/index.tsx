@@ -325,9 +325,14 @@ export function Notice({ tone, icon, id, className, children }: { tone: "info" |
   );
 }
 
-export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
+/**
+ * `className` is its colour, the ink unless a caller gives another (on a fill: Button's text-current, the send button's
+ * text-on-primary). It replaces the ink rather than joining it: Tailwind orders two text colours by name, not by the
+ * order they're written, and text-primary-ink would outrank both.
+ */
+export function Spinner({ size = "md", className = "text-primary-ink" }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const s = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-10 w-10" : "h-6 w-6";
-  return <span role="status" className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-primary", s, className)} aria-label="Loading" />;
+  return <span role="status" className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent", s, className)} aria-label="Loading" />;
 }
 
 /**
@@ -337,7 +342,7 @@ export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg";
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-3 py-12 text-slate-500" role="status" aria-live="polite">
-      <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent text-primary" aria-hidden /> <span className="text-sm">{label}</span>
+      <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent text-primary-ink" aria-hidden /> <span className="text-sm">{label}</span>
     </div>
   );
 }
@@ -538,7 +543,7 @@ export function Modal({ open, onClose, title, children, footer }: { open: boolea
             {title}
           </h2>
           {/* A 44px target; the negative margins keep the header as tall as its title. */}
-          <button type="button" onClick={onClose} className="-my-2 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary" aria-label="Close">
+          <button type="button" onClick={onClose} className="-my-2 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink" aria-label="Close">
             ✕
           </button>
         </div>

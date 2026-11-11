@@ -127,7 +127,7 @@ export function PostCard({ slug, post, detail = false, onDeleted }: { slug: stri
                 // pointer resting on a near-black icon after the click. The wash and ring are brandTones', as on the
                 // phone: a pale brand's own tint (bg-primary/14) vanished into the tray.
                 className={clsx(
-                  "inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 motion-safe:active:scale-90 pointer-coarse:h-10 pointer-coarse:w-10",
+                  "inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-primary-ink disabled:opacity-40 motion-safe:active:scale-90 pointer-coarse:h-10 pointer-coarse:w-10",
                   active ? "bg-primary-wash text-primary-ink ring-1 ring-primary-ring ring-inset" : "text-slate-500 enabled:hover:bg-white enabled:hover:text-slate-700 enabled:hover:shadow-sm",
                 )}
                 aria-label={REACTION_LABEL[t]}

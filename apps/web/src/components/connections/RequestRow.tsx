@@ -39,7 +39,7 @@ export function RequestRow({
   return (
     // A card named for who it's with, so a screen reader's list of them reads as a list of people. Focusable from script only,
     // so focus has somewhere to land when an action takes away the button that had it.
-    <article id={id} tabIndex={-1} aria-labelledby={nameId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+    <article id={id} tabIndex={-1} aria-labelledby={nameId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-ink">
       <div className="flex items-start gap-3">
         <Avatar name={name} src={member?.avatarUrl} size="md" toneKey={member?.id} />
         <div className="min-w-0 flex-1">
@@ -47,7 +47,7 @@ export function RequestRow({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 id={nameId} className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">
               {profileHref ? (
-                <Link to={profileHref} className="hover:underline focus-visible:outline-2 focus-visible:outline-primary">
+                <Link to={profileHref} className="hover:underline focus-visible:outline-2 focus-visible:outline-primary-ink">
                   {name}
                 </Link>
               ) : (

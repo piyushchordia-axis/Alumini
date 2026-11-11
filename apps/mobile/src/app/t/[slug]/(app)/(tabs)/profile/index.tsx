@@ -81,25 +81,25 @@ export default function MyProfileScreen() {
       <ProfileStrengthPanel strength={profileStrength(membership, tenant)} slug={slug} />
       <Card>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/my-content`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
-          <IconPosts size={18} color={theme.primary} />
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>My posts & listings</Text>
+          <IconPosts size={18} color={theme.primaryInk} />
+          <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>My posts & listings</Text>
         </Pressable>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/notifications`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
-          <IconBell size={18} color={theme.primary} />
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>Notifications</Text>
+          <IconBell size={18} color={theme.primaryInk} />
+          <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Notifications</Text>
         </Pressable>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/account`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
-          <IconMail size={18} color={theme.primary} />
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>Email & account</Text>
+          <IconMail size={18} color={theme.primaryInk} />
+          <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Email & account</Text>
         </Pressable>
         <Pressable onPress={() => router.push(`/t/${slug}/profile/appearance`)} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
-          <IconPalette size={18} color={theme.primary} />
-          <Text style={{ color: theme.primary, fontWeight: "600" }}>Appearance</Text>
+          <IconPalette size={18} color={theme.primaryInk} />
+          <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Appearance</Text>
         </Pressable>
         {isTenantAdmin && (
           <Pressable onPress={() => router.push(adminHomeHref(slug))} accessibilityRole="link" style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44 }}>
-            <IconDashboard size={18} color={theme.primary} />
-            <Text style={{ color: theme.primary, fontWeight: "600" }}>Admin console</Text>
+            <IconDashboard size={18} color={theme.primaryInk} />
+            <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Admin console</Text>
           </Pressable>
         )}
       </Card>
@@ -123,7 +123,7 @@ export default function MyProfileScreen() {
                 accessibilityLabel={`Switch to ${m.tenant.name}`}
                 hitSlop={8}
               >
-                <Text style={{ color: theme.primary }}>{m.status === "APPROVED" ? "Switch" : "Open"}</Text>
+                <Text style={{ color: theme.primaryInk }}>{m.status === "APPROVED" ? "Switch" : "Open"}</Text>
               </Pressable>
             )}
           </Row>
@@ -136,7 +136,7 @@ export default function MyProfileScreen() {
           accessibilityRole="button"
           hitSlop={6}
         >
-          <Text style={{ color: theme.primary }}>+ Join another institution</Text>
+          <Text style={{ color: theme.primaryInk }}>+ Join another institution</Text>
         </Pressable>
       </Card>
       <Button title="Sign out" variant="outline" onPress={() => void signOut(`/t/${slug}`)} />

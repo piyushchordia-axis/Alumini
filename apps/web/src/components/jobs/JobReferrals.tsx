@@ -16,7 +16,7 @@ import { toast } from "@/stores/uiStore";
 function Section({ id, title, aside, children }: { id?: string; title: string; aside?: ReactNode; children: ReactNode }) {
   const headingId = useId();
   return (
-    <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+    <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary-ink">
       <div className="flex flex-wrap items-center gap-2">
         <h2 id={headingId} className="text-base font-semibold text-slate-900">
           {title}

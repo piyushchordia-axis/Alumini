@@ -64,7 +64,7 @@ export function OptionPicker<T extends string>({ label, value, options, onChange
               {label}
             </Text>
             <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Close" style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ fontSize: 15, color: theme.primary, fontWeight: "600" }}>Close</Text>
+              <Text style={{ fontSize: 15, color: theme.primaryInk, fontWeight: "600" }}>Close</Text>
             </Pressable>
           </View>
           <FlatList
@@ -87,7 +87,7 @@ export function OptionPicker<T extends string>({ label, value, options, onChange
                   {...toggleState(active)}
                   style={({ pressed }) => ({ minHeight: 48, justifyContent: "center", paddingHorizontal: spacing.lg, backgroundColor: active ? theme.primarySoft : pressed ? "#f1f5f9" : "transparent" })}
                 >
-                  <Text style={{ fontSize: 15, color: active ? theme.primary : colors.text, fontWeight: active ? "600" : "400" }}>{item.label}</Text>
+                  <Text style={{ fontSize: 15, color: active ? theme.primaryInk : colors.text, fontWeight: active ? "600" : "400" }}>{item.label}</Text>
                 </Pressable>
               );
             }}

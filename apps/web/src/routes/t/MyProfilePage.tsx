@@ -114,7 +114,7 @@ export function MyProfilePage() {
                 {m.tenant.name} <span className="text-slate-500">· {m.status.toLowerCase()}</span>
               </span>
               {m.tenant.slug !== tenant.slug && (
-                <Link to={`/t/${m.tenant.slug}/app`} className="text-sm text-primary underline">
+                <Link to={`/t/${m.tenant.slug}/app`} className="text-sm text-primary-ink underline">
                   Switch
                 </Link>
               )}
@@ -122,7 +122,7 @@ export function MyProfilePage() {
           ))}
         </ul>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link to="/?switch=1" className="text-sm text-primary underline">
+          <Link to="/?switch=1" className="text-sm text-primary-ink underline">
             Join another institution
           </Link>
           {others.length === 0 && <span className="text-xs text-slate-500">You're a member of one institution.</span>}

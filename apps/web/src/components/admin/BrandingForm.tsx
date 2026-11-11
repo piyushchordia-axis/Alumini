@@ -69,7 +69,7 @@ function ColourField({ label, value, shown, placeholder, error, warning, onChang
               title={swatchLabel(swatch)}
               onClick={() => onChange(swatch.hex)}
               className={clsx(
-                "flex h-9 w-9 items-center justify-center rounded-full border-2 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary pointer-coarse:h-11 pointer-coarse:w-11",
+                "flex h-9 w-9 items-center justify-center rounded-full border-2 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink pointer-coarse:h-11 pointer-coarse:w-11",
                 chosen ? "border-slate-900" : "border-transparent hover:border-slate-300",
               )}
             >

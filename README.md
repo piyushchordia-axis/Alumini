@@ -677,8 +677,9 @@ Only they see it: their own membership carries it, and no admin, directory or "U
   of the plain page colour at 85%, so only a soft wash of it shows. On either, grey text on the page itself steps one
   shade darker (the meta grey to the secondary one, `#5b6b80` to `#475569`: the web's `[data-backdrop]` rule, the
   phone's `theme.pageMuted` and `Muted`), so it reads at least as well as on the plain page. Brand-coloured text on the
-  page (the phone's Filters toggles) takes `pageInk` on any background, the plain one included: the brand's ink,
-  darkened as far as it must be to read at 4.5:1 under a soft 12% wash on the darkest the page gets. The web's current
+  page (the phone's Filters toggles, ghost buttons and spinners, the web digest's directory link) takes `pageInk` on any
+  background, the plain one included: the brand's ink, darkened as far as it must be to read at 4.5:1 under a soft 12%
+  wash on the darkest the page gets, a shade darker than the ink for a pale brand. The web's current
   links, in the sidebar and the More sheet, sit on the opaque chosen-state wash instead; their text takes `pageInk`
   too, which reads at 4.5:1 there for any brand, as the brand's ink itself does (`brandTones` darkens it until it reads
   on its own wash). Without its photo (an institution that took its cover away) the page is plain, and the choice comes
@@ -744,6 +745,15 @@ looks the same on the web and the phone and stays readable in any institution co
   and chat composer). On the web a focused field's edge is the brand's ink, which shows in any institution colour (the
   country box, a see-through select over a drawn box, shows its focus too), and an invalid one's the danger edge, which
   until now lost to the grey and never showed. Cards, dividers and outline buttons keep their lighter lines.
+- **Brand text.** An institution's own colour is only ever a fill, a border or a switch's track, because it may be as
+  pale as `#fde68a`, which reads at 1.25:1 on white, or nearly black. Text, icons, link underlines and focus outlines
+  and rings in the brand colour are its ink (`brandTones`), on both apps and in every console; brand text on the
+  member's page itself is the page ink (see Appearance); and text or an icon on the colour itself (a primary button,
+  the inbox's unread count, the phone's New post button, your own chat bubble, the send button) is its `onPrimary`,
+  white or, on a pale brand, slate-900, never plain white. Before, over a hundred links, icons and focus outlines
+  across the apps still drew the raw colour, and the unread count, New post's plus and a few buttons were white on it,
+  both of which a pale brand lost. The Branding form's preview and swatches still show the colours being chosen, and
+  the charts keep their own palette.
 - **Brand cover.** The landing, sign-in, registration and walk-through covers (`BrandCover` on both apps) write the
   institution's name and lines in plain white on an even black veil, as dark as `heroScrim` (`lib/color.ts`) says white
   needs to read at 4.5:1: 30% for a colour white already reads on, as the seeded institutions are; 50% for a pale one
@@ -755,9 +765,12 @@ looks the same on the web and the phone and stays readable in any institution co
 - **Tests.** `tones.test.ts` pins every pair with `contrastRatio`, the fields' edges with them (and that both apps'
   fields draw them), and checks `index.css` against the shared values; `color.test.ts` checks `heroScrim` across the
   colour cube, a photo and a gradient; `rsvp.test.ts` the RSVP rules. The e2e journeys measure what is painted
-  (`expectReadable` and `expectEdge` in `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill, skill chips, the
-  success toast, the sign-in page's field edges, and the landing's hero and its veil over Demo University's blue (30%),
-  over a pale colour served in its place (50%) and over a cover photo served with it (55%).
+  (`expectReadable`, `expectEdge` and `expectIcon` in `e2e/lib.mjs`): badges' ink and edge, the chosen RSVP's fill,
+  skill chips, the success toast, the sign-in page's field edges, and the landing's hero and its veil over Demo
+  University's blue (30%), over a pale colour served in its place (50%) and over a cover photo served with it (55%).
+  On that pale colour (`PALE_BRAND`) they read brand text too: a link and its icon on a card in its ink, a link on the
+  page in its page ink, and the inbox's unread count (and the phone's New post button) on the colour in its
+  `onPrimary`.
 
 ### Lists and loading
 

@@ -30,7 +30,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
       {d.items.length > 0 && (
         <>
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-            <IconSpark size={16} className="text-primary" /> Celebrating today
+            <IconSpark size={16} className="text-primary-ink" /> Celebrating today
           </h2>
           <ul className="mt-2 flex gap-2 overflow-x-auto pb-0.5">
             {d.items.map((c) => (

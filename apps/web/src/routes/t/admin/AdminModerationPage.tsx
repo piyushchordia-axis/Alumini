@@ -239,7 +239,7 @@ export function ModerationRow({ slug, item, features }: { slug: string; item: Mo
           </div>
           <p className="mt-1 line-clamp-2 text-sm text-slate-800">{item.title ?? item.excerpt}</p>
           <div className="mt-1 flex gap-3 text-xs">
-            <button className="text-primary underline" aria-expanded={expanded} onClick={() => setExpanded((e) => !e)}>
+            <button className="text-primary-ink underline" aria-expanded={expanded} onClick={() => setExpanded((e) => !e)}>
               {expanded ? "Hide" : "View full content"}
             </button>
             {link && (

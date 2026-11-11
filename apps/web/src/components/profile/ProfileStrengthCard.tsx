@@ -90,7 +90,7 @@ export function ProfileStrengthCard() {
     <section aria-labelledby={headingId}>
       <Card className="p-4 sm:p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
             <IconProfile size={20} />
           </span>
           <div className="min-w-0 flex-1">

@@ -74,7 +74,7 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
           >
             {/* Only for the eye: aria-pressed says whether it's chosen. */}
             {poll.allowsMultiple && (
-              <span aria-hidden className={clsx("flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border-2", on ? "border-primary bg-primary text-white" : "border-slate-400 bg-white")}>
+              <span aria-hidden className={clsx("flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border-2", on ? "border-primary-ink bg-primary-ink text-white" : "border-slate-400 bg-white")}>
                 {on && <IconCheck size={12} strokeWidth={3} />}
               </span>
             )}

@@ -172,7 +172,7 @@ export const MessageRow = memo(function MessageRow({
               Not sent{pending.error ? `: ${pending.error}` : ""}
             </Text>
             <Pressable onPress={() => actions.onRetry(pending.clientKey)} accessibilityRole="button" accessibilityLabel="Try again" style={smallButton}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: theme.primary }}>Try again</Text>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: theme.primaryInk }}>Try again</Text>
             </Pressable>
             <Pressable onPress={() => actions.onDiscard(pending.clientKey)} accessibilityRole="button" accessibilityLabel="Discard" style={smallButton}>
               <Text style={{ fontSize: 13, color: colors.muted }}>Discard</Text>

@@ -66,7 +66,7 @@ function ReportRow({ report: r }: { report: PlatformChatReportDto }) {
       {note ? (
         <span className="font-medium text-slate-900">{r.tenant.name}</span>
       ) : (
-        <Link to={`/t/${r.tenant.slug}/admin/chat-reports?status=${r.status}`} className="font-medium text-primary hover:underline">
+        <Link to={`/t/${r.tenant.slug}/admin/chat-reports?status=${r.status}`} className="font-medium text-primary-ink hover:underline">
           {r.tenant.name}
         </Link>
       )}

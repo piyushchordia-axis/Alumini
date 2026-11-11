@@ -47,7 +47,7 @@ export function PendingApprovalPage() {
   return (
     <AuthShell tenant={tenant.data} title={copy.title}>
       <div className="text-center">
-        <div aria-hidden className="mx-auto flex h-18 w-18 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div aria-hidden className="mx-auto flex h-18 w-18 items-center justify-center rounded-full bg-primary/10 text-primary-ink">
           <copy.Icon size={36} />
         </div>
         <p className="mt-4 text-sm text-slate-600">{copy.body}</p>

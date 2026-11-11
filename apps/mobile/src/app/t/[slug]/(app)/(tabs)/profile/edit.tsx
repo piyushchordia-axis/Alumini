@@ -131,7 +131,7 @@ function ProfileEditor({ tenant, membership, customFields }: { tenant: TenantPub
           aria-busy={f.busy}
           style={({ pressed }) => ({ minWidth: 64, minHeight: 44, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: pressed ? colors.bg : "transparent", opacity: f.photoBusy ? 0.5 : 1 })}
         >
-          {f.busy ? <ActivityIndicator color={theme.primary} /> : <Text style={{ fontSize: 16, fontWeight: "700", color: theme.primary }}>Save</Text>}
+          {f.busy ? <ActivityIndicator color={theme.primaryInk} /> : <Text style={{ fontSize: 16, fontWeight: "700", color: theme.primaryInk }}>Save</Text>}
         </Pressable>
       }
     >

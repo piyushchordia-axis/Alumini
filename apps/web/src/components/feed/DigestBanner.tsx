@@ -13,12 +13,12 @@ export function DigestBanner({ slug }: { slug: string }) {
   if (!d || Date.now() - new Date(d.createdAt).getTime() > 7 * 86_400_000) return null;
   return (
     <Link to={`/t/${slug}/app/digest`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm hover:bg-slate-50">
-      <IconFeed size={18} className="text-primary" />
+      <IconFeed size={18} className="text-primary-ink" />
       <span className="flex-1">
         <span className="font-medium text-slate-900">This week</span>
         <span className="text-slate-500"> · {digestSummary(d)}</span>
       </span>
-      <span className="text-primary">Read →</span>
+      <span className="text-primary-ink">Read →</span>
     </Link>
   );
 }

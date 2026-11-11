@@ -291,11 +291,11 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
             actions={
               <>
                 {c.group && (
-                  <Link to={groupPath(slug, c.id)} aria-label="Group details" title="Group details" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+                  <Link to={groupPath(slug, c.id)} aria-label="Group details" title="Group details" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink">
                     <IconInfo />
                   </Link>
                 )}
-                <button type="button" aria-label="Conversation options" onClick={() => setOptionsOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+                <button type="button" aria-label="Conversation options" onClick={() => setOptionsOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink">
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
                     <circle cx="5" cy="12" r="2" />
                     <circle cx="12" cy="12" r="2" />
@@ -403,7 +403,7 @@ function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slu
   const about = group ? groupUnavailable(group) : null;
   const title = about?.title ?? (off ? "Messages aren't available" : answered ? "This conversation isn't available" : "This conversation couldn't be opened");
   const text = about?.text ?? (off ? errorMessage(error) : answered ? "It may have been removed, or the link may be wrong." : "Check your connection, then try again.");
-  const action = "inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  const action = "inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink";
   const Icon = about ? IconGroups : off ? IconLock : IconMessages;
   return (
     <ChatPane>
@@ -422,7 +422,7 @@ function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slu
               </Button>
             )}
             {group?.myState === "INVITED" && (
-              <Link to={groupsPath(slug, "invitations")} className={clsx(action, "bg-primary text-white hover:opacity-90")}>
+              <Link to={groupsPath(slug, "invitations")} className={clsx(action, "bg-primary text-on-primary hover:opacity-90")}>
                 See invitation
               </Link>
             )}
@@ -431,7 +431,7 @@ function ThreadUnavailable({ slug, id, groupsOn, error, backTo, onRetry }: { slu
                 Group details
               </Link>
             )}
-            <Link to={backTo} className={clsx(action, about ? "text-slate-600 hover:bg-slate-100" : "bg-primary text-white hover:opacity-90")}>
+            <Link to={backTo} className={clsx(action, about ? "text-slate-600 hover:bg-slate-100" : "bg-primary text-on-primary hover:opacity-90")}>
               Back to messages
             </Link>
           </ChatNotice>

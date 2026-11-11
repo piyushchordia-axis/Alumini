@@ -26,7 +26,7 @@ export function ContactButton({
   onPress: () => void;
 }) {
   const theme = useTheme();
-  const fg = primary ? "#fff" : colors.text;
+  const fg = primary ? theme.onPrimary : colors.text;
   const icon = <Icon size={18} color={primary ? fg : colors.muted} />;
   return (
     <Pressable

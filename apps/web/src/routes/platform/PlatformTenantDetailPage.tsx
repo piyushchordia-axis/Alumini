@@ -73,7 +73,7 @@ export function PlatformTenantDetailPage() {
         }
         subtitle={
           <>
-            <a href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline">
+            <a href={`/t/${tenant.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary-ink underline">
               /t/{tenant.slug}
               <IconExternalLink size={14} />
               <span className="sr-only"> (opens in a new tab)</span>

@@ -76,7 +76,7 @@ function MemberOptions({
     <Modal open onClose={onClose} title={member.fullName}>
       <div className="flex flex-col items-start gap-2">
         {profileHref && (
-          <Link to={profileHref} className="inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-medium text-primary underline focus-visible:outline-2 focus-visible:outline-primary">
+          <Link to={profileHref} className="inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-medium text-primary-ink underline focus-visible:outline-2 focus-visible:outline-primary-ink">
             View profile
           </Link>
         )}
@@ -132,7 +132,7 @@ function MemberRow({ row, onOptions }: { row: ChatGroupMemberDto; onOptions?: ()
           type="button"
           onClick={onOptions}
           aria-label={`Options for ${member.fullName}`}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
             <circle cx="5" cy="12" r="2" />
@@ -165,7 +165,7 @@ function Members({
   return (
     <Card as="section" className="overflow-hidden">
       {/* Focus comes here after a removal, whose row and its Options button are about to go. */}
-      <h2 ref={headingRef} tabIndex={-1} className="border-b border-slate-100 px-4 py-3 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+      <h2 ref={headingRef} tabIndex={-1} className="border-b border-slate-100 px-4 py-3 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-primary-ink">
         Members · {group.memberCount}
       </h2>
       {list.view === "loading" ? (

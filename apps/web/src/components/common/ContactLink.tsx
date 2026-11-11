@@ -13,7 +13,7 @@ const KINDS: Record<ContactKind, { Icon: ComponentType<IconProps>; href: (addres
 };
 
 const action =
-  "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink";
 
 /**
  * One way to get in touch, as a 44px link with its icon: a website (in a new tab, with the rel member-entered links get),
@@ -52,7 +52,7 @@ export function ContactLink({
       href={KINDS[kind].href(address)}
       target={external ? "_blank" : undefined}
       rel={external ? EXTERNAL_REL : undefined}
-      className={clsx(action, primary ? "bg-primary text-white shadow-sm hover:opacity-90" : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}
+      className={clsx(action, primary ? "bg-primary text-on-primary shadow-sm hover:opacity-90" : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50")}
     >
       {!iconAfter && icon}
       {text}

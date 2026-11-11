@@ -97,7 +97,7 @@ function AdminMember({ id }: { id: string }) {
 
   const isSelf = m.id === me.id;
   return (
-    <AdminScreen title={m.fullName} scrollRef={scroller} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primary} colors={[theme.primary]} />}>
+    <AdminScreen title={m.fullName} scrollRef={scroller} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primaryInk} colors={[theme.primaryInk]} />}>
       <Card style={{ gap: spacing.lg }}>
         <ProfileSummary
           profile={{ ...m, isMentor: !!m.mentorProfile?.isActive }}

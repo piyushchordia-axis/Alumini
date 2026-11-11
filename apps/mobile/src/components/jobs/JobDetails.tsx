@@ -181,12 +181,12 @@ export function AboutCompany({ job, level = 1, plain = false, framed = true }: {
           )}
           {job.companyWebsite && !plain && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <IconGlobe size={16} color={theme.primary} />
+              <IconGlobe size={16} color={theme.primaryInk} />
               {/* Padded to a 44-point target; the text is the address, so where it goes is what it says. */}
-              <Text role="link" {...linkProps(job.companyWebsite)} style={{ flexShrink: 1, paddingVertical: 12, fontSize: 14, fontWeight: "600", color: theme.primary }}>
+              <Text role="link" {...linkProps(job.companyWebsite)} style={{ flexShrink: 1, paddingVertical: 12, fontSize: 14, fontWeight: "600", color: theme.primaryInk }}>
                 {shownAddress(job.companyWebsite)}
               </Text>
-              <IconExternalLink size={14} color={theme.primary} />
+              <IconExternalLink size={14} color={theme.primaryInk} />
             </View>
           )}
         </View>

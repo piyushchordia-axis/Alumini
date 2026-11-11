@@ -19,7 +19,7 @@ export function AdminDashboardPage() {
       title="Dashboard"
       subtitle={`${tenant.name} at a glance`}
       actions={
-        <Link to={`${base}/analytics`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <Link to={`${base}/analytics`} className="inline-flex items-center gap-1 text-sm font-medium text-primary-ink hover:underline">
           Growth and activity charts
           <IconChevronRight size={16} />
         </Link>
@@ -70,7 +70,7 @@ export function AdminDashboardPage() {
             ),
           )}
         </p>
-        <Link to={`${base}/settings`} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+        <Link to={`${base}/settings`} className="inline-flex items-center gap-1 font-medium text-primary-ink hover:underline">
           Settings
           <IconChevronRight size={16} />
         </Link>

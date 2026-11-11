@@ -87,7 +87,7 @@ export function InviteMembersDialog({ slug, group, open, onClose, directoryOn }:
                 type="button"
                 onClick={() => toggle(m)}
                 aria-label={`Remove ${m.fullName}`}
-                className="inline-flex min-h-11 items-center gap-1 rounded-full bg-primary/10 px-3 text-sm text-primary hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex min-h-11 items-center gap-1 rounded-full bg-primary/10 px-3 text-sm text-primary-ink hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary-ink"
               >
                 <span className="max-w-48 truncate">{m.fullName}</span>
                 <span aria-hidden>✕</span>

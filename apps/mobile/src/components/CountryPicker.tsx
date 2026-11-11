@@ -60,7 +60,7 @@ export function CountryPicker({ label, value, onChange, variant = "country", cle
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.lg, paddingBottom: spacing.sm }}>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: "700", color: colors.text }}>{label}</Text>
               <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12}>
-                <Text style={{ fontSize: 15, color: theme.primary, fontWeight: "600" }}>Close</Text>
+                <Text style={{ fontSize: 15, color: theme.primaryInk, fontWeight: "600" }}>Close</Text>
               </Pressable>
             </View>
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>

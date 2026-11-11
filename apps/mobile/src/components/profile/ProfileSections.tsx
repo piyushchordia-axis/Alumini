@@ -174,7 +174,7 @@ function OfferToMentor({ form: f }: { form: ProfileDraftController }) {
   return (
     <Pressable onPress={() => router.push(mentorsHref(slug, "be-a-mentor"))} role="link" style={{ minHeight: 44, justifyContent: "center" }}>
       <Text style={{ fontSize: 13, color: "#475569" }}>
-        Happy to guide other members? <Text style={{ color: theme.primary, fontWeight: "600", textDecorationLine: "underline" }}>Offer to mentor</Text>
+        Happy to guide other members? <Text style={{ color: theme.primaryInk, fontWeight: "600", textDecorationLine: "underline" }}>Offer to mentor</Text>
       </Text>
     </Pressable>
   );

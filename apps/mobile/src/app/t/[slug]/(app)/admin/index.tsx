@@ -43,7 +43,7 @@ export default function AdminHomeScreen() {
   // The Dashboard is this screen.
   const sections = ADMIN_SECTIONS.filter((s) => s.key !== "dashboard");
   return (
-    <AdminScreen title={tenant.shortName ?? tenant.name} home refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primary} colors={[theme.primary]} />}>
+    <AdminScreen title={tenant.shortName ?? tenant.name} home refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primaryInk} colors={[theme.primaryInk]} />}>
       <Muted size={13}>Admin console for {tenant.name}</Muted>
       {tiles ? (
         <>

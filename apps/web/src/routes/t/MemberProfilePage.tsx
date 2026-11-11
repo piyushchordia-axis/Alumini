@@ -54,7 +54,7 @@ export function MemberProfilePage() {
       <Card className="p-6">
         <ProfileSummary profile={m} nameExtras={m.role === "TENANT_ADMIN" && <Badge tone="primary">Admin</Badge>}>
           {isSelf && (
-            <Link to={`/t/${slug}/app/profile`} className="mt-2 inline-block text-sm text-primary underline">
+            <Link to={`/t/${slug}/app/profile`} className="mt-2 inline-block text-sm text-primary-ink underline">
               Edit my profile
             </Link>
           )}
@@ -70,7 +70,7 @@ export function MemberProfilePage() {
             <div>
               <dt className="text-slate-500">Phone</dt>
               <dd>
-                <a href={`tel:${m.phone}`} className="text-primary">
+                <a href={`tel:${m.phone}`} className="text-primary-ink">
                   {formatPhone(m.phone)}
                 </a>{" "}
                 <a href={`https://wa.me/${m.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-tone-success-ink">

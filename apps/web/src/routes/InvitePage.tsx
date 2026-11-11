@@ -1,3 +1,4 @@
+import { brandTones } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -20,7 +21,7 @@ export function InvitePage() {
         <Card className="w-full max-w-md p-6 text-center">
           <h1 className="text-xl font-semibold text-slate-900">Invitation not available</h1>
           <p className="mt-2 text-sm text-slate-600">{errorMessage(invite.error ?? "This invitation link is no longer valid.")} Ask your alumni office for a new one.</p>
-          <Link to="/" className="mt-4 inline-block text-primary underline">
+          <Link to="/" className="mt-4 inline-block text-primary-ink underline">
             Find your institution
           </Link>
         </Card>
@@ -43,7 +44,8 @@ export function InvitePage() {
         <p className="mt-2 text-sm text-slate-600">
           Reconnect with your batchmates, find jobs and events. Sign in with <span className="font-mono font-medium">{maskedPhone}</span>, the number this invitation was sent to.
         </p>
-        <Link to={next} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white" style={{ background: tenant.primaryColor }}>
+        {/* Painted in the invited institution's colour, so its text is that colour's on-primary, not the theme's. */}
+        <Link to={next} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold" style={{ background: tenant.primaryColor, color: brandTones(tenant.primaryColor).onPrimary }}>
           Accept invitation
         </Link>
       </Card>

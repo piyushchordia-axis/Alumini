@@ -53,6 +53,14 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   They don't see a photo under the page's veil, and they refuse a faded (disabled) element. An element a re-render
   replaced between being found and being read has left the page, which isn't a fade: `paintedColour` finds it again
   and reads that, a few times, before saying it kept leaving.
+- `expectIcon(svg, where)` checks an SVG icon at 3:1 on what's behind it, reading the stroke of its first shape, which
+  both apps draw in. `PALE_BRAND` is a pale yellow no seeded institution has (`#fde68a`, 1.25:1 on white), with the
+  ink, page ink and on-primary both apps draw from it. Demo University's ink is its blue, so only a pale colour served
+  in its place (`scriptTenant`, in a tab of a signed-in member's own or on the main page until a reload) tells the ink
+  from the raw colour: web-member reads the digest banner's Read and its icon (the ink, on the card), the digest's
+  directory link (the page ink, on the plain page) and an unread request's count in the inbox (on-primary, on the
+  colour); mobile-web the same count, My profile's Notifications link and icon, Delete my account (the page ink) and
+  the feed's New post plus.
 - `expectEmptyState(box, where, { actions, absent, tones })` checks an empty state or a chat notice, found from its
   title (the web's `h3` directly inside it, the phone's title as a direct child), or the note before a first message
   (the web's `role="note"` named by its title; on the phone the card two levels above the title, which sits in a column

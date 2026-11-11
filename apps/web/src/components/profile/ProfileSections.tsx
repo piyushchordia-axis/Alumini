@@ -54,7 +54,7 @@ function SubHeading({ children, hint }: { children: ReactNode; hint?: ReactNode 
  */
 export function DisclosureSummary({ children }: { children: ReactNode }) {
   return (
-    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-4 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
+    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-4 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ink [&::-webkit-details-marker]:hidden">
       <span>{children}</span>
       <IconChevronDown size={18} className="text-slate-400 transition-transform [[open]>summary>&]:rotate-180" />
     </summary>
@@ -241,7 +241,7 @@ function OfferToMentor({ form: f }: { form: ProfileFormController }) {
       {f.dirty ? (
         "Save your profile, then you can offer to mentor."
       ) : (
-        <Link to={mentorsPath(slug, "be-a-mentor")} className="font-medium text-primary underline">
+        <Link to={mentorsPath(slug, "be-a-mentor")} className="font-medium text-primary-ink underline">
           Offer to mentor
         </Link>
       )}

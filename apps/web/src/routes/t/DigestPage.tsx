@@ -88,7 +88,7 @@ export function DigestPage() {
             <div className="flex items-start gap-2 text-sm text-slate-600">
               <IconDirectory size={16} className="mt-0.5 text-slate-400" />
               <p>
-                {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week. <Link to={`${base}/directory`} className="text-primary underline">See the directory</Link>
+                {d.newMembers} new member{d.newMembers === 1 ? "" : "s"} joined that week. <Link to={`${base}/directory`} className="text-page-ink underline">See the directory</Link>
               </p>
             </div>
           )}

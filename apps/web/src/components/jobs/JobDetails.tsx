@@ -159,7 +159,7 @@ export function JobDetails({
             id={titleId}
             tabIndex={titleId ? -1 : undefined}
             className={clsx(
-              "font-display font-semibold tracking-tight text-slate-900 outline-none [overflow-wrap:anywhere] focus-visible:ring-2 focus-visible:ring-primary/40",
+              "font-display font-semibold tracking-tight text-slate-900 outline-none [overflow-wrap:anywhere] focus-visible:ring-2 focus-visible:ring-primary-ink",
               level === 1 ? "text-xl sm:text-2xl" : "text-base",
             )}
           >
@@ -238,7 +238,7 @@ export function AboutCompany({ job, level = 1, plain = false, className }: { job
                 {job.companyWebsite}
               </p>
             ) : (
-              <a href={job.companyWebsite} target="_blank" rel={EXTERNAL_REL} className="mt-1 inline-flex min-h-11 max-w-full items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+              <a href={job.companyWebsite} target="_blank" rel={EXTERNAL_REL} className="mt-1 inline-flex min-h-11 max-w-full items-center gap-1.5 text-sm font-medium text-primary-ink hover:underline">
                 <IconGlobe size={16} />
                 <span className="min-w-0 [overflow-wrap:anywhere]">{shownAddress(job.companyWebsite)}</span>
                 <IconExternalLink size={14} />

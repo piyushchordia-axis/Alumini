@@ -23,13 +23,13 @@ export function DigestBanner({ slug }: { slug: string }) {
       style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 }}
     >
       <View aria-hidden>
-        <IconFeed size={18} color={theme.primary} />
+        <IconFeed size={18} color={theme.primaryInk} />
       </View>
       <Text style={{ flex: 1, color: colors.text }}>
         <Text style={{ fontWeight: "700" }}>This week</Text>
         <Text style={{ color: colors.muted }}> · {digestSummary(d)}</Text>
       </Text>
-      <Text style={{ color: theme.primary, fontWeight: "600" }}>Read →</Text>
+      <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Read →</Text>
     </Pressable>
   );
 }

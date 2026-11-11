@@ -106,7 +106,7 @@ export function ProfileStrengthCard() {
       <Card style={{ gap: spacing.md }}>
         <View style={styles.header}>
           <View style={[styles.badge, { backgroundColor: theme.primarySoft }]}>
-            <IconProfile size={20} color={theme.primary} />
+            <IconProfile size={20} color={theme.primaryInk} />
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <Text {...headingRole(2)} style={styles.title}>

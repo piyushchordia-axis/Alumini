@@ -53,7 +53,7 @@ function JobLine({ slug, r }: { slug: string; r: ReferralDto }) {
     // The whole line, so a long title wraps after "For" rather than under it, and a full 44-point target.
     <Pressable onPress={() => router.push(jobHref(slug, id))} accessibilityRole="link" accessibilityLabel={what} style={{ minHeight: 44, justifyContent: "center" }}>
       <Text style={line}>
-        For <Text style={{ fontWeight: "600", color: theme.primary, textDecorationLine: "underline" }}>{what}</Text>
+        For <Text style={{ fontWeight: "600", color: theme.primaryInk, textDecorationLine: "underline" }}>{what}</Text>
       </Text>
     </Pressable>
   );

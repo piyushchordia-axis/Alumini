@@ -56,7 +56,7 @@ function ConversationRow({ c, now, onPress }: { c: ChatConversationDto; now: Dat
           )}
           {unread && (
             <View style={{ minWidth: 20, height: 20, borderRadius: radius.full, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
-              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{c.unread > 99 ? "99+" : c.unread}</Text>
+              <Text style={{ color: theme.onPrimary, fontSize: 11, fontWeight: "700" }}>{c.unread > 99 ? "99+" : c.unread}</Text>
             </View>
           )}
         </View>

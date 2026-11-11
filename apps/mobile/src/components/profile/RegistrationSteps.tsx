@@ -418,7 +418,7 @@ function CopyBanner({ copy, message, note, onUse, onUndo }: CopyBannerProps) {
         </View>
       ) : (
         <View style={[styles.banner, { borderColor: theme.primarySoft, backgroundColor: theme.primarySoft }]}>
-          <IconSwitch size={20} color={theme.primary} />
+          <IconSwitch size={20} color={theme.primaryInk} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.bannerTitle}>You have a profile at {source}</Text>
             <Text style={styles.bannerText}>{portableProfileOfferText(copy)}</Text>

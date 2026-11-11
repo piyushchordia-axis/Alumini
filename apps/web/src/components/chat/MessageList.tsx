@@ -55,7 +55,7 @@ export function MessageList({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div ref={ref} onScroll={onScroll} role="log" aria-label={label} aria-busy={loadingOlder} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 [overflow-anchor:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:px-5">
+      <div ref={ref} onScroll={onScroll} role="log" aria-label={label} aria-busy={loadingOlder} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 [overflow-anchor:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-ink sm:px-5">
         <div>
           {hasOlder && (
             <div className="flex justify-center pb-3">
@@ -77,7 +77,7 @@ export function MessageList({
         </div>
       </div>
       {!pinned && (
-        <button type="button" onClick={jumpToLatest} className="absolute bottom-3 left-1/2 flex min-h-11 -translate-x-1/2 items-center gap-1 rounded-full bg-slate-900 px-4 text-sm font-medium text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        <button type="button" onClick={jumpToLatest} className="absolute bottom-3 left-1/2 flex min-h-11 -translate-x-1/2 items-center gap-1 rounded-full bg-slate-900 px-4 text-sm font-medium text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink">
           {hasNew ? "New messages" : "Jump to latest"} <span aria-hidden>↓</span>
         </button>
       )}
@@ -172,7 +172,7 @@ const Bubble = memo(function Bubble({
             title="Report message"
             onClick={() => actions.onReport(message.id)}
             className={clsx(
-              "absolute left-full top-1/2 ml-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-red-600 focus:opacity-100 focus-visible:outline-2 focus-visible:outline-primary",
+              "absolute left-full top-1/2 ml-1 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-red-600 focus:opacity-100 focus-visible:outline-2 focus-visible:outline-primary-ink",
               selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 pointer-coarse:pointer-events-none",
             )}
           >
@@ -188,10 +188,10 @@ const Bubble = memo(function Bubble({
             <span className="px-1 text-red-600" role="alert">
               Not sent{pending.error ? `: ${pending.error}` : ""}
             </span>
-            <button type="button" onClick={() => actions.onRetry(pending.clientKey)} className="min-h-11 rounded-md px-2 font-semibold text-primary hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+            <button type="button" onClick={() => actions.onRetry(pending.clientKey)} className="min-h-11 rounded-md px-2 font-semibold text-primary-ink hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink">
               Try again
             </button>
-            <button type="button" onClick={() => actions.onDiscard(pending.clientKey)} className="min-h-11 rounded-md px-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary">
+            <button type="button" onClick={() => actions.onDiscard(pending.clientKey)} className="min-h-11 rounded-md px-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary-ink">
               Discard
             </button>
           </div>

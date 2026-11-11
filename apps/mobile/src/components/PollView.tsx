@@ -85,7 +85,7 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
               {poll.allowsMultiple && (
                 <View
                   aria-hidden
-                  style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: on ? theme.primary : colors.faint, backgroundColor: on ? theme.primary : colors.card, alignItems: "center", justifyContent: "center" }}
+                  style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: on ? theme.primaryInk : colors.faint, backgroundColor: on ? theme.primaryInk : colors.card, alignItems: "center", justifyContent: "center" }}
                 >
                   {on && <IconCheck size={12} color="#fff" strokeWidth={3} />}
                 </View>
@@ -104,7 +104,7 @@ export function PollView({ slug, postId, poll, canVote }: { slug: string; postId
       {canVote && !poll.isClosed && voted && !changing && (
         <Row>
           <Pressable onPress={() => setChanging(true)} accessibilityRole="button" hitSlop={8}>
-            <Text style={{ color: theme.primary }}>Change vote</Text>
+            <Text style={{ color: theme.primaryInk }}>Change vote</Text>
           </Pressable>
           <Pressable onPress={() => clear.mutate()} accessibilityRole="button" hitSlop={8}>
             <Text style={{ color: colors.muted }}>Remove vote</Text>

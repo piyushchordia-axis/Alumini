@@ -22,7 +22,7 @@ const NAME = "font-semibold text-slate-900 [overflow-wrap:anywhere]";
  */
 function GroupRow({ slug, group, title, badges, children, actions }: { slug: string; group: ChatGroupDto; title?: string; badges?: ReactNode; children?: ReactNode; actions?: ReactNode }) {
   return (
-    <Card as="article" className="relative p-4 transition focus-within:ring-2 focus-within:ring-primary/30 hover:border-slate-300 hover:shadow">
+    <Card as="article" className="relative p-4 transition has-focus-visible:ring-2 has-focus-visible:ring-primary-ink hover:border-slate-300 hover:shadow">
       <div className="flex items-start gap-3">
         <Avatar name={title ?? group.name} size="md" />
         <div className="min-w-0 flex-1">
@@ -64,7 +64,7 @@ export function GroupCard({ slug, group }: { slug: string; group: ChatGroupDto }
       }
       actions={
         member ? (
-          <Link to={groupChatPath(slug, group.id)} aria-label={`Open chat, ${group.name}`} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-primary">
+          <Link to={groupChatPath(slug, group.id)} aria-label={`Open chat, ${group.name}`} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-primary-ink">
             Open chat
           </Link>
         ) : undefined

@@ -29,7 +29,7 @@ export function UnsubscribePage() {
             <p className="mt-2 text-sm text-slate-600">
               You won't get {WHAT[done.scope]} from {done.tenantName}. You can turn it back on any time in the app under Notifications → Settings.
             </p>
-            <Link to="/" className="mt-4 inline-block text-primary underline">
+            <Link to="/" className="mt-4 inline-block text-primary-ink underline">
               Open Illuminize
             </Link>
           </>

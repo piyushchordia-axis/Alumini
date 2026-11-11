@@ -91,7 +91,7 @@ export default function AdminAnalyticsScreen() {
     }
   };
   return (
-    <AdminScreen title="Analytics" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primary} colors={[theme.primary]} />}>
+    <AdminScreen title="Analytics" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={theme.primaryInk} colors={[theme.primaryInk]} />}>
       <Muted size={13}>{q.data ? `Weeks start on Monday, ${q.data.timeZone} time` : "How your community is growing"}</Muted>
       <ChipSelect label="Period" options={RANGE_OPTIONS} value={String(weeks)} onChange={(v) => router.setParams({ weeks: v || undefined })} tall />
       <ExportButtons

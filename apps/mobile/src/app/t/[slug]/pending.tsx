@@ -46,7 +46,7 @@ export default function PendingScreen() {
     <Screen topInset>
       <View style={{ alignItems: "center", gap: 12, paddingVertical: 32 }}>
         <View aria-hidden style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.primarySoft, alignItems: "center", justifyContent: "center" }}>
-          <copy.Icon size={36} color={theme.primary} />
+          <copy.Icon size={36} color={theme.primaryInk} />
         </View>
         <Title>{copy.title}</Title>
         <Text style={{ color: colors.muted, textAlign: "center", lineHeight: 20 }}>{copy.body}</Text>

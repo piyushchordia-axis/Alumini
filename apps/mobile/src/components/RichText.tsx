@@ -97,7 +97,7 @@ export function RichText({ text, style }: { text: string | null | undefined; sty
   return (
     <View style={styles.root}>
       {blocks.map((block, i) => (
-        <Block key={i} block={block} style={style} linkColor={theme.primary} />
+        <Block key={i} block={block} style={style} linkColor={theme.primaryInk} />
       ))}
     </View>
   );

@@ -49,7 +49,7 @@ export function CompanyReuseOffer({ slug, company, excludeId, current, onUse }: 
     <div role="status">
       {found && offered ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-          <IconBuilding size={20} className="text-primary" />
+          <IconBuilding size={20} className="text-primary-ink" />
           <p className="min-w-0 flex-1 basis-48 text-sm text-slate-700">{companyReuseText(found.companyName, fill)}</p>
           <Button
             type="button"
@@ -66,7 +66,7 @@ export function CompanyReuseOffer({ slug, company, excludeId, current, onUse }: 
           </Button>
         </div>
       ) : showDone ? (
-        <p ref={done} tabIndex={-1} className="mt-3 text-sm text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+        <p ref={done} tabIndex={-1} className="mt-3 text-sm text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-primary-ink">
           Filled in from your last job at {used}. Check them before you post.
         </p>
       ) : null}

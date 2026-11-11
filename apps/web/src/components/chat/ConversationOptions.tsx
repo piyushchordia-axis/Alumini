@@ -90,7 +90,7 @@ export function ConversationOptions({ slug, conversation, open, onClose, onBlock
         )}
 
         <div className="border-t border-slate-100 pt-4">
-          <Link to={`/t/${slug}/app/messages/blocked`} onClick={close} className="inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-medium text-primary underline focus-visible:outline-2 focus-visible:outline-primary">
+          <Link to={`/t/${slug}/app/messages/blocked`} onClick={close} className="inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-medium text-primary-ink underline focus-visible:outline-2 focus-visible:outline-primary-ink">
             Blocked members
           </Link>
         </div>

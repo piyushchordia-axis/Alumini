@@ -16,7 +16,7 @@ function Inlines({ nodes }: { nodes: RichInline[] }) {
         href={node.href}
         target={node.href.startsWith("mailto:") ? undefined : "_blank"}
         rel={EXTERNAL_REL}
-        className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+        className="font-medium text-primary-ink underline decoration-primary-ink/40 underline-offset-2 hover:decoration-primary-ink"
       >
         {node.text}
       </a>

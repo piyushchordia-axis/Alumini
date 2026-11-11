@@ -66,7 +66,7 @@ export function NewConversationPage() {
               title={directOff ? "Private messages aren't available" : "You can't message this member"}
               text={directOff ? `${tenant.shortName ?? tenant.name} has switched private messages off.` : "They can't be contacted here at the moment."}
             >
-              <Link to={inbox} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              <Link to={inbox} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-on-primary hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink">
                 Back to messages
               </Link>
             </ChatNotice>

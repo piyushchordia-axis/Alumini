@@ -251,7 +251,7 @@ function BackdropTile({
       aria-busy={busy || undefined}
       onClick={onSelect}
       className={clsx(
-        "relative flex min-h-11 w-full flex-col gap-2 rounded-xl p-2 text-left text-sm font-medium transition duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+        "relative flex min-h-11 w-full flex-col gap-2 rounded-xl p-2 text-left text-sm font-medium transition duration-[var(--duration-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink",
         checked ? "bg-primary-wash text-primary-ink ring-2 ring-primary-ring" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 hover:ring-slate-300",
       )}
     >

@@ -23,7 +23,7 @@ export function MentorAreas({ areas }: { areas: MentorArea[] }) {
 export function MentorCard({ slug, mentor }: { slug: string; mentor: MentorCardDto }) {
   const { member } = mentor;
   return (
-    <Card as="article" className="relative p-4 transition focus-within:ring-2 focus-within:ring-primary/30 hover:border-slate-300 hover:shadow">
+    <Card as="article" className="relative p-4 transition has-focus-visible:ring-2 has-focus-visible:ring-primary-ink hover:border-slate-300 hover:shadow">
       <div className="flex items-start gap-3">
         <Avatar name={member.fullName} src={member.avatarUrl} size="md" toneKey={member.id} />
         <div className="min-w-0 flex-1">

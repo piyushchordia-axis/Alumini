@@ -20,7 +20,7 @@ const firstName = (fullName: string) => fullName.split(/\s+/)[0] ?? fullName;
 /** What this member can do about this mentor: ask, see where their request stands, or open the chat it led to. */
 export function MentorAction({ slug, mentor }: { slug: string; mentor: MentorDto }) {
   const name = mentor.member.fullName;
-  const action = "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-primary";
+  const action = "inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-primary-ink";
   if (mentor.isMe)
     return (
       <div className="space-y-2">
@@ -93,7 +93,7 @@ function MentorDetailPage({ id }: { id: string }) {
             <p className="text-sm text-slate-600 [overflow-wrap:anywhere]">{memberRoleLine(member)}</p>
             <p className="text-sm text-slate-500">{memberYearsLine(member, member.city)}</p>
             {tenant.settings.features.directory && (
-              <Link to={`/t/${slug}/app/directory/${member.id}`} className="mt-1 inline-flex min-h-11 items-center text-sm text-primary underline">
+              <Link to={`/t/${slug}/app/directory/${member.id}`} className="mt-1 inline-flex min-h-11 items-center text-sm text-primary-ink underline">
                 View full profile
               </Link>
             )}

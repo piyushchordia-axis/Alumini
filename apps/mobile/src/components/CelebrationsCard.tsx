@@ -30,7 +30,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
       {d.items.length > 0 && (
         <View style={{ gap: 8 }}>
           <Row gap={6}>
-            <IconSpark size={16} color={theme.primary} />
+            <IconSpark size={16} color={theme.primaryInk} />
             <Text style={{ fontWeight: "700", color: colors.text, fontSize: 14 }}>Celebrating today</Text>
           </Row>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -68,7 +68,7 @@ export function CelebrationsCard({ slug }: { slug: string }) {
           <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>On your birthday, classmates see it here (day only, never the year).</Text>
           <Row>
             <Pressable onPress={() => seen.mutate()} accessibilityRole="button" hitSlop={8}>
-              <Text style={{ color: theme.primary, fontWeight: "600" }}>Got it</Text>
+              <Text style={{ color: theme.primaryInk, fontWeight: "600" }}>Got it</Text>
             </Pressable>
             <Pressable onPress={() => router.push(`/t/${slug}/profile/edit`)} accessibilityRole="link" hitSlop={8}>
               <Text style={{ color: colors.muted }}>Change in profile</Text>
