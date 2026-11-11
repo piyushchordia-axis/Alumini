@@ -90,11 +90,40 @@ phone-sized preview in the browser. Port 4000 must still be public.
 
 **Usability pass**
 
+Three parts of it are told where they show, further down: the welcome on a member's first visit (under Richer
+profiles), More's groups with the phone feed's **Explore** row and **Upcoming events** (Wave 2), and the framed pinned
+posts (Wave 1, Polls and announcements). The rest, on the web and the phone alike:
+
+- **Easier to read.** Small grey text (times, places, counts, hints) is a shade darker, form boxes have a clear grey
+  edge on their white cards, and the name and tagline on an institution's cover are plain white over a veil just dark
+  enough to read them, whatever its colour. Members without a photo have initials in a colour of their own, the same
+  on every screen.
 - **Tags that read in any colour.** Badges, skill chips and the chat list's **Archived** tag have a thin edge in their
   colour and the same fills on the web and the phone, so a pale institution colour no longer fades them into the card.
   RSVP to the Mumbai coffee meetup: your answer is drawn in its colour (green for **I'm going**, amber for **Maybe**)
   with a check, and a poll marks your vote with a check too. Errors under a field are a darker red that reads on the
   page, and toasts read better.
+- **Lists that keep their place.** The first time a list opens, a grey outline of its cards stands in under its title
+  and search box until they come. In **Directory** or **Jobs**, type a search or change a filter: the cards already
+  listed stay, faded, with a small **Updating results…** above them, until the new ones arrive, rather than the list
+  emptying to an outline each time (on a fast connection it can be over in a blink). The search asks once you pause
+  typing, not at every letter. The admin console's **Members** works the same way on the web now, with no **Search**
+  button: the rows stay faded while a search loads, their names still links but **Approve** and **Suspend** held until
+  the new rows arrive, and the search stays in the address. A post, job, event or listing you open keeps its header
+  and Back over an outline of the page while it loads, and if it can't load, says so there with **Retry loading**.
+- **Profiles that open at once.** In **Directory**, open **Priya Nair** from her card: her initials, name, headline,
+  years and **Mentor** badge show straight away, from the card, with an outline of the rest until her full profile
+  arrives. On the web, pointing at **Directory** in the menu, or tabbing to it, fetches its first cards ahead, so it
+  opens on them; the phone app fetches them once the feed has loaded.
+- **A first message, welcomed** (on fresh demo data: run `pnpm db:reset` first, because once Priya has written to Sneha,
+  as Wave 2's Messages walk-through does, the page opens their thread instead). As Priya, choose **Message this member**
+  on Sneha Kulkarni's profile: in place of the old warning, a note, **Say hello to Sneha Kulkarni**, says her first
+  message arrives as a request and gives a tip for writing it. Once it's sent, **Request sent** has the date she could
+  ask again on a line of its own, with a clock.
+- **Choices that keep words whole.** Under **Mentors → Be a mentor**, the twelve areas are chips as wide as their
+  names, wrapping onto more lines, where a fixed grid used to break "Entrepreneurship" in two; a chosen one is tinted,
+  its box ticked. A job's key facts sit side by side only where their longest word fits, down to one column at large
+  text sizes.
 - **Empty screens that say what's next.** Join Demo University with a new number and open **Messages**: the empty
   inbox offers **Find people**, which opens the Directory (each profile there has **Message this member**), and **Find
   a group**. Create a group, and its thread says "No messages yet" until someone writes. In **My posts** (under More on
@@ -104,17 +133,6 @@ phone-sized preview in the browser. Port 4000 must still be public.
   Businesses do. Open a post you've just written: "No comments yet" invites the first reply. On the phone, an event's
   **Who's coming** now has the web's **Going** and **Maybe** tabs; on **London pub night** (Events → Past), which is
   over, both say only that nobody answered, where an upcoming event's empty list invites you to be the first.
-- **A first message, welcomed** (on fresh demo data: run `pnpm db:reset` first, because once Priya has written to Sneha,
-  as Wave 2's Messages walk-through does, the page opens their thread instead). As Priya, choose **Message this member**
-  on Sneha Kulkarni's profile: in place of the old warning, a note, **Say hello to Sneha Kulkarni**, says her first
-  message arrives as a request and gives a tip for writing it. Once it's sent, **Request sent** has the date she could
-  ask again on a line of its own, with a clock.
-- **Results that stay while you search.** In **Directory** or **Jobs**, type a search or change a filter: the cards
-  already listed stay, faded, with a small **Updating results…** above them, until the new ones arrive, rather than the
-  list emptying to an outline each time (on a fast connection it can be over in a blink). The search asks once you
-  pause typing, not at every letter. The admin console's **Members** works the same way on the web now, with no
-  **Search** button: the rows stay faded while a search loads, their names still links but **Approve** and
-  **Suspend** held until the new rows arrive, and the search stays in the address.
 - **Photos and PDFs in chat.** Sign in as Rahul and open his chat with Priya: the paperclip beside the box, **Add photos
   or a file**, adds up to four photos and PDFs (a file chooser on the web, where a photo pasted or dropped on the box
   goes in too; on the phone a sheet with **Photos** and **PDF file**). Each waits in a tray while it uploads, and Send
@@ -122,11 +140,6 @@ phone-sized preview in the browser. Port 4000 must still be public.
   (**Share photo** on the phone) and, on someone else's message, **Report message**; a PDF is a card that downloads (on
   the phone, opens the share sheet). A first message can't carry any: the line under the box says "Photos and files can
   be sent once … accepts."
-- **Profiles that open at once.** In **Directory**, open **Priya Nair** from her card: her initials, name, headline,
-  years and **Mentor** badge show straight away, from the card, with an outline of the rest until her full profile
-  arrives (on a fast connection it can be over in a blink). On the web, pointing at **Directory** in the menu, or
-  tabbing to it, fetches its first cards ahead, so it opens on them; the phone app fetches them once the feed has
-  loaded.
 
 **Start and end years for every member** (run `pnpm db:reset` first)
 
@@ -273,10 +286,10 @@ feed its card says **You: yes**.
      why, but no messages. Another report is already there: Meera reported a threatening message from Arjun.
   7. Choose **View messages** on Sneha's report. You see the reported message and the few around it, and nothing else
      of their chat. Priya's photo and PDF, if they're among them, show under her message: choose the photo to see it,
-     or download the PDF, for 15 minutes after View messages. Choose **Remove message** and confirm: it becomes "This message was removed" in both members'
-     chats, and Priya is told. Then open **Audit log**: your view is recorded as `chat_report.view`, and the removal as
-     `chat_report.resolve`. Leaving Chat reports hides the messages, so seeing them again means choosing View messages
-     again, which is recorded too.
+     or download the PDF, for 15 minutes after View messages. Choose **Remove message** and confirm: it becomes "This
+     message was removed" in both members' chats, and Priya is told. Then open **Audit log**: your view is recorded as
+     `chat_report.view`, and the removal as `chat_report.resolve`. Leaving Chat reports hides the messages, so seeing
+     them again means choosing View messages again, which is recorded too.
 
   Also try **Conversation options → Block member** in a chat: the other member isn't told, and nothing they send
   reaches you from then on. **Blocked members**, at the top of Messages, lists them and lets you unblock. Pushes to a

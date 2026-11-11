@@ -1619,8 +1619,13 @@ apps/mobile/src   app/ (expo-router screens: tabs under (app)/(tabs), chat and o
                   admin console under (app)/admin), components/ (ui, icons via react-native-svg, profile, jobs,
                   RichText…), hooks/, lib/ (files.ts: picking and sharing files), stores/, theme/
 packages/shared   constants (enums, labels, countries), zod schemas, DTO types, client/ (typed fetch client, upload
-                  helpers), realtime/ (events and client), chat/ (chat cache and live sync, no React),
-                  lib/ (features.ts: switches and current pupils; sections.ts: the member app's sections;
+                  helpers), realtime/ (events and client), chat/ (chat cache and live sync, no React; labels.ts:
+                  what a thread says under its box (threadFooter); rerequest.ts: the timer for asking again;
+                  empty.ts: an empty inbox and thread; attachments.ts and attachmentLinks.ts: chat photos' and
+                  files' rules, tray and links), lib/ (features.ts: switches and current pupils; sections.ts:
+                  the member app's sections, their names and lines, and More's groups; welcome.ts: the first-entry
+                  walk-through; emptyStates.ts: what empty lists say and offer; events.ts: the phone feed's
+                  Upcoming events strip;
                   profile.ts: profile sections, registration steps, strength and "Use details from";
                   memberYears.ts: a member's start and end years, their text and their rules; skills.ts;
                   salary.ts: formatSalary; jobs.ts: open, place, experience and facts; richText.ts: the parser;
@@ -1919,6 +1924,9 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     listings resolve theirs). A report filed while a listing is being deleted can still slip in the same way.
   - `CONTENT_REMOVED` pushes include the admin's note, which chat removals keep in the app.
   - Illuminize staff reach only escalated chat reports, even in an institution where they are genuine admins.
+- Events: an event's Going and Maybe counts can be more than the people its lists show. The counts (`recountRsvps`)
+  take every answer, where the lists (`listAttendees`) show approved members only, so a member suspended since still
+  counts; and the counts are taken again only when someone answers, so a deleted account's answer counts until then.
 - Uploads:
   - A CDN in front of S3 may keep serving a deleted profile or background photo until its cached copy expires.
   - Only a profile or background photo has to be the member's own upload. Job company logos, business logos, post
@@ -1965,8 +1973,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - At a community, "N years with us" on the celebrations card still counts from when the membership was approved in
     the app, not from "Member since".
   - At a community, Settings still calls the end years' range "Earliest batch year" and "Latest batch year" (it bounds
-    "Until"), and some copy still says "batchmates": the directory's subtitle, the empty feed, jobs and businesses, the
-    profile strength card, the bio's placeholder, the invitation page and the invitation email.
+    "Until"), and some copy still says "batchmates": the web directory's subtitle, the profile strength card, the bio's
+    placeholder, the invitation page and the invitation email.
 - The admin console in the phone app:
   - Illuminize staff who aren't members of an institution can't use its console in the phone app, which needs an
     approved membership there; they use the web console.
@@ -1980,6 +1988,8 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
   - A few web lists still read a query's error directly: the console's Moderation, Reports and Chat reports, the
     platform's audit log and chat reports, and the institution picker show it, with no Retry, above any rows they keep
     when a refetch fails.
+  - On the phone, a list whose next page fails to load says nothing about it, in the member app and the console alike:
+    its spinner just goes. The web says what went wrong above Load more (`nextPageError`).
   - Focus while a page loads: the phone's Edit profile draws its bar afresh when the institution's questions come (its
     editor owns the bar's Save), so on the web build a Back focused meanwhile loses focus then. A job's, a group's or a
     mentor's own "unavailable" notice, on both apps, gives way to the outline while its Retry is on its way, so the
@@ -2003,20 +2013,31 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
     step names, a third of the row each and not capped, wrap at their spaces (after the number first), but a word wider
     than its third breaks inside it (on the web from about 1.75 times the text size on a 320-pixel screen, and past
     twice it on 390), though never cut short.
-  - Emoji no longer stand in for icons, but typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls on both
-    apps and in the consoles (close, back, send, checkmarks, a chat's options and a few arrows) rather than the shared
-    SVG set.
+  - Emoji no longer stand in for icons, and checkmarks, chevrons, send and the info mark are SVG, but typographic
+    glyphs still draw a few controls rather than the shared SVG set: ✕ to close the web's dialogs (`Modal`) and to
+    remove a poll option (both apps), a photo from the phone's new post or an invitee from a group's invite list (both
+    apps); ‹ and ← for Back in the phone's bars (`StackHeader`, `ChatFrame`: ‹ on iOS, ← elsewhere), and ‹ on its
+    sign-in screen's Back; ⋯ for the phone's Conversation options and a group member's options; → after the digest
+    banner's Read (both apps); ↓ on a chat's Jump to latest (both apps); and ↑ ↓ for the platform's Compare sort.
 - Colour and contrast:
   - The readable-colours guard skips the phone's StyleSheet entries and style maps (it reads only the style written on
-    the element) and, on the web, `text-slate-400` outside a `className` (a class map may be an icon's), as well as a
-    colour value held in a variable or passed down as a prop. Raw brand and white-on-brand classes are checked in any
-    string on the web, class maps included.
+    the element) and white text on the phone's brand fill (`theme.primary`), and, on the web, `text-slate-400` outside
+    a `className` (a class map may be an icon's), as well as a colour value held in a variable or passed down as a
+    prop. Raw brand and white-on-brand classes are checked in any string on the web, class maps included.
   - On the phone, icons in the faint grey drawn on the page itself, not in a card, can fall below 3:1 over a member's
     dark background photo (2.52:1 over black under the page's veil). The web steps them to the meta grey on a tint or
     a photo (`[data-backdrop]`); the phone has no such step.
+  - The phone's `ChipSelect` (one choice among chips: the filters, a form's single choices such as a job's type, and
+    the console's Moderation, Analytics and Audit log) and the web console's audit log chips still draw the chosen chip
+    in the solid brand colour with `onPrimary` text, not the wash, ring and ink of the other chosen states, and with no
+    tick, so with a pale institution colour it barely stands out from white.
 - Sign-in: refresh tokens rotate with no grace period, so a refresh whose response is lost signs the member out.
-- Tests: reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a
-  note report, are covered by the API tests only.
+- Tests:
+  - Reporting a declined, withdrawn or closed mentorship or referral request's note, and the admin's view of a note
+    report, are covered by the API tests only.
+  - The API test "tells the client its token expired and disconnects" (`test/integration/realtime.test.ts`) gives its
+    server 1-second access tokens (`ACCESS_TOKEN_TTL_SEC: "1"`), so on a busy machine the token can expire before the
+    socket connects and the test fails; it passes run again, or on its own.
 
 **Also.**
 

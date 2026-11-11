@@ -173,22 +173,23 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **Rich text.** Long member-written text renders through `RichText` (web `components/common/RichText.tsx`, mobile
   `components/RichText.tsx`), never `dangerouslySetInnerHTML`; cards use `plainExcerpt`, forms show `RICH_TEXT_HINT`.
   Posts, comments and chat stay plain text.
-- **Uploads.** Every image goes through `storeUpload` (`processImage` in `src/lib/images.ts`, then the `uploads`
-  ledger). A profile photo changes only through `applyAvatarChange`, inside the saving transaction: it must be an avatar
-  the member (or the editing admin) uploaded here, and the photo it replaces is deleted after commit if unused. The
-  server decides by the bytes, never the declared type. A picked file is never uploaded as it is: pickers prepare every
-  pick (`useImageUpload` with `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with
-  `prepareImageFile` on web) and check the prepared file with `imageFileProblem`, and the phone deletes both the
-  picker's copy and the prepared one afterwards. The one exception is a chat photo: the phone keeps its prepared copy as
-  the preview until its tray item or outbox entry is released (`onOutboxRelease`), then deletes it: a sent one's 60
-  seconds later, as the bubble's placeholder, a discarded one's (and all at sign-out) at once; the picker's copy still
-  goes straight away (mobile `lib/chatAttachments.ts`). A member's background photo (purpose `backdrop`) follows the
-  profile photo's rules, through `applyBackdropPhotoChange`, and the clean-up and the sweep cover it. Chat photos and
-  PDFs keep their own ledger instead: `uploadChatAttachment` (`services/chat/attachments.service.ts`) stores them in
-  private storage (`ctx.privateStorage`, never `storeUpload`, `/uploads`, the `uploads` table or the public bucket) with
-  a row in `chat_attachments`, which a send claims inside `appendMessage`'s transaction; photos still go through
-  `processImage`, and the server still decides the type by the bytes. Members reach them only by short-lived signed
-  links (`chatAttachmentLinks`, and staff the report's audited view), never an address in a DTO or a socket event.
+- **Uploads.** Every image but a chat photo goes through `storeUpload` (`processImage` in `src/lib/images.ts`, then
+  the `uploads` ledger). A profile photo changes only through `applyAvatarChange`, inside the saving transaction: it
+  must be an avatar the member (or the editing admin) uploaded here, and the photo it replaces is deleted after commit
+  if unused. A member's background photo (purpose `backdrop`) follows the profile photo's rules, through
+  `applyBackdropPhotoChange`, and the clean-up and the sweep cover it. The server decides by the bytes, never the
+  declared type. A picked file is never uploaded as it is: pickers prepare every pick (`useImageUpload` with
+  `preparePickedPhoto` on mobile, `ImageUploader` and `AvatarPicker` with `prepareImageFile` on web) and check the
+  prepared file with `imageFileProblem`, and the phone deletes both the picker's copy and the prepared one afterwards.
+  Chat photos and PDFs keep their own ledger instead: `uploadChatAttachment` (`services/chat/attachments.service.ts`)
+  stores them in private storage (`ctx.privateStorage`, never `storeUpload`, `/uploads`, the `uploads` table or the
+  public bucket) with a row in `chat_attachments`, which a send claims inside `appendMessage`'s transaction; photos
+  still go through `processImage`, and the server still decides the type by the bytes. Members reach them only by
+  short-lived signed links (`chatAttachmentLinks`, and staff the report's audited view), never an address in a DTO or
+  a socket event. The phone keeps a chat photo's prepared copy as the preview until its tray item or outbox entry is
+  released (`onOutboxRelease`), then deletes it: a sent one's 60 seconds later, as the bubble's placeholder, a
+  discarded one's (and all at sign-out) at once; the picker's copy still goes straight away (mobile
+  `lib/chatAttachments.ts`).
 - **Lists and contacts.** Card DTOs (`JobCardDto`, business cards) are built field by field and never carry contact
   details; only the detail does, and once a job isn't open (`jobIsOpen`: approved, not closed, not past its closing
   date) only to its poster and admins. Funding lists still send them (a known gap): don't copy `toFundingDto`.
@@ -202,31 +203,35 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
 - **UI / UX (quality craft, not Liquid Glass).** Institution brand leads; avoid purple/glow/cream-serif templates and
   full glassmorphism. Prefer opaque high-contrast content; soft blur only on sticky chrome (header / tab bar).
   - **Icons.** Chrome uses the shared SVG stroke set (`components/icons.tsx` on web and mobile). Do not use emoji as
-    nav, empty-state, badge or feature icons: `EmptyState` and `ChatNotice` take an SVG element only, and ESLint
-    (`packages/config/eslint/no-emoji-icons.cjs`) rejects emoji in web, mobile and shared source (CI doesn't lint
-    mobile, so the API unit test `noEmojiIcons.test.ts` runs the guard over all three). Reactions may keep emoji
-    *inside* labeled SVG-framed hit targets only, on a commented `eslint-disable-next-line`. Notification and push
-    titles (the API's 📣, 🎂, 🎉) are message text, not icons, and keep theirs. Section maps store icon *names*
-    (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`), not emoji.
-    `EmptyState` and `ChatNotice` draw the bare icon you pass (`<IconMail />`, no size or colour) at their own size, in
-    the brand's ink on a round wash (`EmptyIcon`, 3:1 in any institution colour; no ring, which would read as chosen).
-    An empty state's ways on go in its `action` (links or buttons: the main way on first, as primary; a second way, a
-    way back or one that clears a search or a filter may be outline; on the phone too, never a button beside the box);
-    `inline` drops the frame inside a card or a list; `live`, for search and filter results only, has screen readers
-    read it out, which on the web repeats its words in a hidden status line, so e2e matches its title with
-    `exact: true`. e2e finds the box from its title (web: the `h3` directly inside it; phone: the title's parent) and
-    checks the badge (pinned to the institution's `BRAND_TONES`) and the actions with `expectEmptyState`.
+    nav, empty-state, badge or feature icons: ESLint (`packages/config/eslint/no-emoji-icons.cjs`) rejects emoji in
+    web, mobile and shared source (CI doesn't lint mobile, so the API unit test `noEmojiIcons.test.ts` runs the guard
+    over all three). Reactions may keep emoji *inside* labeled SVG-framed hit targets only, on a commented
+    `eslint-disable-next-line`. Notification and push titles (the API's 📣, 🎂, 🎉) are message text, not icons, and
+    keep theirs. Section maps store icon *names* (`apps/web/src/lib/sections.ts`, `apps/mobile/src/lib/sections.ts`),
+    not emoji.
+  - **Empty states.** `EmptyState` and `ChatNotice` take an SVG element only, the bare icon (`<IconMail />`, no size or
+    colour), and draw it at their own size, in the brand's ink on a round wash (`EmptyIcon`, 3:1 in any institution
+    colour; no ring, which would read as chosen). An empty state's ways on go in its `action` (links or buttons: the
+    main way on first, as primary; a second way, a way back or one that clears a search or a filter may be outline; on
+    the phone too, never a button beside the box); `inline` drops the frame inside a card or a list; `live`, for search
+    and filter results only, has screen readers read it out, which on the web repeats its words in a hidden status
+    line, so e2e matches its title with `exact: true`. e2e finds the box from its title (web: the `h3` directly inside
+    it; phone: the title's parent) and checks the badge (pinned to the institution's `BRAND_TONES`) and the actions
+    with `expectEmptyState`.
   - **Brand colour.** Institutions choose any colour, which may be too light to read or near-black, so the raw brand
     (web `bg-primary`, mobile `theme.primary`) is only ever a fill, a border or a switch's track. Brand-coloured text,
     icons, link underlines and focus outlines and rings use the ink (web `text-primary-ink`, `decoration-primary-ink`,
     `outline-primary-ink`, `ring-primary-ink`; mobile `theme.primaryInk`), brand text on the page itself takes the page
     ink (see Member background; the phone's ghost `Button` and `Spinner` take it everywhere, since it reads in a card
     too), and text or an icon on the brand colour uses `text-on-primary` / `theme.onPrimary`, never white: all from
-    `brandTones`. The readable-colours guard (see Greys and tones) rejects raw brand text and icons on both apps, raw
-    brand outlines and rings on the web, and white on `bg-primary` on the web only. A soft
-    `ring-primary/20` is only a halo beside a focused field's ink edge, and the Branding form's preview and swatches,
-    which show the colours being chosen, are the one exception. Demo University's ink is its brand blue, so e2e checks
-    brand colours on `PALE_BRAND` (`e2e/lib.mjs`), served in its place by `scriptTenant`.
+    `brandTones`, which also gives `edge`, the brand as a line at 3:1 on white and the plain page (web `primary-edge`,
+    mobile `theme.primaryEdge`; a member's Institution colour page can take it under 3:1, so a line drawn on the page
+    itself, not in a card, needs its own check against `pageBackdrop`), and `tint`, its 12% tint as a solid colour (web
+    `primary-tint`, mobile `theme.primaryTint`). A soft `ring-primary/20` is only a halo beside a focused field's ink
+    edge, and the Branding form's preview and swatches, which show the colours being chosen, are the one exception. The
+    readable-colours guard (below) rejects raw brand text and icons on both apps, and raw brand outlines and rings and
+    white on `bg-primary` on the web only. Demo University's ink is its brand blue, so e2e checks brand colours on
+    `PALE_BRAND` (`e2e/lib.mjs`), served in its place by `scriptTenant`.
     A chosen state is a wash, a thin ring and the ink, as the reaction chips and the toggle chips are (web
     `bg-primary-wash` and `ring-primary-ring`, mobile `theme.primaryWash` and `primaryRing`; not `bg-primary/14`, which
     a pale brand loses in the tray), never a stroke colour alone, and hover styles go only on the unchosen state, where
@@ -251,9 +256,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     multiple-choice questions, the phone's report reasons) are web `ToggleChip` and the phone's `Chip check`: 44px
     buttons with aria-pressed, chosen on the wash with the ring and the ink and an `IconCheck` before the name, so not
     by colour alone; e2e checks them with `expectChipLook`. A phone chip in a wrapping row passes `fit` (never wider
-    than the row), and every `Chip` label stops at `CONTROL_TEXT_MAX_SCALE`. `ChipSelect` (one choice among chips, as
-    in the filters) is still the solid brand with `onPrimary`, which a pale brand's fill barely tells from white: it
-    moves over when touched.
+    than the row), and every `Chip` label stops at `CONTROL_TEXT_MAX_SCALE`. The phone's `ChipSelect` (one choice among
+    chips, as in the filters) and the web console's audit log chips are still the solid brand with `onPrimary`, which a
+    pale brand's fill barely tells from white: they move over when touched (README → Known gaps).
   - **Side-by-side text.** Text laid in columns (job and member facts, the console's tiles, the landing's sections)
     takes as many as leave room for its longest word, down to one: web `fitColumns` (`lib/layout.ts`) as a `grid`'s
     style, mobile `FitGrid`, both sized by shared `lib/layout.ts`. Not a fixed fraction (`grid-cols-2` on a phone,
@@ -285,34 +290,32 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     notification times in `<time dateTime>`. `STATUS_TONES` gives neutral, success, warning, danger and info a fill, an
     edge (3:1), an ink (4.5:1 on the fill, white and the page) and a solid (under white text): web
     `bg-tone-success-fill`, `border-tone-success-edge`, `text-tone-success-ink`, `bg-tone-success-solid` and so on; the
-    phone reads `STATUS_TONES`. `brandTones` also gives `edge`, the brand as a line at 3:1 on white and the plain page
-    (web `primary-edge`, mobile `theme.primaryEdge`; a member's Institution colour page can take it under 3:1, so a line
-    drawn on the page itself, not in a card, needs its own check against `pageBackdrop`), and `tint`, its 12% tint as a
-    solid colour (web `primary-tint`, mobile `theme.primaryTint`). A new value goes in `tones.ts` and, written out, in
-    `index.css`, which the test checks against it. A tag (`Badge` on both apps, skill and input chips) is its tone's
-    fill, a 1px edge and its ink, with a pixel less padding so the edge doesn't change its size; a chosen RSVP is its
-    tone's fill, edge and ink. A field's error is the danger ink, as web `FormField` (with its required `*`) and mobile
+    phone reads `STATUS_TONES`. A new value goes in `tones.ts` and, written out, in `index.css`, which the test checks
+    against it. A tag (`Badge` on both apps, skill and input chips) is its tone's fill, a 1px edge and its ink, with a
+    pixel less padding so the edge doesn't change its size; a chosen RSVP is its tone's fill, edge and ink. A field's
+    error is the danger ink, as web `FormField` (with its required `*`) and mobile
     `Input`/`FieldError` draw it (the phone's `*` is part of the label), toasts sit on the solids, and the phone's
     `colors.danger`, `success`, `warning` and `info` are the solids, for fills and borders. A form field's edge is the
     faint grey, 3:1 on white, because on a white card it is all that shows the field: web `controlClass` (`Input`,
     `Select`, `Textarea`: `border-slate-400`, `focus:border-primary-ink`, invalid `border-tone-danger-edge`), the chat
     composer and the phone number's country box; mobile `Input`, `CountryPicker`, `OptionPicker`, `DateTimeField`,
     `SkillsInput` and the chat composer (`colors.faint`, `colors.danger` when invalid). Cards, dividers and outline
-    buttons keep their light lines (`colors.border`, `slate-200`/`300`), which aren't a control's only edge. ESLint's
-    `illuminize-colours/readable-colours` (`packages/config/eslint/readable-colours.cjs`) holds web and mobile source
-    to this and to Brand colour. On the web it checks every string, class maps included, for a placeholder in
-    slate-300 or 400, `text-`, `outline-`, `accent-`, `decoration-`, `ring-`, `fill-` or `stroke-primary` and their
-    arbitrary forms (`text-[rgb(var(--c-primary))]`, `accent-[var(--color-primary)]`; a ring's, fill's or stroke's
-    `/20` tint passes), `text-white` beside `bg-primary` (in one string, or across a `className`'s strings), and an
-    inline colour written as the brand variable; and a `className` for `text-slate-400` under any variant but a
-    disabled one (not on an `Icon*` or `svg`, or under an `aria-hidden` that is always true). On the phone it checks
-    what is written on the element: `placeholderTextColor={colors.faint}`, `color: colors.faint` or
-    `color: theme.primary` in a `Text`'s or `TextInput`'s own `style`, and `theme.primary` as an icon's or an
-    `ActivityIndicator`'s `color` or a `RefreshControl`'s `tintColor` or `colors`. It leaves the phone's StyleSheet
-    entries and style maps, the web's `text-slate-400` outside a `className` (a class map may be an icon's), and a
-    colour value held in a variable or passed down as a prop unchecked: keep those to these rules by hand. An icon-only
-    control whose class colours only its icon takes a commented `eslint-disable-next-line`. CI doesn't lint mobile, so
-    the API unit test `readableColours.test.ts` runs the rule over both apps.
+    buttons keep their light lines (`colors.border`, `slate-200`/`300`), which aren't a control's only edge.
+  - **The readable-colours guard.** ESLint's `illuminize-colours/readable-colours`
+    (`packages/config/eslint/readable-colours.cjs`) holds web and mobile source to Greys and tones and to Brand colour.
+    On the web it checks every string, class maps included, for a placeholder in slate-300 or 400, `text-`,
+    `outline-`, `accent-`, `decoration-`, `ring-`, `fill-` or `stroke-primary` and their arbitrary forms
+    (`text-[rgb(var(--c-primary))]`, `accent-[var(--color-primary)]`; a ring's, fill's or stroke's `/20` tint passes),
+    `text-white` beside `bg-primary` (in one string, or across a `className`'s strings), and an inline colour written
+    as the brand variable; and a `className` for `text-slate-400` under any variant but a disabled one (not on an
+    `Icon*` or `svg`, or under an `aria-hidden` that is always true). On the phone it checks what is written on the
+    element: `placeholderTextColor={colors.faint}`, `color: colors.faint` or `color: theme.primary` in a `Text`'s or
+    `TextInput`'s own `style`, and `theme.primary` as an icon's or an `ActivityIndicator`'s `color` or a
+    `RefreshControl`'s `tintColor` or `colors`. It leaves the phone's StyleSheet entries and style maps, white text on
+    the phone's `theme.primary` fill, the web's `text-slate-400` outside a `className` (a class map may be an icon's),
+    and a colour value held in a variable or passed down as a prop unchecked: keep those to these rules by hand. An
+    icon-only control whose class colours only its icon takes a commented `eslint-disable-next-line`. CI doesn't lint
+    mobile, so the API unit test `readableColours.test.ts` runs the rule over both apps.
   - **Notices.** A note above a box or a form is `Notice` (both apps): `info` on the info tone with `IconInfo`, for what
     is worth knowing before acting (not live; on the web the box it's about lists it in `aria-describedby`), and
     `warning` on the warning tone with `IconAlert`, for what went wrong, which replaces the info note while it shows
@@ -350,21 +353,21 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     ring-inset ring-primary-ring`, with its text in `text-page-ink`, in the sidebar and the More sheet alike, as brand
     text on the page is; like the ink, pageInk reads at 4.5:1 on the opaque wash for any brand (`appearance.test.ts`).
     `text-primary-ink` stays for text on white: the web bottom bar and the phone's tabs tint in the ink
-    (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work
-    waiting in the warning fill, edge and ink (web `NavBadge`, the bell included; the phone's tab badges and `HubRow`).
-    More (the phone's More tab, the web's phone sheet) groups what's behind it (`moreHubGroups`: Connect, Community,
-    then You and the account's rows) in described rows: the phone's `HubRow description`, the web's `SheetTile`. A row's
-    line is its description, never part of its name, which stays the label or its count's: the phone gives it as the
-    hint and, because react-native-web ignores `accessibilityHint`, through `describedBy` (`components/ui.tsx`) to a
-    `nativeID`. No line names another nav label (`sections.test.ts`), as e2e finds links by their text; the phone's
-    More scrolls, so Sign out stays in reach. The feed alone, on a phone, starts with Explore (`ExploreRow` on each
-    app): More's sections as wrapping chips with More's badges, a labelled region and never a nav (e2e finds the bar's
-    links inside one), and nothing when nothing is behind More. The web draws phone-only modules through
-    `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`), never hidden by CSS, so a wide screen has no second copy of
-    the sidebar's links. Under Celebrations and above the composer, the phone feed's Upcoming events strip
-    (`UpcomingEvents`, with the `EventDateTile` the event cards use) is a plain query under `["events", slug]`
-    (`UPCOMING_EVENTS_STRIP`) beside the Events lists' infinite ones, so every event change refreshes it, and nothing
-    may `setQueriesData` that prefix as if every entry had pages; a placeholder holds its height while it loads.
+    (`theme.primaryInk`). Counts take `STATUS_TONES`: unread in white on the danger solid, work waiting in the warning
+    fill, edge and ink (web `NavBadge`, the bell included; the phone's tab badges and `HubRow`). More (the phone's More
+    tab, the web's phone sheet) groups what's behind it (`moreHubGroups`: Connect, Community, then You and the
+    account's rows) in described rows: the phone's `HubRow description`, the web's `SheetTile`. A row's line is its
+    description, never part of its name, which stays the label or its count's: the phone gives it as the hint and
+    through `describedBy` (see Gotchas: react-native-web ignores hints). No line names another nav label
+    (`sections.test.ts`), as e2e finds links by their text; the phone's More scrolls, so Sign out stays in reach. The
+    feed alone, on a phone, starts with Explore (`ExploreRow` on each app): More's sections as wrapping chips with
+    More's badges, a labelled region and never a nav (e2e finds the bar's links inside one), and nothing when nothing
+    is behind More. The web draws phone-only modules through `usePhoneLayout` (`hooks/useMediaQuery.ts`, below `md`),
+    never hidden by CSS, so a wide screen has no second copy of the sidebar's links. Under Celebrations and above the
+    composer, the phone feed's Upcoming events strip (`UpcomingEvents`, with the `EventDateTile` the event cards use)
+    is a plain query under `["events", slug]` (`UPCOMING_EVENTS_STRIP`) beside the Events lists' infinite ones, so
+    every event change refreshes it, and nothing may `setQueriesData` that prefix as if every entry had pages; a
+    placeholder holds its height while it loads.
     Admin chrome stays denser and more tool-like than the member app on both apps; on mobile that means `AdminScreen`
     chrome, 44pt rows with 14pt text, amber waiting counts, and no `MemberAppBar` or tab bar inside the console. Its
     way in (`IconDashboard`, not Moderation's shield) is on More and My profile, with the waiting count on the More row
@@ -388,18 +391,18 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   - **Loading.** A list's first load draws its skeleton, never a bare spinner, under its title, search box and filters,
     which stay up. Lists read `view` (shared `listView`, which `useInfiniteList` returns on both apps): `loading` the
     skeleton, `error` the error and a retry only with nothing on screen (the hook's `retry`, which keeps the error up,
-    its button busy and focused, until the answer comes; a failed refetch keeps the rows, and a failed next page is said
-    beside Load more, `nextPageError`), `empty` the empty state only after a real answer, and `idle`, a query switched
-    off, nothing. The shape comes from
+    its button busy and focused, until the answer comes; a failed refetch keeps the rows, and on the web a failed next
+    page is said beside Load more, `nextPageError`, where the phone says nothing yet: README → Known gaps), `empty` the
+    empty state only after a real answer, and `idle`, a query switched off, nothing. The shape comes from
     `SKELETON_LAYOUTS` (web `ListSkeleton`, or `ListBody`'s `skeleton`; mobile `ListEmpty`'s `skeleton`, `row` by
     default, as every list's `ListEmpty` draws one). Skeletons are slate blocks on white level-1 surfaces, never the
     brand colour or straight on the member's background, and hold no article, `li`, link or button, which e2e takes for
     the real thing. Only the blocks pulse, never the white surfaces (faded, they'd let a background through). The web's
     is a `role="status"` saying "Loading…" to screen readers, pulsing only under `motion-safe`; the phone's is one
     progressbar named `LOADING_LABEL` ("Loading", or the screen's own words, such as "Finding members…"), still under
-    reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame. `data-testid` / `testID="skeleton"` is there for
-    e2e alone. Spinners stay only on the guards, sign-in and landing, registration, Load more and buttons. Console
-    lists draw `adminRow` or `table`.
+    reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame.
+    `data-testid` / `testID="skeleton"` is there for e2e alone. Spinners stay only on the guards, sign-in and landing,
+    registration, Load more and buttons. Console lists draw `adminRow` or `table`.
     A detail or form page (the consoles' and the platform's included) keeps its header and Back while it loads and
     draws its outline under them (`PAGE_SKELETONS`: `article`, `profile`, `form`, `thread`, `panel`): web `BackLink`
     (never a "←" glyph) and any title it knows, over `PageSkeleton` in the page's own width; mobile
@@ -416,13 +419,13 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     the phone console's `usePagedList`): `onlyFiltersChanged` for rows that only open a page, as Directory and Jobs do,
     `onlySearchChanged` for console rows whose actions belong to their tab (the web console's and platform's `useQuery`
     lists pass `keepPrevious(onlySearchChanged)` as `placeholderData`), holding those rows' buttons while
-    `isPlaceholderData`; both compare filters by value, as pages rebuild them each render. `useInfiniteList` keeps nothing while a retry from the error is on its way
-    (`listPlaceholder`) and returns `updating` (kept rows: faded, busy, under `UPDATING_RESULTS` "Updating results…";
-    web `KeptResults`, busy on the grid; mobile `UpdatingNote` last in the box above the rows, raised over them, with
-    `KEPT_ROW` on each row and `busy` on each card, or on a console row's name, as a scroll view's busy isn't read, and
-    an iOS announcement),
-    `hasMore` (web Load more) and `refreshing` (mobile pull-to-refresh), from `listHasMore`, `listMayLoadMore` and
-    `listRefreshing`, never `hasNextPage` or `isRefetching`, which kept rows would fool. The note floats on the first
+    `isPlaceholderData`; both compare filters by value, as pages rebuild them each render. `useInfiniteList` keeps
+    nothing while a retry from the error is on its way (`listPlaceholder`) and returns `updating` (kept rows: faded,
+    busy, under `UPDATING_RESULTS` "Updating results…"; web `KeptResults`, busy on the grid; mobile `UpdatingNote` last
+    in the box above the rows, raised over them, with `KEPT_ROW` on each row and `busy` on each card, or on a console
+    row's name, as a scroll view's busy isn't read, and an iOS announcement), `hasMore` (web Load more) and
+    `refreshing` (mobile pull-to-refresh), from `listHasMore`, `listMayLoadMore` and `listRefreshing`, never
+    `hasNextPage` or `isRefetching` (see Gotchas: kept rows fool them). The note floats on the first
     row's top edge, below the filters, taking no room or clicks (on mobile Jobs, at the foot of the list's header with
     `gap`), and the search box stays mounted; kept rows that are none show the skeleton (`listView`), so no empty state
     names a search whose answer hasn't come. A member's or an institution console's search box that hits the API, and
@@ -579,6 +582,14 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
   account is deleted, staff alerts for escalated chat reports, and another member of staff for a report that their
   change of admins escalated. README "Profiles and onboarding", "Photos and uploads", "Appearance", "Tenants and
   membership", "Chat reports and admin access" and "Account deletion and suspension" describe them.
+- **The usability programme is done:** a walk-through on a member's first entry, greys, tags and brand text that read
+  in any institution colour, pinned posts that stand out and a colour of their own for each member's initials, More in
+  described groups with the phone feed's Explore row and Upcoming events strip, skeletons and results kept while a
+  search loads, detail pages that keep their header and Back, a welcoming first-message note and a date to ask again,
+  choices and facts laid out whole at any text size, empty states that offer the way on, and private photos and PDFs
+  in chat, on web and mobile and in both consoles. README "Profiles and onboarding", "Colour and contrast", "Photos
+  and uploads", "Engagement", "Navigation on phones", "Lists and loading", "Feature switches", "Jobs", "Direct
+  messages", "Mentorship" and "Chat reports and admin access" describe them.
 - **Wave 3 is next:** event upgrades (tickets, reminders) and giving campaigns, on the payments layer
   (`apps/api/src/services/payments`).
 - **Known follow-ups:**
@@ -586,18 +597,26 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     unchosen safety items (reporting a blocked member, holding back a reported admin, capping refusals) and the
     privacy policy's cover for the deleted accounts' phone hash, kept with no expiry;
   - the device pass in `e2e/README.md` → "Checks that need a real phone": one ordered pass for an iPhone and an Android
-    phone, in Expo Go but for its last part (pushes and links need a development build), not run yet; record each run
-    in its Runs table;
+    phone, in Expo Go but for its last part (pushes, links and what chat leaves in the app's files need a development
+    build), not run yet, the usability programme's checks among them (chips and choices at the largest text size, the
+    tab bar, More, Explore and the Upcoming strip on a narrow phone, the walk-through's Android back and iOS swipe, and
+    chat's photo and PDF pickers, viewer and share sheet); record each run in its Runs table;
+  - the seed's fixed ids: seeded memberships get new random ids at every `pnpm db:reset`, so a demo member's initials
+    may change colour (`avatarTone` hashes the membership id). The usability programme's last feed-cards commit
+    (fixed ids in a `seedIds.ts`, and a test that Jignesh Patel's, Hetal Shah's and Bhavin Trivedi's initials differ)
+    waits for the work on the seed's Samaj portraits to be committed first;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
   - uploads: only a profile or background photo must be the member's own upload (job and business logos, post images
-    and event covers take any http(s) address), only those are ever deleted, and a CDN may serve a deleted one until it
-    expires;
+    and event covers take any http(s) address), only those are ever deleted (chat's private files have a sweep of their
+    own), and a CDN may serve a deleted one until it expires;
   - no dark mode: the apps are light only, and members choose just their pages' background;
-  - typographic glyphs (✕ ✓ ‹ ← → ↑ ↓ › ⋯ ➤) still draw some controls (close, back, send, checkmarks) rather than
-    the SVG set;
-  - UI polish still open: deeper tenant theming (Branding previews only a gradient card), skeleton loaders and
-    purposeful motion tokens;
+  - typographic glyphs still draw a few controls rather than the SVG set: ✕ (the web `Modal`'s close, removing a poll
+    option on both apps, a photo in the phone's `PostForm`, and an invitee in both apps' invite lists), ‹ and ← (Back
+    in the phone's `StackHeader` and `ChatFrame` and on its sign-in screen), ⋯ (the phone's Conversation options and a
+    group member's options), → (the digest banner's Read on both apps), ↓ (Jump to latest in a chat on both apps) and
+    ↑ ↓ (the platform's Compare sort);
+  - UI polish still open: deeper tenant theming (Branding previews only a gradient card) and purposeful motion tokens;
   - the Linux CI (`.github/workflows/ci.yml`) runs only on `main` and pull requests, while the Windows workflow also
     runs on `claude/**` pushes, so the Linux CI's new `docker` job (the API image, with sharp on Alpine) hasn't run on
     GitHub yet.

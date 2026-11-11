@@ -830,15 +830,40 @@ restart Metro (`pnpm mobile`): a server started before the install can't find th
    and `+91 98765 43211` on Android. Part 18 deletes those two accounts, and part 19 uses them once they've joined
    again; never confirm Delete account as Rahul.
 5. Turn on TalkBack (Android) or VoiceOver (iPhone) only for the checks that ask for it.
-6. Sign-in codes are limited, and the pass is laid out to stay inside the limits in a day: each number may ask for 5
-   codes an hour and 10 a day (the day counted from its first code), a minute apart, and each phone, or this computer
-   for all its browser windows, 20 an hour. Rahul, the number used most, asks for 7 in parts 1 to 19. Signing the
-   second phone in as the same person straight after the first, the code screen says "Resend code in …s": wait for
-   it, then choose Resend code. Past a limit, sign-in says "Too many codes requested for this number. Please try again
-   later." (for a phone or the computer, "Too many codes requested. Please try again later."): wait an hour, or until
-   the next day, or carry on as another demo member. `pnpm db:reset` clears the counters too, but it also puts the
-   demo data back as it started, losing the accounts from parts 1 and 2 and what later parts build on, so after a
-   reset start again from part 1. Part 20 is the exception: it works after a reset, on another day.
+6. Sign-in codes are limited: each number may ask for 5 codes an hour and 10 a day (the hour and the day both counted
+   from its first code, and a refused request counts too), a minute apart, and each phone, or this computer for all
+   its browser windows, 20 an hour. Parts 1 to 19 fit in a day if nobody signs in more often than the list below says,
+   and a number's sixth code comes more than an hour after its first. On the computer, keep Priya in a normal window
+   and Demo University's admin in a private one from the start, Rahul from part 6 in a second browser, and everyone
+   else, in turn, in that browser's private window. And do these checks where the pass already has the right person
+   signed in, rather than signing someone in for them: part 5's institution picker (signed out) when Rahul signs out
+   at the start of part 13, and part 5's Samaj and console halves as the Samaj admin in parts 13 and 14; part 6's My
+   posts and part 7's Find people and Find a group, which need a new member, with the numbers from parts 1 and 2
+   before part 2's last check; and part 14's Demo University announcement while a phone is that admin for Chat
+   reports. Then parts 1 to 19 ask for these codes:
+   - Rahul (`+91 91000 00001`), 9: each phone's app at the end of part 2 and again after part 16, one phone after
+     Arjun's check in part 9 and one after Vikram's in part 11, Safari in part 4, Chrome in part 7 and the computer in
+     part 6. The sixth, in part 9, must come more than an hour after the first.
+   - The Samaj admin, Jignesh Patel (`+91 90000 00004`), 6: each phone in part 13 and again after part 14's Chat
+     reports, the phone that showed the demo-school admin's Settings in part 14, and the computer in part 16. The
+     sixth, the computer's in part 16, must come more than an hour after the first in part 13.
+   - Demo University's admin (`+91 90000 00001`), 3: the computer at the start, and each phone for Chat reports.
+   - Each new number (`+91 98765 43210`, `+91 98765 43211`), 3: part 1, and part 18 before and after deleting it.
+   - One each: Priya, Arjun (part 9), Sneha (part 9), Vikram (part 11), `+91 98765 43212` (part 13), Hetal Shah
+     (part 14), the demo-school admin (`+91 90000 00003`, part 14, on one phone) and Demo College's admin
+     (`+91 90000 00002`, part 18).
+
+   Part 20, at least a day (24 hours) after Rahul's first code in part 2, or after a `pnpm db:reset`, asks for 3 each
+   from Rahul and Demo University's admin (each phone and the computer), 2 from Hetal (the computer and a phone) and
+   at most one from anyone else. Sooner, Rahul's day still holds his 9 codes from parts 1 to 19, and the second of
+   part 20's would be his eleventh.
+
+   Signing the second phone in as the same person straight after the first, the code screen says "Resend code in
+   …s": wait for it, then choose Resend code. Past a limit, sign-in says "Too many codes requested for this number.
+   Please try again later." (for a phone or the computer, "Too many codes requested. Please try again later."): wait
+   an hour, or until the next day, or carry on as another demo member. `pnpm db:reset` clears the counters too, but it
+   also puts the demo data back as it started, losing the accounts from parts 1 and 2 and what later parts build on,
+   so after a reset start again from part 1. Part 20 is the exception: it works after a reset, on another day.
 
 ### 1. Sign-in and phone entry
 

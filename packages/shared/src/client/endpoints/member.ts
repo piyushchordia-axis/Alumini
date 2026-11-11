@@ -166,7 +166,7 @@ export function chatEndpoints(core: ApiCore) {
     /**
      * Uploads a prepared photo or a PDF to a conversation, for the message being written to name in `attachmentIds`; one
      * that no send claims is swept away a day later. `name` is the file's name, sent as a field of its own and before the
-     * file, since the server reads a part's own file name as Latin-1. `signal` cancels it (see startUpload).
+     * file, which the server prefers to the part's own file name. `signal` cancels it (see startUpload).
      */
     attach: (slug: string, id: string, file: Blob | ChatNativeFile, opts: { name?: string; signal?: AbortSignal } = {}) => {
       const formData = new FormData();
