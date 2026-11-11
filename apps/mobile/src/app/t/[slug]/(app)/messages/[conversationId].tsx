@@ -31,7 +31,7 @@ import { PhotoViewer } from "@/components/chat/PhotoViewer";
 import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconAlert, IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, EmptyState, ErrorText, type Focusable, focusOn, PageSkeleton, Spinner } from "@/components/ui";
+import { Button, EmptyState, ErrorText, type Focusable, focusOn, PageSkeleton } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useMembership } from "@/hooks/useMembership";
