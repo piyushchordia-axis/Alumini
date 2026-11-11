@@ -26,9 +26,11 @@ import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconChevronDown, IconChevronUp, IconClose, IconFields, IconPlus } from "@/components/icons";
-import { Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, ListSkeleton, Modal, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, Card, Checkbox, EmptyState, FormField, Input, ListSkeleton, Modal, PageHeader, Select } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
@@ -228,6 +230,7 @@ export function AdminProfileFieldsPage() {
   const listKey = [...qk.admin.profileFields(slug), { showArchived }];
   // The other toggle's list stays on the page while this one loads, rather than a spinner in its place.
   const list = useQuery({ queryKey: listKey, queryFn: () => api.admin.profileFields.list(slug, showArchived), placeholderData: keepPreviousData });
+  const page = usePageQuery(list);
   // Shown at once and put back if refused, as on the phone. The arrows wait until the stored order is back, so the next
   // move starts from it.
   const reorder = useMutation({
@@ -256,14 +259,14 @@ export function AdminProfileFieldsPage() {
       toast.error(errorMessage(e));
     },
   });
-  if (list.isLoading)
+  // Only with nothing to show: a refetch failing in the background keeps the fields on screen.
+  if (!list.data)
     return (
       <div className="space-y-4">
         <PageHeader title="Profile fields" />
-        <ListSkeleton shape="adminRow" />
+        <PageLoad page={page} outline={<ListSkeleton shape="adminRow" />} />
       </div>
     );
-  if (list.error || !list.data) return <ErrorBox error={list.error ?? "Failed"} />;
   const fields = list.data;
   const active = fields.filter((f) => !f.archivedAt);
   const move = (index: number, delta: number) => reorder.mutate(moveId(active.map((f) => f.id), index, delta));

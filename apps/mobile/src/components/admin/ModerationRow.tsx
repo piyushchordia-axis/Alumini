@@ -5,9 +5,11 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ContentPreview } from "@/components/admin/ContentPreview";
 import { IconAnnounce, IconExternalLink, IconFlag, IconPin } from "@/components/icons";
+import { PageLoad } from "@/components/PageLoad";
 import { StatusLine } from "@/components/Sheet";
-import { Badge, Button, Card, ErrorText, Spinner } from "@/components/ui";
+import { Badge, Button, Card, SkeletonGroup, SkeletonLines } from "@/components/ui";
 import type { ModerationActions } from "@/hooks/useModerationActions";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import type { RowStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -54,6 +56,7 @@ export function ModerationRow({
   const router = useRouter();
   const key = moderationItemKey(item);
   const full = useQuery({ queryKey: qk.admin.content(slug, item.contentType, item.id), queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
+  const content = usePageQuery(full);
   const busy = actions.busyWith(item);
   const target = adminContentTarget(item.contentType, item.id, features);
   const href = target ? targetHref(slug, target, { isAdmin: true }) : null;
@@ -108,13 +111,16 @@ export function ModerationRow({
         <View style={styles.panel}>
           {full.data ? (
             <ContentPreview type={item.contentType} content={full.data} />
-          ) : full.error ? (
-            <View style={{ gap: spacing.sm }}>
-              <ErrorText error={full.error} />
-              <Button size="compact" variant="outline" title="Try again" onPress={() => void full.refetch()} />
-            </View>
           ) : (
-            <Spinner label="Loading the content" />
+            <PageLoad
+              page={content}
+              compact
+              outline={
+                <SkeletonGroup label="Loading the content">
+                  <SkeletonLines widths={[100, 94, 88, 60]} />
+                </SkeletonGroup>
+              }
+            />
           )}
         </View>
       )}

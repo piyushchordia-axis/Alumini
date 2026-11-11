@@ -5,7 +5,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { JobUnavailable, ReferralsUnavailable, jobUnavailableText } from "@/components/jobs/JobUnavailable";
-import { Avatar, Button, ErrorText, Input, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Avatar, Button, ErrorText, Input, Screen } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -46,12 +47,7 @@ function ReferralRequest({ jobId }: { jobId: string }) {
         <JobUnavailable error={error} onRetry={() => void query.refetch()} />
       </Screen>
     );
-  if (!query.data)
-    return (
-      <Screen title="Ask for a referral">
-        <Spinner label="Loading job…" />
-      </Screen>
-    );
+  if (!query.data) return loadingScreen({ title: "Ask for a referral", shape: "form", label: "Loading job…" });
   const j = query.data;
   const poster = j.author.fullName;
   if (j.isMine)

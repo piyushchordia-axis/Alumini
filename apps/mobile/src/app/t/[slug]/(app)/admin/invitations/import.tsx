@@ -30,7 +30,7 @@ import { AccessibilityInfo, Platform, StyleSheet, Text, View } from "react-nativ
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { IconDownload, IconUpload } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
-import { Button, Card, Choice, ErrorText, Muted, Spinner } from "@/components/ui";
+import { Button, Card, Choice, ErrorText, Muted, SkeletonGroup, SkeletonLines } from "@/components/ui";
 import { useAdminProfileFields } from "@/hooks/useAdminProfileFields";
 import { refreshInvitations, useInvitationSummary } from "@/hooks/useAdminInvitations";
 import { useMembership } from "@/hooks/useMembership";
@@ -159,7 +159,10 @@ export default function InvitationImportScreen() {
           <Button title="Try again" variant="outline" onPress={() => void fields.refetch()} />
         </>
       ) : !ready ? (
-        <Spinner label="Loading your profile questions" />
+        // Nothing on the screen waits for the questions but the buttons under this, so a line or two says so, not a form.
+        <SkeletonGroup label="Loading your profile questions">
+          <SkeletonLines widths={[70, 45]} />
+        </SkeletonGroup>
       ) : null}
       {!picked && (
         <View style={styles.buttons}>

@@ -673,13 +673,15 @@ export function ListEmpty({
 
 /**
  * A list error's retry ("Try again", or `title`). While `retrying` it shows it's busy and ignores presses, but stays
- * enabled: a disabled button drops focus (the web build makes it a disabled `<button>`), which this keeps.
+ * enabled: a disabled button drops focus (the web build makes it a disabled `<button>`), which this keeps. `size` as
+ * Button's: "compact" in a console row.
  */
-export function RetryButton({ title = "Try again", onRetry, retrying = false }: { title?: string; onRetry: () => void; retrying?: boolean }) {
+export function RetryButton({ title = "Try again", onRetry, retrying = false, size }: { title?: string; onRetry: () => void; retrying?: boolean; size?: "regular" | "compact" }) {
   return (
     <Button
       title={title}
       variant="outline"
+      size={size}
       aria-busy={retrying}
       icon={retrying ? (color) => <ActivityIndicator color={color} /> : undefined}
       style={retrying ? { opacity: 0.7 } : undefined}
@@ -798,7 +800,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, lineHeight: 22, color: "#1e293b" },
 });
 
-export { ListSkeleton, SkeletonBox, SkeletonGroup, SkeletonLines } from "@/components/Skeleton";
+export { ListSkeleton, PageSkeleton, SkeletonBox, SkeletonGroup, SkeletonLines, TilesSkeleton } from "@/components/Skeleton";
 export { SectionScreen } from "@/components/SectionScreen";
 export { StackScreen } from "@/components/StackScreen";
 export { StackHeader } from "@/components/StackHeader";

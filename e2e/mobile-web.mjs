@@ -1556,7 +1556,30 @@ try {
     await page.waitForURL(detail);
     await visible(page.getByText("Pune", { exact: true })).waitFor();
 
+    // The listing stays when a refetch fails in the background. Opened cold with nothing to show, it says what went wrong
+    // under its bar (Back and Business, as the listing has them), not in place of the screen, with Retry loading, which
+    // brings the listing. Read under that bar: a cold link puts the list beneath it.
+    const shown = await scriptBusiness(page, "demo-university", detail.split("/").pop());
+    shown.answer(503, "INTERNAL");
+    await shown.refetch();
+    await visible(page.getByText("Pune", { exact: true })).waitFor();
+    if (await page.getByRole("button", { name: "Retry loading", exact: true }).locator("visible=true").count()) throw new Error("a failed background refetch of a listing on screen offers Retry loading");
     await page.goto(detail);
+    const listingBack = visible(page.getByRole("button", { name: "Back", exact: true }));
+    const underListingBar = listingBack.locator("xpath=../../following-sibling::*[1]");
+    await listingBack.waitFor();
+    await listingBack.locator("xpath=..").getByRole("heading", { name: "Business", exact: true }).waitFor();
+    const retryListing = underListingBar.getByRole("button", { name: "Retry loading", exact: true });
+    await retryListing.waitFor();
+    await underListingBar.getByRole("alert").filter({ hasText: "e2e INTERNAL" }).waitFor();
+    if (await underListingBar.getByText("Pune", { exact: true }).count()) throw new Error("the listing shows while its answer fails");
+    await shot("m07a-business-error");
+    shown.answer(null);
+    await retryListing.click();
+    await underListingBar.getByText("Pune", { exact: true }).waitFor();
+    if (await retryListing.count()) throw new Error("Retry loading stays once the listing is in");
+    await shown.stop();
+
     await visible(page.getByRole("button", { name: "Delete", exact: true })).click();
     await shot("m07a-business-delete");
     await sheet.getByRole("button", { name: "Delete listing" }).click();
@@ -1599,6 +1622,33 @@ try {
     await openSection("Funding");
     await page.getByText("Embedded credit for SME marketplaces", { exact: false }).locator("visible=true").first().dispatchEvent("click");
     const funding = await opened(/\/t\/demo-university\/funding\/[0-9a-f-]+$/);
+
+    // A listing opened cold whose answer is slow (held here) has its bar from the first frame, Back and the title Funding,
+    // and under it the listing's outline, one progressbar saying Loading and no spinner, until the listing comes, and Back,
+    // focused meanwhile, keeps focus then: it's the same bar. Read under that bar: the list a cold link puts beneath it
+    // draws its own.
+    const listingHeld = await holdGets(page, (u) => /\/t\/demo-university\/funding\/[0-9a-f]{8}-[0-9a-f-]+$/.test(u.pathname));
+    const back = page.getByRole("button", { name: "Back", exact: true }).locator("visible=true").last();
+    const underBar = back.locator("xpath=../../following-sibling::*[1]");
+    try {
+      await page.goto(funding);
+      await back.waitFor();
+      await listingHeld.asked();
+      await back.locator("xpath=..").getByRole("heading", { name: "Funding", exact: true }).waitFor();
+      const loading = underBar.getByRole("progressbar", { name: "Loading", exact: true });
+      await loading.waitFor();
+      if ((await loading.getAttribute("data-testid")) !== "skeleton") throw new Error("the listing's Loading isn't its outline");
+      if ((await underBar.getByRole("progressbar").count()) !== 1) throw new Error("the listing's outline comes with a spinner");
+      if (await underBar.getByText("Embedded credit for SME marketplaces", { exact: false }).count()) throw new Error("the listing shows while its answer is held");
+      await back.focus();
+      await shot("m07d-funding-loading");
+    } finally {
+      listingHeld.release();
+    }
+    await underBar.getByText("Embedded credit for SME marketplaces", { exact: false }).first().waitFor();
+    if (await underBar.getByTestId("skeleton").count()) throw new Error("the listing's outline stays once the listing is in");
+    if (!(await back.evaluate((el) => el === document.activeElement))) throw new Error("Back lost focus when the listing took its outline's place");
+    await listingHeld.stop();
 
     // A reload is a cold start, as a push tap or a shared link is.
     const nested = [

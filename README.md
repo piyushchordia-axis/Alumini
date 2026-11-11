@@ -802,7 +802,35 @@ reports and Profile fields, as their rows are. The web console and the platform 
 with a table's outline for Invitations, the audit logs, Institutions and Compare.
 
 Spinners stay where there is no page yet or the wait is a button's: the route guards, the sign-in and landing pages,
-registration, Load more and buttons. Detail and form pages on both apps still show one too (Known gaps).
+registration, Load more and buttons.
+
+**Detail and form pages** keep their header and Back while they load: a post, a job, an event, a listing, a member's or
+a mentor's page, a group, a chat, the digest, the edit forms, requests and settings, and in the consoles the
+dashboards, analytics, settings, a member's page, a moderation item's full content, and the platform's figures and an
+institution's page.
+
+- **The header.** On the web, the page's own back link (`BackLink`: an SVG chevron and the page's words, such as All
+  jobs, Directory, Members or Institutions, or Back while a mentor's name or a job's title isn't known yet) and any
+  title the page knows already (Edit job, Notification settings). On the phone, the screen's bar with Back and its
+  title from the first frame, a cold link's included (`loadingScreen()`: `Screen title=` over the outline), or the
+  chat's or the console's own bar.
+- **The outline** under it, the same on both apps (`PAGE_SKELETONS` in `lib/skeletons.ts`, each app's `PageSkeleton`):
+  an article (a title, when and where, the text and two buttons), a profile (the photo, the name and two groups of
+  details), a form (four fields and the button), a chat's bubbles, or a dashboard's figures over a card of rows.
+- **The query**, read as a list's is (`usePageQuery` on each app, over the shared `pageView`): the page whenever it has
+  its data, so a refetch that fails in the background keeps it on screen, and what's typed into a form with it; the
+  outline while the first answer comes; and, with nothing to show, the error in place under the header with **Retry
+  loading** (`PageLoad`; read out, as an alert on the web and the phone's `ErrorText`), which keeps the error up and
+  its button busy while it retries, for that query alone (one whose key changes meanwhile, such as Analytics' range,
+  shows its own). A job, a group, a mentor or a chat that can't be shown (and the forms and requests that go with them)
+  keeps its own notice saying why, with a way back; a job's, on both apps, under the same back link or bar.
+- **Forms** wait only for their queries' first answer (`loadingFirstTime`), so a refetch never swaps a form, and what's
+  typed into it, for its outline; both apps' Edit profile now do too. The phone's Looking for work opens only on a
+  real answer (no listing yet is one) and, with none, shows the error and Retry loading, so a blank form can't save
+  over a listing it failed to load.
+- **Focus.** Back stays the first thing on the page, and the same element before and after: on the web the same link,
+  on the phone the same `Screen` (`loadingScreen()` is called as a function, not drawn as a screen of its own), so
+  focus left on it stays there when the page takes the outline's place.
 
 A list opts in to keeping its rows with `keepPreviousWhile` (`useInfiniteList`, or the phone console's
 `usePagedList`, which also returns `view` and `updating`): Directory and Jobs with `onlyFiltersChanged`, as their
@@ -848,7 +876,12 @@ web a refused directory search: no Load more for the kept cards, then its Retry 
 with no kept cards back over it. In the consoles they hold a Members search on both apps (the rows kept with Suspend
 held; on the web no Search button, the search in the address, and the console's Members link starting the list
 again), the web Invitations' and the platform's Institutions searches, and the platform's Users search typed digit by
-digit, asked for once, with Make platform admin held meanwhile.
+digit, asked for once, with Make platform admin held meanwhile. For detail pages they hold a job's answer on the web
+(All jobs and the article's outline at once, with no spinner or title, and All jobs keeping focus when the job comes)
+and a funding listing's on the phone, opened cold (its bar, Back and Funding, over one progressbar named Loading, until
+the listing comes, Back keeping focus), and on both apps fail a business listing's: a failed background refetch
+keeps the listing, and opened afresh its error shows, read out, under All businesses or the bar, with Retry loading
+bringing the listing.
 
 ### Rich text
 
@@ -1544,8 +1577,9 @@ packages/shared   constants (enums, labels, countries), zod schemas, DTO types, 
                   layout.ts: how many columns text laid side by side takes, from its longest word;
                   tones.ts: the shared greys and status tones (GREYS, STATUS_TONES); rsvp.ts: an event's RSVP
                   buttons, tones and open state; appearance.ts: a member's background; lists.ts: how a list reads
-                  its query (listView) and keeps its rows for a new search (onlyFiltersChanged);
-                  skeletons.ts: the skeletons' shapes; directory.ts: a profile's card from the cached
+                  its query (listView) and keeps its rows for a new search (onlyFiltersChanged), and how a
+                  detail or form page reads its own (pageView);
+                  skeletons.ts: the lists' and the pages' outlines; directory.ts: a profile's card from the cached
                   directory (cardInPages) and the fetch ahead of it; admin.ts and its siblings: what both
                   admin consoles share)
 e2e/              Playwright smoke scripts for web, admin console and the exported mobile web build
@@ -1870,14 +1904,16 @@ later, the delivery receipts, and deletes tokens Expo reports as `DeviceNotRegis
 - Screens and navigation:
   - A mobile detail screen opened cold from a link or push seeds the list under it with the detail's params (for
     example `/businesses?id=…`), because expo-router passes them to the anchor route.
-  - Some screens still read a query's error directly (`DigestPage`, for one), and the web post, event, funding and
-    business pages replace the screen when a background refetch fails (`MemberProfilePage` doesn't).
+  - A few web lists still read a query's error directly: the console's Moderation, Reports and Chat reports, the
+    platform's audit log and chat reports, and the institution picker show it, with no Retry, above any rows they keep
+    when a refetch fails.
+  - Focus while a page loads: the phone's Edit profile draws its bar afresh when the institution's questions come (its
+    editor owns the bar's Save), so on the web build a Back focused meanwhile loses focus then. A job's, a group's or a
+    mentor's own "unavailable" notice, on both apps, gives way to the outline while its Retry is on its way, so the
+    button, and focus, go with it (`usePageQuery`'s Retry loading keeps its error up instead).
   - UI follow-ups: deeper tenant theming (Branding previews a gradient card, not the landing page or the app), and
     purposeful motion.
-  - Lists draw a skeleton while they first load, the consoles' and the platform's included (see Lists and loading),
-    but detail and form pages on both apps (a job, an event, a post, the edit forms, the consoles' dashboards and
-    settings, a moderation item's full content) still show a spinner in place of the page. The platform's audit log
-    filter still asks at every keystroke and keeps no rows.
+  - The platform's audit log filter still asks at every keystroke and keeps no rows (see Lists and loading).
   - No dark mode: both apps are light only, and the phone app keeps dark status-bar content when the phone is in dark
     mode. Members choose only their pages' background (see Appearance).
   - Text laid side by side (job and member facts, the console's tiles, the landing's sections) chooses its columns

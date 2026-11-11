@@ -10,8 +10,10 @@ import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { openLink, RichText } from "@/components/RichText";
-import { Avatar, Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Avatar, Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -27,6 +29,7 @@ export default function BusinessDetailScreen() {
   // A listing opened from a link or a reload has nothing behind it, and back() would leave the member stuck here.
   const leave = () => (router.canGoBack() ? router.back() : router.replace(`/t/${slug}/businesses`));
   const item = useQuery({ queryKey: qk.business(slug, id), queryFn: () => api.businesses.get(slug, id) });
+  const page = usePageQuery(item);
   const remove = useMutation({
     mutationFn: () => api.businesses.remove(slug, id),
     onSuccess: () => {
@@ -35,8 +38,8 @@ export default function BusinessDetailScreen() {
       leave();
     },
   });
-  if (item.isLoading) return <Spinner />;
-  if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={leave} backLabel="Back" />;
+  // Only with nothing to show: a refetch failing in the background keeps the listing on screen.
+  if (!item.data) return loadingScreen({ title: "Business", shape: "article", page });
   const b = item.data;
   return (
     <Screen title="Business">

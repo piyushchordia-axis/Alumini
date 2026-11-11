@@ -44,11 +44,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconAnnounce, IconCheck, IconExternalLink, IconFlag, IconPin } from "@/components/icons";
 import { JobApplyArea } from "@/components/jobs/JobApplyArea";
 import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
-import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, Loading, PageHeader, Pagination, Select, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorBox, ListSkeleton, PageHeader, Pagination, Select, SkeletonLines, SkeletonStatus, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { invalidateTenant } from "@/lib/invalidate";
@@ -142,6 +144,7 @@ export function ModerationRow({ slug, item, features }: { slug: string; item: Mo
   const [modal, setModal] = useState<Asking | null>(null);
   const [expanded, setExpanded] = useState(false);
   const full = useQuery({ queryKey: qk.admin.content(slug, item.contentType, item.id), queryFn: () => api.admin.moderation.get(slug, item.contentType, item.id), enabled: expanded });
+  const content = usePageQuery(full);
   const refresh = () => {
     void invalidateTenant(qc, slug);
   };
@@ -249,9 +252,18 @@ export function ModerationRow({ slug, item, features }: { slug: string; item: Mo
           </div>
           {expanded && (
             <div className="mt-2 rounded-lg bg-slate-50 p-3">
-              {full.isLoading && <Loading />}
-              {full.error && !full.data && <ErrorBox error={full.error} />}
-              {full.data && <ContentPreview type={item.contentType} content={full.data} />}
+              {full.data ? (
+                <ContentPreview type={item.contentType} content={full.data} />
+              ) : (
+                <PageLoad
+                  page={content}
+                  outline={
+                    <SkeletonStatus>
+                      <SkeletonLines widths={[100, 94, 88, 60]} />
+                    </SkeletonStatus>
+                  }
+                />
+              )}
             </div>
           )}
         </div>

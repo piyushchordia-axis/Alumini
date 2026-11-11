@@ -9,7 +9,7 @@ import { ChatHeader, ChatScreen } from "@/components/chat/ChatFrame";
 import { MentorAction, useMentor } from "@/components/mentors/MentorAction";
 import { MentorAreas } from "@/components/mentors/MentorCards";
 import { MentorsOff, MentorUnavailable, mentorUnavailableText, useMentorsEnabled } from "@/components/mentors/MentorFrame";
-import { Avatar, Button, ErrorText, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, ErrorText, Input, PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { leaveGroupNotice } from "@/lib/groups";
@@ -49,7 +49,7 @@ function MentorRequest({ id }: { id: string }) {
     return (
       <ChatScreen>
         <ChatHeader title={TITLE} />
-        <Spinner label="Loading mentor…" />
+        <PageSkeleton shape="form" label="Loading mentor…" style={{ padding: spacing.lg }} />
       </ChatScreen>
     );
   const m = query.data;

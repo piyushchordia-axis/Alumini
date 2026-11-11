@@ -13,7 +13,7 @@ import { GroupUnavailable, GroupsOff, useGroupsEnabled } from "@/components/grou
 import { InviteMembersSheet } from "@/components/groups/InviteMembersSheet";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Avatar, Badge, Button, ErrorText, ListSkeleton, RetryButton, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorText, ListSkeleton, PageSkeleton, RetryButton } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -301,7 +301,7 @@ function GroupDetail({ id }: { id: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="Group details" />
-        <Spinner label="Loading group…" />
+        <PageSkeleton shape="article" label="Loading group…" style={{ padding: spacing.lg }} />
       </ChatScreen>
     );
   }

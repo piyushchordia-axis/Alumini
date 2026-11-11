@@ -88,3 +88,43 @@ export const MY_CONTENT_SKELETONS: Readonly<Record<MyContentTab, SkeletonShape>>
   events: "event",
   pastEvents: "event",
 };
+
+// The outlines a detail or form page draws under its header and Back while its first answer comes, the same on both
+// apps (web `PageSkeleton` in ui/Skeleton.tsx; mobile `PageSkeleton` in components/Skeleton.tsx, which `LoadingScreen`
+// draws under `Screen title=`). Like the lists', neutral slate on white.
+
+export const PAGE_SKELETON_SHAPES = ["article", "profile", "form", "thread", "panel"] as const;
+export type PageSkeletonShape = (typeof PAGE_SKELETON_SHAPES)[number];
+
+/** A page's outline, drawn in this order: its tiles, then one white card (lead and head, sections, fields, actions), or its bubbles. */
+export interface PageSkeletonLayout {
+  /** What leads the head, above it on a phone and beside it on a wide screen: a profile's photo. */
+  lead: SkeletonLead | null;
+  /** The head's lines: the title, drawn taller, then the lines under it (when, where, what they do), as percentages. */
+  head: readonly number[];
+  /** Figures side by side above the card, as a dashboard's: two to a row, four from the web's lg breakpoint up. */
+  tiles: number;
+  /** Groups of lines under the head, each set off by a hairline, as percentages of the card's width. */
+  sections: readonly (readonly number[])[];
+  /** A form's fields: a short label over a full-width box each. */
+  fields: number;
+  /** Buttons along the card's foot. */
+  actions: number;
+  /** A chat's bubbles, theirs and yours in turn (theirs first), each a percentage of the pane's width, on no card. */
+  bubbles: readonly number[];
+}
+
+const page = (layout: Partial<PageSkeletonLayout>): PageSkeletonLayout => ({ lead: null, head: [], tiles: 0, sections: [], fields: 0, actions: 0, bubbles: [], ...layout });
+
+export const PAGE_SKELETONS: Readonly<Record<PageSkeletonShape, PageSkeletonLayout>> = {
+  /** A post, a job, an event, a listing, a group, a digest: the title and two lines of when and where, the text, then its buttons. */
+  article: page({ head: [70, 45, 35], sections: [[100, 96, 90, 55]], actions: 2 }),
+  /** A member's or a mentor's page: the photo, the name, what they do and their years, then two groups of details. */
+  profile: page({ lead: { kind: "circle", size: 96, phoneSize: 88 }, head: [45, 70, 40], sections: [[30, 90, 75], [30, 85, 60]] }),
+  /** An edit form or settings, under the title the page already shows: four fields and the button that saves them. */
+  form: page({ fields: 4, actions: 1 }),
+  /** A chat's messages, in the pane under its header. */
+  thread: page({ bubbles: [55, 40, 70, 35, 60] }),
+  /** The consoles' dashboards, analytics and the platform's figures: four tiles over a card of rows. */
+  panel: page({ tiles: 4, sections: [[35, 90, 80, 85, 70]] }),
+};

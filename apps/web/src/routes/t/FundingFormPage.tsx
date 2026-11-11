@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { PageLoad } from "@/components/common/PageLoad";
 import { FundingForm } from "@/components/funding/FundingForm";
-import { Card, ErrorBox, Loading, PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
@@ -15,8 +17,15 @@ export function FundingFormPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const existing = useQuery({ queryKey: qk.fundingItem(slug, id ?? ""), queryFn: () => api.funding.get(slug, id!), enabled: !!id });
-  if (id && existing.isLoading) return <Loading />;
-  if (id && (existing.error || !existing.data)) return <ErrorBox error={existing.error ?? "Not found"} />;
+  const page = usePageQuery(existing);
+  // Only with nothing to show: a failed background refetch must not replace the form and lose what was typed.
+  if (id && !existing.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="Edit listing" />
+        <PageLoad page={page} shape="form" />
+      </div>
+    );
   const kind = existing.data?.kind ?? (params.get("kind") === "OFFERING" ? "OFFERING" : "SEEKING");
   return (
     <div className="mx-auto max-w-2xl">

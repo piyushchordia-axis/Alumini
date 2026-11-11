@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "react-native";
 import { EventForm } from "@/components/forms/EventForm";
-import { LoadError, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -14,8 +16,9 @@ export default function EditEventScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
-  if (ev.isLoading) return <Spinner />;
-  if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  const page = usePageQuery(ev);
+  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed.
+  if (!ev.data) return loadingScreen({ title: "Edit event", shape: "form", page });
   return (
     <Screen title="Edit event">
       <EventForm

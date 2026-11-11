@@ -3,8 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { StatusLine } from "@/components/Sheet";
-import { Button, ErrorText, Spinner } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -21,6 +22,7 @@ export default function AdminBrandingScreen() {
   const slug = tenant.slug;
   const qc = useQueryClient();
   const q = useQuery({ queryKey: qk.admin.settings(slug), queryFn: () => api.admin.settings.get(slug) });
+  const page = usePageQuery(q);
   // What became of Save. Here rather than in the form, which starts again when a new name or colour comes back.
   const [said, setSaid] = useStatus<Said>();
   const refresh = () =>
@@ -34,15 +36,8 @@ export default function AdminBrandingScreen() {
   if (!q.data) {
     return (
       <AdminScreen title="Branding">
-        {/* Only until the first answer: a refetch keeps the form, and what's typed in it. */}
-        {q.isLoading && !q.isFetched ? (
-          <Spinner label="Loading the branding" />
-        ) : (
-          <>
-            <ErrorText error={q.error ?? "Couldn't load the branding"} />
-            <Button title="Try again" variant="outline" onPress={() => void q.refetch()} />
-          </>
-        )}
+        {/* Only with nothing to show: a refetch failing in the background keeps the form, and what's typed in it. */}
+        <PageLoad page={page} shape="form" label="Loading the branding" />
       </AdminScreen>
     );
   }

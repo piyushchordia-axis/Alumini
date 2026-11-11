@@ -1,4 +1,4 @@
-import { LOADING_LABEL, SKELETON_LAYOUTS, skeletonWidth, type SkeletonFrame, type SkeletonLayout, type SkeletonLead, type SkeletonShape } from "@illuminize/shared";
+import { LOADING_LABEL, PAGE_SKELETONS, SKELETON_LAYOUTS, skeletonWidth, type PageSkeletonLayout, type PageSkeletonShape, type SkeletonFrame, type SkeletonLayout, type SkeletonLead, type SkeletonShape } from "@illuminize/shared";
 import clsx from "clsx";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -122,6 +122,89 @@ export function ListSkeleton({ shape, count, label, frame, columns, className }:
               <Item layout={layout} row={row} />
             </div>
           ))
+        )}
+      </div>
+    </SkeletonStatus>
+  );
+}
+
+/** The card's lead and head: a profile's photo above its lines on a phone and beside them from sm up, as ProfileSummary lays them. */
+function PageHead({ layout }: { layout: PageSkeletonLayout }) {
+  const lines = layout.head.map((w, i) => (
+    // The title is taller than the lines under it, and centred under a photo on a phone, as the name is.
+    <Skeleton key={i} className={clsx(i === 0 ? "h-6" : "h-3", layout.lead && "mx-auto sm:mx-0")} style={width(w, 0)} />
+  ));
+  if (!layout.lead) return <div className="space-y-3">{lines}</div>;
+  return (
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+      <Lead lead={layout.lead} />
+      <div className="w-full min-w-0 flex-1 space-y-3 sm:pt-2">{lines}</div>
+    </div>
+  );
+}
+
+function PageCard({ layout }: { layout: PageSkeletonLayout }) {
+  const head = layout.lead !== null || layout.head.length > 0;
+  return (
+    <>
+      {head && <PageHead layout={layout} />}
+      {layout.sections.map((lines, i) => (
+        <SkeletonLines key={i} widths={lines} row={i} className={clsx(head || i > 0 ? "mt-5 border-t border-slate-100 pt-5" : undefined)} />
+      ))}
+      {layout.fields > 0 && (
+        <div className={clsx("space-y-5", head && "mt-5")}>
+          {Array.from({ length: layout.fields }, (_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3" style={width(30, i)} />
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      )}
+      {layout.actions > 0 && (
+        <div className="mt-6 flex flex-wrap gap-2">
+          {Array.from({ length: layout.actions }, (_, i) => (
+            <Skeleton key={i} className="h-11 w-28 rounded-lg" />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * A detail or form page's outline while its first answer comes (`PAGE_SKELETONS`, shared with the phone), under the
+ * Back link and any title the page knows already, which it draws itself, in its own width. `label` replaces "Loading…"
+ * where the page says something more specific.
+ */
+export function PageSkeleton({ shape, label, className }: { shape: PageSkeletonShape; label?: string; className?: string }) {
+  const layout = PAGE_SKELETONS[shape];
+  const card = layout.lead !== null || layout.head.length > 0 || layout.sections.length > 0 || layout.fields > 0 || layout.actions > 0;
+  return (
+    <SkeletonStatus label={label} className={className}>
+      <div className="space-y-4">
+        {layout.tiles > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: layout.tiles }, (_, i) => (
+              <div key={i} className={clsx(CARD, "space-y-3 p-4")}>
+                <Skeleton className="h-3" style={width(55, i)} />
+                <Skeleton className="h-7 w-16" />
+              </div>
+            ))}
+          </div>
+        )}
+        {layout.bubbles.length > 0 && (
+          // A chat pane is white already, so its bubbles need no card.
+          <div className="flex flex-col gap-3 p-4">
+            {layout.bubbles.map((w, i) => (
+              <Skeleton key={i} className={clsx("h-10 rounded-2xl", i % 2 === 0 ? "self-start" : "self-end")} style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        )}
+        {card && (
+          <div className={clsx(CARD, "p-5")}>
+            <PageCard layout={layout} />
+          </div>
         )}
       </div>
     </SkeletonStatus>

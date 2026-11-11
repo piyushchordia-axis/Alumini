@@ -3,7 +3,9 @@ import { errorMessage, isApiClientError } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Alert, Text, View } from "react-native";
-import { Button, Card, ErrorText, Input, Muted, Screen, Spinner } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Button, Card, Input, Muted, Screen, SkeletonGroup, SkeletonLines } from "@/components/ui";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/authStore";
@@ -16,6 +18,7 @@ export default function AccountScreen() {
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const status = useQuery({ queryKey: qk.myEmail, queryFn: () => api.me.email.get() });
+  const page = usePageQuery(status);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string | undefined>();
@@ -45,10 +48,16 @@ export default function AccountScreen() {
       <Card>
         <Text style={{ fontWeight: "700", color: colors.text }}>Email</Text>
         <Muted size={13}>For the weekly digest and announcements. Never shown to other members; shared by all your institutions.</Muted>
-        {status.isLoading ? (
-          <Spinner />
-        ) : status.error ? (
-          <ErrorText error={status.error} />
+        {/* Only with nothing to show: a refetch failing in the background keeps the address, and what's typed for a new one. */}
+        {!d ? (
+          <PageLoad
+            page={page}
+            outline={
+              <SkeletonGroup>
+                <SkeletonLines widths={[55, 35]} />
+              </SkeletonGroup>
+            }
+          />
         ) : (
           <View style={{ gap: 10 }}>
             {d?.email && (

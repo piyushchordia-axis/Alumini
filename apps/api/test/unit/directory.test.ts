@@ -1,4 +1,4 @@
-import { awaitingFirstAnswer, cardInPages, directoryPrefetchSection, homeSection, PROFILE_DETAILS_OUTLINE, TENANT_FEATURES, type DirectoryCardDto, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
+import { awaitingFirstAnswer, cardInPages, directoryPrefetchSection, homeSection, TENANT_FEATURES, type DirectoryCardDto, type TenantFeature, type TenantFeatures } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 const card = (id: string, fullName = `Member ${id}`): DirectoryCardDto => ({
@@ -61,19 +61,6 @@ describe("awaitingFirstAnswer", () => {
     expect(awaitingFirstAnswer({ isPending: false, isFetched: true })).toBe(false);
     // TanStack puts a query with no data back to pending while a retry is on its way; it has still answered.
     expect(awaitingFirstAnswer({ isPending: true, isFetched: true })).toBe(false);
-  });
-});
-
-describe("PROFILE_DETAILS_OUTLINE", () => {
-  it("gives the outline under a header drawn from a card groups of lines between 10% and 100% wide", () => {
-    expect(PROFILE_DETAILS_OUTLINE.length).toBeGreaterThan(0);
-    for (const lines of PROFILE_DETAILS_OUTLINE) {
-      expect(lines.length).toBeGreaterThan(0);
-      for (const w of lines) {
-        expect(w).toBeGreaterThanOrEqual(10);
-        expect(w).toBeLessThanOrEqual(100);
-      }
-    }
   });
 });
 

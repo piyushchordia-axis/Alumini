@@ -1219,6 +1219,29 @@ try {
     await page.click('button:has-text("Save changes")');
     await page.waitForSelector(`h1:has-text("${name} and Sons")`);
 
+    // The listing's page keeps the listing when a refetch fails in the background. Opened afresh with nothing to show, it
+    // says what went wrong in place, read out, under All businesses, with Retry loading, which brings the listing.
+    const shown = await scriptBusiness(page, "demo-university", /\/businesses\/([0-9a-f-]+)$/.exec(page.url())[1]);
+    const listing = page.locator("main h1", { hasText: `${name} and Sons` });
+    const retryListing = page.locator("main").getByRole("button", { name: "Retry loading", exact: true });
+    shown.answer(503, "INTERNAL");
+    await shown.refetch();
+    if (!(await listing.count())) throw new Error("a failed background refetch took the listing off its page");
+    if (await retryListing.count()) throw new Error("a failed background refetch of a listing on screen offers Retry loading");
+    await page.reload();
+    const said = page.locator("main").getByRole("alert").filter({ hasText: "e2e INTERNAL" });
+    await said.waitFor();
+    await retryListing.waitFor();
+    const allBusinesses = page.locator("main").getByRole("link", { name: "All businesses", exact: true });
+    const [backBox, saidBox] = [await allBusinesses.boundingBox(), await said.boundingBox()];
+    if (!backBox || backBox.y + backBox.height > saidBox.y + 1) throw new Error("the listing's error isn't in place under All businesses");
+    if (await listing.count()) throw new Error("the listing shows while its answer fails");
+    shown.answer(null);
+    await retryListing.click();
+    await listing.waitFor();
+    if (await retryListing.count()) throw new Error("Retry loading stays once the listing is in");
+    await shown.stop();
+
     await page.goto(BASE + "/t/demo-university/app/my-content");
     await page.click('[role="tab"]:has-text("Businesses")');
     await page.locator("h3", { hasText: `${name} and Sons` }).click();
@@ -1469,9 +1492,31 @@ try {
     for (let i = 0; i < 20 && (opacity = await drawnOpacity(card)) < 1; i++) await page.waitForTimeout(50);
     if (opacity < 1) throw new Error(`the Backend card stays faded (opacity ${opacity}) once the search's answer is in`);
 
+    // The job's page, its answer held back here: All jobs and the page's outline come at once, with no spinner and no
+    // title yet, and All jobs, focused meanwhile, keeps focus when the job takes the outline's place.
+    const jobHeld = await holdGets(page, (u) => /\/t\/demo-university\/jobs\/[0-9a-f]{8}-[0-9a-f-]+$/.test(u.pathname));
+    const allJobs = page.locator("main").getByRole("link", { name: "All jobs", exact: true });
+    try {
+      await card.click();
+      await jobHeld.asked();
+      await allJobs.waitFor();
+      const outline = page.locator("main [data-testid=skeleton]");
+      await outline.waitFor();
+      if ((await outline.getAttribute("role")) !== "status" || (await outline.textContent()).trim() !== "Loading…") throw new Error("the job's outline isn't a status saying Loading…");
+      if (await outline.locator("article, li, a, button").count()) throw new Error("the job's outline holds an article, li, link or button");
+      if (await page.locator("main .animate-spin").count()) throw new Error("the job's page shows a spinner while its answer is held");
+      if (await page.locator("main h1").count()) throw new Error("the job's page shows a title before its answer");
+      const [back, drawn] = [await allJobs.boundingBox(), await outline.boundingBox()];
+      if (back.y + back.height > drawn.y + 1) throw new Error("All jobs isn't above the job's outline");
+      await allJobs.focus();
+      await page.screenshot({ path: `${SHOTS}/06j-job-loading-phone.png` });
+    } finally {
+      jobHeld.release();
+    }
     // The job's page keeps its own order, marks the same two, and says how many of its skills this member has.
-    await card.click();
     await page.waitForSelector("h1:has-text('Backend Engineer (Node.js)')");
+    await jobHeld.stop();
+    if (!(await allJobs.evaluate((el) => el === document.activeElement))) throw new Error("All jobs lost focus when the job took its outline's place");
     await page.getByText("You have 2 of 4 skills", { exact: true }).waitFor();
     const skills = page.getByRole("list", { name: "Skills" }).getByRole("listitem");
     const onPage = (await skills.allTextContents()).map((t) => t.trim());

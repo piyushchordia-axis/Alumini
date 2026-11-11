@@ -2,7 +2,8 @@ import { CAN_REFER_BADGE, JOB_DELETED_TEXT, waitingReferralsCloseText } from "@i
 import { errorMessage, fatalQueryError } from "@illuminize/shared/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { MemberLink } from "@/components/common/MemberLink";
 import { JobApplyArea } from "@/components/jobs/JobApplyArea";
@@ -11,7 +12,7 @@ import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Badge, Button, Card, LinkButton, Loading } from "@/components/ui";
+import { Badge, Button, Card, LinkButton, PageSkeleton } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { useRowFocus } from "@/hooks/useRowFocus";
@@ -68,16 +69,28 @@ function JobDetailPage({ jobId }: { jobId: string }) {
 
   // Only an answer, or nothing at all to show: a refetch failing in the background keeps the page.
   const error = fatalQueryError(job);
-  if (error) return <JobUnavailable error={error} onRetry={() => void job.refetch()} />;
-  if (!job.data) return <Loading />;
+  const back = <BackLink to={jobsPath(slug)}>All jobs</BackLink>;
+  // Under the same All jobs the outline had, so it stays put (and keeps focus) whichever comes.
+  if (error)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <JobUnavailable error={error} onRetry={() => void job.refetch()} />
+      </div>
+    );
+  if (!job.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <PageSkeleton shape="article" />
+      </div>
+    );
   const j = job.data;
   const waiting = j.pendingReferralCount ?? 0;
   const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={jobsPath(slug)} className="inline-flex min-h-11 items-center text-sm text-slate-500 hover:text-slate-800">
-        ← All jobs
-      </Link>
+      {back}
       <Card className="p-5">
         <JobDetails
           job={j}

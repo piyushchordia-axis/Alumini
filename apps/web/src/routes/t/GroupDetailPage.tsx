@@ -5,13 +5,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BlockConfirmDialog, BlockMemberButton } from "@/components/chat/BlockMemberButton";
+import { BackLink } from "@/components/common/BackLink";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ListError } from "@/components/common/ListBody";
 import { GroupUnavailable } from "@/components/groups/GroupUnavailable";
 import { InviteMembersDialog } from "@/components/groups/InviteMembersDialog";
 import { ModerationCardNote, ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, LinkButton, ListSkeleton, LoadMore, Loading, Modal } from "@/components/ui";
+import { Avatar, Badge, Button, Card, LinkButton, ListSkeleton, LoadMore, Modal, PageSkeleton } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -263,7 +264,14 @@ function GroupDetailPage({ id }: { id: string }) {
 
   const error = fatalQueryError(query);
   if (error) return <GroupUnavailable slug={slug} error={error} onRetry={() => void query.refetch()} />;
-  if (!query.data) return <Loading />;
+  // Groups' own tab once the group says which is this member's; Discover meanwhile, as the list opens on it.
+  if (!query.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <BackLink to={groupsPath(slug)}>Groups</BackLink>
+        <PageSkeleton shape="article" />
+      </div>
+    );
   const g = query.data;
   const member = g.myState === "ACTIVE";
   const invited = g.myState === "INVITED";
@@ -302,9 +310,7 @@ function GroupDetailPage({ id }: { id: string }) {
   const leaveBody = groupLeaveText(g);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={groupsPath(slug, backTab)} className="text-sm text-slate-500 hover:text-slate-800">
-        ← Groups
-      </Link>
+      <BackLink to={groupsPath(slug, backTab)}>Groups</BackLink>
       <Card className="p-5">
         <div className="flex items-start gap-3">
           <Avatar name={g.name} size="lg" />

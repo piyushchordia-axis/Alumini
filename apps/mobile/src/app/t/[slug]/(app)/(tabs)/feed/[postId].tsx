@@ -6,11 +6,13 @@ import { useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { IconComment } from "@/components/icons";
 import { MemberRow } from "@/components/MemberRow";
+import { PageLoad } from "@/components/PageLoad";
 import { PostCard } from "@/components/PostCard";
 import { ReportButton } from "@/components/ReportButton";
-import { Button, EmptyState, headingRole, Input, ListEmpty, LoadError, Muted, Row, Spinner, StackScreen } from "@/components/ui";
+import { Button, EmptyState, headingRole, Input, ListEmpty, Muted, Row, StackScreen } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -23,6 +25,7 @@ export default function PostDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const post = useQuery({ queryKey: qk.post(slug, postId), queryFn: () => api.posts.get(slug, postId) });
+  const page = usePageQuery(post);
   const comments = useInfiniteList(qk.comments(slug, postId), (cursor) => api.posts.comments.list(slug, postId, { cursor, limit: 20 }), !!post.data);
   const [body, setBody] = useState("");
   const invalidate = () => {
@@ -39,16 +42,12 @@ export default function PostDetailScreen() {
     onError: (e) => Alert.alert("Could not comment", errorMessage(e)),
   });
   const remove = useMutation({ mutationFn: (id: string) => api.posts.comments.remove(slug, postId, id), onSuccess: invalidate, onError: (e) => Alert.alert("Could not delete", errorMessage(e)) });
-  if (post.isLoading)
+  // Only with nothing to show: a refetch failing in the background keeps the post, its comments and what's typed. In the
+  // StackScreen the post has, so its bar, Back and its focus included, stays when the post comes.
+  if (!post.data)
     return (
       <StackScreen title="Post">
-        <Spinner />
-      </StackScreen>
-    );
-  if (post.error || !post.data)
-    return (
-      <StackScreen title="Post">
-        <LoadError error={post.error ?? "Not found"} onRetry={() => void post.refetch()} onBack={() => router.back()} backLabel="Back" />
+        <PageLoad page={page} shape="article" style={{ padding: spacing.lg }} />
       </StackScreen>
     );
   const canComment = postTakesComments(post.data);

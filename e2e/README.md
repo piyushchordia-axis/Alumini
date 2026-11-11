@@ -111,6 +111,16 @@ three scripts uses exactly 20: `pnpm e2e:web` 8, `pnpm e2e:admin` 4 and `pnpm e2
   (`aria-busy="true"`), as a list's busy isn't read on a phone. A debounced search typed letter by letter
   (`pressSequentially` with a short delay) holds every search GET, not only the last, so an early answer can't replace
   the kept rows, and counts the searches asked for: fewer than half the letters, the last the whole word.
+- Detail pages: hold the item's own GET (match its id, `/jobs/<uuid>$`, not the list's address) and check the header
+  and Back are there with the outline under them and no spinner. On the web, Back is a link in `main` (All jobs) above
+  `main [data-testid=skeleton]`, and no `main .animate-spin` or `h1` shows yet. On the phone, a cold link mounts the
+  section's list under the detail, which draws its own outline and the same words, so read the pushed screen through
+  its bar: the visible Back button (`.last()`), the title in Back's row (`xpath=..`), and the screen's content after
+  the bar (`xpath=../../following-sibling::*[1]`), holding one progressbar, the skeleton. A spinner is a progressbar
+  too on the web build, so count them. To check the error in place, answer the item's GET with a 503 (`scriptBusiness`
+  and the like: `answer(503, "INTERNAL")`, then `refetch()` for a background refetch, which must keep the page, or a
+  reload or cold `goto`, after which the error, an alert, and Retry loading show under Back once the retries are
+  spent); `answer(null)` and Retry loading bring the page back.
 
 ## Web (member journey)
 
@@ -198,7 +208,9 @@ Covers:
   and a LinkedIn link with the right target and rel; and Directory pointed at again asking for nothing, its first
   page cached;
 - businesses: search and filters, contact details only on a listing's own page; add (its logo a 4000 × 3000 photo of
-  over 5 MB, made smaller in the browser before it goes up), edit, find it in My posts and delete it;
+  over 5 MB, made smaller in the browser before it goes up), edit, its page keeping the listing through a failed
+  background refetch and, reloaded while its answer fails, saying so in place (an alert reading "e2e INTERNAL")
+  under All businesses with Retry loading, which brings the listing, find it in My posts and delete it;
 - My profile: the photo picker refusing a text file beside it, Cancel upload pressed while a photo is still being
   prepared sending nothing, a saved photo served as a 512-pixel square JPEG, and initials when a photo can't load, in
   the member's own tone in the header and the picker alike, beside Demo University's initials in its ink on its tint; a
@@ -214,8 +226,10 @@ Covers:
   and its edge at 3:1, its link's name saying "(you have this)" after each; "Backend" typed letter by letter into
   Search jobs asking fewer times than its letters (the last for "Backend"), and while that answer is held back the
   cards listed staying, faded under "Updating results…", the internship among them, until the answer replaces them
-  unfaded; its page keeping the job's order, the same
-  two checked (filled in the brand, readable, with an edge, as the others have), and "You have 2 of 4 skills";
+  unfaded; its page, while its answer is held back, showing All jobs above the page's outline (a status saying
+  "Loading…", holding no article, `li`, link or button) with no spinner and no title, All jobs focused meanwhile
+  keeping focus when the job comes; its page keeping the job's order, the same two checked (filled in the brand,
+  readable, with an edge, as the others have), and "You have 2 of 4 skills";
   "You have 0 of 4 skills" and no marks on Associate Product Manager; and the member's own job, asking for TypeScript
   among skills too long for one line, unmarked on its page and on its My posts card, whose chips shorten to fit;
 - joining Demo College as that member (nothing sent): its landing page offering Join DCE and "Signed in as" rather than
@@ -518,9 +532,13 @@ Covers:
 - businesses behind More: search, filters and contact details only on a listing's own page; the description's bullets
   as one list with the bullet marks hidden from screen readers, its numbered steps read out from 1 with the numbers on
   the left, and its link; add (its logo changed to a 4000 × 3000 photo of over 5 MB, made smaller before it goes up),
-  edit, My posts and delete through the confirm sheet;
-- notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold,
-  and a notification tap landing on its target;
+  edit, My posts and delete through the confirm sheet; the listing kept through a failed background refetch and,
+  opened cold while its answer fails, the error (an alert) and Retry loading under its bar with Back and Business, not
+  in place of the screen, Retry loading bringing the listing;
+- notification settings persisting, opened from a Settings button named by its word alone; nested screens opened cold
+  (a funding listing first with its answer held back: its bar, Back and the title Funding, there from the first frame
+  over the listing's outline, one progressbar named "Loading" and no spinner, until the listing comes, Back focused
+  meanwhile keeping focus then), and a notification tap landing on its target;
 - direct messages between two seeded members (Arjun and Vikram), as on the web, including the note welcoming the first
   message ("Say hello to Vikram Desai", its text and tip, its envelope in Demo University's badge, its words readable,
   nothing hinting at a decline, no paperclip and the line saying photos and files wait for Vikram to accept), the
@@ -1128,6 +1146,11 @@ second copy of a screen, or back to the page the button was on.
       card: her initials, name, headline, years and Mentor badge show at once, with Back, the initials keeping their
       colour when the rest of her profile comes, and TalkBack or VoiceOver reads the outline under them once as
       "Loading".
+- [ ] On a slow connection, open a job from Jobs: the bar with Back and "Job" shows at once, over a grey outline of the
+      page (its title, two lines and its text), until the job comes, with no spinner, and Back works meanwhile. Then
+      open Funding, turn the network off and open a listing not opened before: after a few seconds the error and Retry
+      loading show under the bar with Back and "Funding", not in place of the screen; turn the network on, and Retry
+      loading brings the listing.
 
 ### 13. Notices with Approve and Reject
 
@@ -1497,7 +1520,8 @@ made after the five native modules above were added.
 
 - [ ] With the app closed, open a job, business or mentor from a push or a link (for example
       `illuminize://t/demo-university/jobs/<id>`, with an id from the web app's address bar). Back (and, on the iPhone,
-      the swipe back) goes to that section's list.
+      the swipe back) goes to that section's list. On a slow connection, the bar with Back and the screen's title (Job,
+      Business) is there from the first moment, over a grey outline of the page, until it loads.
 - [ ] Open such a link while the app is on another section: Back goes somewhere sensible, never to a duplicate screen.
 - [ ] Open Rahul's own mentor page, `illuminize://t/demo-university/mentors/<id>`, with the id from the end of his
       profile's address in the web app's Directory: Edit mentor profile opens Be a mentor, once, and Back never returns

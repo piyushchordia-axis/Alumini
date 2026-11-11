@@ -1,4 +1,4 @@
-import { MY_CONTENT_SKELETONS, MY_CONTENT_TABS, SKELETON_LAYOUTS, SKELETON_SHAPES, skeletonWidth } from "@illuminize/shared";
+import { MY_CONTENT_SKELETONS, MY_CONTENT_TABS, PAGE_SKELETONS, PAGE_SKELETON_SHAPES, SKELETON_LAYOUTS, SKELETON_SHAPES, skeletonWidth } from "@illuminize/shared";
 import { describe, expect, it } from "vitest";
 
 describe("the skeleton layouts both apps draw", () => {
@@ -43,6 +43,44 @@ describe("the skeleton layouts both apps draw", () => {
     // Notifications are rows in one card, with their time at the end; console rows end in an action.
     expect(SKELETON_LAYOUTS.notification).toMatchObject({ lead: null, trailing: "time", frame: "rows" });
     expect(SKELETON_LAYOUTS.adminRow.trailing).toBe("action");
+  });
+});
+
+describe("the page outlines both apps draw under a detail or form page's header and Back", () => {
+  it("cover every page shape, and only those", () => {
+    expect(Object.keys(PAGE_SKELETONS).sort()).toEqual([...PAGE_SKELETON_SHAPES].sort());
+  });
+
+  it.each(PAGE_SKELETON_SHAPES)("draw %s with something in it, lines between 10%% and 100%% wide, and whole counts", (shape) => {
+    const layout = PAGE_SKELETONS[shape];
+    const widths = [...layout.head, ...layout.sections.flat(), ...layout.bubbles];
+    for (const w of widths) {
+      expect(w).toBeGreaterThanOrEqual(10);
+      expect(w).toBeLessThanOrEqual(100);
+    }
+    for (const n of [layout.tiles, layout.fields, layout.actions]) expect(Number.isInteger(n) && n >= 0).toBe(true);
+    for (const lines of layout.sections) expect(lines.length).toBeGreaterThan(0);
+    expect(widths.length + layout.tiles + layout.fields + layout.actions).toBeGreaterThan(0);
+    if (layout.lead) {
+      expect(layout.lead.phoneSize).toBeGreaterThanOrEqual(32);
+      expect(layout.lead.phoneSize).toBeLessThanOrEqual(layout.lead.size);
+    }
+  });
+
+  it("draw each page as it lays itself out", () => {
+    // A job, an event, a post: the title and when and where, the text, then its buttons.
+    expect(PAGE_SKELETONS.article.head.length).toBeGreaterThanOrEqual(2);
+    expect(PAGE_SKELETONS.article.sections.length).toBeGreaterThan(0);
+    expect(PAGE_SKELETONS.article.actions).toBeGreaterThan(0);
+    // A member's page leads with their photo, as large as the profile's own.
+    expect(PAGE_SKELETONS.profile.lead).toEqual({ kind: "circle", size: 96, phoneSize: 88 });
+    // A form's title is the page's own, drawn above the outline, so the outline has fields and a button and no head.
+    expect(PAGE_SKELETONS.form).toMatchObject({ lead: null, head: [], fields: 4, actions: 1 });
+    // A chat's messages are bubbles on the pane, with no card or fields; dashboards are tiles over a card of rows.
+    expect(PAGE_SKELETONS.thread).toMatchObject({ lead: null, head: [], sections: [], fields: 0, actions: 0, tiles: 0 });
+    expect(PAGE_SKELETONS.thread.bubbles.length).toBeGreaterThanOrEqual(3);
+    expect(PAGE_SKELETONS.panel.tiles).toBe(4);
+    expect(PAGE_SKELETONS.panel.sections.length).toBeGreaterThan(0);
   });
 });
 

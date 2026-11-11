@@ -5,8 +5,10 @@ import { Linking, Text, View } from "react-native";
 import { MessageMemberButton, ProfileBlockButton } from "@/components/chat/MemberChatActions";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileDetailsOutline } from "@/components/profile/ProfileDetailsOutline";
-import { Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { useCachedDirectoryCard } from "@/lib/directory";
 import { formatDate } from "@/lib/format";
@@ -19,6 +21,7 @@ export default function MemberProfileScreen() {
   const { membershipId = "" } = useLocalSearchParams<{ membershipId: string }>();
   const router = useRouter();
   const profile = useQuery({ queryKey: qk.member(slug, membershipId), queryFn: () => api.directory.profile(slug, membershipId) });
+  const page = usePageQuery(profile);
   // Opened from a card the directory listed: the header from that card until the profile's first answer, offline too.
   const card = useCachedDirectoryCard(slug, membershipId, profile);
   // The same elements in the same places as the loaded screen, the bar with Back, the card and its header, so React
@@ -32,9 +35,8 @@ export default function MemberProfileScreen() {
         </Card>
       </Screen>
     );
-  if (profile.isLoading) return <Spinner />;
   // Only with nothing to show: a refetch failing in the background keeps the profile on screen.
-  if (!profile.data) return <LoadError error={profile.error ?? "Not found"} onRetry={() => void profile.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  if (!profile.data) return loadingScreen({ title: "Member", shape: "profile", page });
   const m = profile.data;
   // Blocking doesn't depend on messages being on: an institution may switch them off in the middle of an incident.
   const canBlock = m.id !== membership.id && membership.chatEligible;

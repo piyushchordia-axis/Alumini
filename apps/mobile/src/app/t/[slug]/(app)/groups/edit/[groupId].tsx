@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader, ChatScreen } from "@/components/chat/ChatFrame";
 import { GroupUnavailable, GroupsOff, useGroupsEnabled } from "@/components/groups/GroupFrame";
 import { GroupForm } from "@/components/groups/GroupForm";
-import { Spinner } from "@/components/ui";
+import { PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { groupHref, groupsAreReviewed, leaveGroupNotice, refreshGroup } from "@/lib/groups";
@@ -37,7 +37,7 @@ function EditGroup({ id }: { id: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="Edit group" />
-        <Spinner label="Loading group…" />
+        <PageSkeleton shape="form" label="Loading group…" style={{ padding: spacing.lg }} />
       </ChatScreen>
     );
   }

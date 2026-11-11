@@ -4,9 +4,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useState, type ComponentType } from "react";
 import { ChartCard, ColumnChart, HBarChart, LineChart } from "@/components/charts";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconDownload, IconTrendDown, IconTrendFlat, IconTrendUp, type IconProps } from "@/components/icons";
-import { Button, Card, ErrorBox, Loading, PageHeader, Select } from "@/components/ui";
+import { Button, Card, PageHeader, Select } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
 import { qk } from "@/lib/queryKeys";
@@ -89,6 +91,7 @@ export function AdminAnalyticsPage() {
   const { tenant } = useAdminTenant();
   const [weeks, setWeeks] = useState<number>(DEFAULT_ANALYTICS_WEEKS);
   const q = useQuery({ queryKey: qk.admin.analytics(tenant.slug, weeks), queryFn: () => api.admin.analytics(tenant.slug, weeks), placeholderData: (prev) => prev });
+  const page = usePageQuery(q);
   // The charts of the range before stay up while the new one loads, which this says.
   const updating = q.isPlaceholderData && q.isFetching;
   return (
@@ -118,7 +121,8 @@ export function AdminAnalyticsPage() {
       <p role="status" className={clsx("text-xs text-slate-500", !updating && "sr-only")}>
         {updating ? "Updating…" : ""}
       </p>
-      {q.isLoading ? <Loading /> : q.error || !q.data ? <ErrorBox error={q.error ?? "Failed"} /> : <Charts d={q.data} />}
+      {/* A refetch failing in the background keeps the charts; a range that can't load says so in their place. */}
+      {q.data ? <Charts d={q.data} /> : <PageLoad page={page} shape="panel" />}
     </div>
   );
 }

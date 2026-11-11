@@ -2,9 +2,10 @@ import { memberRoleLine, memberYearsLine, mentorAvailabilityText, mentorshipKeys
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { MentorAreas } from "@/components/mentors/MentorCard";
 import { MentorUnavailable } from "@/components/mentors/MentorUnavailable";
-import { Avatar, Card, LinkButton, Loading } from "@/components/ui";
+import { Avatar, Card, LinkButton, PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { mentorRequestPath, mentorsPath } from "@/lib/mentors";
@@ -71,14 +72,19 @@ function MentorDetailPage({ id }: { id: string }) {
   // Only an answer, or nothing at all to show: a refetch failing in the background keeps the page.
   const error = fatalQueryError(query);
   if (error) return <MentorUnavailable slug={slug} error={error} onRetry={() => void query.refetch()} />;
-  if (!query.data) return <Loading />;
+  const back = <BackLink to={mentorsPath(slug)}>Mentors</BackLink>;
+  if (!query.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <PageSkeleton shape="profile" />
+      </div>
+    );
   const m = query.data;
   const { member } = m;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={mentorsPath(slug)} className="text-sm text-slate-500 hover:text-slate-800">
-        ← Mentors
-      </Link>
+      {back}
       <Card className="p-5 sm:p-6">
         <div className="flex items-start gap-4">
           <Avatar name={member.fullName} src={member.avatarUrl} size="lg" toneKey={member.id} />

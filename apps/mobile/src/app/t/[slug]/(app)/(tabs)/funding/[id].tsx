@@ -9,8 +9,10 @@ import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { openLink, RichText } from "@/components/RichText";
-import { Badge, Button, Card, LoadError, Muted, Row, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Badge, Button, Card, Muted, Row, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatAmountRange, formatDate } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -23,11 +25,12 @@ export default function FundingDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const item = useQuery({ queryKey: qk.fundingItem(slug, id), queryFn: () => api.funding.get(slug, id) });
+  const page = usePageQuery(item);
   const invalidate = () => void qc.invalidateQueries({ queryKey: ["funding", slug] });
   const close = useMutation({ mutationFn: () => api.funding.close(slug, id), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   const remove = useMutation({ mutationFn: () => api.funding.remove(slug, id), onSuccess: () => { invalidate(); router.back(); }, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
-  if (item.isLoading) return <Spinner />;
-  if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  // Only with nothing to show: a refetch failing in the background keeps the listing on screen.
+  if (!item.data) return loadingScreen({ title: "Funding", shape: "article", page });
   const f = item.data;
   return (
     <Screen title="Funding">

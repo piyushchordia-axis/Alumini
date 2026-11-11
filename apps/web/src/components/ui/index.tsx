@@ -330,7 +330,10 @@ export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg";
   return <span role="status" className={clsx("inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-primary", s, className)} aria-label="Loading" />;
 }
 
-/** A centred spinner, only where there's no page yet to outline (the guards, sign-in); a list's first load draws ListSkeleton. */
+/**
+ * A centred spinner, only where there's no page yet to outline (the guards, sign-in); a list's first load draws
+ * ListSkeleton, and a detail or form page PageSkeleton under its header and Back.
+ */
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-3 py-12 text-slate-500" role="status" aria-live="polite">
@@ -339,7 +342,7 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-export { ListSkeleton, Skeleton, SkeletonLines, SkeletonStatus } from "./Skeleton";
+export { ListSkeleton, PageSkeleton, Skeleton, SkeletonLines, SkeletonStatus } from "./Skeleton";
 
 /**
  * The round badge an empty state or a chat notice draws its icon in, hidden from screen readers: the brand's wash, with

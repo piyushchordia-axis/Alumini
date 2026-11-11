@@ -9,10 +9,11 @@ import { JobApplyArea } from "@/components/jobs/JobApplyArea";
 import { AboutCompany, JobDetails } from "@/components/jobs/JobDetails";
 import { JobReferrals, MyReferral } from "@/components/jobs/JobReferrals";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
+import { loadingScreen } from "@/components/LoadingScreen";
 import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
-import { Badge, Button, Card, ErrorText, Row, Screen, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorText, Row, Screen } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { useStatus } from "@/hooks/useStatus";
@@ -66,8 +67,14 @@ function JobDetail({ jobId }: { jobId: string }) {
 
   // Only an answer, or nothing at all to show: a refetch failing in the background keeps the page.
   const error = fatalQueryError(job);
-  if (error) return <JobUnavailable error={error} onRetry={() => void job.refetch()} />;
-  if (!job.data) return <Spinner />;
+  // Under the bar the loading screen drew, so Back and the title stay put (and focus with them) whichever comes.
+  if (error)
+    return (
+      <Screen title="Job">
+        <JobUnavailable error={error} onRetry={() => void job.refetch()} />
+      </Screen>
+    );
+  if (!job.data) return loadingScreen({ title: "Job", shape: "article" });
   const j = job.data;
   const waiting = j.pendingReferralCount ?? 0;
   const closesWaiting = waiting > 0 ? waitingReferralsCloseText(waiting) : undefined;

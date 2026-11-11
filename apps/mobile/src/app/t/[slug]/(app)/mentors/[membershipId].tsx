@@ -8,7 +8,7 @@ import { ChatHeader, ChatScreen } from "@/components/chat/ChatFrame";
 import { MentorAction, useMentor } from "@/components/mentors/MentorAction";
 import { MentorAreas } from "@/components/mentors/MentorCards";
 import { MentorsOff, MentorUnavailable, useMentorsEnabled } from "@/components/mentors/MentorFrame";
-import { Avatar, Button, Spinner } from "@/components/ui";
+import { Avatar, Button, PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { colors, radius, spacing } from "@/theme";
 
@@ -45,7 +45,7 @@ function MentorDetail({ id }: { id: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="Mentor" />
-        <Spinner label="Loading mentor…" />
+        <PageSkeleton shape="profile" label="Loading mentor…" style={{ padding: spacing.lg }} />
       </ChatScreen>
     );
   const m = query.data;

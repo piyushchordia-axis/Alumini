@@ -1,9 +1,11 @@
 import { ADMIN_SECTIONS, approvalSummary, dashboardTiles, formatCount, type DashboardTile } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconChevronRight } from "@/components/icons";
-import { Card, ErrorBox, Loading, PageHeader, Stat } from "@/components/ui";
+import { Card, PageHeader, Stat } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -11,8 +13,27 @@ export function AdminDashboardPage() {
   const { tenant } = useAdminTenant();
   const base = `/t/${tenant.slug}/admin`;
   const q = useQuery({ queryKey: qk.admin.dashboard(tenant.slug), queryFn: () => api.admin.dashboard(tenant.slug) });
-  if (q.isLoading) return <Loading />;
-  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Failed"} />;
+  const page = usePageQuery(q);
+  const header = (
+    <PageHeader
+      title="Dashboard"
+      subtitle={`${tenant.name} at a glance`}
+      actions={
+        <Link to={`${base}/analytics`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          Growth and activity charts
+          <IconChevronRight size={16} />
+        </Link>
+      }
+    />
+  );
+  // Only with nothing to show: a refetch failing in the background keeps the figures on screen.
+  if (!q.data)
+    return (
+      <div className="space-y-5">
+        {header}
+        <PageLoad page={page} shape="panel" />
+      </div>
+    );
   const { needs, glance } = dashboardTiles(q.data);
   const href = (t: DashboardTile) => {
     const section = ADMIN_SECTIONS.find((s) => s.key === t.section);
@@ -31,16 +52,7 @@ export function AdminDashboardPage() {
   };
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Dashboard"
-        subtitle={`${tenant.name} at a glance`}
-        actions={
-          <Link to={`${base}/analytics`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-            Growth and activity charts
-            <IconChevronRight size={16} />
-          </Link>
-        }
-      />
+      {header}
 
       <div className="grid gap-3 sm:grid-cols-2">{needs.map(stat)}</div>
 

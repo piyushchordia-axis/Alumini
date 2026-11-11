@@ -2,10 +2,11 @@ import { enabledGroupVisibilities } from "@illuminize/shared";
 import { chatKeys } from "@illuminize/shared/chat";
 import { fatalQueryError } from "@illuminize/shared/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { GroupForm } from "@/components/groups/GroupForm";
 import { GroupUnavailable } from "@/components/groups/GroupUnavailable";
-import { Card, Loading, PageHeader } from "@/components/ui";
+import { Card, PageHeader, PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { groupChatPath, groupPath, groupsAreReviewed, groupsPath, refreshGroup } from "@/lib/groups";
@@ -26,9 +27,7 @@ export function GroupFormPage() {
   if (!groupId) {
     return (
       <div className="mx-auto max-w-2xl">
-        <Link to={groupsPath(slug)} className="text-sm text-slate-500 hover:text-slate-800">
-          ← Groups
-        </Link>
+        <BackLink to={groupsPath(slug)}>Groups</BackLink>
         <PageHeader title="Create group" subtitle="A shared conversation with other members" />
         <Card className="p-5">
           <GroupForm
@@ -57,15 +56,20 @@ export function GroupFormPage() {
   // Only with nothing to show: a failed background refetch mustn't replace the form and lose what was typed.
   const error = fatalQueryError(existing);
   if (error) return <GroupUnavailable error={error} slug={slug} onRetry={() => void existing.refetch()} />;
-  if (!existing.data) return <Loading />;
+  if (!existing.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <BackLink to={groupPath(slug, groupId)}>Group details</BackLink>
+        <PageHeader title="Edit group" />
+        <PageSkeleton shape="form" />
+      </div>
+    );
   const group = existing.data;
   if (!group.canEdit) return <GroupUnavailable slug={slug} title="You can't edit this group" text="Only its owner can, while it isn't archived or removed." />;
   const review = group.review;
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={groupPath(slug, group.id)} className="text-sm text-slate-500 hover:text-slate-800">
-        ← Group details
-      </Link>
+      <BackLink to={groupPath(slug, group.id)}>Group details</BackLink>
       <PageHeader title="Edit group" />
       <Card className="p-5">
         <GroupForm

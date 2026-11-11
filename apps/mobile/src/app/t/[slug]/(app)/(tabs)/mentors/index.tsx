@@ -28,10 +28,12 @@ import { IconLock, IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCards";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, ListSkeleton, Muted, SectionScreen, Spinner, Tabs } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Button, Card, ChipSelect, EmptyState, ErrorText, Input, ListEmpty, ListSkeleton, Muted, SectionScreen, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { useStatus } from "@/hooks/useStatus";
 import { useGroupNotice } from "@/lib/groups";
 import { api } from "@/lib/api";
@@ -177,16 +179,11 @@ function useMyMentorProfile(slug: string, enabled = true) {
 function BeAMentor({ slug }: { slug: string }) {
   const qc = useQueryClient();
   const me = useMyMentorProfile(slug);
+  const page = usePageQuery(me);
   const [status, setStatus] = useStatus();
-  if (me.isLoading) return <Spinner />;
-  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed.
-  if (me.data === undefined)
-    return (
-      <View style={{ padding: spacing.lg, gap: spacing.sm }}>
-        <ErrorText error={me.error ?? "Your mentor profile couldn't be loaded"} />
-        <Button title="Retry loading" variant="outline" onPress={() => void me.refetch()} />
-      </View>
-    );
+  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed. A null answer is
+  // one: no mentor profile yet.
+  if (me.data === undefined) return <PageLoad page={page} shape="form" style={{ padding: spacing.lg }} />;
   const profile = me.data;
   const [title, text] = profile?.isActive
     ? ["You're listed as a mentor", "Members can find you in Find mentors and ask you to mentor them. Their requests wait in Requests, and you choose which to accept."]

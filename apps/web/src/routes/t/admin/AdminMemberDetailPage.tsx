@@ -5,10 +5,12 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AuditTable } from "@/components/admin/AuditTable";
 import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
-import { IconChevronLeft } from "@/components/icons";
+import { BackLink } from "@/components/common/BackLink";
+import { PageLoad } from "@/components/common/PageLoad";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
-import { Badge, Button, Card, ErrorBox, Loading } from "@/components/ui";
+import { Badge, Button, Card } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -30,16 +32,21 @@ function AdminMemberDetail({ membershipId }: { membershipId: string }) {
   const slug = tenant.slug;
   const q = useQuery({ queryKey: qk.admin.member(slug, membershipId), queryFn: () => api.admin.members.get(slug, membershipId) });
   const actions = useMemberActions(slug);
-  if (q.isLoading) return <Loading />;
-  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Not found"} />;
+  const page = usePageQuery(q);
+  const back = <BackLink to={`/t/${slug}/admin/members`}>Members</BackLink>;
+  // Only with nothing to show: a refetch failing in the background keeps the member on screen.
+  if (!q.data)
+    return (
+      <div className="space-y-4">
+        {back}
+        <PageLoad page={page} shape="profile" />
+      </div>
+    );
   const m = q.data;
   const isSelf = m.id === me?.id;
   return (
     <div className="space-y-4">
-      <Link to={`/t/${slug}/admin/members`} className="inline-flex min-h-11 items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-        <IconChevronLeft size={16} />
-        Members
-      </Link>
+      {back}
       <Card className="p-5">
         <ProfileSummary
           profile={{ ...m, isMentor: !!m.mentorProfile?.isActive }}

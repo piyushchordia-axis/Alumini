@@ -7,8 +7,10 @@ import { AdminScreen } from "@/components/admin/AdminScreen";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { IconChevronRight, IconPalette } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
-import { Button, Card, ErrorText, Muted, Spinner } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Card, Muted } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { useStatus } from "@/hooks/useStatus";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -30,6 +32,7 @@ export default function AdminSettingsScreen() {
   const qc = useQueryClient();
   const router = useRouter();
   const q = useQuery({ queryKey: qk.admin.settings(slug), queryFn: () => api.admin.settings.get(slug) });
+  const page = usePageQuery(q);
   // What became of Save. Here rather than in the form, which starts again when the saved settings come back.
   const [said, setSaid] = useStatus<Said>();
   const refresh = () =>
@@ -44,15 +47,8 @@ export default function AdminSettingsScreen() {
   if (!q.data) {
     return (
       <AdminScreen title="Settings">
-        {/* Only until the first answer: a refetch keeps the form, and what's typed in it. */}
-        {q.isLoading && !q.isFetched ? (
-          <Spinner label="Loading settings" />
-        ) : (
-          <>
-            <ErrorText error={q.error ?? "Couldn't load the settings"} />
-            <Button title="Try again" variant="outline" onPress={() => void q.refetch()} />
-          </>
-        )}
+        {/* Only with nothing to show: a refetch failing in the background keeps the form, and what's typed in it. */}
+        <PageLoad page={page} shape="form" label="Loading settings" />
       </AdminScreen>
     );
   }

@@ -1,4 +1,4 @@
-import { PROFILE_DETAILS_OUTLINE } from "@illuminize/shared";
+import { PAGE_SKELETONS } from "@illuminize/shared";
 import { View } from "react-native";
 import { SkeletonGroup, SkeletonLines } from "@/components/ui";
 import { colors, spacing } from "@/theme";
@@ -14,7 +14,7 @@ export function ProfileDetailsOutline() {
   return (
     <SkeletonGroup style={[hairline, { marginTop: spacing.xs }]}>
       <View style={{ gap: spacing.lg }}>
-        {PROFILE_DETAILS_OUTLINE.map((lines, row) => (
+        {PAGE_SKELETONS.profile.sections.map((lines, row) => (
           <SkeletonLines key={row} widths={lines} row={row} style={row > 0 ? hairline : undefined} />
         ))}
       </View>

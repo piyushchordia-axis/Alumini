@@ -1,5 +1,4 @@
 import { ADMIN_SECTIONS, approvalSummary, dashboardTiles, type DashboardTile } from "@illuminize/shared";
-import { fatalQueryError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -8,9 +7,11 @@ import { AdminScreen } from "@/components/admin/AdminScreen";
 import { StatGrid, StatTile } from "@/components/admin/StatTile";
 import { HubRow } from "@/components/HubRow";
 import { IconChevronRight } from "@/components/icons";
-import { Button, Card, ErrorText, Muted, Spinner, headingRole } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Card, Muted, headingRole } from "@/components/ui";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { adminSectionHref } from "@/lib/admin";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
@@ -23,7 +24,7 @@ export default function AdminHomeScreen() {
   const qc = useQueryClient();
   const theme = useTheme();
   const dashboard = useAdminDashboard(slug);
-  const error = fatalQueryError(dashboard);
+  const page = usePageQuery(dashboard);
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => {
     setRefreshing(true);
@@ -57,13 +58,9 @@ export default function AdminHomeScreen() {
           {/* The figures over time, as the web Dashboard links to them. */}
           <ConsoleLink label="Growth and activity charts" onPress={() => router.push(adminSectionHref(slug, "analytics"))} />
         </>
-      ) : error ? (
-        <>
-          <ErrorText error={error} />
-          <Button title="Try again" variant="outline" onPress={() => void dashboard.refetch()} />
-        </>
       ) : (
-        <Spinner label="Loading the dashboard" />
+        // Only with nothing to show: a refetch failing in the background keeps the figures on screen.
+        <PageLoad page={page} shape="panel" label="Loading the dashboard" />
       )}
       <Card>
         <Text style={styles.sentence}>

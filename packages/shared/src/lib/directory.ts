@@ -40,15 +40,6 @@ export function awaitingFirstAnswer(query: { isPending: boolean; isFetched: bool
 }
 
 /**
- * The outline of a profile's details, under its header drawn from a card while the rest loads, on both apps: two
- * groups of lines set off by a hairline, as percentages of the card's width (the first line of each a short heading).
- */
-export const PROFILE_DETAILS_OUTLINE: readonly (readonly number[])[] = [
-  [30, 90, 75],
-  [30, 85, 60],
-];
-
-/**
  * The section whose first answer sets the phone fetching the directory's first page ahead: the member's home section,
  * the one they open on, so the fetch never races what they came to see. Null with the directory off, when it is home
  * itself (it loads its own cards), or with no home section (every section off).

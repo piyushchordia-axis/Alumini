@@ -31,7 +31,7 @@ import { PhotoViewer } from "@/components/chat/PhotoViewer";
 import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconAlert, IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, EmptyState, ErrorText, focusOn, Spinner, type Focusable } from "@/components/ui";
+import { Button, EmptyState, ErrorText, type Focusable, focusOn, PageSkeleton, Spinner } from "@/components/ui";
 import { useAppActive, useChatEnabled, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useMembership } from "@/hooks/useMembership";
@@ -270,7 +270,7 @@ function Thread({ id }: { id: string }) {
     return (
       <ChatScreen>
         <ChatHeader title="Conversation" />
-        <Spinner label="Loading conversation…" />
+        <PageSkeleton shape="thread" label="Loading conversation…" />
       </ChatScreen>
     );
   }
@@ -343,7 +343,7 @@ function Thread({ id }: { id: string }) {
       />
       <View style={{ flex: 1 }}>
         {messages.isLoading ? (
-          <Spinner label="Loading messages…" />
+          <PageSkeleton shape="thread" label="Loading messages…" />
         ) : firstLoadFailed ? (
           <ChatNotice icon={<IconAlert />} title="Messages couldn't be loaded" text={errorMessage(messages.error)}>
             <Button title="Retry loading" variant="outline" onPress={() => void messages.refetch()} />

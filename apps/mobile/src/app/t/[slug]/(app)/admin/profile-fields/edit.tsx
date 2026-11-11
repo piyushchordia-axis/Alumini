@@ -4,9 +4,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { AdminScreen } from "@/components/admin/AdminScreen";
 import { FieldEditorForm } from "@/components/admin/FieldEditorForm";
 import { IconFields } from "@/components/icons";
-import { Button, EmptyState, ErrorText, Spinner } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Button, EmptyState } from "@/components/ui";
 import { refreshProfileFields, useAdminProfileFields } from "@/hooks/useAdminProfileFields";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { leaveGroupNotice } from "@/lib/groups";
 
@@ -21,21 +23,15 @@ export default function ProfileFieldEditScreen() {
   const qc = useQueryClient();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const list = useAdminProfileFields(slug, false);
+  const page = usePageQuery(list);
   const field = id ? list.data?.find((f) => f.id === id) : null;
   const leave = () => (router.canGoBack() ? router.back() : router.replace(`/t/${slug}/admin/profile-fields`));
 
   if (id && !list.data) {
     return (
       <AdminScreen title="Edit profile field">
-        {/* Only until the first answer: a refetch keeps the form, and what's typed in it. */}
-        {list.isLoading && !list.isFetched ? (
-          <Spinner label="Loading the field" />
-        ) : (
-          <>
-            <ErrorText error={list.error ?? "Couldn't load the field"} />
-            <Button title="Try again" variant="outline" onPress={() => void list.refetch()} />
-          </>
-        )}
+        {/* Only with nothing to show: a refetch failing in the background keeps the form, and what's typed in it. */}
+        <PageLoad page={page} shape="form" label="Loading the field" />
       </AdminScreen>
     );
   }

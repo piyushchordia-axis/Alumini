@@ -1,4 +1,4 @@
-import { PROFILE_DETAILS_OUTLINE } from "@illuminize/shared";
+import { PAGE_SKELETONS } from "@illuminize/shared";
 import { SkeletonLines, SkeletonStatus } from "@/components/ui";
 
 /**
@@ -9,7 +9,7 @@ import { SkeletonLines, SkeletonStatus } from "@/components/ui";
 export function ProfileDetailsOutline({ className }: { className?: string }) {
   return (
     <SkeletonStatus className={className}>
-      {PROFILE_DETAILS_OUTLINE.map((lines, row) => (
+      {PAGE_SKELETONS.profile.sections.map((lines, row) => (
         <SkeletonLines key={row} widths={lines} row={row} className={row > 0 ? "mt-5 border-t border-slate-100 pt-5" : undefined} />
       ))}
     </SkeletonStatus>

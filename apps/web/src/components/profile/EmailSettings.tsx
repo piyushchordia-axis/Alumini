@@ -1,7 +1,9 @@
 import { isApiClientError, errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, FormField, Input } from "@/components/ui";
+import { PageLoad } from "@/components/common/PageLoad";
+import { Button, FormField, Input, SkeletonLines, SkeletonStatus } from "@/components/ui";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -11,6 +13,7 @@ import { toast } from "@/stores/uiStore";
 export function EmailSettings() {
   const qc = useQueryClient();
   const status = useQuery({ queryKey: qk.myEmail, queryFn: () => api.me.email.get() });
+  const page = usePageQuery(status);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -41,10 +44,18 @@ export function EmailSettings() {
         Email
       </h2>
       <p className="mt-1 text-sm text-slate-500">For the weekly digest and announcements. Never shown to other members; shared by all your institutions.</p>
-      {status.isLoading ? (
-        <p className="mt-3 text-sm text-slate-400">Loading…</p>
-      ) : status.isError ? (
-        <p className="mt-3 text-sm text-tone-danger-ink">{errorMessage(status.error)}</p>
+      {/* Only with nothing to show: a refetch failing in the background keeps the address, and what's typed for a new one. */}
+      {!d ? (
+        <div className="mt-3">
+          <PageLoad
+            page={page}
+            outline={
+              <SkeletonStatus>
+                <SkeletonLines widths={[55, 35]} />
+              </SkeletonStatus>
+            }
+          />
+        </div>
       ) : (
         <div className="mt-3 space-y-3">
           {d?.email && (

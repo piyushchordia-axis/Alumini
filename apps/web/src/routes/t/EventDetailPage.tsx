@@ -4,16 +4,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ReasonModal } from "@/components/admin/ReasonModal";
+import { BackLink } from "@/components/common/BackLink";
 import { ListError } from "@/components/common/ListBody";
 import { MemberLink } from "@/components/common/MemberLink";
+import { PageLoad } from "@/components/common/PageLoad";
 import { RichText } from "@/components/common/RichText";
 import { RsvpButtons } from "@/components/events/RsvpButtons";
 import { IconEvents, IconMapPin } from "@/components/icons";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, EmptyState, ErrorBox, LinkButton, ListSkeleton, LoadMore, Loading, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Card, EmptyState, LinkButton, ListSkeleton, LoadMore, Tabs } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -26,6 +29,7 @@ export function EventDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
+  const page = usePageQuery(ev);
   const [who, setWho] = useState<AttendeeList>("YES");
   // As RsvpButtons does: whether the event takes answers goes by when the page opened.
   const [openedAt] = useState(() => Date.now());
@@ -53,15 +57,20 @@ export function EventDetailPage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  if (ev.isLoading) return <Loading />;
-  if (ev.error || !ev.data) return <ErrorBox error={ev.error ?? "Not found"} />;
+  const back = <BackLink to={`/t/${slug}/app/events`}>All events</BackLink>;
+  // Only with nothing to show: a refetch failing in the background keeps the event on screen.
+  if (!ev.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <PageLoad page={page} shape="article" />
+      </div>
+    );
   const e = ev.data;
   const noOne = attendeesEmpty(who, e, openedAt);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={`/t/${slug}/app/events`} className="text-sm text-slate-500 hover:text-slate-800">
-        ← All events
-      </Link>
+      {back}
       <Card className="overflow-hidden">
         {e.coverImageUrl && <img src={e.coverImageUrl} alt="" className="h-48 w-full object-cover" />}
         <div className="p-5">

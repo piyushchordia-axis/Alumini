@@ -3,8 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
-import { Card, ErrorBox, Loading, PageHeader, Tabs } from "@/components/ui";
+import { PageLoad } from "@/components/common/PageLoad";
+import { Card, PageHeader, Tabs } from "@/components/ui";
 import { useAdminTenant } from "@/hooks/useAdminTenant";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -14,6 +16,7 @@ export function AdminSettingsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"settings" | "branding">("settings");
   const q = useQuery({ queryKey: qk.admin.settings(slug), queryFn: () => api.admin.settings.get(slug) });
+  const page = usePageQuery(q);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: qk.admin.settings(slug) });
     void qc.invalidateQueries({ queryKey: qk.tenant(slug) });
@@ -21,12 +24,19 @@ export function AdminSettingsPage() {
     // The dashboard's approval sentence.
     void qc.invalidateQueries({ queryKey: qk.admin.dashboard(slug) });
   };
-  if (q.isLoading) return <Loading />;
-  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Failed"} />;
+  const header = <PageHeader title="Settings" subtitle="Approval rules, features and how your institution looks" />;
+  // Only with nothing to show: a refetch failing in the background keeps the forms and what was typed in them.
+  if (!q.data)
+    return (
+      <div className="space-y-4">
+        {header}
+        <PageLoad page={page} shape="form" />
+      </div>
+    );
   const plan = planChannelsSentence(q.data.outboundChannels);
   return (
     <div className="space-y-4">
-      <PageHeader title="Settings" subtitle="Approval rules, features and how your institution looks" />
+      {header}
       <Card className="p-4 text-sm text-slate-700">
         {plan.sentence.map((part, i) =>
           part.strong ? (

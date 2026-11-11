@@ -1,7 +1,8 @@
 // How a list's results area reads its query, the same on both apps: the outline while the first answer comes, the
 // error with nothing to show (kept, its button busy, while a retry asked for there is on its way), the empty state only
 // after a real answer, and the rows (kept through a failed refetch, with a failed next page said beside Load more, and
-// kept from the search before, faded under UPDATING_RESULTS, while a new search's answer comes).
+// kept from the search before, faded under UPDATING_RESULTS, while a new search's answer comes). A detail or form page
+// reads its query the same way (pageView).
 
 /**
  * What a list's results area draws. `idle`: nothing, because the list isn't asked for (its query is switched off, such as
@@ -38,6 +39,32 @@ export function listView(query: ListQueryState, count: number): ListView {
   if (query.isPlaceholderData) return "loading";
   if (query.status === "error") return "error";
   return "empty";
+}
+
+/**
+ * What a detail or form page draws under its header and Back. `page`: itself, whenever it has its data, so a refetch
+ * failing in the background keeps it on screen. `loading`: its outline while the first answer comes (offline, paused,
+ * included). `error`: what went wrong and a way to try again, with nothing to show, kept up while a retry asked for there
+ * is on its way (`retrying`), so the button pressed keeps focus. `idle`: nothing, for a query switched off.
+ */
+export type PageView = "idle" | "loading" | "error" | "page";
+
+/** The view of a page whose query holds `hasData` (TanStack's `data !== undefined`: a null answer, such as no digest yet, is one). */
+export function pageView(query: Pick<ListQueryState, "status" | "fetchStatus" | "retrying">, hasData: boolean): PageView {
+  if (hasData) return "page";
+  if (query.status === "pending") return query.fetchStatus === "idle" ? "idle" : query.retrying ? "error" : "loading";
+  // An answer that held nothing is a page that isn't there.
+  return "error";
+}
+
+/**
+ * Whether a page's Retry loading is still on its way for the query on screen (usePageQuery): the error it was pressed on,
+ * known by its time (`retriedAt`, TanStack's `errorUpdatedAt`, which the refetch keeps), is still that query's latest. A
+ * query whose key changed meanwhile (another range on Analytics, say) has an error time of its own, or none, so it shows
+ * its own outline or error rather than the one before's under a busy button that does nothing.
+ */
+export function pageRetrying(retriedAt: number | null, errorUpdatedAt: number): boolean {
+  return retriedAt !== null && errorUpdatedAt > 0 && retriedAt === errorUpdatedAt;
 }
 
 /**

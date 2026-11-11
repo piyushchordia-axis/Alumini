@@ -1,12 +1,13 @@
-import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, type MembershipDto, type ProfileFieldDto, type ProfileSection, type TenantPublicDto } from "@illuminize/shared";
+import { PROFILE_SECTIONS, PROFILE_SECTION_TITLES, loadingFirstTime, type MembershipDto, type ProfileFieldDto, type ProfileSection, type TenantPublicDto } from "@illuminize/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, type ComponentRef, type ReactNode } from "react";
 import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, Text, View, type ScrollViewInstance } from "react-native";
+import { loadingScreen } from "@/components/LoadingScreen";
 import { ProfileAboutSection, ProfileBasicsSection, ProfileWorkSection } from "@/components/profile/ProfileSections";
 import { useProfileDraft } from "@/components/profile/useProfileDraft";
 import type { SkillsInputHandle } from "@/components/SkillsInput";
-import { Button, Card, ErrorText, Muted, Screen, Spinner, headingRole } from "@/components/ui";
+import { Button, Card, ErrorText, Muted, Screen, headingRole } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
 import { api } from "@/lib/api";
@@ -24,13 +25,9 @@ const sectionFrom = (value: unknown): ProfileSection | null => PROFILE_SECTIONS.
 export default function EditProfileScreen() {
   const { tenant, membership } = useMembership();
   const fields = useProfileFields(tenant.slug);
-  // The form starts once the institution's questions are in, so nothing typed or uploaded is lost to a remount.
-  if (fields.isLoading)
-    return (
-      <Screen title="Edit profile">
-        <Spinner />
-      </Screen>
-    );
+  // The form starts once the institution's questions are in, so nothing typed or uploaded is lost to a remount, and only
+  // the first answer counts: a refetch of questions that failed to load mustn't swap the form for its outline.
+  if (loadingFirstTime(fields)) return loadingScreen({ title: "Edit profile", shape: "form" });
   return <ProfileEditor tenant={tenant} membership={membership} customFields={fields.data ?? []} />;
 }
 

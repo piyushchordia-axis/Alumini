@@ -2,15 +2,18 @@ import { BUSINESS_CATEGORY_LABELS } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ContactLink } from "@/components/common/ContactLink";
 import { MemberLink } from "@/components/common/MemberLink";
+import { PageLoad } from "@/components/common/PageLoad";
 import { RichText } from "@/components/common/RichText";
 import { ModerationStatusBadge } from "@/components/moderation/ModerationStatusBadge";
 import { ReportButton } from "@/components/moderation/ReportDialog";
-import { Avatar, Badge, Button, Card, ErrorBox, LinkButton, Loading } from "@/components/ui";
+import { Avatar, Badge, Button, Card, LinkButton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -24,6 +27,7 @@ export function BusinessDetailPage() {
   const qc = useQueryClient();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const item = useQuery({ queryKey: qk.business(slug, id), queryFn: () => api.businesses.get(slug, id) });
+  const page = usePageQuery(item);
   const remove = useMutation({
     mutationFn: () => api.businesses.remove(slug, id),
     onSuccess: () => {
@@ -32,14 +36,19 @@ export function BusinessDetailPage() {
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  if (item.isLoading) return <Loading />;
-  if (item.error || !item.data) return <ErrorBox error={item.error ?? "Not found"} />;
+  const back = <BackLink to={`/t/${slug}/app/businesses`}>All businesses</BackLink>;
+  // Only with nothing to show: a refetch failing in the background keeps the listing on screen.
+  if (!item.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {back}
+        <PageLoad page={page} shape="article" />
+      </div>
+    );
   const b = item.data;
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Link to={`/t/${slug}/app/businesses`} className="text-sm text-slate-500 hover:text-slate-800">
-        ← All businesses
-      </Link>
+      {back}
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

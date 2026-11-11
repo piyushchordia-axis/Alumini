@@ -2,9 +2,10 @@ import { REFERRAL_NOT_TAKING, REFERRAL_NOTE_MAX_LENGTH, REFERRAL_NOTE_PLACEHOLDE
 import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { JobUnavailable, ReferralsUnavailable, jobUnavailableText } from "@/components/jobs/JobUnavailable";
-import { Avatar, Button, Card, ErrorBox, LinkButton, Loading, PageHeader, Textarea } from "@/components/ui";
+import { Avatar, Button, Card, ErrorBox, LinkButton, PageHeader, PageSkeleton, Textarea } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -38,8 +39,26 @@ function ReferralRequestPage({ jobId }: { jobId: string }) {
 
   if (!available) return <ReferralsUnavailable />;
   const error = fatalQueryError(query);
-  if (error && !query.data) return <JobUnavailable error={error} onRetry={() => void query.refetch()} />;
-  if (!query.data) return <Loading />;
+  // The job's title isn't known yet, so Back says only that. It and the heading stay put whether the outline or why the
+  // job can't be shown comes, as the phone keeps its bar: two children, as the loaded page has them, so Back keeps focus.
+  const back = <BackLink to={jobPath(slug, jobId)}>Back</BackLink>;
+  const heading = <PageHeader title="Ask for a referral" />;
+  if (error && !query.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        {back}
+        {heading}
+        <JobUnavailable error={error} onRetry={() => void query.refetch()} />
+      </div>
+    );
+  if (!query.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        {back}
+        {heading}
+        <PageSkeleton shape="form" />
+      </div>
+    );
   const j = query.data;
   const poster = j.author.fullName;
   if (j.isMine) return <JobUnavailable title="You can't ask yourself" text="This is your own job. Members ask you for referrals on its page." />;
@@ -79,9 +98,7 @@ function ReferralRequestPage({ jobId }: { jobId: string }) {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={jobPath(slug, j.id)} className="inline-flex min-h-11 items-center text-sm text-slate-500 hover:text-slate-800 [overflow-wrap:anywhere]">
-        ← {j.title}
-      </Link>
+      <BackLink to={jobPath(slug, j.id)}>{j.title}</BackLink>
       <PageHeader title="Ask for a referral" />
       <Card className="p-5">
         <p className="font-semibold text-slate-900 [overflow-wrap:anywhere]">{j.title}</p>

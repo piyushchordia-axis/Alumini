@@ -28,7 +28,7 @@ import { StatGrid, StatTile } from "@/components/admin/StatTile";
 import { ConfirmSheet } from "@/components/ConfirmSheet";
 import { IconChevronRight, IconMail, IconSearch, IconUpload } from "@/components/icons";
 import { StatusLine } from "@/components/Sheet";
-import { Button, EmptyState, ErrorText, ListEmpty, Muted, Spinner, Tabs } from "@/components/ui";
+import { Button, EmptyState, ErrorText, ListEmpty, Muted, Spinner, Tabs, TilesSkeleton } from "@/components/ui";
 import { KEPT_ROW, UpdatingNote } from "@/components/UpdatingNote";
 import { refreshInvitations, useInvitationSummary } from "@/hooks/useAdminInvitations";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -192,7 +192,7 @@ export default function AdminInvitationsScreen() {
           <Button title="Try again" variant="outline" onPress={() => void summary.refetch()} />
         </>
       ) : (
-        <Spinner label="Loading the figures" />
+        <TilesSkeleton count={5} dense label="Loading the figures" />
       )}
       <Pressable
         onPress={() => router.push(`/t/${slug}/admin/invitations/import`)}

@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "react-native";
 import { PostForm } from "@/components/forms/PostForm";
-import { LoadError, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -14,8 +16,9 @@ export default function EditPostScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const post = useQuery({ queryKey: qk.post(slug, postId), queryFn: () => api.posts.get(slug, postId) });
-  if (post.isLoading) return <Spinner />;
-  if (post.error || !post.data) return <LoadError error={post.error ?? "Not found"} onRetry={() => void post.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  const page = usePageQuery(post);
+  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed.
+  if (!post.data) return loadingScreen({ title: "Edit post", shape: "form", page });
   return (
     <Screen title="Edit post">
       <PostForm

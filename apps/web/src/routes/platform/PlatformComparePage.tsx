@@ -5,8 +5,10 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChartCard, HBarChart, plural, type Unit } from "@/components/charts";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconDownload } from "@/components/icons";
-import { Avatar, Button, ErrorBox, FormField, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { Avatar, Button, FormField, Input, ListSkeleton, PageHeader } from "@/components/ui";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
@@ -58,6 +60,7 @@ export function PlatformComparePage() {
     onError: (e) => toast.error(errorMessage(e, "The export failed. Try again.")),
   });
 
+  const page = usePageQuery(q);
   const d = q.data;
   const rows = [...(d?.rows ?? [])].sort((a, b) => {
     const x = value(a, sort.key);
@@ -100,10 +103,9 @@ export function PlatformComparePage() {
         )}
       </div>
 
-      {q.isLoading ? (
-        <ListSkeleton shape="table" />
-      ) : q.error || !d ? (
-        <ErrorBox error={q.error ?? "Failed"} />
+      {/* A refetch failing in the background keeps the chart and table; a period that can't load says so in their place. */}
+      {!d ? (
+        <PageLoad page={page} outline={<ListSkeleton shape="table" />} />
       ) : (
         <>
           <ChartCard

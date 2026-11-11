@@ -8,8 +8,10 @@ import { AdminScreen } from "@/components/admin/AdminScreen";
 import { ExportButtons } from "@/components/admin/ExportButton";
 import { StatGrid } from "@/components/admin/StatTile";
 import { ChartCard, ColumnChart, HBarChart, Kpi, LineChart } from "@/components/charts";
-import { Button, ChipSelect, ErrorText, Muted, Spinner, headingRole } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Button, ChipSelect, ErrorText, Muted, headingRole } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing, useTheme } from "@/theme";
@@ -77,6 +79,7 @@ export default function AdminAnalyticsScreen() {
     if (updating && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(UPDATING);
   }, [updating]);
   const error = fatalQueryError(q);
+  const page = usePageQuery(q);
   const [exportError, setExportError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => {
@@ -103,13 +106,20 @@ export default function AdminAnalyticsScreen() {
       <View role="status" accessibilityLiveRegion={Platform.OS === "android" ? "polite" : undefined}>
         {updating ? <Muted size={13}>{UPDATING}</Muted> : null}
       </View>
-      {error ? (
+      {q.data ? (
         <>
-          <ErrorText error={error} />
-          <Button title="Try again" variant="outline" onPress={() => void q.refetch()} />
+          {/* A refetch the API refused keeps the charts, and says so above them. */}
+          {error ? (
+            <>
+              <ErrorText error={error} />
+              <Button title="Try again" variant="outline" onPress={() => void q.refetch()} />
+            </>
+          ) : null}
+          <Charts d={q.data} features={tenant.settings.features} />
         </>
-      ) : null}
-      {q.data ? <Charts d={q.data} features={tenant.settings.features} /> : !error ? <Spinner label="Loading the charts" /> : null}
+      ) : (
+        <PageLoad page={page} shape="panel" label="Loading the charts" />
+      )}
     </AdminScreen>
   );
 }

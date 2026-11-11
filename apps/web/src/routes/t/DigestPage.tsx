@@ -1,9 +1,11 @@
 import { jobPlaceLabel } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconDirectory, IconFeed } from "@/components/icons";
-import { Card, EmptyState, ErrorBox, ListSkeleton, PageHeader } from "@/components/ui";
+import { Card, EmptyState, ListSkeleton, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -14,16 +16,17 @@ export function DigestPage() {
   const slug = tenant.slug;
   const base = `/t/${slug}/app`;
   const q = useQuery({ queryKey: qk.digest(slug), queryFn: () => api.celebrations.digest(slug) });
+  const page = usePageQuery(q);
   const title = `This week at ${tenant.shortName ?? tenant.name}`;
-  // The title is known before the digest is: only what it lists waits.
-  if (q.isLoading)
+  // The title is known before the digest is: only what it lists waits, and says so if it can't come. A null answer is
+  // one (no digest yet), and a refetch failing in the background keeps the digest on screen.
+  if (q.data === undefined)
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <PageHeader title={title} />
-        <ListSkeleton shape="notification" count={4} />
+        <PageLoad page={page} outline={<ListSkeleton shape="notification" count={4} />} />
       </div>
     );
-  if (q.error) return <ErrorBox error={q.error} />;
   const d = q.data;
   return (
     <div className="mx-auto max-w-2xl space-y-4">

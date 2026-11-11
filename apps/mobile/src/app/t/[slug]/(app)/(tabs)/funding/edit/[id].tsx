@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "react-native";
 import { FundingForm } from "@/components/forms/FundingForm";
-import { LoadError, Screen, Spinner } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
@@ -14,8 +16,9 @@ export default function EditFundingScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const item = useQuery({ queryKey: qk.fundingItem(slug, id), queryFn: () => api.funding.get(slug, id) });
-  if (item.isLoading) return <Spinner />;
-  if (item.error || !item.data) return <LoadError error={item.error ?? "Not found"} onRetry={() => void item.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  const page = usePageQuery(item);
+  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed.
+  if (!item.data) return loadingScreen({ title: "Edit listing", shape: "form", page });
   return (
     <Screen title="Edit listing">
       <FundingForm

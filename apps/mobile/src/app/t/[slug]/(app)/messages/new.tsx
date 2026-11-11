@@ -9,7 +9,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatHeader, ChatNotice, ChatOff, ChatScreen, useLeaveChatScreen } from "@/components/chat/ChatFrame";
 import { FirstMessageNote } from "@/components/chat/RequestNotes";
 import { IconMessages } from "@/components/icons";
-import { Button, Spinner } from "@/components/ui";
+import { Button, PageSkeleton } from "@/components/ui";
 import { useChatEnabled } from "@/hooks/useChat";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -103,7 +103,7 @@ function NewConversation({ to }: { to: string }) {
       <ChatHeader title={profile.data?.fullName ?? "New message"} member={profile.data ?? undefined} subtitle={memberYearsLine(profile.data ?? {}, "New conversation")} />
       {waiting ? (
         <View style={{ flex: 1 }}>
-          <Spinner />
+          <PageSkeleton shape="thread" />
         </View>
       ) : (
         <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl }}>

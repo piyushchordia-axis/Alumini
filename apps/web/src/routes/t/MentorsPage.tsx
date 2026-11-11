@@ -25,15 +25,17 @@ import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ListBody } from "@/components/common/ListBody";
+import { PageLoad } from "@/components/common/PageLoad";
 import { MentorsUnavailable } from "@/components/guards/RequireFeature";
 import { IconMentors, IconSearch } from "@/components/icons";
 import { MentorCard } from "@/components/mentors/MentorCard";
 import { MentorProfileForm } from "@/components/mentors/MentorProfileForm";
 import { MentorshipRequests, useMentorshipList } from "@/components/mentors/MentorshipRequests";
-import { Button, Card, EmptyState, ErrorBox, Input, ListSkeleton, Loading, PageHeader, Select, Tabs } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorBox, Input, ListSkeleton, PageHeader, Select, Tabs } from "@/components/ui";
 import { useDebounced } from "@/hooks/useDebounced";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { refreshMentorship } from "@/lib/mentors";
 import { toast } from "@/stores/uiStore";
@@ -158,17 +160,10 @@ function useMyMentorProfile(slug: string, enabled = true) {
 function BeAMentor({ slug }: { slug: string }) {
   const qc = useQueryClient();
   const me = useMyMentorProfile(slug);
-  if (me.isLoading) return <Loading />;
-  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed.
-  if (me.data === undefined)
-    return (
-      <div className="space-y-3">
-        <ErrorBox error={me.error ?? "Your mentor profile couldn't be loaded"} />
-        <Button variant="outline" size="sm" className="min-h-11" onClick={() => void me.refetch()}>
-          Retry loading
-        </Button>
-      </div>
-    );
+  const page = usePageQuery(me);
+  // Only with nothing to show: a refetch failing in the background keeps the form and what was typed. A null answer is
+  // one: no mentor profile yet.
+  if (me.data === undefined) return <PageLoad page={page} shape="form" />;
   const profile = me.data;
   const [title, text] = profile?.isActive
     ? ["You're listed as a mentor", "Members can find you in Find mentors and ask you to mentor them. Their requests wait in Requests, and you choose which to accept."]

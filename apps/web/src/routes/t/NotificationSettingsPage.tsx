@@ -3,8 +3,10 @@ import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
-import { Card, ChoiceInput, ErrorBox, Loading, PageHeader } from "@/components/ui";
+import { PageLoad } from "@/components/common/PageLoad";
+import { Card, ChoiceInput, PageHeader } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { toast } from "@/stores/uiStore";
@@ -49,6 +51,7 @@ export function NotificationSettingsPage() {
   const slug = tenant.slug;
   const qc = useQueryClient();
   const prefs = useQuery({ queryKey: qk.notificationPrefs(slug), queryFn: () => api.notifications.prefs(slug) });
+  const page = usePageQuery(prefs);
   const save = useMutation({
     mutationFn: (input: NotificationPrefsUpdate) => api.notifications.updatePrefs(slug, input),
     onMutate: async (input) => {
@@ -64,13 +67,20 @@ export function NotificationSettingsPage() {
     },
     onSuccess: (data) => qc.setQueryData(qk.notificationPrefs(slug), data),
   });
-  if (prefs.isLoading) return <Loading />;
-  if (prefs.error || !prefs.data) return <ErrorBox error={prefs.error ?? "Not found"} />;
+  const header = <PageHeader title="Notification settings" subtitle={`For ${tenant.name}. Account notices (approvals, moderation decisions) always reach you.`} />;
+  // Only with nothing to show: a refetch failing in the background keeps the switches on screen.
+  if (!prefs.data)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        {header}
+        <PageLoad page={page} shape="form" />
+      </div>
+    );
   const p = prefs.data;
   const categories = visibleNotificationCategories({ features: tenant.settings.features, chatEligible: membership.chatEligible, isTenantAdmin });
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="Notification settings" subtitle={`For ${tenant.name}. Account notices (approvals, moderation decisions) always reach you.`} />
+      {header}
       <Card className="divide-y divide-slate-100 px-5">
         {categories.map((c) => {
           const info = NOTIFICATION_CATEGORY_INFO[c];

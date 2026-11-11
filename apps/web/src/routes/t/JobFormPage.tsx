@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { JobForm } from "@/components/jobs/JobForm";
 import { JobUnavailable } from "@/components/jobs/JobUnavailable";
-import { Card, Loading, PageHeader } from "@/components/ui";
+import { Card, PageHeader, PageSkeleton } from "@/components/ui";
 import { useJob } from "@/hooks/useJob";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
@@ -21,11 +21,25 @@ export function JobFormPage() {
   const existing = useJob(slug, jobId ?? "", !!jobId);
   // Only an answer, or nothing at all to show: a refetch failing in the background keeps the form and what was typed.
   const error = jobId ? fatalQueryError(existing) : null;
-  if (error) return <JobUnavailable error={error} onRetry={() => void existing.refetch()} />;
-  if (jobId && !existing.data) return <Loading />;
+  const header = <PageHeader title={jobId ? "Edit job" : "Post a job"} subtitle="Share an opening or a referral with alumni" />;
+  // Under the header the outline had, as the phone keeps its bar.
+  if (error)
+    return (
+      <div className="mx-auto max-w-2xl">
+        {header}
+        <JobUnavailable error={error} onRetry={() => void existing.refetch()} />
+      </div>
+    );
+  if (jobId && !existing.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        {header}
+        <PageSkeleton shape="form" />
+      </div>
+    );
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title={jobId ? "Edit job" : "Post a job"} subtitle="Share an opening or a referral with alumni" />
+      {header}
       <Card className="p-5">
         <JobForm
           slug={slug}

@@ -2,10 +2,11 @@ import { MENTORSHIP_NOTE_MAX_LENGTH, memberRoleLine, memberYearsLabel, mentorshi
 import { fatalQueryError, isApiClientError } from "@illuminize/shared/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { BackLink } from "@/components/common/BackLink";
 import { MentorAreas } from "@/components/mentors/MentorCard";
 import { MentorUnavailable, mentorUnavailableText } from "@/components/mentors/MentorUnavailable";
-import { Avatar, Button, Card, ErrorBox, Loading, PageHeader, Textarea } from "@/components/ui";
+import { Avatar, Button, Card, ErrorBox, PageHeader, PageSkeleton, Textarea } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { mentorPath, mentorsPath, refreshMentorship } from "@/lib/mentors";
@@ -37,7 +38,15 @@ function MentorRequestPage({ id }: { id: string }) {
 
   const error = fatalQueryError(query);
   if (error && !query.data) return <MentorUnavailable slug={slug} error={error} onRetry={() => void query.refetch()} />;
-  if (!query.data) return <Loading />;
+  // The mentor's name isn't known yet, so Back says only that.
+  if (!query.data)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <BackLink to={mentorPath(slug, id)}>Back</BackLink>
+        <PageHeader title="Request mentorship" />
+        <PageSkeleton shape="form" />
+      </div>
+    );
   const m = query.data;
   const refused = error ? mentorUnavailableText(error) : null;
   const name = m.member.fullName;
@@ -70,9 +79,7 @@ function MentorRequestPage({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={mentorPath(slug, m.member.id)} className="text-sm text-slate-500 hover:text-slate-800">
-        ← {name}
-      </Link>
+      <BackLink to={mentorPath(slug, m.member.id)}>{name}</BackLink>
       <PageHeader title="Request mentorship" />
       <Card className="p-5">
         <div className="flex items-start gap-3">

@@ -9,9 +9,11 @@ import { MemberRow } from "@/components/MemberRow";
 import { ModerationBadge, ModerationNote } from "@/components/ModerationBadge";
 import { ReportButton } from "@/components/ReportButton";
 import { RichText } from "@/components/RichText";
-import { Avatar, Badge, Button, Card, EmptyState, headingRole, ListEmpty, LoadError, Muted, Row, Screen, Spinner, Tabs, toggleState } from "@/components/ui";
+import { loadingScreen } from "@/components/LoadingScreen";
+import { Avatar, Badge, Button, Card, EmptyState, headingRole, ListEmpty, Muted, Row, Screen, Tabs, toggleState } from "@/components/ui";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -24,6 +26,7 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const ev = useQuery({ queryKey: qk.event(slug, id), queryFn: () => api.events.get(slug, id) });
+  const page = usePageQuery(ev);
   const [openedAt] = useState(() => Date.now());
   const [who, setWho] = useState<AttendeeList>("YES");
   // Under the event's key, so an RSVP refreshes both lists.
@@ -40,8 +43,8 @@ export default function EventDetailScreen() {
   });
   const cancel = useMutation({ mutationFn: () => api.events.cancel(slug, id, null), onSuccess: invalidate, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
   const remove = useMutation({ mutationFn: () => api.events.remove(slug, id), onSuccess: () => { invalidate(); router.back(); }, onError: (e) => Alert.alert("Failed", errorMessage(e)) });
-  if (ev.isLoading) return <Spinner />;
-  if (ev.error || !ev.data) return <LoadError error={ev.error ?? "Not found"} onRetry={() => void ev.refetch()} onBack={() => router.back()} backLabel="Back" />;
+  // Only with nothing to show: a refetch failing in the background keeps the event on screen.
+  if (!ev.data) return loadingScreen({ title: "Event", shape: "article", page });
   const e = ev.data;
   const disabled = !rsvpsOpen(e, openedAt) || rsvp.isPending;
   const closedText = rsvpClosedText(e, openedAt);

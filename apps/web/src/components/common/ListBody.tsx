@@ -26,7 +26,10 @@ export interface ListState<T> {
 export function ListError({ error, onRetry, retrying = false, className }: { error: unknown; onRetry: () => unknown; retrying?: boolean; className?: string }) {
   return (
     <div className={clsx("space-y-3", className)}>
-      <ErrorBox error={error} />
+      {/* Read out when it takes the place of the "Loading…" status, as the phone's ErrorText is; the button stays outside it. */}
+      <div role="alert">
+        <ErrorBox error={error} />
+      </div>
       <Button
         variant="outline"
         size="sm"

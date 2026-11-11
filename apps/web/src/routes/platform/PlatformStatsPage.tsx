@@ -1,18 +1,28 @@
 import { BILLING_MODEL_LABELS } from "@illuminize/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ErrorBox, Loading, PageHeader, Stat } from "@/components/ui";
+import { PageLoad } from "@/components/common/PageLoad";
+import { PageHeader, Stat } from "@/components/ui";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 
 export function PlatformStatsPage() {
   const q = useQuery({ queryKey: qk.platform.stats, queryFn: () => api.platform.stats() });
-  if (q.isLoading) return <Loading />;
-  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Failed"} />;
+  const page = usePageQuery(q);
+  const header = <PageHeader title="Platform stats" subtitle="Across all institutions" />;
+  // Only with nothing to show: a refetch failing in the background keeps the figures on screen.
+  if (!q.data)
+    return (
+      <div className="space-y-5">
+        {header}
+        <PageLoad page={page} shape="panel" />
+      </div>
+    );
   const s = q.data;
   return (
     <div className="space-y-5">
-      <PageHeader title="Platform stats" subtitle="Across all institutions" />
+      {header}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Institutions" value={s.tenants.total} hint={`${s.tenants.byStatus.ACTIVE} active · ${s.tenants.byStatus.SUSPENDED} suspended`} />
         <Stat label="Users" value={s.users} />

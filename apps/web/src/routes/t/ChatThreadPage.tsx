@@ -29,7 +29,7 @@ import { ReportMessageDialog } from "@/components/chat/ReportMessageDialog";
 import { RerequestWhen } from "@/components/chat/RequestNotes";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { IconGroups, IconInfo, IconLock, IconMessages } from "@/components/icons";
-import { Button, EmptyState, Loading } from "@/components/ui";
+import { Button, EmptyState, PageSkeleton } from "@/components/ui";
 import { useDocumentVisible, useNow, useOpenConversation, useRerequestRefetch } from "@/hooks/useChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
 import { useMembership } from "@/hooks/useMembership";
@@ -222,7 +222,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
         {() => (
           <>
             <ChatPaneHeader backTo={inboxHref} title="Conversation" />
-            <Loading />
+            <PageSkeleton shape="thread" />
           </>
         )}
       </ChatPane>
@@ -307,7 +307,7 @@ function ChatThreadPage({ conversationId: id }: { conversationId: string }) {
           />
           {loadingFirst ? (
             <div className="flex-1">
-              <Loading label="Loading messages…" />
+              <PageSkeleton shape="thread" label="Loading messages…" />
             </div>
           ) : firstLoadFailed ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">

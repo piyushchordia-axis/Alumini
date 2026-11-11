@@ -11,12 +11,15 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   platform console (`routes/platform`). Design tokens live in `src/index.css`; SVG icons in `src/components/icons.tsx`;
   shared primitives in `src/components/ui` (skeletons in `ui/Skeleton.tsx`; a list's states in
   `components/common/ListBody.tsx`, with `ListError`; kept results in `components/common/UpdatingNote.tsx`,
-  `UpdatingNote` and `KeptResults`).
+  `UpdatingNote` and `KeptResults`; a detail or form page's back link in `components/common/BackLink.tsx`, and its
+  states in `hooks/usePageQuery.ts` and `components/common/PageLoad.tsx`).
 - `apps/mobile`: Expo SDK 58 with expo-router: the member app and the institution admin console
   (`src/app/t/[slug]/(app)/admin`, a stack above the tabs). Screens are in `src/app`. Theme tokens in `src/theme`;
   SVG icons in `src/components/icons.tsx` (`react-native-svg`); primitives in `src/components/ui.tsx` (skeletons in
-  `components/Skeleton.tsx`, which `ListEmpty` draws; kept results' note in `components/UpdatingNote.tsx`). Chrome:
-  `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen` (pushed screens), `ChatHeader` (chat
+  `components/Skeleton.tsx`, which `ListEmpty` draws, with `PageSkeleton` and `TilesSkeleton`; kept results' note in
+  `components/UpdatingNote.tsx`; a detail or form screen's states in `hooks/usePageQuery.ts` and
+  `components/PageLoad.tsx`). Chrome: `MemberAppBar` (tab roots), `StackHeader` / `Screen title=` / `StackScreen`
+  (pushed screens; `loadingScreen()` in `components/LoadingScreen.tsx` while one loads), `ChatHeader` (chat
   overlays), `AdminScreen` / `AdminListScreen` (admin console screens: `StackHeader` with the Admin badge, falling back
   to the console's home). Do not use native stack headers for member chrome (see Gotchas). Files the console picks or
   saves go through `src/lib/files.ts` (`pickTextFile`, `saveFile`: the document picker, the cache and the share sheet).
@@ -56,8 +59,9 @@ pnpm + turborepo monorepo. README.md is the full product and architecture guide;
   (`mayCreate`), with My posts' tabs (`MY_CONTENT`, `myContentTabs`); `lib/lists.ts` how a list reads its query
   (`listView`, `loadingFirstTime`, `LOADING_LABEL`) and keeps its rows while a new search loads (`keepPrevious`,
   `onlyFiltersChanged`, `listUpdating`, `UPDATING_RESULTS`; the hooks' `listPlaceholder`, `listHasMore`,
-  `listMayLoadMore` and `listRefreshing`), and `lib/skeletons.ts` the skeletons' shapes
-  (`SKELETON_LAYOUTS`, My posts' `MY_CONTENT_SKELETONS`).
+  `listMayLoadMore` and `listRefreshing`) and how a detail or form page reads its own (`pageView`), and
+  `lib/skeletons.ts` the skeletons' shapes (`SKELETON_LAYOUTS`, My posts' `MY_CONTENT_SKELETONS`, and the pages'
+  `PAGE_SKELETONS`).
 - `e2e/`: plain Playwright scripts for the member, admin/platform and mobile-web journeys.
 - `scripts/`: `setup-local.mjs` (one-command setup), `demo.mjs` (`pnpm demo`), and their shared `lib.mjs`.
 
@@ -331,9 +335,9 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     only.
   - **Mobile headers.** Native stack headers float over content on device — do not use them for member chrome. Tab
     roots: `SectionScreen` (draws `MemberAppBar`, owns status-bar inset) and `headerShown: false` on the tab stack
-    index. Pushed details/modals: `Screen title="…"` or `StackScreen` / `StackHeader`, stacks with
-    `screenOptions={{ headerShown: false }}` (keep `presentation: "modal"` where needed). Chat overlays: `ChatHeader`.
-    Auth screens without a bar: `Screen topInset`.
+    index. Pushed details/modals: `Screen title="…"` (`loadingScreen()` while it loads) or `StackScreen` /
+    `StackHeader`, stacks with `screenOptions={{ headerShown: false }}` (keep `presentation: "modal"` where needed).
+    Chat overlays: `ChatHeader`. Auth screens without a bar: `Screen topInset`.
   - **Phone entry.** OTP fields hold one `{ country, number }` entry. They read every change to the box with
     `readPhoneEntry(country, raw, entry)` and every country picked with `readPhoneEntry(country, entry.held ??
     entry.number)` (libphonenumber-js/min: a pasted "+44…" moves the country, a trunk "0" isn't counted;
@@ -358,8 +362,20 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     is a `role="status"` saying "Loading…" to screen readers, pulsing only under `motion-safe`; the phone's is one
     progressbar named `LOADING_LABEL` ("Loading", or the screen's own words, such as "Finding members…"), still under
     reanimated's `useReducedMotion`, and full-width rows (Messages, Notifications) take the `band` frame. `data-testid` / `testID="skeleton"` is there for
-    e2e alone. Spinners stay on the guards, sign-in and landing, registration, Load more and buttons, and for now on
-    detail and form pages (README → Known gaps). Console lists draw `adminRow` or `table`.
+    e2e alone. Spinners stay only on the guards, sign-in and landing, registration, Load more and buttons. Console
+    lists draw `adminRow` or `table`.
+    A detail or form page (the consoles' and the platform's included) keeps its header and Back while it loads and
+    draws its outline under them (`PAGE_SKELETONS`: `article`, `profile`, `form`, `thread`, `panel`): web `BackLink`
+    (never a "←" glyph) and any title it knows, over `PageSkeleton` in the page's own width; mobile
+    `return loadingScreen({ … })` (`Screen title=` with Back, and the loaded screen's `badge` and `fallbackHref`),
+    called as a function so the root stays the same `Screen` and Back keeps focus when the answer comes (a
+    `StackScreen` screen wraps `PageLoad` in its own), or `PageSkeleton` inside the `ChatScreen` / `AdminScreen` chrome
+    a screen already has. It reads its query through `usePageQuery` (shared `pageView`; `pageRetrying` ties a retry to
+    the error it was pressed on) and draws `PageLoad` under the header: the outline while the first answer comes, the
+    error (an alert) with Retry loading only with nothing to show (kept up, its button busy, while the retry is on its
+    way; `compact` in a console row), and the page whenever it has data, so a refetch failing in the background never
+    replaces it. A page that says why in a notice of its own (`JobUnavailable`, `GroupUnavailable`,
+    `MentorUnavailable`, a chat's) keeps that for real errors, a job's under the page's back link or bar.
     A list that keeps its rows while a new search or filter loads opts in with `keepPreviousWhile` (`useInfiniteList`;
     the phone console's `usePagedList`): `onlyFiltersChanged` for rows that only open a page, as Directory and Jobs do,
     `onlySearchChanged` for console rows whose actions belong to their tab (the web console's and platform's `useQuery`

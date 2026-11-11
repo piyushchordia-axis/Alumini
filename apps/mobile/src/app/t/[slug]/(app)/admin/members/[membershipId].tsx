@@ -13,9 +13,11 @@ import { MemberStatusBadge } from "@/components/admin/MemberStatusBadge";
 import { IconAudit, IconDirectory } from "@/components/icons";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { StatusLine } from "@/components/Sheet";
-import { Badge, Button, Card, EmptyState, ErrorText, Spinner, headingRole } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Badge, Button, Card, EmptyState, headingRole } from "@/components/ui";
 import { useMemberActions, type MemberActionOutcome } from "@/hooks/useMemberActions";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { useStatus } from "@/hooks/useStatus";
 import { adminMemberHref, adminSectionHref } from "@/lib/admin";
 import { api } from "@/lib/api";
@@ -47,6 +49,7 @@ function AdminMember({ id }: { id: string }) {
   // Checked before asking, as the address can carry anything.
   const valid = uuidSchema.safeParse(id).success;
   const query = useQuery({ queryKey: qk.admin.member(slug, id), queryFn: () => api.admin.members.get(slug, id), enabled: valid });
+  const page = usePageQuery(query);
   const [said, say] = useStatus<MemberActionOutcome>();
   const actions = useMemberActions(slug, say);
   const scroller = useRef<ScrollViewInstance>(null);
@@ -87,14 +90,7 @@ function AdminMember({ id }: { id: string }) {
   if (!m) {
     return (
       <AdminScreen title="Member">
-        {error ? (
-          <>
-            <ErrorText error={error} />
-            <Button title="Try again" variant="outline" onPress={() => void query.refetch()} />
-          </>
-        ) : (
-          <Spinner label="Loading member" />
-        )}
+        <PageLoad page={page} shape="profile" label="Loading member" />
       </AdminScreen>
     );
   }

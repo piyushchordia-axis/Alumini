@@ -8,7 +8,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatNotice, ChatPane, ChatPaneHeader } from "@/components/chat/ChatPane";
 import { FirstMessageNote } from "@/components/chat/RequestNotes";
 import { IconLock, IconMessages } from "@/components/icons";
-import { Loading } from "@/components/ui";
+import { PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -106,7 +106,7 @@ export function NewConversationPage() {
           <ChatPaneHeader backTo={inbox} title={profile.data?.fullName ?? "New message"} member={profile.data} profileHref={profile.data ? `/t/${slug}/app/directory/${to}` : null} subtitle={memberYearsLine(profile.data ?? {}, "New conversation")} />
           {waiting ? (
             <div className="flex-1">
-              <Loading />
+              <PageSkeleton shape="thread" />
             </div>
           ) : (
             // Centred by its own auto margins, not justify-center, so a phone's keyboard shrinking the pane scrolls it rather than cutting its top off.

@@ -11,6 +11,8 @@ import {
   loadingFirstTime,
   nextPageError,
   onlyFiltersChanged,
+  pageRetrying,
+  pageView,
   type ListPagingState,
   type ListQueryState,
 } from "@illuminize/shared";
@@ -68,6 +70,56 @@ describe("a list's view", () => {
 
   it("is named Loading for screen readers, as the phone's progressbar and the e2e scripts call it", () => {
     expect(LOADING_LABEL).toBe("Loading");
+  });
+});
+
+describe("a detail or form page's view", () => {
+  it("draws the page whenever it has its data: fresh, refetching, or kept through a refetch that failed", () => {
+    expect(pageView(answered(), true)).toBe("page");
+    expect(pageView(answered("fetching"), true)).toBe("page");
+    // The web post, event, funding and business pages used to swap themselves for the error here.
+    expect(pageView(failed(), true)).toBe("page");
+    expect(pageView(failed("fetching"), true)).toBe("page");
+  });
+
+  it("draws its outline under its header and Back while the first answer is on its way, offline (paused) included", () => {
+    expect(pageView(pending("fetching"), false)).toBe("loading");
+    expect(pageView(pending("paused"), false)).toBe("loading");
+  });
+
+  it("draws nothing for a page whose query is switched off (a form with nothing to edit yet)", () => {
+    expect(pageView(pending("idle"), false)).toBe("idle");
+  });
+
+  it("says what went wrong in place only with nothing to show, and an answer that held nothing is a page that isn't there", () => {
+    expect(pageView(failed(), false)).toBe("error");
+    expect(pageView(failed("fetching"), false)).toBe("error");
+    expect(pageView(answered(), false)).toBe("error");
+  });
+
+  it("keeps the error up while a retry asked for from it is on its way, so the button pressed (and focus) stays", () => {
+    // TanStack sends a query with no data back to pending, its error cleared, for a retry.
+    expect(pageView({ ...pending("fetching"), retrying: true }, false)).toBe("error");
+    expect(pageView({ ...pending("paused"), retrying: true }, false)).toBe("error");
+    // Only a retry asked for there: coming back to a page that failed before draws its outline.
+    expect(pageView({ ...pending("fetching"), retrying: false }, false)).toBe("loading");
+    // Its answer decides from then on.
+    expect(pageView({ ...answered(), retrying: true }, true)).toBe("page");
+    expect(pageView({ ...failed(), retrying: true }, false)).toBe("error");
+  });
+
+  it("counts a retry as on its way only for the query whose error it was pressed on, not one whose key changed since", () => {
+    // Pressed on the error that came at 1000; the refetch keeps that error's time while it's on its way.
+    expect(pageRetrying(1_000, 1_000)).toBe(true);
+    // Nothing pressed.
+    expect(pageRetrying(null, 1_000)).toBe(false);
+    // Another key (26 weeks in place of 12) that never failed, or failed at another time: its own outline or error.
+    expect(pageRetrying(1_000, 0)).toBe(false);
+    expect(pageRetrying(1_000, 2_000)).toBe(false);
+    // The retry failed: a newer error, which the page shows with its button free again.
+    expect(pageRetrying(1_000, 1_500)).toBe(false);
+    // A query that has never failed can't be retrying, whatever was pressed.
+    expect(pageRetrying(0, 0)).toBe(false);
   });
 });
 

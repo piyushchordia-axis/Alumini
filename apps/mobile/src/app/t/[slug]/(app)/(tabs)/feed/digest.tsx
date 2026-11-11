@@ -3,8 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { IconDirectory, IconFeed } from "@/components/icons";
-import { Card, EmptyState, ListSkeleton, LoadError, Muted, Screen } from "@/components/ui";
+import { PageLoad } from "@/components/PageLoad";
+import { Card, EmptyState, ListSkeleton, Muted, Screen } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { colors, spacing } from "@/theme";
@@ -24,17 +26,13 @@ export default function DigestScreen() {
   const slug = tenant.slug;
   const router = useRouter();
   const q = useQuery({ queryKey: qk.digest(slug), queryFn: () => api.celebrations.digest(slug) });
-  // The title is known before the digest is: only what it lists waits.
-  if (q.isLoading)
+  const page = usePageQuery(q);
+  // The title is known before the digest is: only what it lists waits, and says so if it can't come. A null answer is
+  // one (no digest yet), and a refetch failing in the background keeps the digest on screen.
+  if (q.data === undefined)
     return (
       <Screen title="This week">
-        <ListSkeleton shape="notification" count={4} />
-      </Screen>
-    );
-  if (q.error)
-    return (
-      <Screen title="This week">
-        <LoadError error={q.error} onRetry={() => void q.refetch()} onBack={() => router.back()} backLabel="Back" />
+        <PageLoad page={page} outline={<ListSkeleton shape="notification" count={4} />} />
       </Screen>
     );
   const d = q.data;

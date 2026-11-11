@@ -1,4 +1,4 @@
-import { DELETE_ACCOUNT_CONFIRM, PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, profileStrength, type ProfileSection } from "@illuminize/shared";
+import { DELETE_ACCOUNT_CONFIRM, PROFILE_SECTIONS, PROFILE_SECTION_TITLES, formatPhone, loadingFirstTime, profileStrength, type ProfileSection } from "@illuminize/shared";
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -9,7 +9,7 @@ import { EmailSettings } from "@/components/profile/EmailSettings";
 import { ProfileDetails, ProfileSummary } from "@/components/profile/ProfileDetails";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileStrengthPanel } from "@/components/profile/ProfileStrengthCard";
-import { Avatar, Badge, Button, Card, Loading, PageHeader } from "@/components/ui";
+import { Avatar, Badge, Button, Card, PageHeader, PageSkeleton } from "@/components/ui";
 import { useMembership } from "@/hooks/useMembership";
 import { useProfileFields } from "@/hooks/useProfileFields";
 import { api } from "@/lib/api";
@@ -45,7 +45,8 @@ export function MyProfilePage() {
     staleTime: 0,
   });
   const summary = { ...membership, isMentor: asOthersSeeIt.data?.isMentor, isOpenToWork: asOthersSeeIt.data?.isOpenToWork };
-  const formReady = !fields.isLoading;
+  // Only the first answer: a refetch of questions that failed to load mustn't swap the form, and what's typed, for its outline.
+  const formReady = !loadingFirstTime(fields);
   // A link to a section (#work, from the profile checklist) lands on it once the form is there to scroll to.
   useEffect(() => {
     const section = hash.slice(1);
@@ -97,9 +98,7 @@ export function MyProfilePage() {
           }}
         />
       ) : (
-        <Card className="p-5">
-          <Loading />
-        </Card>
+        <PageSkeleton shape="form" />
       )}
       <Card className="p-5">
         <EmailSettings />

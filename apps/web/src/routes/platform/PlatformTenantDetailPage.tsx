@@ -16,11 +16,14 @@ import {
 import { errorMessage } from "@illuminize/shared/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { SettingsForm } from "@/components/admin/SettingsForm";
+import { BackLink } from "@/components/common/BackLink";
+import { PageLoad } from "@/components/common/PageLoad";
 import { IconAdmin, IconAudit, IconExternalLink, IconWallet } from "@/components/icons";
-import { Avatar, Badge, Button, Card, Checkbox, EmptyState, ErrorBox, FormField, Input, ListSkeleton, Loading, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, Checkbox, EmptyState, FormField, Input, ListSkeleton, Modal, PageHeader, Select, Stat, Tabs, Textarea } from "@/components/ui";
+import { usePageQuery } from "@/hooks/usePageQuery";
 import { api } from "@/lib/api";
 import { formatDate, formatMoneyMinor } from "@/lib/format";
 import { qk } from "@/lib/queryKeys";
@@ -33,6 +36,7 @@ export function PlatformTenantDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("overview");
   const q = useQuery({ queryKey: qk.platform.tenant(tenantId), queryFn: () => api.platform.tenants.get(tenantId) });
+  const page = usePageQuery(q);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["platform"] });
     void qc.invalidateQueries({ queryKey: ["tenants"] });
@@ -46,14 +50,19 @@ export function PlatformTenantDetailPage() {
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  if (q.isLoading) return <Loading />;
-  if (q.error || !q.data) return <ErrorBox error={q.error ?? "Not found"} />;
+  const back = <BackLink to="/platform/tenants">Institutions</BackLink>;
+  // Only with nothing to show: a refetch failing in the background keeps the institution, and its forms, on screen.
+  if (!q.data)
+    return (
+      <div className="space-y-4">
+        {back}
+        <PageLoad page={page} shape="panel" />
+      </div>
+    );
   const { tenant, settings, counts, currentPlan, admins } = q.data;
   return (
     <div className="space-y-4">
-      <Link to="/platform/tenants" className="text-sm text-slate-500 hover:text-slate-800">
-        ← Institutions
-      </Link>
+      {back}
       <PageHeader
         title={
           <span className="flex items-center gap-3">
@@ -369,6 +378,7 @@ function PlanEditModal({ plan, mode, timeZone, onClose, onSaved }: { plan: Billi
 function BillingTab({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const billing = useQuery({ queryKey: qk.platform.billing(tenantId), queryFn: () => api.platform.billing.get(tenantId) });
+  const billingPage = usePageQuery(billing);
   // Billing periods are calendar days in the platform's billing time zone (from the API; India by default).
   const zone = billing.data?.timeZone ?? "Asia/Kolkata";
   const { start: monthStart, end: monthEnd } = currentMonthIn(zone);
@@ -419,8 +429,8 @@ function BillingTab({ tenantId }: { tenantId: string }) {
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  if (billing.isLoading) return <ListSkeleton shape="adminRow" />;
-  if (billing.error || !billing.data) return <ErrorBox error={billing.error ?? "Failed"} />;
+  // Only with nothing to show: a refetch failing in the background keeps the plan, and what's typed for the next one.
+  if (!billing.data) return <PageLoad page={billingPage} outline={<ListSkeleton shape="adminRow" />} />;
   const b = billing.data;
   return (
     <div className="space-y-4">

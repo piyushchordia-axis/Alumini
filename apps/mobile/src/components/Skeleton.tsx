@@ -1,4 +1,4 @@
-import { LOADING_LABEL, SKELETON_LAYOUTS, skeletonWidth, type SkeletonFrame, type SkeletonLayout, type SkeletonLead, type SkeletonShape } from "@illuminize/shared";
+import { LOADING_LABEL, PAGE_SKELETONS, SKELETON_LAYOUTS, skeletonWidth, type PageSkeletonLayout, type PageSkeletonShape, type SkeletonFrame, type SkeletonLayout, type SkeletonLead, type SkeletonShape } from "@illuminize/shared";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Animated, Easing, Platform, View, type DimensionValue, type StyleProp, type ViewStyle } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
@@ -162,6 +162,105 @@ export function ListSkeleton({ shape, count, label, frame, style }: { shape: Ske
           ))}
         </View>
       )}
+    </SkeletonGroup>
+  );
+}
+
+const TILE: ViewStyle = { flexGrow: 1, flexBasis: "45%", minHeight: 96, gap: spacing.sm, padding: spacing.md };
+const DENSE_TILE: ViewStyle = { flexGrow: 1, flexBasis: "30%", gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md };
+
+/** Figures on white tiles, two to a row (three when `dense`, a summary above a list), as StatGrid lays them out. */
+function Tiles({ count, dense = false }: { count: number; dense?: boolean }) {
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={[SURFACE, dense ? DENSE_TILE : TILE]}>
+          <SkeletonBox width={pct(55, i)} height={10} />
+          <SkeletonBox width={dense ? 32 : 48} height={dense ? 20 : 24} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** The card's lead and head: a profile's photo with the lines centred under it, as ProfileSummary lays them on a phone. */
+function PageHead({ layout }: { layout: PageSkeletonLayout }) {
+  return (
+    <View style={{ gap: spacing.sm, alignItems: layout.lead ? "center" : "stretch" }}>
+      {layout.lead && <SkeletonBox width={layout.lead.phoneSize} height={layout.lead.phoneSize} corner={leadCorner(layout.lead)} style={{ marginBottom: spacing.xs }} />}
+      {layout.head.map((w, i) => (
+        // The title is taller than the lines under it.
+        <SkeletonBox key={i} width={pct(w, 0)} height={i === 0 ? 18 : 10} />
+      ))}
+    </View>
+  );
+}
+
+function PageCard({ layout }: { layout: PageSkeletonLayout }) {
+  const head = layout.lead !== null || layout.head.length > 0;
+  return (
+    <View style={{ gap: spacing.lg }}>
+      {head && <PageHead layout={layout} />}
+      {layout.sections.map((lines, i) => (
+        <SkeletonLines key={i} widths={lines} row={i} style={head || i > 0 ? [HAIRLINE, { paddingTop: spacing.lg }] : undefined} />
+      ))}
+      {layout.fields > 0 && (
+        <View style={{ gap: spacing.lg }}>
+          {Array.from({ length: layout.fields }, (_, i) => (
+            <View key={i} style={{ gap: spacing.sm }}>
+              <SkeletonBox width={pct(30, i)} height={10} />
+              <SkeletonBox width="100%" height={44} corner={radius.md} />
+            </View>
+          ))}
+        </View>
+      )}
+      {layout.actions > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+          {Array.from({ length: layout.actions }, (_, i) => (
+            <SkeletonBox key={i} width={112} height={46} corner={radius.md} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * A detail or form screen's outline while its first answer comes (`PAGE_SKELETONS`, shared with the web), under the bar
+ * the screen draws itself (loadingScreen's, or a chat's or the console's own): its figures, then one white card, or a
+ * chat's bubbles on the chat's plain page. `label` replaces "Loading" where the screen already says something more
+ * specific.
+ */
+export function PageSkeleton({ shape, label, style }: { shape: PageSkeletonShape; label?: string; style?: StyleProp<ViewStyle> }) {
+  const layout = PAGE_SKELETONS[shape];
+  const card = layout.lead !== null || layout.head.length > 0 || layout.sections.length > 0 || layout.fields > 0 || layout.actions > 0;
+  return (
+    <SkeletonGroup label={label} style={style}>
+      <View style={{ gap: spacing.md }}>
+        {layout.tiles > 0 && <Tiles count={layout.tiles} />}
+        {layout.bubbles.length > 0 && (
+          <View style={{ gap: spacing.md, padding: spacing.lg }}>
+            {layout.bubbles.map((w, i) => (
+              // Theirs and yours in turn, as a thread's messages sit, theirs first.
+              <SkeletonBox key={i} width={`${w}%`} height={40} corner={radius.lg} style={{ alignSelf: i % 2 === 0 ? "flex-start" : "flex-end" }} />
+            ))}
+          </View>
+        )}
+        {card && (
+          <View style={[SURFACE, { padding: spacing.lg }]}>
+            <PageCard layout={layout} />
+          </View>
+        )}
+      </View>
+    </SkeletonGroup>
+  );
+}
+
+/** Figures that load on their own above the rest of a screen (the console's invitation counts): their tiles alone, with no card. */
+export function TilesSkeleton({ count, dense, label, style }: { count: number; dense?: boolean; label?: string; style?: StyleProp<ViewStyle> }) {
+  return (
+    <SkeletonGroup label={label} style={style}>
+      <Tiles count={count} dense={dense} />
     </SkeletonGroup>
   );
 }
