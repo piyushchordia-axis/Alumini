@@ -21,6 +21,7 @@ import { lockDirectConversation, reportContextIds, seedDirectThread } from "../r
 import { seedGroup } from "../repositories/chatGroups.repo";
 import { createDb, type Db } from "./client";
 import { samajEndYear, seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
+import { seededMembershipId } from "./seedIds";
 import { seedSamajPortraits } from "./seedSamajPortraits";
 import { sql } from "drizzle-orm";
 import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, mentorProfiles, mentorships, postComments, postReactions, posts, referralRequests, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
@@ -402,7 +403,8 @@ const SEED_PROFILES: Record<string, Record<string, SeedProfile>> = {
   },
 };
 
-async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed, profile: SeedProfile = {}): Promise<string> {
+/** Inserts a named member with their fixed id (seededMembershipId); a membership already there keeps its own. */
+async function upsertSeedMember(db: Db, slug: string, tenantId: string, m: MemberSeed, profile: SeedProfile = {}): Promise<string> {
   const [user] = await db
     .insert(users)
     .values({ phoneE164: m.phone, phoneRegion: "IN", displayName: m.fullName })
@@ -412,6 +414,7 @@ async function upsertSeedMember(db: Db, tenantId: string, m: MemberSeed, profile
   const [row] = await db
     .insert(memberships)
     .values({
+      id: seededMembershipId(slug, m.phone),
       tenantId,
       userId: user!.id,
       role: m.role ?? "MEMBER",
@@ -447,7 +450,7 @@ export async function seedMembers(db: Db, tenantIds: Record<string, string>): Pr
   for (const [slug, members] of Object.entries(SEED_MEMBERS)) {
     const tenantId = tenantIds[slug];
     if (!tenantId) continue;
-    for (const m of members) membershipIds[`${slug}:${m.phone}`] = await upsertSeedMember(db, tenantId, m, SEED_PROFILES[slug]?.[m.phone]);
+    for (const m of members) membershipIds[`${slug}:${m.phone}`] = await upsertSeedMember(db, slug, tenantId, m, SEED_PROFILES[slug]?.[m.phone]);
   }
   return membershipIds;
 }
@@ -1081,7 +1084,7 @@ async function seedReferrals(db: Db, tenantId: string, member: (phone: string) =
 async function seedCurrentPupil(db: Db, tenantIds: Record<string, string>): Promise<void> {
   const school = tenantIds["demo-school"];
   if (!school) return;
-  await upsertSeedMember(db, school, { phone: "+919100000026", fullName: "Naina Sen", startYear: new Date().getFullYear() - 4, batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
+  await upsertSeedMember(db, "demo-school", school, { phone: "+919100000026", fullName: "Naina Sen", startYear: new Date().getFullYear() - 4, batchYear: new Date().getFullYear() + 2, professionType: "STUDENT", city: "Bengaluru", country: "IN" });
 }
 
 /** Direct threads for the Samaj showcase: one accepted chat and one pending request. */

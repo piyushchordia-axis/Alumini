@@ -601,10 +601,6 @@ package.json. Use Node scripts, and `fileURLToPath` rather than `URL.pathname` f
     build), not run yet, the usability programme's checks among them (chips and choices at the largest text size, the
     tab bar, More, Explore and the Upcoming strip on a narrow phone, the walk-through's Android back and iOS swipe, and
     chat's photo and PDF pickers, viewer and share sheet); record each run in its Runs table;
-  - the seed's fixed ids: seeded memberships get new random ids at every `pnpm db:reset`, so a demo member's initials
-    may change colour (`avatarTone` hashes the membership id). The usability programme's last feed-cards commit
-    (fixed ids in a `seedIds.ts`, and a test that Jignesh Patel's, Hetal Shah's and Bhavin Trivedi's initials differ)
-    waits for the work on the seed's Samaj portraits to be committed first;
   - links: events, businesses and funding still use `httpUrlSchema`, which lets a user name or password through and
     stores the address as typed; rich text leaves a non-ASCII (IDN) host as plain text;
   - uploads: only a profile or background photo must be the member's own upload (job and business logos, post images

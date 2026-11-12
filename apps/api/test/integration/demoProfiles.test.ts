@@ -3,7 +3,8 @@ import { isCurrentPupil, memberYearsIssues, membershipProfileUpdateSchema, sortE
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { invitations, memberFieldValues, memberships, tenantProfileFields, tenantSettings, tenants, users } from "../../src/db/schema";
-import { seedAll } from "../../src/db/seed";
+import { SEED_MEMBERS, seedAll } from "../../src/db/seed";
+import { seededMembershipId } from "../../src/db/seedIds";
 import { createTestContext, isDatabaseAvailable, type TestContext } from "../helpers/testContext";
 
 const dbAvailable = await isDatabaseAvailable();
@@ -189,6 +190,14 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     expect(invite?.fieldValues).toEqual({ hostel: "raman" });
     const hostel = (await questions("demo-university")).find((f) => f.key === "hostel")!;
     expect(hostel.options.map((o) => o.value)).toContain("raman");
+  });
+
+  it("gives each named member the same membership id after every reset, so their initials keep their colours", async () => {
+    const { rows } = await seed();
+    const named = rows.filter(({ phone }) => !phone.startsWith("+9193"));
+    // Everyone SEED_MEMBERS lists, and Naina Sen, the current pupil.
+    expect(named).toHaveLength(Object.values(SEED_MEMBERS).flat().length + 1);
+    for (const { m, phone, tenant } of named) expect(m.id, phone).toBe(seededMembershipId(tenant.slug, phone));
   });
 
   it("owes the first-entry walk-through to no seeded approved member, and to each one never approved once they are", async () => {

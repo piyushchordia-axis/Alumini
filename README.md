@@ -116,6 +116,11 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 
 Any other phone number registers as a brand-new member.
 
+Every Samaj member has a stand-in portrait (`apps/api/src/db/seedSamajPortraits.ts`, from the photos in
+`apps/api/src/db/portraits`), stored as a profile photo they uploaded. Only the seed's own run (`pnpm db:seed`,
+`pnpm db:reset`) adds them, always to the local upload folder (`UPLOAD_DIR`) whatever `STORAGE_PROVIDER` says, and the
+tests seed without them. Members elsewhere show initials, each in a colour of their own that a reset keeps.
+
 The seed also builds history relative to today (`apps/api/src/db/seedDemoHistory.ts`), so the analytics and engagement
 features have something to show: 26 weeks of activity and posts, profile questions with answers, invitations in every
 state, a poll, a pinned announcement, a birthday (Meera) and a membership anniversary (Rahul) today, and confirmed
@@ -660,7 +665,10 @@ count it.
   pages) draws each in its own colour, the web invitation page, which no institution's theme colours, the invited
   institution's, and the Branding previews the colour being chosen. A job's company tile takes
   a tone from the company's name. The palette is separate from the charts' `SERIES`; `avatar.test.ts` checks every
-  tone's contrast, how evenly ids spread and that a key keeps its tone.
+  tone's contrast, how evenly ids spread and that a key keeps its tone. The seed gives its named members fixed ids
+  (`seededMembershipId` in `apps/api/src/db/seedIds.ts`, from the institution and the phone), so the demo's colours
+  are the same after every reset, and `seedIds.test.ts` checks that Ananya Rao, Rahul Mehta and Priya Nair, side by
+  side on Demo University's feed, differ; generated members keep random ids.
 
 ### Appearance
 

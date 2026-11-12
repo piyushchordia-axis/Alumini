@@ -97,7 +97,8 @@ posts (Wave 1, Polls and announcements). The rest, on the web and the phone alik
 - **Easier to read.** Small grey text (times, places, counts, hints) is a shade darker, form boxes have a clear grey
   edge on their white cards, and the name and tagline on an institution's cover are plain white over a veil just dark
   enough to read them, whatever its colour. Members without a photo have initials in a colour of their own, the same
-  on every screen.
+  on every screen and after every reset: Ananya Rao, Rahul Mehta and Priya Nair each have their own on Demo
+  University's feed. At the Samaj, everyone has a portrait.
 - **Tags that read in any colour.** Badges, skill chips and the chat list's **Archived** tag have a thin edge in their
   colour and the same fills on the web and the phone, so a pale institution colour no longer fades them into the card.
   RSVP to the Mumbai coffee meetup: your answer is drawn in its colour (green for **I'm going**, amber for **Maybe**)
