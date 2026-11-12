@@ -268,9 +268,12 @@ export function notificationEndpoints(core: ApiCore) {
 }
 
 export interface NativeFile {
-  uri: string;
+  /** A local file address. Expo's fetch cannot send this shape on its own; pass `bytes` as well. */
+  uri?: string;
   name: string;
   type: string;
+  /** The file's bytes. Expo's fetch accepts a form part that implements this, and refuses one that only has a uri. */
+  bytes?: () => Uint8Array | Promise<Uint8Array>;
 }
 
 export function uploadEndpoints(core: ApiCore) {
@@ -282,7 +285,12 @@ export function uploadEndpoints(core: ApiCore) {
     upload: (slug: string, file: Blob | NativeFile, opts: { filename?: string; purpose?: UploadPurpose; signal?: AbortSignal } = {}) => {
       const formData = new FormData();
       if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, (file as File).name || opts.filename || "image.jpg");
-      else formData.append("file", file as unknown as Blob);
+      else {
+        const native = file as NativeFile;
+        // A uri-only part is what Expo's fetch rejects with "Unsupported FormDataPart implementation".
+        const part = native.bytes ? { name: native.name, type: native.type, bytes: () => native.bytes!() } : native;
+        formData.append("file", part as unknown as Blob);
+      }
       return core.data<UploadResultDto>({ method: "POST", path: "/uploads", tenantSlug: slug, query: { purpose: opts.purpose }, formData, signal: opts.signal });
     },
   };

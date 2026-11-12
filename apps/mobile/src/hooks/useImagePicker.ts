@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
-import { discardPickedPhoto, discardPreparedPhoto, preparePickedPhoto } from "@/lib/photos";
+import { discardPickedPhoto, discardPreparedPhoto, preparePickedPhoto, uploadPart } from "@/lib/photos";
 
 export interface ImageUploadOptions {
   /** "avatar" for a profile photo, which the server crops to a square JPEG; "backdrop" for the member's background photo. */
@@ -24,7 +24,7 @@ const UNREADABLE = "Couldn't open that photo. Try another one.";
 class PickProblem extends Error {}
 
 interface PreparedPick {
-  /** What FormData is given: a File in the browser build, { uri, name, type } on a phone. */
+  /** What FormData is given: a File in the browser build, a part with the file's bytes on a phone. */
   file: File | NativeFile;
   type: string;
   size: number;
@@ -49,7 +49,7 @@ async function preparePick(asset: ImagePicker.ImagePickerAsset, purpose: UploadP
   } catch {
     throw new PickProblem(UNREADABLE);
   }
-  return { file: { uri: photo.uri, name: photo.name, type: photo.type }, type: photo.type, size: photo.size, copy: photo.uri };
+  return { file: uploadPart(photo), type: photo.type, size: photo.size, copy: photo.uri };
 }
 
 /**
