@@ -140,9 +140,6 @@ export function businessEndpoints(core: ApiCore) {
   };
 }
 
-/** A file on the phone, which may read its own bytes: Expo's fetch sends a part that does, and refuses one with only a uri. */
-type ChatNativeFile = NativeFile & { bytes?: () => Uint8Array | Promise<Uint8Array> };
-
 export function chatEndpoints(core: ApiCore) {
   return {
     /** Sends to a member, opening the thread if there isn't one: the first message goes as a request. */
@@ -168,16 +165,12 @@ export function chatEndpoints(core: ApiCore) {
      * that no send claims is swept away a day later. `name` is the file's name, sent as a field of its own and before the
      * file, which the server prefers to the part's own file name. `signal` cancels it (see startUpload).
      */
-    attach: (slug: string, id: string, file: Blob | ChatNativeFile, opts: { name?: string; signal?: AbortSignal } = {}) => {
+    attach: (slug: string, id: string, file: Blob | NativeFile, opts: { name?: string; signal?: AbortSignal } = {}) => {
       const formData = new FormData();
       const name = opts.name ?? ((typeof Blob !== "undefined" && file instanceof Blob ? (file as File).name : (file as NativeFile).name) || "");
       if (name) formData.append("name", name);
       if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, name || "upload");
-      else {
-        const native = file as ChatNativeFile;
-        const part = native.bytes ? { name: native.name, type: native.type, bytes: () => native.bytes!() } : native;
-        formData.append("file", part as unknown as Blob);
-      }
+      else formData.append("file", nativePart(file as NativeFile));
       return core.data<ChatAttachmentDto>({ method: "POST", path: `/chat/conversations/${id}/attachments`, tenantSlug: slug, formData, signal: opts.signal });
     },
     /**
@@ -306,6 +299,15 @@ export interface NativeFile {
   bytes?: () => Uint8Array | Promise<Uint8Array>;
 }
 
+/**
+ * The form part for a file on the phone. One that reads its own bytes goes as just those (name, type, bytes), with no
+ * uri beside them; a uri-only part is what Expo's fetch rejects with "Unsupported FormDataPart implementation".
+ */
+function nativePart(file: NativeFile): Blob {
+  const part = file.bytes ? { name: file.name, type: file.type, bytes: () => file.bytes!() } : file;
+  return part as unknown as Blob;
+}
+
 export function uploadEndpoints(core: ApiCore) {
   return {
     /**
@@ -315,12 +317,7 @@ export function uploadEndpoints(core: ApiCore) {
     upload: (slug: string, file: Blob | NativeFile, opts: { filename?: string; purpose?: UploadPurpose; signal?: AbortSignal } = {}) => {
       const formData = new FormData();
       if (typeof Blob !== "undefined" && file instanceof Blob) formData.append("file", file, (file as File).name || opts.filename || "image.jpg");
-      else {
-        const native = file as NativeFile;
-        // A uri-only part is what Expo's fetch rejects with "Unsupported FormDataPart implementation".
-        const part = native.bytes ? { name: native.name, type: native.type, bytes: () => native.bytes!() } : native;
-        formData.append("file", part as unknown as Blob);
-      }
+      else formData.append("file", nativePart(file as NativeFile));
       return core.data<UploadResultDto>({ method: "POST", path: "/uploads", tenantSlug: slug, query: { purpose: opts.purpose }, formData, signal: opts.signal });
     },
   };
