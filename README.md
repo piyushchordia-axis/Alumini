@@ -109,10 +109,10 @@ in the response so the apps show it on screen. `OTP_DEV_FIXED_CODE=123456` makes
 | Tenant admin, Demo College (`demo-college`) | `+919000000002` | admin approves members **and** content; has pending members, pending posts/job/event/business listing and an open spam report |
 | Tenant admin, Demo School (`demo-school`) | `+919000000003` | admin approves members, content published immediately; messaging, groups and mentorship start off, as at any school |
 | Tenant admin, Shri Gujarati Samaj (`shri-gujarati-samaj`) | `+919000000004` | Jignesh Patel, a member since 1998; type OTHER; admin approves members, content published immediately; full showcase seed (feed, jobs, events, businesses, chat, groups, mentors, referrals) |
-| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` (Parth Joshi, Diya Raval) pending approval. Each has a "member since" year (Bhavin 1996, Hetal 2005, Nisha 2010), and all but Kiran Parikh (2008–2021) still belong ("2005–present") |
+| Samaj members (showcase) | `+919100000031`–`038` | Hetal (textiles), Ravi (product / referrals), Kiran (jewellery), Asha (job seeker / mentee), Bhavin (mentor), Nisha (diaspora); `037`–`038` (Parth Joshi, Diya Raval) pending approval. Each has a start year and an end year from 2016 to 2025 (Hetal 2005–2019, Kiran 2008–2021, Nisha 2010–2017, Parth 2018–2023) |
 | Members | `+9191000000xx` | see `apps/api/src/db/seed.ts`; each has a start and an end year, four years apart at the university and the college (Rahul and Priya 2008–2012), ten to twelve at the school (Aditya Reddy 1993–2004) |
 | Current pupil, Demo School | `+919100000026` | Naina Sen, who joined four years ago and leaves two years from now: never sees messages, groups, mentors or referrals |
-| Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months; their years follow the same pattern, and at the Samaj four in five still belong |
+| Generated members | `+91931…`, `+91932…`, `+91933…`, `+91934…` | 130 extra alumni across the four institutions, approved over the last six months; their years follow the same pattern, and at the Samaj each end year is from 2016 to 2025, never before the year they joined |
 
 Any other phone number registers as a brand-new member.
 
@@ -316,8 +316,8 @@ saves retyping. The shared rules are in `packages/shared/src/lib/profile.ts`, `l
   organisers; seekers, mentors, requests, event attendees, celebrations ("Birthday · 2008–2012") and the directory;
   profiles (and the "here" entry of their studies); group members, invitation search and blocked members; and the
   consoles' member rows and pages. Under a name they lead the grey line (`memberYearsLine`: "2008–2012 · Infosys"); on
-  one line they follow the name: "Posted by Hetal Shah (2005–present) · 3h ago", the moderation queue's "by Nisha Modi
-  (2010–present)", and an admin's notice, "Parth Joshi (2018–present) has requested to join." The chat list puts them
+  one line they follow the name: "Posted by Hetal Shah (2005–2019) · 3h ago", the moderation queue's "by Nisha Modi
+  (2010–2017)", and an admin's notice, "Parth Joshi (2018–2023) has requested to join." The chat list puts them
   after the other member's name, as the line below is the message preview, and a direct chat's header shows them under
   the name; a group's messages show names alone. The grey is each app's muted text (web `text-slate-500`, the phone's
   `colors.muted`), not the fainter grey, which is too faint to read. A member's page in the admin console lists them as

@@ -93,9 +93,9 @@ phone-sized preview in the browser. Port 4000 must still be public.
   "2015–present". An invitation fills both in.
 - **Under every name.** The years show in grey with members' names: under them in the feed and its comments, the
   directory, profiles, a direct chat's header, group members and more, and after the name in the chat list, where the
-  line below is the last message. Rahul and Priya were at Demo University 2008–2012. At the Samaj, Jignesh Patel has
-  been a member since 1998, Bhavin Trivedi since 1996 ("1996–present"), and all the showcase members still belong but
-  Kiran Parikh, whose years are 2008–2021.
+  line below is the last message. Rahul and Priya were at Demo University 2008–2012. At the Samaj every showcase
+  member has an end year from 2016 to 2025: Jignesh Patel 1998–2021, Bhavin Trivedi 1996–2018, Hetal Shah 2005–2019,
+  and Kiran Parikh 2008–2021.
 - **Were there in.** In **Directory**, choose **Were there in** 2012 (under **Filters** on the phone app): Priya is
   there, and in 2013 she isn't. **Any year** takes the filter off.
 - **For admins.** The invitations template has `start_year` and `end_year` columns, and a list with a "Batch" column

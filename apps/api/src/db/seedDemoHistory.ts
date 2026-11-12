@@ -334,13 +334,28 @@ function answerFor(r: () => number, f: { type: FieldSeed["type"]; options: Array
   }
 }
 
+/** The years a Samaj member's end is drawn from. Never before the year they joined, and never after 2025. */
+const SAMAJ_END_FROM = 2016;
+const SAMAJ_END_TO = 2025;
+
+/**
+ * A Samaj member's end year, spread across 2016–2025. The same phone always gets the same year, and the year is never
+ * earlier than the year they joined.
+ */
+export function samajEndYear(startYear: number, phone: string): number {
+  const from = Math.max(SAMAJ_END_FROM, startYear);
+  const to = Math.max(from, SAMAJ_END_TO);
+  const draw = rng(`samaj-end:${phone}`)();
+  return from + Math.floor(draw * (to - from + 1));
+}
+
 /**
  * A generated member's years, from the year drawn for them and their place in the list, so no draw is added and every
  * other generated value stays as it was. Four years before the batch at a university or college, ten to twelve at the
- * school. At the community the drawn year is when they joined, and four in five still belong.
+ * school. At the community the drawn year is when they joined, and the end is a year from 2016 to 2025.
  */
-function generatedYears(slug: string, drawn: number, index: number, year: number): { startYear: number; batchYear: number | null } {
-  if (slug === "shri-gujarati-samaj") return { startYear: drawn, batchYear: index % 5 === 0 ? Math.min(year, drawn + 5 + (index % 4)) : null };
+function generatedYears(slug: string, drawn: number, index: number, phone: string): { startYear: number; batchYear: number | null } {
+  if (slug === "shri-gujarati-samaj") return { startYear: drawn, batchYear: samajEndYear(drawn, phone) };
   return { startYear: drawn - (slug === "demo-school" ? 12 - (index % 3) : 4), batchYear: drawn };
 }
 
@@ -425,7 +440,7 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
           dob,
           linkedin: r() < 0.4 ? `https://www.linkedin.com/in/${fullName.toLowerCase().replace(/[^a-z]+/g, "-")}-${i}` : null,
         };
-        return { ...person, years: generatedYears(slug, batch, i, year), profile: generatedProfile(profiles, slug, { ...person, index: i }, year) };
+        return { ...person, years: generatedYears(slug, batch, i, person.phone), profile: generatedProfile(profiles, slug, { ...person, index: i }, year) };
       });
       const userRows = await db
         .insert(users)
@@ -457,6 +472,16 @@ export async function seedDemoHistory(db: Db, tenantIds: Record<string, string>,
         )
         .onConflictDoNothing();
       result.generatedMembers += people.length;
+    }
+
+    // Members seeded earlier with no end year ("present") get one from 2016 to 2025. A year already stored is left as it is.
+    if (slug === "shri-gujarati-samaj") {
+      const open = await db
+        .select({ id: memberships.id, startYear: memberships.startYear, phone: users.phoneE164 })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(and(eq(memberships.tenantId, tenantId), isNull(memberships.batchYear)));
+      for (const m of open) await db.update(memberships).set({ batchYear: samajEndYear(m.startYear, m.phone) }).where(eq(memberships.id, m.id));
     }
 
     const all = await db

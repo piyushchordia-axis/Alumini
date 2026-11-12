@@ -307,7 +307,7 @@ Covers:
   by the script), the console leaving for the feed with one set of tabs, More dropping its row, and the console opened
   cold doing the same;
 - the console's members list, as the Samaj admin: the Pending tile opening Pending with its count, Parth Joshi's
-  details line led by his years, as a member who still belongs ("2018–present · +91 91000 00037 · Infosys, Pune ·
+  details line led by his years ("2018–2023 · +91 91000 00037 · Infosys, Pune ·
   requested …"), 44px actions named for Parth and Diya Raval, no sideways scrolling, and Approve all asking first
   (Cancel sends nothing); Parth approved from his new-member notice (answered by the script) after its confirmation,
   its Reject opening the reason sheet first, an open reason sheet closing and saying where he stands once the API's
@@ -322,7 +322,7 @@ Covers:
   buttons until its own arrive; searching for Nisha, and for Jignesh, whose own row says "You" with no actions; and a
   second page (answered by the script) loading on scroll, a row repeated across the pages shown once;
 - a member's page and the audit log, as the Samaj admin: Nisha Modi opened from her row in the members list (its name
-  starting "Nisha Modi, Approved, 2010–present"), with her facts (her phone as the console writes it, her place by name,
+  starting "Nisha Modi, Approved, 2010–2017"), with her facts (her phone as the console writes it, her place by name,
   what she does), her mentor profile listed in Mentors with its areas and availability, no sideways scrolling, and
   Remove as mentor asking first (Cancel sends nothing); her answers edited, Chapter saved as Diaspora ("Answers saved"),
   then Surat chosen and cancelled, the saved answer standing and the next edit starting from it; View profile in the app
@@ -411,7 +411,7 @@ Covers:
   rows; no sideways scrolling; the members CSV saying "Preparing…" while the script holds
   it, with Activity CSV disabled until it's saved (one export at a time), then downloaded as
   shri-gujarati-samaj-members-<date>.csv with one byte order mark, Start year and End year after Email (Hetal Shah's
-  2005 and a blank end) and the Samaj's Chapter among its columns; and a reload keeping 6 months.
+  2005 and 2019) and the Samaj's Chapter among its columns; and a reload keeping 6 months.
 
 Note: on the web export, screens underneath stay mounted (React Navigation keeps inactive tab stacks and stacked
 screens), so the script picks the last visible match and dispatches clicks directly in a few places. On iOS and
@@ -705,8 +705,7 @@ members waiting for approval (Parth Joshi and Diya Raval). Three checks on the w
       a different institution, then Shri Gujarati Samaj, and sign in as Jignesh.
 - [ ] On the Samaj feed, press and hold a reaction on a post, as in part 5: once chosen, the chip is a light orange tint
       with a thin ring and a filled icon, and the count beside it turns orange. Like again takes it back.
-- [ ] On the Samaj feed, the grey line under Hetal Shah's name on her posts starts "2005–present": she is still a
-      member.
+- [ ] On the Samaj feed, the grey line under Hetal Shah's name on her posts starts "2005–2019".
 
 Then, on a computer, join Shri Gujarati Samaj in the web app with another number that isn't in the demo data
 (`+91 98765 43212`, say), giving 2015 as Member since and leaving Until blank, and submit for approval: the admin's
@@ -889,7 +888,7 @@ The console's file pickers and the share sheet, as the Samaj admin.
       error. Do the same with Activity CSV (shri-gujarati-samaj-activity-<first week>-to-<today>.csv). Save both to
       Files (iPhone) or Drive or Downloads (Android) and open them in Excel or Google Sheets: the columns line up, the
       first header reads "Name" with nothing in front of it, the names read correctly, both files have Start year and
-      End year columns (Hetal Shah's End year blank: she still belongs), the Members CSV has a Chapter column and its
+      End year columns (Hetal Shah's End year is 2019), the Members CSV has a Chapter column and its
       city reads અમદાવાદ (not "àª…": the file is UTF-8 with a byte order mark), and each phone number keeps all its
       digits, behind a ' that stops a spreadsheet reading it as a sum. Put Ahmedabad back.
 
