@@ -20,7 +20,8 @@ import { runInTransaction } from "../lib/transaction";
 import { lockDirectConversation, reportContextIds, seedDirectThread } from "../repositories/chat.repo";
 import { seedGroup } from "../repositories/chatGroups.repo";
 import { createDb, type Db } from "./client";
-import { seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
+import { samajEndYear, seedDemoHistory, type DemoHistoryResult } from "./seedDemoHistory";
+import { seedSamajPortraits } from "./seedSamajPortraits";
 import { sql } from "drizzle-orm";
 import { businessListings, chatConversations, chatGroups, chatMessages, chatReports, contentReports, eventRsvps, events, fundingListings, jobSeekers, jobs, memberships, mentorProfiles, mentorships, postComments, postReactions, posts, referralRequests, tenantBillingPlans, tenantSettings, tenants, users } from "./schema";
 
@@ -152,7 +153,7 @@ type MemberSeed = {
   phone: string;
   fullName: string;
   startYear: number;
-  /** Null at the Samaj, a community, for someone who still belongs. */
+  /** Null only at a community, for someone who still belongs; the Samaj's members each have one (samajEndYear). */
   batchYear: number | null;
   professionType: (typeof memberships.$inferInsert)["professionType"];
   companyName?: string;
@@ -195,15 +196,15 @@ export const SEED_MEMBERS: Record<string, MemberSeed[]> = {
     { phone: "+919100000025", fullName: "Dev Malhotra", startYear: 2012, batchYear: 2022, professionType: "STUDENT", city: "Chennai", country: "IN", status: "PENDING" },
   ],
   "shri-gujarati-samaj": [
-    { phone: "+919000000004", fullName: "Jignesh Patel", startYear: 1998, batchYear: null, professionType: "EMPLOYED", companyName: "Shri Gujarati Samaj", designation: "Community Administrator", city: "Ahmedabad", country: "IN", role: "TENANT_ADMIN", bio: "Looking after member approvals and community events for the Samaj." },
-    { phone: "+919100000031", fullName: "Hetal Shah", startYear: 2005, batchYear: null, professionType: "BUSINESS_OWNER", companyName: "Shah Fabrics", designation: "Proprietor", city: "Surat", country: "IN", bio: "Third-generation textile trader. Happy to help members sourcing fabric or visiting Surat.", interests: ["textiles", "trade"] },
-    { phone: "+919100000032", fullName: "Ravi Mehta", startYear: 2012, batchYear: null, professionType: "EMPLOYED", companyName: "Tata Consultancy Services", designation: "Product Manager", city: "Ahmedabad", country: "IN", bio: "Product at TCS Digital. Often in London for client work.", interests: ["product", "startups"] },
+    { phone: "+919000000004", fullName: "Jignesh Patel", startYear: 1998, batchYear: samajEndYear(1998, "+919000000004"), professionType: "EMPLOYED", companyName: "Shri Gujarati Samaj", designation: "Community Administrator", city: "Ahmedabad", country: "IN", role: "TENANT_ADMIN", bio: "Looking after member approvals and community events for the Samaj." },
+    { phone: "+919100000031", fullName: "Hetal Shah", startYear: 2005, batchYear: samajEndYear(2005, "+919100000031"), professionType: "BUSINESS_OWNER", companyName: "Shah Fabrics", designation: "Proprietor", city: "Surat", country: "IN", bio: "Third-generation textile trader. Happy to help members sourcing fabric or visiting Surat.", interests: ["textiles", "trade"] },
+    { phone: "+919100000032", fullName: "Ravi Mehta", startYear: 2012, batchYear: samajEndYear(2012, "+919100000032"), professionType: "EMPLOYED", companyName: "Tata Consultancy Services", designation: "Product Manager", city: "Ahmedabad", country: "IN", bio: "Product at TCS Digital. Often in London for client work.", interests: ["product", "startups"] },
     { phone: "+919100000033", fullName: "Kiran Parikh", startYear: 2008, batchYear: 2021, professionType: "BUSINESS_OWNER", companyName: "Parikh Jewellers", designation: "Managing Partner", city: "Surat", country: "IN", bio: "Diamond and gold jewellery for retail and export.", interests: ["jewellery", "export"] },
-    { phone: "+919100000034", fullName: "Asha Desai", startYear: 2022, batchYear: null, professionType: "STUDENT", companyName: "Nirma University", city: "Ahmedabad", country: "IN", bio: "Final-year BBA. Looking for internships in marketing or operations." },
-    { phone: "+919100000035", fullName: "Bhavin Trivedi", startYear: 1996, batchYear: null, professionType: "EMPLOYED", companyName: "HDFC Bank", designation: "Senior Vice President", city: "Ahmedabad", country: "IN", bio: "SME banking. Glad to mentor members starting or expanding a business.", interests: ["finance", "mentoring"] },
-    { phone: "+919100000036", fullName: "Nisha Modi", startYear: 2010, batchYear: null, professionType: "EMPLOYED", companyName: "Deloitte", designation: "Senior Consultant", city: "New Jersey", country: "US", bio: "Strategy consulting in the US. Happy to chat about moving abroad.", interests: ["consulting", "diaspora"] },
-    { phone: "+919100000037", fullName: "Parth Joshi", startYear: 2018, batchYear: null, professionType: "EMPLOYED", companyName: "Infosys", designation: "Senior Developer", city: "Pune", country: "IN", status: "PENDING" },
-    { phone: "+919100000038", fullName: "Diya Raval", startYear: 2020, batchYear: null, professionType: "FOUNDER", companyName: "Raval Foods", city: "Rajkot", country: "IN", status: "PENDING" },
+    { phone: "+919100000034", fullName: "Asha Desai", startYear: 2022, batchYear: samajEndYear(2022, "+919100000034"), professionType: "STUDENT", companyName: "Nirma University", city: "Ahmedabad", country: "IN", bio: "Final-year BBA. Looking for internships in marketing or operations." },
+    { phone: "+919100000035", fullName: "Bhavin Trivedi", startYear: 1996, batchYear: samajEndYear(1996, "+919100000035"), professionType: "EMPLOYED", companyName: "HDFC Bank", designation: "Senior Vice President", city: "Ahmedabad", country: "IN", bio: "SME banking. Glad to mentor members starting or expanding a business.", interests: ["finance", "mentoring"] },
+    { phone: "+919100000036", fullName: "Nisha Modi", startYear: 2010, batchYear: samajEndYear(2010, "+919100000036"), professionType: "EMPLOYED", companyName: "Deloitte", designation: "Senior Consultant", city: "New Jersey", country: "US", bio: "Strategy consulting in the US. Happy to chat about moving abroad.", interests: ["consulting", "diaspora"] },
+    { phone: "+919100000037", fullName: "Parth Joshi", startYear: 2018, batchYear: samajEndYear(2018, "+919100000037"), professionType: "EMPLOYED", companyName: "Infosys", designation: "Senior Developer", city: "Pune", country: "IN", status: "PENDING" },
+    { phone: "+919100000038", fullName: "Diya Raval", startYear: 2020, batchYear: samajEndYear(2020, "+919100000038"), professionType: "FOUNDER", companyName: "Raval Foods", city: "Rajkot", country: "IN", status: "PENDING" },
   ],
 };
 
@@ -1292,14 +1293,19 @@ export async function seedConnections(db: Db, tenantIds: Record<string, string>,
   await seedCurrentPupil(db, tenantIds);
 }
 
-export async function seedAll(db: Db, platformAdminPhones: string[]): Promise<SeedResult & { memberships: number; tenantsWithContent: number; history: DemoHistoryResult }> {
+export async function seedAll(
+  db: Db,
+  platformAdminPhones: string[],
+  options?: { portraits?: { uploadDir: string; publicBaseUrl: string } },
+): Promise<SeedResult & { memberships: number; tenantsWithContent: number; history: DemoHistoryResult; portraits: number }> {
   const core = await seedCore(db, platformAdminPhones);
   const membershipIds = await seedMembers(db, core.tenantIds);
   const tenantsWithContent = await seedContent(db, core.tenantIds, membershipIds);
   await seedBilling(db, core.tenantIds, core.platformAdminUserId);
   const history = await seedDemoHistory(db, core.tenantIds, membershipIds);
   await seedConnections(db, core.tenantIds, membershipIds);
-  return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent, history };
+  const portraits = options?.portraits ? await seedSamajPortraits(db, options.portraits) : 0;
+  return { ...core, memberships: Object.keys(membershipIds).length, tenantsWithContent, history, portraits };
 }
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
@@ -1307,7 +1313,7 @@ if (isDirectRun) {
   loadDotenvFiles();
   const config = loadConfig();
   const { pool, db } = createDb(config.DATABASE_URL);
-  seedAll(db, config.platformAdminPhones)
+  seedAll(db, config.platformAdminPhones, { portraits: { uploadDir: config.uploadDirAbsolute, publicBaseUrl: config.PUBLIC_BASE_URL } })
     .then((r) => {
       console.log("Seeded:", JSON.stringify(r, null, 2));
     })

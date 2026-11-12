@@ -123,16 +123,20 @@ describe.skipIf(!dbAvailable)("demo profiles", () => {
     expect(core).toHaveLength(110);
     expect(createHash("sha256").update(JSON.stringify(core)).digest("hex")).toBe(GENERATED_DIGEST);
 
-    // Everyone has a start no later than their end. Only the Samaj, a community, leaves ends blank: most of its members still belong.
+    // Everyone has a start no later than their end. A community may leave an end blank; the Samaj's seed fills every one with a year from 2016 to 2025.
     expectValidYears(seeded);
     for (const { m, phone, tenant } of rows) {
       if (m.batchYear !== null) expect(m.startYear, phone).toBeLessThanOrEqual(m.batchYear);
       else expect(tenant.type, phone).toBe("OTHER");
     }
     const samaj = rows.filter((r) => r.tenant.type === "OTHER");
-    const stillThere = samaj.filter((r) => r.m.batchYear === null).length;
-    expect(stillThere / samaj.length).toBeGreaterThan(0.7);
-    expect(stillThere).toBeLessThan(samaj.length);
+    const ends = samaj.map((r) => r.m.batchYear);
+    expect(ends.every((y) => y !== null)).toBe(true);
+    for (const { m, phone } of samaj) {
+      expect(m.batchYear, phone).toBeGreaterThanOrEqual(Math.max(2016, m.startYear));
+      expect(m.batchYear, phone).toBeLessThanOrEqual(2025);
+    }
+    expect(new Set(ends).size).toBeGreaterThan(1);
     const kiran = samaj.find((r) => r.phone === "+919100000033")?.m;
     expect([kiran?.startYear, kiran?.batchYear]).toEqual([2008, 2021]);
     // Years follow from the end the seed drew: four years at university and college, ten to twelve at school.

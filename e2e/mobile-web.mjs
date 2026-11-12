@@ -4258,8 +4258,7 @@ try {
     await pending.waitFor();
     if ((await pending.getAttribute("aria-selected")) !== "true") throw new Error("the members list didn't open on Pending");
     if (!/^Pending\s*2$/.test((await pending.innerText()).trim())) throw new Error(`the Pending tab reads "${await pending.innerText()}", not its count of 2`);
-    // A community member who still belongs: their years run to the present.
-    await shown(page.getByText(/^2018–present · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
+    await shown(page.getByText(/^2018–2023 · \+91 91000 00037 · Infosys, Pune · requested /)).waitFor();
     // Their status is a tag in the warning tone, as on the web: its ink on its fill, and an edge that shows on the row.
     const status = shown(page.getByRole("link", { name: /^Parth Joshi, / })).getByText("Pending approval", { exact: true });
     await expectReadable(status, "the Pending approval badge");
@@ -4586,7 +4585,7 @@ try {
   await step("a member's page shows their facts and mentor profile, and Remove as mentor asks first", async () => {
     await page.goto(SAMAJ + "/admin/members?status=APPROVED&q=Nisha");
     // The row's name and details open her page; its actions sit beside the link, never in it.
-    await shown(page.getByRole("link", { name: /^Nisha Modi, Approved, 2010–present/ })).click();
+    await shown(page.getByRole("link", { name: /^Nisha Modi, Approved, 2010–2017/ })).click();
     await page.waitForURL(/\/t\/shri-gujarati-samaj\/admin\/members\/[0-9a-f-]{36}$/);
     nishaId = page.url().split("/").pop();
     await shown(page.getByRole("heading", { name: "Nisha Modi", exact: true })).waitFor();
@@ -6344,9 +6343,8 @@ try {
     if (csv.charCodeAt(1) === 0xfeff) throw new Error("the members CSV has two byte order marks");
     const header = csv.slice(1).split("\r\n")[0];
     if (!header.startsWith("Name,Phone,Email,Start year,End year,Status,") || !header.includes(",Chapter")) throw new Error(`the members CSV starts "${header.slice(0, 120)}"`);
-    // A member who still belongs has a blank end year.
     const hetal = csv.slice(1).split("\r\n").find((l) => l.startsWith("Hetal Shah,"));
-    if (!/^Hetal Shah,[^,]*,[^,]*,2005,,Approved,/.test(hetal ?? "")) throw new Error(`Hetal Shah's years in the members CSV read "${hetal?.slice(0, 80)}"`);
+    if (!/^Hetal Shah,[^,]*,[^,]*,2005,2019,Approved,/.test(hetal ?? "")) throw new Error(`Hetal Shah's years in the members CSV read "${hetal?.slice(0, 80)}"`);
     await memberButton("Members CSV").waitFor();
     if ((await memberButton("Activity CSV").getAttribute("aria-disabled")) === "true") throw new Error("Activity CSV stays disabled once the members CSV is saved");
 

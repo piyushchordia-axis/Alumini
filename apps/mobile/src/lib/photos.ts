@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_BYTES, UPLOAD_JPEG_QUALITY, type UploadPurpose } from "@illuminize/shared";
-import { photoUploadPlan } from "@illuminize/shared/client";
+import { photoUploadPlan, type NativeFile } from "@illuminize/shared/client";
 import { File as FsFile, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat, type ImageRef } from "expo-image-manipulator";
 import type { ImagePickerAsset } from "expo-image-picker";
@@ -69,6 +69,15 @@ async function saveSmaller(image: ImageRef, side: number): Promise<PreparedPhoto
     smaller?.release();
     context.release();
   }
+}
+
+/**
+ * The part Expo's fetch will actually send. A `{ uri, name, type }` part is refused
+ * ("Unsupported FormDataPart implementation"); a part with `bytes()` is read and posted.
+ */
+export function uploadPart(photo: PreparedPhoto): NativeFile {
+  const file = new FsFile(photo.uri);
+  return { name: photo.name, type: photo.type, bytes: async () => new Uint8Array(await file.arrayBuffer()) };
 }
 
 /** Deletes a prepared copy once it has gone up, or was given up on. Best effort: the system clears the cache anyway. */
